@@ -1,10 +1,11 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { CourseGrid } from "@/components/courses/course-grid"
-import { mockCourses } from "@/lib/mock-data"
+import { fetchBrowseCourses } from "@/lib/actions/student"
 
-export default function HomePage() {
-  const featuredCourses = mockCourses.slice(0, 3)
+export default async function HomePage() {
+  const allCourses = await fetchBrowseCourses()
+  const featuredCourses = allCourses.slice(0, 3)
 
   return (
     <div>

@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useTransition } from "react"
 import {
   Sidebar,
   SidebarContent,
@@ -16,7 +17,7 @@ import {
   SidebarRail,
   SidebarSeparator,
 } from "@/components/ui/sidebar"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { HugeiconsIcon } from "@hugeicons/react"
 import type { IconSvgElement } from "@hugeicons/react"
@@ -29,7 +30,11 @@ import {
   UserIcon,
   Logout01Icon,
   Bookmark01Icon,
+  Message01Icon,
+  TeachingIcon,
 } from "@hugeicons/core-free-icons"
+import { useUser } from "@/components/providers/user-provider"
+import { logoutAction } from "@/lib/auth/actions"
 
 type NavItem = {
   title: string
@@ -58,10 +63,16 @@ const mainItems: NavItem[] = [
     match: (p) => p === "/dashboard/my-courses" || (p.startsWith("/dashboard/courses/") && p.includes("/learn")),
   },
   {
-    title: "Favorites",
-    href: "/dashboard/favorites",
+    title: "Bookmarks",
+    href: "/dashboard/bookmarks",
     icon: Bookmark01Icon,
-    match: (p) => p === "/dashboard/favorites",
+    match: (p) => p === "/dashboard/bookmarks",
+  },
+  {
+    title: "Messages",
+    href: "/dashboard/messages",
+    icon: Message01Icon,
+    match: (p) => p === "/dashboard/messages",
   },
 ]
 
@@ -93,6 +104,17 @@ function isActive(item: NavItem, pathname: string) {
 
 export function AppSidebar() {
   const pathname = usePathname()
+  const user = useUser()
+  const [isPending, startTransition] = useTransition()
+
+  const userInitials = `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
+  const isInstructor = user.role === "INSTRUCTOR" || user.role === "ADMIN"
+
+  function handleLogout() {
+    startTransition(async () => {
+      await logoutAction()
+    })
+  }
 
   return (
     <Sidebar collapsible="icon">
@@ -159,18 +181,27 @@ export function AppSidebar() {
       <SidebarFooter>
         <SidebarSeparator />
         <SidebarMenu>
+          {isInstructor && (
+            <SidebarMenuItem>
+              <SidebarMenuButton render={<Link href="/instructor" />}>
+                <HugeiconsIcon icon={TeachingIcon} size={18} />
+                <span>Instructor Portal</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
           <SidebarMenuItem>
             <div className="flex items-center justify-between px-2 py-1.5">
               <div className="flex items-center gap-2 min-w-0">
                 <Avatar className="h-7 w-7 shrink-0">
+                  {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.firstName} />}
                   <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                    U
+                    {userInitials}
                   </AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight min-w-0">
-                  <span className="truncate font-medium text-xs">User</span>
+                  <span className="truncate font-medium text-xs">{user.firstName} {user.lastName}</span>
                   <span className="truncate text-[10px] text-muted-foreground">
-                    user@worldstreet.com
+                    {user.email}
                   </span>
                 </div>
               </div>
@@ -178,9 +209,11 @@ export function AppSidebar() {
             </div>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton render={<button type="button" />}>
+            <SidebarMenuButton 
+              render={<button type="button" onClick={handleLogout} disabled={isPending} />}
+            >
               <HugeiconsIcon icon={Logout01Icon} size={18} />
-              <span>Log out</span>
+              <span>{isPending ? "Logging out..." : "Log out"}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

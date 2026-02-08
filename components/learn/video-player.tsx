@@ -48,16 +48,10 @@ type VideoPlayerProps = {
   nextLesson: Lesson | null
   currentTitle: string
   onLightsOut?: (active: boolean) => void
+  onComplete?: () => void
 }
 
 const PLAYBACK_RATES = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
-const QUALITY_OPTIONS = [
-  { value: "auto", label: "Auto" },
-  { value: "1080", label: "1080p" },
-  { value: "720", label: "720p" },
-  { value: "480", label: "480p" },
-  { value: "360", label: "360p" },
-]
 
 function formatTime(seconds: number) {
   if (!isFinite(seconds) || seconds < 0) return "0:00"
@@ -76,6 +70,7 @@ export function VideoPlayer({
   nextLesson,
   currentTitle,
   onLightsOut,
+  onComplete,
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -121,9 +116,6 @@ export function VideoPlayer({
 
   // Mobile settings drawer
   const [showMobileSettings, setShowMobileSettings] = useState(false)
-
-  // Quality
-  const [quality, setQuality] = useState<string>("auto")
 
   const router = useRouter()
 
@@ -199,11 +191,13 @@ export function VideoPlayer({
 
   const handleEnded = useCallback(() => {
     setIsPlaying(false)
+    // Mark lesson as complete
+    onComplete?.()
     if (nextLesson) {
       setShowOverlay(true)
       setCountdown(5)
     }
-  }, [nextLesson])
+  }, [nextLesson, onComplete])
 
   // Fullscreen change listener
   useEffect(() => {
@@ -430,14 +424,6 @@ export function VideoPlayer({
     },
     [togglePlay, skip, flashOsd]
   )
-
-  /* ---- Change quality ---- */
-  const changeQuality = useCallback((q: string) => {
-    setQuality(q)
-    flashOsd(q === "auto" ? "Auto" : `${q}p`)
-    setShowSettings(false)
-    setShowMobileSettings(false)
-  }, [flashOsd])
 
   /* ---- Keyboard shortcuts ---- */
   useEffect(() => {
@@ -751,31 +737,6 @@ export function VideoPlayer({
                     </button>
                   ))}
                 </div>
-                {/* Quality section */}
-                <div className="px-3 py-2 border-t border-white/10">
-                  <p className="text-white/50 text-[10px] uppercase tracking-wider font-medium">
-                    Quality
-                  </p>
-                </div>
-                <div className="py-1">
-                  {QUALITY_OPTIONS.map((q) => (
-                    <button
-                      key={q.value}
-                      onClick={() => changeQuality(q.value)}
-                      className={cn(
-                        "w-full text-left px-3 py-1.5 text-xs transition-colors flex items-center justify-between",
-                        quality === q.value
-                          ? "text-primary bg-primary/10"
-                          : "text-white/70 hover:text-white hover:bg-white/5"
-                      )}
-                    >
-                      <span>{q.label}</span>
-                      {quality === q.value && (
-                        <span className="text-primary text-xs">✓</span>
-                      )}
-                    </button>
-                  ))}
-                </div>
               </PopoverContent>
             </Popover>
 
@@ -849,27 +810,6 @@ export function VideoPlayer({
                     )}
                   >
                     {rate === 1 ? "Normal" : `${rate}x`}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Quality */}
-            <div className="space-y-2">
-              <p className="text-muted-foreground text-[10px] uppercase tracking-wider font-medium">Quality</p>
-              <div className="flex flex-wrap gap-1.5">
-                {QUALITY_OPTIONS.map((q) => (
-                  <button
-                    key={q.value}
-                    onClick={() => changeQuality(q.value)}
-                    className={cn(
-                      "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
-                      quality === q.value
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground hover:bg-muted/80"
-                    )}
-                  >
-                    {q.label}
                   </button>
                 ))}
               </div>

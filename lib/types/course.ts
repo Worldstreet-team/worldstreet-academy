@@ -1,6 +1,7 @@
 export type CourseLevel = "beginner" | "intermediate" | "advanced"
 export type CoursePricing = "free" | "paid"
 export type CourseStatus = "draft" | "published" | "archived"
+export type CourseCategory = "Cryptocurrency" | "Trading" | "DeFi" | "NFTs" | "Development" | "Blockchain" | "Other"
 
 export type Course = {
   id: string
@@ -15,6 +16,7 @@ export type Course = {
   price: number | null
   currency: string
   status: CourseStatus
+  category?: CourseCategory
   totalLessons: number
   totalDuration: number // in minutes
   enrolledCount: number
@@ -32,10 +34,11 @@ export type Lesson = {
   courseId: string
   title: string
   description: string | null
-  type: "video" | "text" | "live"
+  type: "video" | "live" | "text"
   videoUrl: string | null
+  thumbnailUrl: string | null
   content: string | null
-  duration: number | null // in minutes
+  duration: number | null // in seconds
   order: number
   isFree: boolean
 }

@@ -1,28 +1,26 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { AnimatePresence, motion } from "motion/react"
 import { cn } from "@/lib/utils"
-
-type Lesson = {
-  id: string
-  courseId: string
-  title: string
-  description: string | null
-  type: "video" | "text" | "live"
-  videoUrl: string | null
-  content: string | null
-  duration: number | null
-  order: number
-  isFree: boolean
-}
+import { HugeiconsIcon } from "@hugeicons/react"
+import { Tick02Icon, Video01Icon, WifiIcon, File01Icon } from "@hugeicons/core-free-icons"
+import type { LearnLesson } from "@/lib/actions/student"
 
 type LessonSidebarProps = {
-  lessons: Lesson[]
+  lessons: LearnLesson[]
   courseId: string
   currentLessonId: string
   nextLessonId: string | null
+  completedLessonIds?: string[]
+}
+
+const typeIcons = {
+  video: Video01Icon,
+  live: WifiIcon,
+  text: File01Icon,
 }
 
 /* ---- Equalizer bars animation (playing indicator) ---- */
@@ -57,13 +55,16 @@ export function LessonSidebar({
   courseId,
   currentLessonId,
   nextLessonId,
+  completedLessonIds = [],
 }: LessonSidebarProps) {
+  const completedCount = completedLessonIds.length
+  
   return (
     <aside className="hidden lg:flex w-80 border-l flex-col shrink-0">
       <div className="p-4 border-b">
         <h3 className="font-semibold text-sm">Course Content</h3>
         <p className="text-xs text-muted-foreground mt-1">
-          {lessons.length} lessons
+          {completedCount}/{lessons.length} lessons completed
         </p>
       </div>
       <ScrollArea className="flex-1">
@@ -72,6 +73,7 @@ export function LessonSidebar({
             {lessons.map((lesson, index) => {
               const isCurrent = lesson.id === currentLessonId
               const isUpNext = lesson.id === nextLessonId
+              const isCompleted = completedLessonIds.includes(lesson.id)
 
               return (
                 <motion.div
@@ -91,24 +93,50 @@ export function LessonSidebar({
                     href={`/dashboard/courses/${courseId}/learn/${lesson.id}`}
                     className="flex items-center gap-3 px-4 py-3 text-sm transition-colors hover:bg-muted/50"
                   >
-                    <motion.span
-                      className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium shrink-0 ${
-                        isCurrent
-                          ? "bg-primary text-primary-foreground"
-                          : isUpNext
-                            ? "bg-primary/20 text-primary"
-                            : "bg-muted text-muted-foreground"
-                      }`}
-                      layout
-                      transition={{ duration: 0.3 }}
-                    >
-                      {index + 1}
-                    </motion.span>
+                    {/* Thumbnail with number overlay */}
+                    <div className="relative w-14 h-10 rounded-md overflow-hidden shrink-0 bg-muted">
+                      {lesson.thumbnailUrl ? (
+                        <Image
+                          src={lesson.thumbnailUrl}
+                          alt={lesson.title}
+                          fill
+                          className="object-cover"
+                          sizes="56px"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center bg-muted">
+                          <HugeiconsIcon 
+                            icon={typeIcons[lesson.type] || Video01Icon} 
+                            size={16} 
+                            className="text-muted-foreground/50" 
+                          />
+                        </div>
+                      )}
+                      {/* Small circle with number */}
+                      <motion.div
+                        className={cn(
+                          "absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold",
+                          isCompleted && !isCurrent
+                            ? "bg-green-500 text-white"
+                            : isCurrent
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-black/70 text-white"
+                        )}
+                        layout
+                        transition={{ duration: 0.3 }}
+                      >
+                        {isCompleted && !isCurrent ? (
+                          <HugeiconsIcon icon={Tick02Icon} size={12} className="text-white" />
+                        ) : (
+                          index + 1
+                        )}
+                      </motion.div>
+                    </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium text-sm">{lesson.title}</p>
                       <p className="text-xs text-muted-foreground capitalize">
                         {lesson.type}
-                        {lesson.duration ? ` · ${lesson.duration}min` : ""}
+                        {lesson.duration ? ` · ${Math.floor(lesson.duration / 60)}:${String(lesson.duration % 60).padStart(2, '0')}` : ""}
                       </p>
                     </div>
                     <AnimatePresence mode="wait">
@@ -142,7 +170,9 @@ export function LessonSidebar({
                           exit={{ opacity: 0 }}
                           className="text-[10px] text-muted-foreground tabular-nums shrink-0"
                         >
-                          {lesson.duration ? `${lesson.duration}m` : lesson.type}
+                          {lesson.duration 
+                            ? `${Math.floor(lesson.duration / 60)}:${String(lesson.duration % 60).padStart(2, '0')}` 
+                            : lesson.type}
                         </motion.span>
                       )}
                     </AnimatePresence>

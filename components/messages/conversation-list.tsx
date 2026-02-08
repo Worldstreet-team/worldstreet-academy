@@ -1,0 +1,133 @@
+"use client"
+
+import { useState } from "react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { Search01Icon } from "@hugeicons/core-free-icons"
+import { Input } from "@/components/ui/input"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { cn } from "@/lib/utils"
+
+export type Conversation = {
+  id: string
+  name: string
+  avatar?: string
+  lastMessage: string
+  timestamp: Date
+  unread: number
+  isOnline?: boolean
+  courseName?: string
+}
+
+type ConversationListProps = {
+  conversations: Conversation[]
+  selectedId: string | null
+  onSelect: (id: string) => void
+  searchPlaceholder?: string
+}
+
+export function ConversationList({
+  conversations,
+  selectedId,
+  onSelect,
+  searchPlaceholder = "Search...",
+}: ConversationListProps) {
+  const [search, setSearch] = useState("")
+
+  const filtered = conversations.filter(
+    (c) =>
+      c.name.toLowerCase().includes(search.toLowerCase()) ||
+      c.lastMessage.toLowerCase().includes(search.toLowerCase())
+  )
+
+  const formatTime = (date: Date) => {
+    const now = new Date()
+    const diff = now.getTime() - date.getTime()
+    const mins = Math.floor(diff / 60000)
+    const hours = Math.floor(diff / 3600000)
+    const days = Math.floor(diff / 86400000)
+
+    if (mins < 1) return "now"
+    if (mins < 60) return `${mins}m`
+    if (hours < 24) return `${hours}h`
+    if (days === 1) return "Yesterday"
+    if (days < 7) return date.toLocaleDateString("en-US", { weekday: "short" })
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+  }
+
+  return (
+    <div className="w-full md:w-80 lg:w-96 border-r flex flex-col bg-background h-full">
+      {/* Search */}
+      <div className="p-3 border-b">
+        <div className="relative">
+          <HugeiconsIcon
+            icon={Search01Icon}
+            size={16}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+          />
+          <Input
+            placeholder={searchPlaceholder}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 h-9 bg-muted border-0"
+          />
+        </div>
+      </div>
+
+      {/* List */}
+      <ScrollArea className="flex-1">
+        {filtered.length === 0 ? (
+          <div className="p-8 text-center text-muted-foreground text-sm">
+            {search ? "No results" : "No conversations"}
+          </div>
+        ) : (
+          <div>
+            {filtered.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => onSelect(c.id)}
+                className={cn(
+                  "w-full px-3 py-2.5 text-left hover:bg-muted/50 transition-colors flex items-center gap-3",
+                  selectedId === c.id && "bg-muted"
+                )}
+              >
+                <div className="relative shrink-0">
+                  <Avatar className="h-12 w-12">
+                    <AvatarImage src={c.avatar} />
+                    <AvatarFallback>{c.name[0]?.toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  {c.isOnline && (
+                    <div className="absolute bottom-0 right-0 h-3 w-3 bg-green-500 rounded-full border-2 border-background" />
+                  )}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={cn("font-medium text-sm truncate", c.unread > 0 && "font-semibold")}>
+                      {c.name}
+                    </span>
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      {formatTime(c.timestamp)}
+                    </span>
+                  </div>
+                  <p className={cn(
+                    "text-sm truncate",
+                    c.unread > 0 ? "text-foreground" : "text-muted-foreground"
+                  )}>
+                    {c.lastMessage}
+                  </p>
+                </div>
+
+                {c.unread > 0 && (
+                  <div className="h-5 min-w-5 px-1.5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-medium shrink-0">
+                    {c.unread > 99 ? "99+" : c.unread}
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </ScrollArea>
+    </div>
+  )
+}

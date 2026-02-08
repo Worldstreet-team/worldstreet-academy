@@ -34,21 +34,35 @@ import {
   Add01Icon,
   Delete01Icon,
   Video01Icon,
-  TextIcon,
   WifiIcon,
   ViewIcon,
   Tick02Icon,
   Edit01Icon,
+  File01Icon,
 } from "@hugeicons/core-free-icons"
 import { cn } from "@/lib/utils"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
-import type { Course, Lesson } from "@/lib/types"
+import type { Lesson, CourseLevel, CoursePricing, CourseStatus, CourseCategory } from "@/lib/types"
+
+// Minimal course data for editing
+type EditableCourse = {
+  id: string
+  title: string
+  description: string
+  thumbnailUrl: string | null
+  level: CourseLevel
+  pricing: CoursePricing
+  price: number | null
+  status: CourseStatus
+  category?: CourseCategory
+}
 
 /* ─── Duration helpers (stored in seconds) ─── */
 
@@ -63,12 +77,14 @@ function formatDurationTimecode(totalSeconds: number): string {
   return `${pad(m)}:${pad(s)}`
 }
 
-/** Human-readable summary: "20m", "1hr 10min", "4hrs 10min" */
+/** Human-readable summary: "23s", "3m", "1hr 10min", "4hrs 10min" */
 function formatDurationHuman(totalSeconds: number): string {
-  if (!totalSeconds || totalSeconds <= 0) return "0m"
+  if (!totalSeconds || totalSeconds <= 0) return "0s"
   const h = Math.floor(totalSeconds / 3600)
   const m = Math.floor((totalSeconds % 3600) / 60)
-  if (h === 0) return `${m || 1}m`
+  const s = totalSeconds % 60
+  if (h === 0 && m === 0) return `${s}s`
+  if (h === 0) return s > 0 ? `${m}m ${s}s` : `${m}m`
   if (m === 0) return h === 1 ? "1hr" : `${h}hrs`
   return h === 1 ? `1hr ${m}min` : `${h}hrs ${m}min`
 }
@@ -77,13 +93,14 @@ import {
   updateCourse,
   type CourseFormState,
 } from "@/lib/actions/instructor"
+import { getImageUploadUrl, getVideoUploadUrl } from "@/lib/actions/upload"
 
 /* ─── Local Lesson Type (client-side, not yet persisted) ─── */
 type EditorLesson = {
   tempId: string
   title: string
   description: string
-  type: "video" | "text" | "live"
+  type: "video" | "live" | "text"
   thumbnailUrl: string
   videoUrl: string
   content: string
@@ -94,8 +111,8 @@ type EditorLesson = {
 
 const typeIcons = {
   video: Video01Icon,
-  text: TextIcon,
   live: WifiIcon,
+  text: File01Icon,
 }
 
 const initialFormState: CourseFormState = {
@@ -124,7 +141,7 @@ export function CourseEditor({
   course,
   existingLessons = [],
 }: {
-  course?: Course
+  course?: EditableCourse
   existingLessons?: Lesson[]
 }) {
   const isEdit = !!course
@@ -136,12 +153,34 @@ export function CourseEditor({
   const [description, setDescription] = useState(course?.description ?? "")
   const [thumbnailUrl, setThumbnailUrl] = useState(course?.thumbnailUrl ?? "")
   const [level, setLevel] = useState(course?.level ?? "beginner")
+  const [category, setCategory] = useState(course?.category ?? "Cryptocurrency")
   const [pricing, setPricing] = useState(course?.pricing ?? "free")
   const [price, setPrice] = useState(course?.price?.toString() ?? "")
   const [status, setStatus] = useState(course?.status ?? "draft")
   const [previewError, setPreviewError] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
 
   useEffect(() => setPreviewError(false), [thumbnailUrl])
+
+  /* Get presigned URL for course thumbnail upload */
+  async function getCourseThumbnailPresignedUrl(file: File) {
+    setUploadError(null)
+    const result = await getImageUploadUrl(file.name, file.type)
+    if (!result.success) {
+      setUploadError(result.error || "Failed to prepare upload")
+    }
+    return result
+  }
+
+  /* Get presigned URL for lesson thumbnail upload */
+  async function getLessonThumbnailPresignedUrl(file: File) {
+    return await getImageUploadUrl(file.name, file.type)
+  }
+
+  /* Get presigned URL for lesson video upload */
+  async function getLessonVideoPresignedUrl(file: File) {
+    return await getVideoUploadUrl(file.name, file.type)
+  }
 
   /* Lessons */
   const [lessons, setLessons] = useState<EditorLesson[]>(
@@ -150,10 +189,10 @@ export function CourseEditor({
       title: l.title,
       description: l.description ?? "",
       type: l.type,
-      thumbnailUrl: "",
+      thumbnailUrl: l.thumbnailUrl ?? "",
       videoUrl: l.videoUrl ?? "",
       content: l.content ?? "",
-      duration: l.duration ? (l.duration * 60).toString() : "",
+      duration: l.duration ? l.duration.toString() : "",
       autoDuration: true,
       isFree: l.isFree,
     }))
@@ -304,7 +343,11 @@ export function CourseEditor({
             value={thumbnailUrl}
             onChange={(url) => setThumbnailUrl(url)}
             onRemove={() => setThumbnailUrl("")}
+            onGetPresignedUrl={getCourseThumbnailPresignedUrl}
           />
+          {uploadError && (
+            <p className="text-sm text-destructive">{uploadError}</p>
+          )}
 
           <SectionDivider label="Level & Status" />
 
@@ -517,8 +560,8 @@ export function CourseEditor({
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="video">Video</SelectItem>
-                                  <SelectItem value="text">Text</SelectItem>
                                   <SelectItem value="live">Live</SelectItem>
+                                  <SelectItem value="text">Text</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
@@ -577,6 +620,7 @@ export function CourseEditor({
                                 thumbnailUrl: "",
                               })
                             }
+                            onGetPresignedUrl={getLessonThumbnailPresignedUrl}
                             compact
                           />
 
@@ -594,6 +638,7 @@ export function CourseEditor({
                               onRemove={() =>
                                 updateLesson(lesson.tempId, { videoUrl: "" })
                               }
+                              onGetPresignedUrl={getLessonVideoPresignedUrl}
                               onDurationDetected={(seconds) => {
                                 if (lesson.autoDuration) {
                                   updateLesson(lesson.tempId, {
@@ -605,19 +650,18 @@ export function CourseEditor({
                             />
                           )}
 
-                          {/* Text Content */}
+                          {/* Text Content Editor */}
                           {lesson.type === "text" && (
                             <div className="space-y-1.5">
-                              <Label>Content</Label>
-                              <Textarea
-                                placeholder="Write the lesson content…"
-                                className="min-h-20"
+                              <Label>Lesson Content</Label>
+                              <RichTextEditor
                                 value={lesson.content}
-                                onChange={(e) =>
+                                onChange={(html) =>
                                   updateLesson(lesson.tempId, {
-                                    content: e.target.value,
+                                    content: html,
                                   })
                                 }
+                                placeholder="Write your lesson content here..."
                               />
                             </div>
                           )}
@@ -768,14 +812,29 @@ export function CourseEditor({
                     key={lesson.tempId}
                     className="flex items-center gap-3 py-2 border-b border-dashed border-border last:border-b-0"
                   >
-                    <span className="text-[11px] font-mono text-muted-foreground w-5 text-center shrink-0">
-                      {i + 1}
-                    </span>
-                    <HugeiconsIcon
-                      icon={typeIcons[lesson.type]}
-                      size={13}
-                      className="text-muted-foreground shrink-0"
-                    />
+                    {/* Thumbnail with number badge */}
+                    <div className="relative w-12 h-8 rounded overflow-hidden shrink-0 bg-muted">
+                      {lesson.thumbnailUrl ? (
+                        <Image
+                          src={lesson.thumbnailUrl}
+                          alt={lesson.title}
+                          fill
+                          className="object-cover"
+                          sizes="48px"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center bg-muted">
+                          <HugeiconsIcon 
+                            icon={typeIcons[lesson.type]} 
+                            size={12} 
+                            className="text-muted-foreground/50" 
+                          />
+                        </div>
+                      )}
+                      <div className="absolute bottom-0.5 right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/70 text-[9px] font-semibold text-white">
+                        {i + 1}
+                      </div>
+                    </div>
                     <span className="text-xs truncate flex-1">
                       {lesson.title}
                     </span>

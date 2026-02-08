@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useTransition } from "react"
 import {
   Sidebar,
   SidebarContent,
@@ -16,7 +17,7 @@ import {
   SidebarRail,
   SidebarSeparator,
 } from "@/components/ui/sidebar"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { HugeiconsIcon } from "@hugeicons/react"
 import type { IconSvgElement } from "@hugeicons/react"
@@ -27,7 +28,11 @@ import {
   Settings01Icon,
   Analytics01Icon,
   Logout01Icon,
+  Message01Icon,
+  DashboardSpeed01Icon,
 } from "@hugeicons/core-free-icons"
+import { useUser } from "@/components/providers/user-provider"
+import { logoutAction } from "@/lib/auth/actions"
 
 type NavItem = {
   title: string
@@ -64,6 +69,12 @@ const mainItems: NavItem[] = [
     icon: Analytics01Icon,
     match: (p) => p === "/instructor/analytics",
   },
+  {
+    title: "Messages",
+    href: "/instructor/messages",
+    icon: Message01Icon,
+    match: (p) => p === "/instructor/messages",
+  },
 ]
 
 const accountItems: NavItem[] = [
@@ -82,6 +93,16 @@ function isActive(item: NavItem, pathname: string) {
 
 export function InstructorSidebar() {
   const pathname = usePathname()
+  const user = useUser()
+  const [isPending, startTransition] = useTransition()
+
+  const userInitials = `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
+
+  function handleLogout() {
+    startTransition(async () => {
+      await logoutAction()
+    })
+  }
 
   return (
     <Sidebar collapsible="icon">
@@ -149,15 +170,22 @@ export function InstructorSidebar() {
         <SidebarSeparator />
         <SidebarMenu>
           <SidebarMenuItem>
+            <SidebarMenuButton render={<Link href="/dashboard" />}>
+              <HugeiconsIcon icon={DashboardSpeed01Icon} size={18} />
+              <span>Student Dashboard</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
             <div className="flex items-center justify-between px-2 py-1.5">
               <div className="flex items-center gap-2 min-w-0">
                 <Avatar className="h-7 w-7 shrink-0">
+                  {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.firstName} />}
                   <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                    SC
+                    {userInitials}
                   </AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight min-w-0">
-                  <span className="truncate font-medium text-xs">Sarah Chen</span>
+                  <span className="truncate font-medium text-xs">{user.firstName} {user.lastName}</span>
                   <span className="truncate text-[10px] text-muted-foreground">
                     instructor
                   </span>
@@ -167,9 +195,11 @@ export function InstructorSidebar() {
             </div>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton render={<button type="button" />}>
+            <SidebarMenuButton 
+              render={<button type="button" onClick={handleLogout} disabled={isPending} />}
+            >
               <HugeiconsIcon icon={Logout01Icon} size={18} />
-              <span>Log out</span>
+              <span>{isPending ? "Logging out..." : "Log out"}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

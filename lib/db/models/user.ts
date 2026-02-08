@@ -2,6 +2,7 @@ import mongoose, { Schema, Document, Model, Types } from "mongoose"
 
 export interface IUser extends Document {
   _id: Types.ObjectId
+  authUserId: string // Reference to central auth service userId
   email: string
   username: string
   firstName: string
@@ -30,6 +31,12 @@ export interface IUser extends Document {
 
 const UserSchema = new Schema<IUser>(
   {
+    authUserId: {
+      type: String,
+      required: true,
+      unique: true,
+      index: true,
+    },
     email: {
       type: String,
       required: true,
@@ -47,11 +54,13 @@ const UserSchema = new Schema<IUser>(
       type: String,
       required: true,
       trim: true,
+      default: "User",
     },
     lastName: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
+      default: "",
     },
     bio: {
       type: String,

@@ -8,9 +8,10 @@ import { cn } from "@/lib/utils"
 type CourseRatingProps = {
   courseId: string
   currentRating?: number
+  inline?: boolean
 }
 
-export function CourseRating({ courseId, currentRating }: CourseRatingProps) {
+export function CourseRating({ courseId, currentRating, inline }: CourseRatingProps) {
   const [rating, setRating] = useState(0)
   const [hovered, setHovered] = useState(0)
   const [submitted, setSubmitted] = useState(false)
@@ -23,24 +24,55 @@ export function CourseRating({ courseId, currentRating }: CourseRatingProps) {
 
   if (submitted) {
     return (
-      <div className="rounded-xl border bg-muted/30 p-4 text-center space-y-1.5">
-        <div className="flex items-center justify-center gap-0.5">
+      <div className={cn(
+        inline ? "flex items-center justify-between" : "rounded-xl border bg-muted/30 p-4 text-center space-y-1.5"
+      )}>
+        <div className={cn("flex items-center gap-0.5", !inline && "justify-center")}>
           {[1, 2, 3, 4, 5].map((star) => (
             <HugeiconsIcon
               key={star}
               icon={StarIcon}
-              size={18}
+              size={inline ? 16 : 18}
               className={star <= rating ? "text-orange-500" : "text-muted-foreground/30"}
               fill={star <= rating ? "currentColor" : "none"}
             />
           ))}
         </div>
-        <p className="text-xs font-medium text-foreground">
-          Thanks for rating!
+        <p className={cn("text-xs text-muted-foreground", !inline && "font-medium text-foreground")}>
+          {inline ? `You rated ${rating}/5` : "Thanks for rating!"}
         </p>
-        <p className="text-[11px] text-muted-foreground">
-          You gave this course {rating} star{rating !== 1 ? "s" : ""}
-        </p>
+      </div>
+    )
+  }
+
+  if (inline) {
+    return (
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">Rate this course</p>
+        <div className="flex items-center gap-0.5">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <button
+              key={star}
+              type="button"
+              onMouseEnter={() => setHovered(star)}
+              onMouseLeave={() => setHovered(0)}
+              onClick={() => handleSubmit(star)}
+              className="p-0.5 transition-transform hover:scale-110"
+            >
+              <HugeiconsIcon
+                icon={StarIcon}
+                size={16}
+                className={cn(
+                  "transition-colors",
+                  star <= (hovered || rating)
+                    ? "text-orange-500"
+                    : "text-muted-foreground/30"
+                )}
+                fill={star <= (hovered || rating) ? "currentColor" : "none"}
+              />
+            </button>
+          ))}
+        </div>
       </div>
     )
   }

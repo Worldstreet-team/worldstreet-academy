@@ -1,7 +1,10 @@
 import type { Course } from "@/lib/types"
+import type { BrowseCourse } from "@/lib/actions/student"
 import { CourseCard } from "./course-card"
 
-export function CourseGrid({ courses }: { courses: Course[] }) {
+type CourseData = Course | BrowseCourse
+
+export function CourseGrid({ courses }: { courses: CourseData[] }) {
   if (courses.length === 0) {
     return (
       <div className="text-center py-12">

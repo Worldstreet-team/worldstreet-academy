@@ -13,9 +13,9 @@ import {
   CarouselPrevious,
   CarouselNext,
 } from "@/components/ui/carousel"
-import type { Course } from "@/lib/types"
+import type { BrowseCourse } from "@/lib/actions/student"
 
-export function CourseCarousel({ courses, title }: { courses: Course[]; title: string }) {
+export function CourseCarousel({ courses, title }: { courses: BrowseCourse[]; title: string }) {
   if (courses.length === 0) return null
 
   return (

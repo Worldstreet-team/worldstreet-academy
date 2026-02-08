@@ -28,7 +28,7 @@ import {
   Analytics01Icon,
 } from "@hugeicons/core-free-icons"
 import type { IconSvgElement } from "@hugeicons/react"
-import { mockCourses } from "@/lib/mock-data"
+import { fetchBrowseCourses, type BrowseCourse } from "@/lib/actions/student"
 
 /* ── Types ────────────────────────────────────────────── */
 type CommandItem = {
@@ -42,7 +42,7 @@ type CommandItem = {
 }
 
 /* ── Pages & tools factory ────────────────────────────── */
-function useCommandItems() {
+function useCommandItems(courses: BrowseCourse[]) {
   const router = useRouter()
   const { resolvedTheme, setTheme } = useTheme()
 
@@ -72,11 +72,11 @@ function useCommandItems() {
       section: "pages",
     },
     {
-      id: "page-favorites",
-      label: "Favorites",
+      id: "page-bookmarks",
+      label: "Bookmarks",
       description: "Your saved courses",
       icon: Bookmark01Icon,
-      action: () => router.push("/dashboard/favorites"),
+      action: () => router.push("/dashboard/bookmarks"),
       section: "pages",
     },
     {
@@ -127,7 +127,7 @@ function useCommandItems() {
     },
   ]
 
-  const courses: CommandItem[] = mockCourses.slice(0, 8).map((c) => ({
+  const courseItems: CommandItem[] = courses.slice(0, 8).map((c) => ({
     id: `course-${c.id}`,
     label: c.title,
     description: `${c.instructorName} · ${c.totalLessons} lessons`,
@@ -137,7 +137,7 @@ function useCommandItems() {
     section: "courses" as const,
   }))
 
-  return [...courses, ...pages, ...tools]
+  return [...courseItems, ...pages, ...tools]
 }
 
 /* ── Shared results list ─────────────────────────────── */
@@ -301,11 +301,17 @@ export function CommandSearch() {
   const [open, setOpen] = React.useState(false)
   const [query, setQuery] = React.useState("")
   const [activeIndex, setActiveIndex] = React.useState(0)
+  const [courses, setCourses] = React.useState<BrowseCourse[]>([])
   const listRef = React.useRef<HTMLDivElement>(null)
   const inputRef = React.useRef<HTMLInputElement>(null)
   const isMobile = useIsMobile()
 
-  const items = useCommandItems()
+  // Load courses when component mounts
+  React.useEffect(() => {
+    fetchBrowseCourses().then(setCourses).catch(console.error)
+  }, [])
+
+  const items = useCommandItems(courses)
 
   const filtered = React.useMemo(() => {
     if (!query.trim()) return items

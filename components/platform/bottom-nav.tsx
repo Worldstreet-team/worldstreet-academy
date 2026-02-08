@@ -35,10 +35,10 @@ const navItems: BottomNavItem[] = [
   },
   // CTA placeholder — rendered separately
   {
-    title: "Favorites",
-    href: "/dashboard/favorites",
+    title: "Bookmarks",
+    href: "/dashboard/bookmarks",
     icon: Bookmark01Icon,
-    match: (p: string) => p === "/dashboard/favorites",
+    match: (p: string) => p === "/dashboard/bookmarks",
   },
   {
     title: "Profile",

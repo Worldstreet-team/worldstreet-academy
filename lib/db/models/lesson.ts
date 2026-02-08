@@ -1,6 +1,6 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose"
 
-export type LessonType = "video" | "text" | "live" | "quiz"
+export type LessonType = "video" | "live" | "text"
 
 export interface ILesson extends Document {
   _id: Types.ObjectId
@@ -53,7 +53,7 @@ const LessonSchema = new Schema<ILesson>(
     },
     type: {
       type: String,
-      enum: ["video", "text", "live", "quiz"],
+      enum: ["video", "live", "text"],
       default: "video",
     },
     videoUrl: {

@@ -146,6 +146,26 @@ export function CourseForm({ course }: { course?: Course }) {
             </div>
 
             <div className="space-y-1.5">
+              <Label>Category</Label>
+              <Select name="category" defaultValue={course?.category ?? "Cryptocurrency"}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Cryptocurrency">Cryptocurrency</SelectItem>
+                  <SelectItem value="Trading">Trading</SelectItem>
+                  <SelectItem value="DeFi">DeFi</SelectItem>
+                  <SelectItem value="NFTs">NFTs</SelectItem>
+                  <SelectItem value="Blockchain">Blockchain</SelectItem>
+                  <SelectItem value="Development">Development</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
               <Label>Status</Label>
               <Select name="status" defaultValue={course?.status ?? "draft"}>
                 <SelectTrigger className="w-full">

@@ -1,41 +1,56 @@
-"use client"
-
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
-import { use } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Topbar } from "@/components/platform/topbar"
-import { mockCourses, mockLessons } from "@/lib/mock-data"
+import {
+  fetchPublicCourse,
+  fetchInstructorPublicCourses,
+  fetchEnrolledCoursesFromInstructor,
+} from "@/lib/actions/student"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   StarIcon,
   BookOpen01Icon,
   Clock01Icon,
   UserMultipleIcon,
-  Certificate01Icon,
   Bookmark01Icon,
   ArrowLeft01Icon,
 } from "@hugeicons/core-free-icons"
+import { LessonPreviewAccordion } from "@/components/courses/lesson-preview-accordion"
+import { AboutInstructor } from "@/components/courses/about-instructor"
 
-export default function CourseDetailPage({
+export default async function CourseDetailPage({
   params,
 }: {
   params: Promise<{ courseId: string }>
 }) {
-  const { courseId } = use(params)
-  const course = mockCourses.find((c) => c.id === courseId)
+  const { courseId } = await params
+  const course = await fetchPublicCourse(courseId)
   if (!course) notFound()
 
-  const lessons = mockLessons.filter((l) => l.courseId === courseId)
   const totalHours = Math.floor(course.totalDuration / 60)
   const totalMins = course.totalDuration % 60
   const durationLabel =
     totalHours > 0 ? `${totalHours}h ${totalMins}m` : `${totalMins}m`
+
+  // Get first lesson ID for "Start Learning" button
+  const firstLessonId = course.lessons[0]?.id ?? "none"
+
+  // Fetch instructor courses
+  const [instructorCourses, enrolledFromInstructor] = await Promise.all([
+    fetchInstructorPublicCourses(course.instructorId),
+    fetchEnrolledCoursesFromInstructor(course.instructorId).catch(() => []),
+  ])
+
+  // Filter out the current course from instructor's courses
+  const otherInstructorCourses = instructorCourses.filter(
+    (c) => c.id !== course.id
+  )
 
   return (
     <>
@@ -103,9 +118,7 @@ export default function CourseDetailPage({
               </Avatar>
               <span className="font-medium">{course.instructorName}</span>
               <span className="text-white/50">·</span>
-              <span>
-                {course.enrolledCount.toLocaleString()} students
-              </span>
+              <span>{course.enrolledCount.toLocaleString()} students</span>
             </div>
           </div>
 
@@ -131,7 +144,7 @@ export default function CourseDetailPage({
         {/* Content */}
         <div className="p-4 md:p-6 lg:p-8 space-y-6">
           {/* Quick stats */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {[
               {
                 icon: BookOpen01Icon,
@@ -144,11 +157,6 @@ export default function CourseDetailPage({
                 value: course.enrolledCount.toLocaleString(),
                 label: "Students",
               },
-              {
-                icon: Certificate01Icon,
-                value: "Included",
-                label: "Certificate",
-              },
             ].map((stat) => (
               <Card
                 key={stat.label}
@@ -156,7 +164,11 @@ export default function CourseDetailPage({
               >
                 <CardContent className="flex items-center gap-2.5 p-3">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                    <HugeiconsIcon icon={stat.icon} size={16} className="text-primary" />
+                    <HugeiconsIcon
+                      icon={stat.icon}
+                      size={16}
+                      className="text-primary"
+                    />
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-bold leading-none">
@@ -181,47 +193,21 @@ export default function CourseDetailPage({
 
           <Separator />
 
-          {/* Curriculum */}
+          {/* Curriculum with thumbnails and previews */}
           <div className="space-y-3">
             <h2 className="text-base font-semibold">
               Curriculum{" "}
               <span className="text-muted-foreground font-normal text-sm">
-                ({lessons.length} lessons)
+                ({course.lessons.length} lessons)
               </span>
             </h2>
-            {lessons.length > 0 ? (
-              <div className="space-y-2">
-                {lessons.map((lesson, index) => (
-                  <div
-                    key={lesson.id}
-                    className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/30 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
-                        {index + 1}
-                      </span>
-                      <div>
-                        <p className="text-sm font-medium">{lesson.title}</p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {lesson.type === "video"
-                            ? `Video · ${lesson.duration}min`
-                            : lesson.type === "live"
-                              ? "Live Session"
-                              : `Reading · ${lesson.duration}min`}
-                        </p>
-                      </div>
-                    </div>
-                    {lesson.isFree && (
-                      <Badge
-                        variant="secondary"
-                        className="text-[10px] shrink-0"
-                      >
-                        Preview
-                      </Badge>
-                    )}
-                  </div>
-                ))}
-              </div>
+            {course.lessons.length > 0 ? (
+              <LessonPreviewAccordion
+                lessons={course.lessons}
+                courseId={course.id}
+                coursePricing={course.pricing}
+                coursePrice={course.price}
+              />
             ) : (
               <p className="text-sm text-muted-foreground py-4 text-center">
                 Curriculum details coming soon.
@@ -231,12 +217,27 @@ export default function CourseDetailPage({
 
           <Separator />
 
+          {/* About Instructor */}
+          <AboutInstructor
+            instructorId={course.instructorId}
+            instructorName={course.instructorName}
+            instructorAvatarUrl={course.instructorAvatarUrl}
+            instructorBio={course.instructorBio}
+            instructorHeadline={course.instructorHeadline}
+            otherCourses={otherInstructorCourses}
+            enrolledCourses={enrolledFromInstructor}
+          />
+
           {/* CTA */}
           <div className="sticky bottom-20 md:bottom-4 z-30">
             <Button
               className="w-full shadow-lg"
               size="lg"
-              render={<Link href={`/dashboard/courses/${course.id}/learn/l-1`} />}
+              render={
+                <Link
+                  href={`/dashboard/courses/${course.id}/learn/${firstLessonId}`}
+                />
+              }
             >
               {course.pricing === "free" ? "Start Learning" : "Enroll Now"}
               {course.pricing !== "free" && (

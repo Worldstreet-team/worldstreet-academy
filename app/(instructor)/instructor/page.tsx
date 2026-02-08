@@ -13,7 +13,7 @@ import {
   CarouselContent,
   CarouselItem,
 } from "@/components/ui/carousel"
-import { mockCourses } from "@/lib/mock-data"
+import { fetchInstructorCourses, type InstructorCourseItem } from "@/lib/actions/instructor"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   BookOpen01Icon,
@@ -24,15 +24,15 @@ import {
   BarChartIcon,
   Search01Icon,
 } from "@hugeicons/core-free-icons"
-
-const INSTRUCTOR_ID = "inst-1"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useUser } from "@/components/providers/user-provider"
 
 /* ── Reusable grid course card ────────────────────────────── */
 function CourseCard({
   course,
   badge,
 }: {
-  course: (typeof mockCourses)[number]
+  course: InstructorCourseItem
   badge: { label: string; variant: "default" | "secondary" | "outline" }
 }) {
   return (
@@ -85,8 +85,26 @@ function CourseCard({
 }
 
 export default function InstructorDashboard() {
+  const user = useUser()
   const [courseSearch, setCourseSearch] = React.useState("")
-  const myCourses = mockCourses.filter((c) => c.instructorId === INSTRUCTOR_ID)
+  const [myCourses, setMyCourses] = React.useState<InstructorCourseItem[]>([])
+  const [isLoading, setIsLoading] = React.useState(true)
+
+  // Fetch courses from database
+  React.useEffect(() => {
+    async function loadCourses() {
+      try {
+        const courses = await fetchInstructorCourses()
+        setMyCourses(courses)
+      } catch (error) {
+        console.error("Failed to fetch courses:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    loadCourses()
+  }, [])
+
   const totalStudents = myCourses.reduce((s, c) => s + c.enrolledCount, 0)
   const totalRevenue = myCourses.reduce(
     (s, c) => s + (c.pricing === "paid" ? (c.price ?? 0) * c.enrolledCount * 0.85 : 0),
@@ -133,7 +151,7 @@ export default function InstructorDashboard() {
         {/* Welcome */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold">Welcome back, Sarah</h1>
+            <h1 className="text-xl font-bold">Welcome back, {user.firstName}</h1>
             <p className="text-sm text-muted-foreground">
               Here&apos;s an overview of your teaching activity.
             </p>
@@ -181,7 +199,19 @@ export default function InstructorDashboard() {
         </div>
 
         {/* Course Sections — Carousel on mobile, Grid on desktop */}
-        {sections.length === 0 && courseSearch.trim() ? (
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <Card key={i} className="overflow-hidden">
+                <Skeleton className="aspect-video w-full" />
+                <CardContent className="p-3.5 space-y-2">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : sections.length === 0 && courseSearch.trim() ? (
           <div className="flex flex-col items-center justify-center py-12 text-sm text-muted-foreground">
             <p>No courses match &quot;{courseSearch}&quot;</p>
             <button
@@ -191,6 +221,18 @@ export default function InstructorDashboard() {
             >
               Clear search
             </button>
+          </div>
+        ) : sections.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <HugeiconsIcon icon={BookOpen01Icon} size={48} className="text-muted-foreground/30 mb-4" />
+            <h3 className="font-semibold text-lg mb-1">No courses yet</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Create your first course to start teaching.
+            </p>
+            <Button render={<Link href="/instructor/courses/new" />}>
+              <HugeiconsIcon icon={Add01Icon} size={16} />
+              Create Course
+            </Button>
           </div>
         ) : (
           sections.map((section, idx) => (

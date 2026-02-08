@@ -28,7 +28,7 @@ export type BookmarkedCourse = {
 // ============================================================================
 
 /**
- * Add course to bookmarks (favorites)
+ * Add course to bookmarks
  */
 export async function addBookmark(userId: string, courseId: string) {
   try {
@@ -141,7 +141,7 @@ export async function toggleBookmark(userId: string, courseId: string) {
 // ============================================================================
 
 /**
- * Get user's bookmarked courses (favorites)
+ * Get user's bookmarked courses
  */
 export async function getUserBookmarks(
   userId: string

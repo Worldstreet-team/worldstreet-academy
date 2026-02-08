@@ -194,7 +194,6 @@ export function LessonManager({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="video">Video</SelectItem>
-                    <SelectItem value="text">Text</SelectItem>
                     <SelectItem value="live">Live</SelectItem>
                   </SelectContent>
                 </Select>
@@ -225,18 +224,6 @@ export function LessonManager({
                     {state.fieldErrors.videoUrl}
                   </p>
                 )}
-              </div>
-            )}
-
-            {lessonType === "text" && (
-              <div className="space-y-1.5">
-                <Label htmlFor="lesson-content">Content</Label>
-                <Textarea
-                  id="lesson-content"
-                  name="content"
-                  placeholder="Lesson content in markdown..."
-                  className="min-h-32"
-                />
               </div>
             )}
 

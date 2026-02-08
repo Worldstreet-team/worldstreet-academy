@@ -18,9 +18,6 @@ export interface IEnrollment extends Document {
   lastAccessedLesson: Types.ObjectId | null
   lastAccessedAt: Date | null
   completedAt: Date | null
-  // Certificate
-  certificateIssued: boolean
-  certificateUrl: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -83,14 +80,6 @@ const EnrollmentSchema = new Schema<IEnrollment>(
     },
     completedAt: {
       type: Date,
-      default: null,
-    },
-    certificateIssued: {
-      type: Boolean,
-      default: false,
-    },
-    certificateUrl: {
-      type: String,
       default: null,
     },
   },

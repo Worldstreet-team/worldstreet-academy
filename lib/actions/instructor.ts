@@ -5,7 +5,8 @@ import { redirect } from "next/navigation"
 import connectDB from "@/lib/db"
 import { Course, Lesson, User, ICourse } from "@/lib/db/models"
 import { uploadThumbnail, deleteFromCloudinary } from "@/lib/cloudinary"
-import type { CourseLevel, CoursePricing, CourseStatus } from "@/lib/types"
+import type { CourseLevel, CoursePricing, CourseStatus, CourseCategory } from "@/lib/types"
+import { getCurrentUser } from "@/lib/auth"
 
 // ---- Types for form state ----
 export type CourseFormState = {
@@ -30,32 +31,32 @@ export type InstructorCourseItem = {
   createdAt: string
 }
 
-// Demo instructor ID (in production, get from session/auth)
-const DEMO_INSTRUCTOR_ID = "demo-instructor-001"
 
-// ---- Get or create demo instructor ----
-async function getOrCreateDemoInstructor() {
-  await connectDB()
+// ---- Generate slug from title ----
+function generateSlug(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "")
+    + "-" + Date.now().toString(36)
+}
+
+// ---- Get authenticated user (any user can be instructor) ----
+async function getAuthenticatedInstructor() {
+  const authUser = await getCurrentUser()
   
-  let instructor = await User.findOne({ email: "instructor@worldstreet.academy" })
+  if (!authUser) {
+    throw new Error("Not authenticated")
+  }
+  
+  // Allow any authenticated user to be an instructor
+  // They can create and manage their own courses
+  
+  await connectDB()
+  const instructor = await User.findById(authUser.id)
   
   if (!instructor) {
-    instructor = await User.create({
-      email: "instructor@worldstreet.academy",
-      username: "demo_instructor",
-      firstName: "Sarah",
-      lastName: "Chen",
-      role: "INSTRUCTOR",
-      avatarUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=96&h=96&fit=crop&crop=face",
-      walletBalance: 0,
-      instructorProfile: {
-        headline: "Crypto Trading Expert",
-        expertise: ["cryptocurrency", "trading", "blockchain"],
-        totalStudents: 0,
-        totalCourses: 0,
-        totalEarnings: 0,
-      },
-    })
+    throw new Error("User not found in database")
   }
   
   return instructor
@@ -65,7 +66,7 @@ async function getOrCreateDemoInstructor() {
 export async function fetchInstructorCourses(): Promise<InstructorCourseItem[]> {
   try {
     await connectDB()
-    const instructor = await getOrCreateDemoInstructor()
+    const instructor = await getAuthenticatedInstructor()
     
     const courses = await Course.find({ instructor: instructor._id })
       .sort({ createdAt: -1 })
@@ -95,7 +96,7 @@ export async function fetchInstructorCourses(): Promise<InstructorCourseItem[]> 
 export async function fetchCourseForEdit(courseId: string) {
   try {
     await connectDB()
-    const instructor = await getOrCreateDemoInstructor()
+    const instructor = await getAuthenticatedInstructor()
     
     const course = await Course.findOne({
       _id: courseId,
@@ -114,10 +115,11 @@ export async function fetchCourseForEdit(courseId: string) {
         title: course.title,
         description: course.description,
         thumbnailUrl: course.thumbnailUrl,
-        level: course.level,
-        pricing: course.pricing,
+        level: course.level as CourseLevel,
+        pricing: course.pricing as CoursePricing,
         price: course.price,
-        status: course.status,
+        status: course.status as CourseStatus,
+        category: (course.category || "Cryptocurrency") as CourseCategory,
       },
       lessons: lessons.map((l) => ({
         id: l._id.toString(),
@@ -126,7 +128,8 @@ export async function fetchCourseForEdit(courseId: string) {
         type: l.type,
         videoUrl: l.videoUrl,
         content: l.content,
-        duration: l.videoDuration ? Math.floor(l.videoDuration / 60) : null,
+        thumbnailUrl: l.videoThumbnailUrl || "",
+        duration: l.videoDuration ?? null,
         isFree: l.isFree,
       })),
     }
@@ -148,6 +151,7 @@ export async function createCourse(
   const pricing = formData.get("pricing") as CoursePricing
   const price = formData.get("price") as string
   const status = formData.get("status") as CourseStatus
+  const category = formData.get("category") as string
   const lessonsJson = formData.get("lessons") as string
 
   // Validate
@@ -172,11 +176,12 @@ export async function createCourse(
 
   try {
     await connectDB()
-    const instructor = await getOrCreateDemoInstructor()
+    const instructor = await getAuthenticatedInstructor()
     
     // Create the course
     const course = await Course.create({
       title,
+      slug: generateSlug(title),
       description,
       thumbnailUrl: thumbnailUrl || null,
       instructor: instructor._id,
@@ -184,20 +189,23 @@ export async function createCourse(
       pricing,
       price: pricing === "paid" ? parseFloat(price) : 0,
       status: status || "draft",
+      category: category || "Cryptocurrency",
     })
     
     // Create lessons if provided
     if (lessonsJson) {
       try {
         const lessons = JSON.parse(lessonsJson)
+        console.log("[Create Course] Parsed lessons:", lessons)
         if (Array.isArray(lessons) && lessons.length > 0) {
           await Lesson.insertMany(
-            lessons.map((l: { title: string; description?: string; type?: string; videoUrl?: string; content?: string; duration?: string; isFree?: boolean }, idx: number) => ({
+            lessons.map((l: { title: string; description?: string; type?: string; thumbnailUrl?: string; videoUrl?: string; content?: string; duration?: string; isFree?: boolean }, idx: number) => ({
               course: course._id,
               title: l.title,
               description: l.description || null,
               type: l.type || "video",
               videoUrl: l.videoUrl || null,
+              videoThumbnailUrl: l.thumbnailUrl || null,
               content: l.content || null,
               videoDuration: l.duration ? parseInt(l.duration) : null,
               isFree: l.isFree || false,
@@ -205,15 +213,24 @@ export async function createCourse(
               isPublished: status === "published",
             }))
           )
+
+          // Calculate total duration in minutes
+          const totalDurationSecs = lessons.reduce((sum: number, l: { duration?: string }) => sum + (l.duration ? parseInt(l.duration) : 0), 0)
           
-          // Update course lesson count
+          // Update course lesson count and duration
           await Course.findByIdAndUpdate(course._id, {
             totalLessons: lessons.length,
+            totalDuration: Math.ceil(totalDurationSecs / 60),
           })
+        } else {
+          console.log("[Create Course] No lessons to create (empty array or not an array)")
         }
-      } catch {
-        console.error("Failed to parse lessons JSON")
+      } catch (err) {
+        console.error("Failed to parse lessons JSON:", err)
+        console.error("Lessons JSON value:", lessonsJson)
       }
+    } else {
+      console.log("[Create Course] No lessons JSON provided")
     }
     
     // Update instructor course count
@@ -243,6 +260,7 @@ export async function updateCourse(
   const pricing = formData.get("pricing") as CoursePricing
   const price = formData.get("price") as string
   const status = formData.get("status") as CourseStatus
+  const category = formData.get("category") as string
   const lessonsJson = formData.get("lessons") as string
 
   const fieldErrors: Record<string, string> = {}
@@ -263,7 +281,7 @@ export async function updateCourse(
 
   try {
     await connectDB()
-    const instructor = await getOrCreateDemoInstructor()
+    const instructor = await getAuthenticatedInstructor()
     
     // Verify ownership
     const existingCourse = await Course.findOne({
@@ -284,24 +302,27 @@ export async function updateCourse(
       pricing,
       price: pricing === "paid" ? parseFloat(price) : 0,
       status,
+      category: category || existingCourse.category,
     })
     
     // Update lessons if provided
     if (lessonsJson) {
       try {
         const lessons = JSON.parse(lessonsJson)
+        console.log("[Update Course] Parsed lessons:", lessons)
         if (Array.isArray(lessons)) {
           // Delete existing lessons and recreate (simple approach)
           await Lesson.deleteMany({ course: courseId })
           
           if (lessons.length > 0) {
             await Lesson.insertMany(
-              lessons.map((l: { tempId?: string; title: string; description?: string; type?: string; videoUrl?: string; content?: string; duration?: string; isFree?: boolean }, idx: number) => ({
+              lessons.map((l: { tempId?: string; title: string; description?: string; type?: string; thumbnailUrl?: string; videoUrl?: string; content?: string; duration?: string; isFree?: boolean }, idx: number) => ({
                 course: courseId,
                 title: l.title,
                 description: l.description || null,
                 type: l.type || "video",
                 videoUrl: l.videoUrl || null,
+                videoThumbnailUrl: l.thumbnailUrl || null,
                 content: l.content || null,
                 videoDuration: l.duration ? parseInt(l.duration) : null,
                 isFree: l.isFree || false,
@@ -310,15 +331,24 @@ export async function updateCourse(
               }))
             )
           }
+
+          // Calculate total duration in minutes
+          const totalDurationSecs = lessons.reduce((sum: number, l: { duration?: string }) => sum + (l.duration ? parseInt(l.duration) : 0), 0)
           
-          // Update course lesson count
+          // Update course lesson count and duration
           await Course.findByIdAndUpdate(courseId, {
             totalLessons: lessons.length,
+            totalDuration: Math.ceil(totalDurationSecs / 60),
           })
+        } else {
+          console.log("[Update Course] Lessons is not an array")
         }
-      } catch {
-        console.error("Failed to parse lessons JSON")
+      } catch (err) {
+        console.error("Failed to parse lessons JSON:", err)
+        console.error("Lessons JSON value:", lessonsJson)
       }
+    } else {
+      console.log("[Update Course] No lessons JSON provided")
     }
 
     revalidatePath("/instructor/courses")
@@ -337,7 +367,7 @@ export async function deleteCourse(formData: FormData): Promise<void> {
 
   try {
     await connectDB()
-    const instructor = await getOrCreateDemoInstructor()
+    const instructor = await getAuthenticatedInstructor()
     
     const course = await Course.findOne({
       _id: courseId,
@@ -408,7 +438,7 @@ export async function addLesson(
 
   try {
     await connectDB()
-    const instructor = await getOrCreateDemoInstructor()
+    const instructor = await getAuthenticatedInstructor()
     
     // Verify ownership
     const course = await Course.findOne({
@@ -433,7 +463,7 @@ export async function addLesson(
       description: description || null,
       type: type || "video",
       videoUrl: type === "video" ? videoUrl : null,
-      content: type === "text" ? content : null,
+      content: null,
       videoDuration: duration ? parseInt(duration) * 60 : null,
       isFree,
       order,
@@ -459,7 +489,7 @@ export async function deleteLesson(formData: FormData): Promise<void> {
 
   try {
     await connectDB()
-    const instructor = await getOrCreateDemoInstructor()
+    const instructor = await getAuthenticatedInstructor()
     
     // Verify ownership
     const course = await Course.findOne({
@@ -502,7 +532,7 @@ export async function uploadCourseThumbnail(
 ) {
   try {
     await connectDB()
-    const instructor = await getOrCreateDemoInstructor()
+    const instructor = await getAuthenticatedInstructor()
     
     const course = await Course.findOne({
       _id: courseId,

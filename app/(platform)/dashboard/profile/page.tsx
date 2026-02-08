@@ -1,10 +1,27 @@
+"use client"
+
 import { Topbar } from "@/components/platform/topbar"
 import { Card, CardContent } from "@/components/ui/card"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
+import { useUser } from "@/components/providers/user-provider"
 
 export default function ProfilePage() {
+  const user = useUser()
+
+  const initials = user
+    ? `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`.toUpperCase() || user.email?.[0]?.toUpperCase() || "U"
+    : "U"
+
+  const fullName = user
+    ? `${user.firstName || ""} ${user.lastName || ""}`.trim() || "User"
+    : "User"
+
+  const memberSince = user?.createdAt
+    ? new Date(user.createdAt).toLocaleDateString("en-US", { month: "long", year: "numeric" })
+    : "—"
+
   return (
     <>
       <Topbar title="Profile" />
@@ -21,13 +38,14 @@ export default function ProfilePage() {
             {/* Avatar section */}
             <div className="flex items-center gap-4">
               <Avatar className="h-16 w-16">
+                {user?.avatarUrl && <AvatarImage src={user.avatarUrl} alt={fullName} />}
                 <AvatarFallback className="text-lg bg-primary/10 text-primary">
-                  U
+                  {initials}
                 </AvatarFallback>
               </Avatar>
               <div className="space-y-1">
-                <h2 className="text-lg font-semibold">User</h2>
-                <p className="text-sm text-muted-foreground">user@worldstreet.com</p>
+                <h2 className="text-lg font-semibold">{fullName}</h2>
+                <p className="text-sm text-muted-foreground">{user?.email || "—"}</p>
               </div>
             </div>
 
@@ -40,27 +58,27 @@ export default function ProfilePage() {
                   <label className="text-sm font-medium text-muted-foreground">
                     Full Name
                   </label>
-                  <p className="mt-1 text-sm">User</p>
+                  <p className="mt-1 text-sm">{fullName}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">
                     Email
                   </label>
-                  <p className="mt-1 text-sm">user@worldstreet.com</p>
+                  <p className="mt-1 text-sm">{user?.email || "—"}</p>
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">
-                    Username
+                    Role
                   </label>
-                  <p className="mt-1 text-sm">@user</p>
+                  <p className="mt-1 text-sm capitalize">{user?.role || "User"}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">
                     Member Since
                   </label>
-                  <p className="mt-1 text-sm">January 2026</p>
+                  <p className="mt-1 text-sm">{memberSince}</p>
                 </div>
               </div>
             </div>

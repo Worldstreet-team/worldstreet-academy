@@ -6,14 +6,13 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { mockCourses, mockLessons } from "@/lib/mock-data"
+import { fetchPublicCourse } from "@/lib/actions/student"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   StarIcon,
   BookOpen01Icon,
   Clock01Icon,
   UserMultipleIcon,
-  Certificate01Icon,
 } from "@hugeicons/core-free-icons"
 
 export default async function CourseDetailPage({
@@ -22,13 +21,13 @@ export default async function CourseDetailPage({
   params: Promise<{ courseId: string }>
 }) {
   const { courseId } = await params
-  const course = mockCourses.find((c) => c.id === courseId)
+  const course = await fetchPublicCourse(courseId)
   if (!course) notFound()
 
-  const lessons = mockLessons.filter((l) => l.courseId === courseId)
   const totalHours = Math.floor(course.totalDuration / 60)
   const totalMins = course.totalDuration % 60
   const durationLabel = totalHours > 0 ? `${totalHours}h ${totalMins}m` : `${totalMins}m`
+  const firstLessonId = course.lessons[0]?.id ?? "none"
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -104,9 +103,9 @@ export default async function CourseDetailPage({
           {/* Curriculum */}
           <div>
             <h2 className="text-xl font-semibold mb-4">Curriculum</h2>
-            {lessons.length > 0 ? (
+            {course.lessons.length > 0 ? (
               <div className="space-y-2">
-                {lessons.map((lesson, index) => (
+                {course.lessons.map((lesson, index) => (
                   <div
                     key={lesson.id}
                     className="flex items-center justify-between rounded-lg border p-4"
@@ -119,10 +118,10 @@ export default async function CourseDetailPage({
                         <p className="text-sm font-medium">{lesson.title}</p>
                         <p className="text-xs text-muted-foreground">
                           {lesson.type === "video"
-                            ? `Video · ${lesson.duration}min`
+                            ? `Video · ${lesson.duration || 0}min`
                             : lesson.type === "live"
                               ? "Live Session"
-                              : `Reading · ${lesson.duration}min`}
+                              : `Reading · ${lesson.duration || 0}min`}
                         </p>
                       </div>
                     </div>
@@ -198,13 +197,6 @@ export default async function CourseDetailPage({
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Certificate</span>
-                  <span className="font-medium inline-flex items-center gap-1">
-                    <HugeiconsIcon icon={Certificate01Icon} size={14} className="text-primary" />
-                    Included
-                  </span>
-                </div>
-                <div className="flex justify-between">
                   <span className="text-muted-foreground">Instructor</span>
                   <span className="font-medium">{course.instructorName}</span>
                 </div>
@@ -212,7 +204,7 @@ export default async function CourseDetailPage({
 
               <Separator />
 
-              <Button className="w-full" size="lg" render={<Link href={`/dashboard/courses/${course.id}/learn/l-1`} />}>
+              <Button className="w-full" size="lg" render={<Link href={`/dashboard/courses/${course.id}/learn/${firstLessonId}`} />}>
                 {course.pricing === "free" ? "Start Learning" : "Enroll Now"}
               </Button>
             </CardContent>

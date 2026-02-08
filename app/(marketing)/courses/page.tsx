@@ -1,9 +1,11 @@
 import { CourseGrid } from "@/components/courses/course-grid"
-import { mockCourses } from "@/lib/mock-data"
+import { fetchBrowseCourses } from "@/lib/actions/student"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 
-export default function CoursesPage() {
+export default async function CoursesPage() {
+  const courses = await fetchBrowseCourses()
+  
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8 space-y-2">
@@ -25,7 +27,7 @@ export default function CoursesPage() {
         </div>
       </div>
 
-      <CourseGrid courses={mockCourses} />
+      <CourseGrid courses={courses} />
     </div>
   )
 }

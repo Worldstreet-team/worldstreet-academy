@@ -13,7 +13,7 @@ import { z } from "zod/v4"
 const CreateLessonSchema = z.object({
   title: z.string().min(3).max(150),
   description: z.string().optional(),
-  type: z.enum(["video", "text", "live", "quiz"]),
+  type: z.enum(["video", "live"]),
   content: z.string().optional(), // For text lessons
   sectionTitle: z.string().optional(),
   isFree: z.boolean().optional(),

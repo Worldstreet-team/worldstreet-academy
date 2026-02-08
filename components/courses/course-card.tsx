@@ -6,11 +6,24 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { StarIcon, Bookmark01Icon } from "@hugeicons/core-free-icons"
+import { StarIcon, Bookmark01Icon, PlayCircle02Icon } from "@hugeicons/core-free-icons"
 import { useFavorites } from "@/lib/hooks/use-favorites"
 import type { Course } from "@/lib/types"
+import type { BrowseCourse } from "@/lib/actions/student"
 
-export function CourseCard({ course }: { course: Course }) {
+type CourseData = Course | BrowseCourse
+
+/** Smart duration display: 23s, 3m, 1hr 10min */
+function formatDuration(totalMinutes: number): string {
+  if (!totalMinutes || totalMinutes <= 0) return "0m"
+  const h = Math.floor(totalMinutes / 60)
+  const m = totalMinutes % 60
+  if (h === 0) return `${m}m`
+  if (m === 0) return h === 1 ? "1hr" : `${h}hrs`
+  return h === 1 ? `1hr ${m}m` : `${h}hrs ${m}m`
+}
+
+export function CourseCard({ course }: { course: CourseData }) {
   const { toggleFavorite, isFavorite } = useFavorites()
   const favorited = isFavorite(course.id)
 
@@ -54,6 +67,19 @@ export function CourseCard({ course }: { course: Course }) {
           >
             <HugeiconsIcon icon={Bookmark01Icon} size={14} fill={favorited ? "currentColor" : "none"} />
           </button>
+          {/* Lesson count + duration overlay */}
+          {course.totalLessons > 0 && (
+            <div className="absolute bottom-2 right-2 z-10 flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-white border border-white/20 backdrop-blur-md bg-black/50 shadow-lg">
+              <HugeiconsIcon icon={PlayCircle02Icon} size={11} />
+              <span>{course.totalLessons}</span>
+              {course.totalDuration > 0 && (
+                <>
+                  <span className="opacity-60">·</span>
+                  <span>{formatDuration(course.totalDuration)}</span>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         <CardContent className="p-4 space-y-2.5">

@@ -1,27 +1,25 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { motion, AnimatePresence } from "motion/react"
 import { cn } from "@/lib/utils"
-
-type Lesson = {
-  id: string
-  courseId: string
-  title: string
-  description: string | null
-  type: "video" | "text" | "live"
-  videoUrl: string | null
-  content: string | null
-  duration: number | null
-  order: number
-  isFree: boolean
-}
+import { HugeiconsIcon } from "@hugeicons/react"
+import { Tick02Icon, Video01Icon, WifiIcon, File01Icon } from "@hugeicons/core-free-icons"
+import type { LearnLesson } from "@/lib/actions/student"
 
 type MobileLessonListProps = {
-  lessons: Lesson[]
+  lessons: LearnLesson[]
   courseId: string
   currentLessonId: string
   nextLessonId: string | null
+  completedLessonIds?: string[]
+}
+
+const typeIcons = {
+  video: Video01Icon,
+  live: WifiIcon,
+  text: File01Icon,
 }
 
 /* ---- Equalizer bars animation (playing indicator) ---- */
@@ -61,12 +59,14 @@ export function MobileLessonList({
   courseId,
   currentLessonId,
   nextLessonId,
+  completedLessonIds = [],
 }: MobileLessonListProps) {
   return (
     <div className="space-y-0.5">
       {lessons.map((lesson, index) => {
         const isCurrent = lesson.id === currentLessonId
         const isUpNext = lesson.id === nextLessonId
+        const isCompleted = completedLessonIds.includes(lesson.id)
         return (
           <Link
             key={lesson.id}
@@ -80,23 +80,50 @@ export function MobileLessonList({
                   : "hover:bg-muted/50"
             )}
           >
-            <span
-              className={cn(
-                "flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium shrink-0",
-                isCurrent
-                  ? "bg-primary text-primary-foreground"
-                  : isUpNext
-                    ? "bg-primary/20 text-primary"
-                    : "bg-muted text-muted-foreground"
+            {/* Thumbnail with number overlay */}
+            <div className="relative w-12 h-8 rounded overflow-hidden shrink-0 bg-muted">
+              {lesson.thumbnailUrl ? (
+                <Image
+                  src={lesson.thumbnailUrl}
+                  alt={lesson.title}
+                  fill
+                  className="object-cover"
+                  sizes="48px"
+                />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center bg-muted">
+                  <HugeiconsIcon 
+                    icon={typeIcons[lesson.type] || Video01Icon} 
+                    size={14} 
+                    className="text-muted-foreground/50" 
+                  />
+                </div>
               )}
-            >
-              {index + 1}
-            </span>
+              {/* Small circle with number */}
+              <div
+                className={cn(
+                  "absolute bottom-0.5 right-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-semibold",
+                  isCompleted && !isCurrent
+                    ? "bg-green-500 text-white"
+                    : isCurrent
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-black/70 text-white"
+                )}
+              >
+                {isCompleted && !isCurrent ? (
+                  <HugeiconsIcon icon={Tick02Icon} size={10} className="text-white" />
+                ) : (
+                  index + 1
+                )}
+              </div>
+            </div>
             <div className="min-w-0 flex-1">
               <p className="truncate font-medium text-sm">{lesson.title}</p>
               <p className="text-[11px] text-muted-foreground capitalize">
                 {lesson.type}
-                {lesson.duration ? ` · ${lesson.duration}min` : ""}
+                {lesson.duration 
+                  ? ` · ${Math.floor(lesson.duration / 60)}:${String(lesson.duration % 60).padStart(2, '0')}` 
+                  : ""}
               </p>
             </div>
             <AnimatePresence mode="wait">
@@ -130,7 +157,9 @@ export function MobileLessonList({
                   exit={{ opacity: 0 }}
                   className="text-[10px] text-muted-foreground tabular-nums shrink-0"
                 >
-                  {lesson.duration ? `${lesson.duration}m` : lesson.type}
+                  {lesson.duration 
+                    ? `${Math.floor(lesson.duration / 60)}:${String(lesson.duration % 60).padStart(2, '0')}` 
+                    : lesson.type}
                 </motion.span>
               )}
             </AnimatePresence>

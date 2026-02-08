@@ -3,10 +3,11 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useTransition } from "react"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -24,15 +25,17 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { UserIcon, Settings01Icon, Logout01Icon, Search01Icon, CommandIcon } from "@hugeicons/core-free-icons"
+import { UserIcon, Settings01Icon, Logout01Icon, Search01Icon, CommandIcon, TeachingIcon, DashboardSpeed01Icon } from "@hugeicons/core-free-icons"
 import { NotificationBell } from "@/components/shared/notification-bell"
+import { useUser } from "@/components/providers/user-provider"
+import { logoutAction } from "@/lib/auth/actions"
 
 /* ── Path → breadcrumb label map ────────────────────────── */
 const labelMap: Record<string, string> = {
   dashboard: "Dashboard",
   courses: "Courses",
   "my-courses": "My Courses",
-  favorites: "Favorites",
+  bookmarks: "Bookmarks",
   profile: "Profile",
   settings: "Settings",
   help: "Help",
@@ -67,13 +70,17 @@ type TopbarProps = {
 export function Topbar({ title, variant = "platform" }: TopbarProps) {
   const pathname = usePathname()
   const crumbs = buildCrumbs(pathname)
+  const user = useUser()
+  const [isPending, startTransition] = useTransition()
 
-  const userInitials = variant === "instructor" ? "SC" : "U"
-  const userName = variant === "instructor" ? "Sarah Chen" : "User"
-  const userEmail =
-    variant === "instructor"
-      ? "sarah@worldstreet.com"
-      : "user@worldstreet.com"
+  const userInitials = `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
+  const isInstructor = user.role === "INSTRUCTOR" || user.role === "ADMIN"
+
+  function handleLogout() {
+    startTransition(async () => {
+      await logoutAction()
+    })
+  }
 
   return (
     <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b">
@@ -130,6 +137,7 @@ export function Topbar({ title, variant = "platform" }: TopbarProps) {
           <DropdownMenu>
             <DropdownMenuTrigger className="focus:outline-none">
               <Avatar className="h-8 w-8 cursor-pointer">
+                {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.firstName} />}
                 <AvatarFallback className="text-xs bg-primary/10 text-primary">
                   {userInitials}
                 </AvatarFallback>
@@ -138,11 +146,29 @@ export function Topbar({ title, variant = "platform" }: TopbarProps) {
             <DropdownMenuContent side="bottom" align="end" sideOffset={8} className="w-56">
               <DropdownMenuLabel>
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium">{userName}</p>
-                  <p className="text-xs text-muted-foreground">{userEmail}</p>
+                  <p className="text-sm font-medium">{user.firstName} {user.lastName}</p>
+                  <p className="text-xs text-muted-foreground">{user.email}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
+              {variant === "platform" && isInstructor && (
+                <>
+                  <DropdownMenuItem render={<Link href="/instructor" />}>
+                    <HugeiconsIcon icon={TeachingIcon} size={16} />
+                    Instructor Portal
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              {variant === "instructor" && (
+                <>
+                  <DropdownMenuItem render={<Link href="/dashboard" />}>
+                    <HugeiconsIcon icon={DashboardSpeed01Icon} size={16} />
+                    Student Dashboard
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
               <DropdownMenuItem render={<Link href={variant === "instructor" ? "/instructor/settings" : "/dashboard/profile"} />}>
                 <HugeiconsIcon icon={UserIcon} size={16} />
                 Profile
@@ -152,9 +178,12 @@ export function Topbar({ title, variant = "platform" }: TopbarProps) {
                 Settings
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem variant="destructive" render={<button type="button" className="w-full" />}>
+              <DropdownMenuItem 
+                variant="destructive" 
+                render={<button type="button" className="w-full" onClick={handleLogout} disabled={isPending} />}
+              >
                 <HugeiconsIcon icon={Logout01Icon} size={16} />
-                Log out
+                {isPending ? "Logging out..." : "Log out"}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

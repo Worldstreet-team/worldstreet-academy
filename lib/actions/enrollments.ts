@@ -26,8 +26,6 @@ export type EnrollmentProgress = {
   completedLessons: string[]
   totalLessons: number
   lastAccessedLesson: string | null
-  certificateIssued: boolean
-  certificateUrl: string | null
 }
 
 // ============================================================================
@@ -194,40 +192,6 @@ export async function updateLastAccessed(
   }
 }
 
-/**
- * Issue certificate for completed course
- */
-export async function issueCertificate(
-  userId: string,
-  courseId: string,
-  certificateUrl: string
-) {
-  try {
-    await connectDB()
-
-    const enrollment = await Enrollment.findOne({
-      user: userId,
-      course: courseId,
-      status: "completed",
-    })
-
-    if (!enrollment) {
-      return { success: false, error: "Course not completed" }
-    }
-
-    enrollment.certificateIssued = true
-    enrollment.certificateUrl = certificateUrl
-    await enrollment.save()
-
-    revalidatePath("/dashboard/my-courses")
-
-    return { success: true }
-  } catch (error) {
-    console.error("Issue certificate error:", error)
-    return { success: false, error: "Failed to issue certificate" }
-  }
-}
-
 // ============================================================================
 // ENROLLMENT QUERIES
 // ============================================================================
@@ -315,8 +279,6 @@ export async function getEnrollmentProgress(
       completedLessons: enrollment.completedLessons.map((id: Types.ObjectId) => id.toString()),
       totalLessons,
       lastAccessedLesson: enrollment.lastAccessedLesson?.toString() || null,
-      certificateIssued: enrollment.certificateIssued,
-      certificateUrl: enrollment.certificateUrl,
     }
   } catch (error) {
     console.error("Get enrollment progress error:", error)

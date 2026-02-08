@@ -29,11 +29,6 @@ export function Footer() {
                   My Learning
                 </Link>
               </li>
-              <li>
-                <Link href="/dashboard/certificates" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                  Certificates
-                </Link>
-              </li>
             </ul>
           </div>
           <div>

@@ -32,10 +32,10 @@ export function Navbar() {
         </div>
         <div className="flex items-center gap-3">
           <ThemeToggle />
-          <Button variant="ghost" size="sm" render={<Link href="/dashboard" />}>
+          <Button variant="ghost" size="sm" render={<a href="https://worldstreetgold.com/login" />}>
             Sign In
           </Button>
-          <Button size="sm" render={<Link href="/dashboard" />}>
+          <Button size="sm" render={<a href="https://worldstreetgold.com/register" />}>
             Get Started
           </Button>
         </div>

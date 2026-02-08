@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import * as React from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { HugeiconsIcon } from "@hugeicons/react"
@@ -9,25 +9,36 @@ import { Topbar } from "@/components/platform/topbar"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { RadialProgress } from "@/components/ui/radial-progress"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { EmptyState } from "@/components/shared/empty-state"
-import { mockCourses } from "@/lib/mock-data"
+import { Skeleton } from "@/components/ui/skeleton"
+import { fetchMyEnrollments, type StudentEnrollment } from "@/lib/actions/student"
 import { cn } from "@/lib/utils"
-
-const enrolledCourses = mockCourses.slice(0, 4).map((course, i) => ({
-  ...course,
-  progress: [35, 72, 100, 12][i],
-  lastLessonId: "l-1",
-}))
 
 const TABS = ["All", "In Progress", "Completed"] as const
 type Tab = (typeof TABS)[number]
 
 export default function MyCoursesPage() {
-  const [activeTab, setActiveTab] = useState<Tab>("All")
-  const [search, setSearch] = useState("")
+  const [activeTab, setActiveTab] = React.useState<Tab>("All")
+  const [search, setSearch] = React.useState("")
+  const [enrolledCourses, setEnrolledCourses] = React.useState<StudentEnrollment[]>([])
+  const [isLoading, setIsLoading] = React.useState(true)
 
-  const filteredCourses = useMemo(() => {
+  React.useEffect(() => {
+    async function loadEnrollments() {
+      try {
+        const data = await fetchMyEnrollments()
+        setEnrolledCourses(data)
+      } catch (error) {
+        console.error("Failed to load enrollments:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    loadEnrollments()
+  }, [])
+
+  const filteredCourses = React.useMemo(() => {
     let courses = enrolledCourses
 
     switch (activeTab) {
@@ -43,13 +54,13 @@ export default function MyCoursesPage() {
       const q = search.toLowerCase()
       courses = courses.filter(
         (c) =>
-          c.title.toLowerCase().includes(q) ||
+          c.courseTitle.toLowerCase().includes(q) ||
           c.instructorName.toLowerCase().includes(q)
       )
     }
 
     return courses
-  }, [activeTab, search])
+  }, [activeTab, search, enrolledCourses])
 
   return (
     <>
@@ -82,7 +93,7 @@ export default function MyCoursesPage() {
             ))}
           </div>
 
-          {enrolledCourses.length > 0 && (
+          {!isLoading && enrolledCourses.length > 0 && (
             <div className="relative">
               <HugeiconsIcon
                 icon={Search01Icon}
@@ -100,7 +111,20 @@ export default function MyCoursesPage() {
           )}
         </div>
 
-        {enrolledCourses.length === 0 ? (
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-5">
+            {[1, 2, 3, 4].map((i) => (
+              <Card key={i} className="h-full">
+                <Skeleton className="aspect-video w-full" />
+                <CardContent className="p-4 space-y-2">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
+                  <Skeleton className="h-3 w-1/4" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : enrolledCourses.length === 0 ? (
           <EmptyState
             illustration="/user/dashboard/course-empty-state.png"
             title="No courses yet"
@@ -136,16 +160,16 @@ export default function MyCoursesPage() {
             {filteredCourses.map((course) => (
               <Link
                 key={course.id}
-                href={`/dashboard/courses/${course.id}/learn/${course.lastLessonId}`}
+                href={`/dashboard/courses/${course.courseId}/learn/${course.firstLessonId || ""}`}
                 className="group block"
               >
                 <Card className="h-full transition-all hover:shadow-md hover:border-primary/30">
                   {/* Flush thumbnail */}
                   <div className="aspect-video w-full bg-muted relative overflow-hidden">
-                    {course.thumbnailUrl ? (
+                    {course.courseThumbnail ? (
                       <Image
-                        src={course.thumbnailUrl}
-                        alt={course.title}
+                        src={course.courseThumbnail}
+                        alt={course.courseTitle}
                         fill
                         className="object-cover group-hover:scale-105 transition-transform duration-300"
                         sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
@@ -153,7 +177,7 @@ export default function MyCoursesPage() {
                     ) : (
                       <div className="absolute inset-0 flex items-center justify-center">
                         <span className="text-muted-foreground/40 text-xs font-medium">
-                          {course.title.split(" ").slice(0, 2).join(" ")}
+                          {course.courseTitle.split(" ").slice(0, 2).join(" ")}
                         </span>
                       </div>
                     )}
@@ -168,21 +192,15 @@ export default function MyCoursesPage() {
                     <div className="flex items-start gap-4">
                       <div className="flex-1 min-w-0 space-y-1.5">
                         <h3 className="font-semibold text-sm leading-snug line-clamp-2 group-hover:text-primary transition-colors">
-                          {course.title}
+                          {course.courseTitle}
                         </h3>
                         <p className="text-xs text-muted-foreground">
                           <span className="inline-flex items-center gap-1.5">
                             <Avatar size="sm">
-                              {course.instructorAvatarUrl && (
-                                <AvatarImage src={course.instructorAvatarUrl} alt={course.instructorName} />
-                              )}
                               <AvatarFallback>{course.instructorName.split(" ").map(n => n[0]).join("")}</AvatarFallback>
                             </Avatar>
                             {course.instructorName}
                           </span>
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {Math.round((course.progress / 100) * course.totalLessons)}/{course.totalLessons} lessons
                         </p>
                       </div>
 

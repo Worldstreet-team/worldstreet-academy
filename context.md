@@ -31,7 +31,7 @@ Online education platform for cryptocurrency/trading courses. Instructor portal 
 - `/dashboard` — Student dashboard
 - `/dashboard/courses` — Browse courses
 - `/dashboard/my-courses` — Enrolled courses
-- `/dashboard/favorites` — Bookmarked courses
+- `/dashboard/bookmarks` — Bookmarked courses
 - `/dashboard/profile` — User profile
 - `/dashboard/settings` — User settings
 - `/dashboard/help` — Help center
@@ -60,7 +60,7 @@ Online education platform for cryptocurrency/trading courses. Instructor portal 
 
 ### Sidebar Footer
 - **Instructor sidebar**: User avatar + name + ThemeToggle on one row, then Log out. "Back to Academy" removed
-- **Platform sidebar**: Same pattern — user avatar + name + ThemeToggle, then Log out. Includes Favorites nav item (`Bookmark01Icon`)
+- **Platform sidebar**: Same pattern — user avatar + name + ThemeToggle, then Log out. Includes Bookmarks nav item (`Bookmark01Icon`)
 - **Marketing navbar**: ThemeToggle next to Sign In / Get Started buttons
 
 ### Topbar
@@ -71,7 +71,7 @@ Online education platform for cryptocurrency/trading courses. Instructor portal 
 
 ### Mobile Navigation
 - **Bottom nav**: Fixed bottom bar on mobile (`md:hidden`) for both portals
-  - **Platform**: Home, My Courses (`BookOpen01Icon`), [Browse CTA], Favorites, Profile — center button is `Search01Icon` in primary circle
+  - **Platform**: Home, My Courses (`BookOpen01Icon`), [Browse CTA], Bookmarks, Profile — center button is `Search01Icon` in primary circle
   - **Instructor**: Overview, Courses, [Add Course CTA], Analytics, Settings — center button is `Add01Icon` in primary circle
   - CTA button is elevated with `ring-4 ring-background` and `shadow-lg shadow-primary/30`
 - **Sidebar preserved**: Bottom nav is mobile-only overlay; sidebar still available via `SidebarTrigger`
@@ -89,7 +89,7 @@ Online education platform for cryptocurrency/trading courses. Instructor portal 
 - **Welcome section**: Transparent container (no gradient bg) with greeting + stats row in subtle `bg-muted/40` cards
 - **Search**: Filter input in My Courses section to search enrolled courses by title/instructor
 - **My Courses**: Swipeable `Carousel` with prev/next controls in header row. Cards show author avatar, star rating in orange pill, glassmorphic price badge, radial progress (green checkmark at 100%), bookmark button. "View All" button centered below.
-- **Favorites section**: Empty state with `Bookmark01Icon`, "Browse Courses" CTA. Route: `/dashboard/favorites`
+- **Bookmarks section**: Empty state with `Bookmark01Icon`, "Browse Courses" CTA. Route: `/dashboard/bookmarks`
 - **Empty states**: Reusable `EmptyState` component (`components/shared/empty-state.tsx`)
 
 ### Course Cards
