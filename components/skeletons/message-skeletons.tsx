@@ -95,22 +95,16 @@ export function MessageBubbleSkeleton({
           )}
           
           {variant === "audio" && (
-            <div className="flex items-center gap-2 min-w-44">
+            <div className="flex items-center gap-2.5 min-w-48">
               <Skeleton className={cn(
                 "h-8 w-8 rounded-full",
                 isOwn ? "bg-primary/30" : ""
               )} />
-              <div className="flex-1 flex items-center gap-[2px] h-5">
-                {Array.from({ length: 20 }).map((_, i) => (
-                  <Skeleton 
-                    key={i} 
-                    className={cn(
-                      "w-[2px] rounded-full",
-                      isOwn ? "bg-primary/30" : ""
-                    )}
-                    style={{ height: `${Math.random() * 12 + 4}px` }}
-                  />
-                ))}
+              <div className="flex-1 h-3 relative">
+                <Skeleton className={cn(
+                  "h-[3px] w-full rounded-full",
+                  isOwn ? "bg-primary/30" : ""
+                )} />
               </div>
               <Skeleton className={cn(
                 "h-3 w-8",

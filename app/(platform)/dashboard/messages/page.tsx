@@ -8,12 +8,13 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { cn } from "@/lib/utils"
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+  ResponsiveModal,
+  ResponsiveModalContent,
+  ResponsiveModalHeader,
+  ResponsiveModalTitle,
+} from "@/components/ui/responsive-modal"
 import {
   ConversationList,
   ChatHeader,
@@ -32,6 +33,7 @@ import {
   sendMessage,
   searchUsers,
   getOrCreateConversation,
+  getRecentUsers,
   type ConversationWithDetails,
   type MessageWithDetails,
   type UserSearchResult,
@@ -41,7 +43,7 @@ import { useMessagePolling } from "@/lib/hooks/use-websocket"
 import { ConversationListSkeleton, MessagesAreaSkeleton } from "@/components/skeletons/message-skeletons"
 
 // Extended message type with status for optimistic updates
-type OptimisticMessage = MessageWithDetails & { status?: "pending" | "sent" | "error" }
+type OptimisticMessage = MessageWithDetails & { status?: "pending" | "sent" | "error"; uploadProgress?: number }
 
 export default function MessagesPage() {
   const [conversations, setConversations] = useState<ConversationWithDetails[]>([])
@@ -51,12 +53,17 @@ export default function MessagesPage() {
   const [showMobileChat, setShowMobileChat] = useState(false)
   const [activeCall, setActiveCall] = useState<{ type: "video" | "audio" } | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   
   // User search state
   const [showUserSearch, setShowUserSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [searchResults, setSearchResults] = useState<UserSearchResult[]>([])
   const [isSearching, setIsSearching] = useState(false)
+  const [recentUsers, setRecentUsers] = useState<UserSearchResult[]>([])
+  const [isLoadingRecent, setIsLoadingRecent] = useState(false)
+
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Load conversations
   useEffect(() => {
@@ -78,10 +85,12 @@ export default function MessagesPage() {
         setMessages([])
         return
       }
+      setIsLoadingMessages(true)
       const result = await getMessages(selectedId)
       if (result.success && result.messages) {
         setMessages(result.messages)
       }
+      setIsLoadingMessages(false)
     }
     loadMessages()
   }, [selectedId])
@@ -103,7 +112,9 @@ export default function MessagesPage() {
       setMessages((prev) => {
         // Filter out messages we already have
         const existingIds = new Set(prev.map((m) => m.id))
-        const uniqueNew = newMessages.filter((m) => !existingIds.has(m.id))
+        const uniqueNew = newMessages
+          .filter((m) => !existingIds.has(m.id))
+          .map((m) => ({ ...m, isNew: true }))
         return [...prev, ...uniqueNew]
       })
       // Refresh conversations to update unread counts
@@ -115,12 +126,21 @@ export default function MessagesPage() {
     }, []),
   })
 
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "auto" })
+    }
+  }, [messages])
+
   // Map to ConversationList format
   const mappedConversations: Conversation[] = conversations.map((c) => ({
     id: c.id,
     name: c.participant.name,
     avatar: c.participant.avatar || undefined,
     lastMessage: c.lastMessage,
+    lastMessageType: c.lastMessageType,
+    isOwnLastMessage: c.isOwnLastMessage,
     timestamp: new Date(c.lastMessageAt),
     unread: c.unreadCount,
     isOnline: c.participant.isOnline,
@@ -144,6 +164,8 @@ export default function MessagesPage() {
     duration: m.duration,
     waveform: m.waveform,
     status: m.status,
+    uploadProgress: (m as OptimisticMessage).uploadProgress,
+    isNew: (m as OptimisticMessage & { isNew?: boolean }).isNew,
   }))
 
   const messageGroups = groupMessagesByDate(mappedMessages)
@@ -219,13 +241,28 @@ export default function MessagesPage() {
         }
         
         if (uploadUrlResult.success && uploadUrlResult.uploadUrl && uploadUrlResult.publicUrl) {
-          const uploadResponse = await fetch(uploadUrlResult.uploadUrl, {
-            method: "PUT",
-            body: attachment.file,
-            headers: { "Content-Type": contentType },
+          // Use XMLHttpRequest for progress tracking on video uploads
+          const uploadOk = await new Promise<boolean>((resolve) => {
+            const xhr = new XMLHttpRequest()
+            xhr.open("PUT", uploadUrlResult.uploadUrl!)
+            xhr.setRequestHeader("Content-Type", contentType)
+            
+            xhr.upload.onprogress = (event) => {
+              if (event.lengthComputable) {
+                const pct = Math.round((event.loaded / event.total) * 100)
+                // Update optimistic message with upload progress
+                setMessages((prev) => 
+                  prev.map((m) => m.id === tempId ? { ...m, uploadProgress: pct } : m)
+                )
+              }
+            }
+            
+            xhr.onload = () => resolve(xhr.status >= 200 && xhr.status < 300)
+            xhr.onerror = () => resolve(false)
+            xhr.send(attachment.file)
           })
           
-          if (uploadResponse.ok) {
+          if (uploadOk) {
             fileData = {
               url: uploadUrlResult.publicUrl,
               name: attachment.file.name,
@@ -272,6 +309,19 @@ export default function MessagesPage() {
     }
   }, [selectedParticipant])
 
+  // Load recent users when search modal opens
+  useEffect(() => {
+    if (showUserSearch && recentUsers.length === 0) {
+      setIsLoadingRecent(true)
+      getRecentUsers().then((result) => {
+        if (result.success && result.users) {
+          setRecentUsers(result.users)
+        }
+        setIsLoadingRecent(false)
+      })
+    }
+  }, [showUserSearch, recentUsers.length])
+
   // User search
   const handleSearch = useCallback(async (query: string) => {
     setSearchQuery(query)
@@ -311,7 +361,15 @@ export default function MessagesPage() {
     <>
       <Topbar title="Messages" />
       
-      <div className="flex-1 flex h-[calc(100vh-4rem)] overflow-hidden">
+      {/* Hide bottom nav when mobile chat is open */}
+      {showMobileChat && (
+        <style>{`@media (max-width: 767px) { nav.fixed.bottom-0 { display: none !important; } }`}</style>
+      )}
+      
+      <div className={cn(
+        "flex-1 flex overflow-hidden",
+        showMobileChat ? "h-[calc(100dvh-4rem)]" : "h-[calc(100dvh-4rem)] pb-16 md:pb-0"
+      )}>
         {/* Conversation List - Hidden on mobile when chat is open */}
         <div className={showMobileChat ? "hidden md:flex" : "flex w-full md:w-auto"}>
           <div className="w-full md:w-80 lg:w-96 border-r flex flex-col bg-background h-full">
@@ -341,7 +399,7 @@ export default function MessagesPage() {
         </div>
 
         {/* Chat Area */}
-        <div className={`flex-1 flex flex-col bg-muted/10 ${!showMobileChat ? "hidden md:flex" : "flex"}`}>
+        <div className={`flex-1 flex flex-col bg-muted/10 overflow-hidden ${!showMobileChat ? "hidden md:flex" : "flex"}`}>
           {selectedParticipant ? (
             <>
               <ChatHeader
@@ -354,37 +412,46 @@ export default function MessagesPage() {
                 onAudioCall={() => setActiveCall({ type: "audio" })}
               />
 
-              <ScrollArea className="flex-1">
-                <div className="px-3 py-4 space-y-1 max-w-3xl mx-auto">
-                  {messageGroups.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground text-sm">
-                      No messages yet. Start the conversation!
-                    </div>
-                  ) : (
-                    messageGroups.map((group) => (
-                      <div key={group.date.toISOString()}>
-                        <DateSeparator date={group.date} />
-                        <div className="space-y-1">
-                          {group.messages.map((msg, i) => {
-                            const prev = group.messages[i - 1]
-                            return (
-                              <MessageBubble
-                                key={msg.id}
-                                message={msg}
-                                showAvatar={!prev || prev.senderId !== msg.senderId}
-                              />
-                            )
-                          })}
-                        </div>
-                      </div>
-                    ))
-                  )}
+              {isLoadingMessages ? (
+                <div className="flex-1 overflow-hidden">
+                  <MessagesAreaSkeleton />
                 </div>
-              </ScrollArea>
+              ) : (
+                <>
+                  <div className="flex-1 overflow-y-auto max-h-[calc(100vh-16rem)] md:max-h-[calc(100vh-12rem)]">
+                    <div className="px-3 py-4 space-y-1 max-w-3xl mx-auto w-full">
+                      {messageGroups.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground text-sm">
+                          No messages yet. Start the conversation!
+                        </div>
+                      ) : (
+                        messageGroups.map((group) => (
+                          <div key={group.date.toISOString()}>
+                            <DateSeparator date={group.date} />
+                            <div className="space-y-1">
+                              {group.messages.map((msg, i) => {
+                                const prev = group.messages[i - 1]
+                                return (
+                                  <MessageBubble
+                                    key={msg.id}
+                                    message={msg}
+                                    showAvatar={!prev || prev.senderId !== msg.senderId}
+                                  />
+                                )
+                              })}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                      <div ref={messagesEndRef} />
+                    </div>
+                  </div>
 
-              <MessageInput
-                onSendMessage={handleSendMessage}
-              />
+                  <MessageInput
+                    onSendMessage={handleSendMessage}
+                  />
+                </>
+              )}
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center text-muted-foreground">
@@ -406,12 +473,12 @@ export default function MessagesPage() {
         </div>
       </div>
 
-      {/* User Search Dialog */}
-      <Dialog open={showUserSearch} onOpenChange={setShowUserSearch}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>New Conversation</DialogTitle>
-          </DialogHeader>
+      {/* User Search Modal (bottom sheet on mobile) */}
+      <ResponsiveModal open={showUserSearch} onOpenChange={setShowUserSearch}>
+        <ResponsiveModalContent className="sm:max-w-md">
+          <ResponsiveModalHeader>
+            <ResponsiveModalTitle>New Conversation</ResponsiveModalTitle>
+          </ResponsiveModalHeader>
           <div className="space-y-4">
             <div className="relative">
               <HugeiconsIcon
@@ -439,44 +506,84 @@ export default function MessagesPage() {
                 </Button>
               )}
             </div>
-            
+
             <ScrollArea className="h-[300px]">
-              {isSearching ? (
-                <div className="text-center py-8 text-muted-foreground text-sm">
-                  Searching...
-                </div>
-              ) : searchResults.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground text-sm">
-                  {searchQuery.length >= 2
-                    ? "No users found"
-                    : "Type at least 2 characters to search"}
-                </div>
+              {searchQuery.length >= 2 ? (
+                isSearching ? (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    Searching...
+                  </div>
+                ) : searchResults.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    No users found
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {searchResults.map((user) => (
+                      <button
+                        key={user.id}
+                        onClick={() => handleStartConversation(user)}
+                        className="w-full p-3 text-left hover:bg-muted rounded-lg transition-colors flex items-center gap-3"
+                      >
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={user.avatar || undefined} />
+                          <AvatarFallback>{user.name[0]?.toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{user.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            @{user.username} · {user.role}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )
               ) : (
-                <div className="space-y-1">
-                  {searchResults.map((user) => (
-                    <button
-                      key={user.id}
-                      onClick={() => handleStartConversation(user)}
-                      className="w-full p-3 text-left hover:bg-muted rounded-lg transition-colors flex items-center gap-3"
-                    >
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={user.avatar || undefined} />
-                        <AvatarFallback>{user.name[0]?.toUpperCase()}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{user.name}</p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          @{user.username} · {user.role}
-                        </p>
-                      </div>
-                    </button>
-                  ))}
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Recently Added
+                  </p>
+                  {isLoadingRecent ? (
+                    <div className="grid grid-cols-4 gap-2">
+                      {Array.from({ length: 8 }).map((_, i) => (
+                        <div key={i} className="flex flex-col items-center gap-1">
+                          <div className="h-12 w-12 rounded-full bg-muted animate-pulse" />
+                          <div className="h-3 w-10 rounded bg-muted animate-pulse" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : recentUsers.length === 0 ? (
+                    <div className="text-center py-6 text-muted-foreground text-sm">
+                      No users yet
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-4 gap-2">
+                      {recentUsers.map((user) => (
+                        <button
+                          key={user.id}
+                          onClick={() => handleStartConversation(user)}
+                          className="flex flex-col items-center gap-1 p-1.5 rounded-xl hover:bg-muted transition-colors"
+                        >
+                          <Avatar className="h-12 w-12">
+                            <AvatarImage src={user.avatar || undefined} />
+                            <AvatarFallback className="text-sm">
+                              {user.name[0]?.toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <p className="text-xs font-medium truncate w-full text-center">
+                            {user.name.split(" ")[0]}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </ScrollArea>
           </div>
-        </DialogContent>
-      </Dialog>
+        </ResponsiveModalContent>
+      </ResponsiveModal>
 
       {/* Video Call Modal */}
       {selectedParticipant && (

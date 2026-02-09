@@ -14,6 +14,8 @@ export type ConversationWithDetails = {
     isOnline: boolean
   }
   lastMessage: string
+  lastMessageType: "text" | "image" | "video" | "audio" | "file"
+  isOwnLastMessage: boolean
   lastMessageAt: Date
   unreadCount: number
 }
@@ -91,6 +93,8 @@ export async function getConversations(): Promise<{
             isOnline: false, // Would need real-time presence system
           },
           lastMessage: conv.lastMessage?.content || "",
+          lastMessageType: conv.lastMessage?.type || "text",
+          isOwnLastMessage: conv.lastMessage?.senderId?.toString() === currentUser.id,
           lastMessageAt: conv.lastMessageAt,
           unreadCount,
         }
@@ -347,5 +351,69 @@ export async function markMessagesAsRead(conversationId: string): Promise<{
   } catch (error) {
     console.error("Error marking messages as read:", error)
     return { success: false, error: "Failed to mark messages as read" }
+  }
+}
+
+// Get total unread message count across all conversations
+export async function getTotalUnreadCount(): Promise<{
+  success: boolean
+  count?: number
+  error?: string
+}> {
+  try {
+    await connectDB()
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return { success: false, error: "Unauthorized" }
+    }
+
+    const userId = new Types.ObjectId(currentUser.id)
+
+    const count = await Message.countDocuments({
+      receiverId: userId,
+      isRead: false,
+    })
+
+    return { success: true, count }
+  } catch (error) {
+    console.error("Error fetching unread count:", error)
+    return { success: false, error: "Failed to fetch unread count" }
+  }
+}
+
+// Get recently added users (newest signups excluding current user)
+export async function getRecentUsers(): Promise<{
+  success: boolean
+  users?: UserSearchResult[]
+  error?: string
+}> {
+  try {
+    await connectDB()
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return { success: false, error: "Unauthorized" }
+    }
+
+    const users = await User.find({
+      _id: { $ne: new Types.ObjectId(currentUser.id) },
+    })
+      .sort({ createdAt: -1 })
+      .limit(8)
+      .select("firstName lastName username avatarUrl role")
+      .lean()
+
+    return {
+      success: true,
+      users: users.map((u) => ({
+        id: u._id.toString(),
+        name: `${u.firstName} ${u.lastName}`.trim(),
+        username: u.username,
+        avatar: u.avatarUrl || null,
+        role: u.role,
+      })),
+    }
+  } catch (error) {
+    console.error("Error fetching recent users:", error)
+    return { success: false, error: "Failed to fetch recent users" }
   }
 }

@@ -251,21 +251,61 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
   const handleFileSelect = (accept: string, type: Attachment["type"]) => {
     if (fileInputRef.current) {
       fileInputRef.current.accept = accept
+      // Allow multiple selection for images (up to 8)
+      fileInputRef.current.multiple = type === "image"
       fileInputRef.current.onclick = () => {
         fileInputRef.current!.value = ""
       }
       fileInputRef.current.onchange = (e) => {
         const files = Array.from((e.target as HTMLInputElement).files || [])
-        const newAttachments: Attachment[] = files.map((file) => ({
+        const maxImages = 8
+        const currentImageCount = attachments.filter((a) => a.type === "image").length
+        
+        // For images, enforce max of 8
+        const filesToAdd = type === "image" 
+          ? files.slice(0, maxImages - currentImageCount)
+          : files.slice(0, 1) // Only 1 video at a time
+        
+        const newAttachments: Attachment[] = filesToAdd.map((file) => ({
           file,
           type,
           preview: type === "image" || type === "video" ? URL.createObjectURL(file) : undefined,
+        }))
+        setAttachments((prev) => {
+          // If adding a video, replace any existing video
+          if (type === "video") {
+            return [...prev.filter((a) => a.type !== "video"), ...newAttachments]
+          }
+          return [...prev, ...newAttachments]
+        })
+      }
+      fileInputRef.current.click()
+    }
+    setIsPopoverOpen(false)
+  }
+
+  const addMoreImages = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.accept = "image/*"
+      fileInputRef.current.multiple = true
+      fileInputRef.current.onclick = () => {
+        fileInputRef.current!.value = ""
+      }
+      fileInputRef.current.onchange = (e) => {
+        const files = Array.from((e.target as HTMLInputElement).files || [])
+        const maxImages = 8
+        const currentImageCount = attachments.filter((a) => a.type === "image").length
+        const filesToAdd = files.slice(0, maxImages - currentImageCount)
+        
+        const newAttachments: Attachment[] = filesToAdd.map((file) => ({
+          file,
+          type: "image" as const,
+          preview: URL.createObjectURL(file),
         }))
         setAttachments((prev) => [...prev, ...newAttachments])
       }
       fileInputRef.current.click()
     }
-    setIsPopoverOpen(false)
   }
 
   const removeAttachment = (index: number) => {
@@ -279,9 +319,12 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
   const handleSend = () => {
     if (audioBlob) {
       const audioFile = new File([audioBlob], `voice_${Date.now()}.webm`, { type: "audio/webm" })
+      // Create blob URL for preview playback during upload
+      const audioBlobUrl = URL.createObjectURL(audioBlob)
       onSendMessage("", [{
         file: audioFile,
         type: "audio",
+        preview: audioBlobUrl,
         waveform: waveformData,
         duration: formatTime(recordingTime),
       }])
@@ -294,7 +337,8 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
         previewAudioRef.current = null
       }
     } else if (message.trim() || attachments.length > 0) {
-      onSendMessage(message, attachments.length > 0 ? attachments : undefined)
+      // Send text with media, media-only, or text-only
+      onSendMessage(message.trim(), attachments.length > 0 ? attachments : undefined)
       setMessage("")
       setAttachments([])
     }
@@ -407,45 +451,110 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
   }
 
   return (
-    <div className="px-2 py-2 bg-background">
+    <div className="shrink-0 px-2 py-2 bg-background border-t">
       <input ref={fileInputRef} type="file" className="hidden" />
 
       {/* Attachments Preview */}
       {attachments.length > 0 && (
-        <div className="flex gap-2 mb-2 px-2 overflow-x-auto pb-1 max-w-3xl mx-auto">
-          {attachments.map((attachment, index) => (
-            <div key={index} className="relative shrink-0 group">
-              {attachment.type === "image" && attachment.preview ? (
-                <div className="h-14 w-14 rounded-lg overflow-hidden bg-muted">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={attachment.preview}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-              ) : attachment.type === "video" && attachment.preview ? (
-                <div className="h-14 w-14 rounded-lg overflow-hidden bg-muted relative">
-                  <video src={attachment.preview} className="h-full w-full object-cover" />
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                    <HugeiconsIcon icon={Video01Icon} size={18} className="text-white" />
+        <div className="mb-2 px-2 max-w-3xl mx-auto">
+          {(() => {
+            const images = attachments.filter((a) => a.type === "image")
+            const videos = attachments.filter((a) => a.type === "video")
+            const others = attachments.filter((a) => a.type !== "image" && a.type !== "video")
+            const imageCount = images.length
+            const canAddMore = imageCount < 8
+
+            return (
+              <div className="space-y-2">
+                {/* Image grid */}
+                {imageCount > 0 && (
+                  <div className="relative">
+                    <div className={cn(
+                      "grid gap-1 rounded-xl overflow-hidden",
+                      imageCount === 1 ? "grid-cols-1" : "grid-cols-2"
+                    )}>
+                      {images.slice(0, 2).map((attachment, index) => {
+                        const originalIndex = attachments.indexOf(attachment)
+                        return (
+                          <div key={originalIndex} className={cn(
+                            "relative bg-muted",
+                            imageCount === 1 ? "aspect-4/3" : "aspect-square"
+                          )}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={attachment.preview}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
+                            <button
+                              onClick={() => removeAttachment(originalIndex)}
+                              className="absolute top-1.5 right-1.5 h-6 w-6 rounded-full bg-black/40 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/60 transition-colors"
+                            >
+                              <HugeiconsIcon icon={Cancel01Icon} size={12} />
+                            </button>
+                            {/* Show +N badge on second image if more than 2 */}
+                            {index === 1 && imageCount > 2 && (
+                              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                <span className="text-white text-lg font-semibold">+{imageCount - 2}</span>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                    {/* Add more images button */}
+                    {canAddMore && (
+                      <button
+                        onClick={addMoreImages}
+                        className="absolute bottom-2 left-2 h-7 px-2.5 rounded-full bg-black/40 backdrop-blur-sm text-white text-xs flex items-center gap-1 hover:bg-black/60 transition-colors"
+                      >
+                        <HugeiconsIcon icon={Add01Icon} size={12} />
+                        Add
+                      </button>
+                    )}
                   </div>
-                </div>
-              ) : (
-                <div className="h-14 px-2.5 rounded-lg bg-muted flex items-center gap-1.5">
-                  <HugeiconsIcon icon={FileEditIcon} size={14} className="text-muted-foreground" />
-                  <span className="text-[11px] max-w-16 truncate">{attachment.file.name}</span>
-                </div>
-              )}
-              
-              <button
-                onClick={() => removeAttachment(index)}
-                className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-foreground/80 text-background flex items-center justify-center transition-transform hover:scale-110"
-              >
-                <HugeiconsIcon icon={Cancel01Icon} size={8} />
-              </button>
-            </div>
-          ))}
+                )}
+
+                {/* Video preview */}
+                {videos.map((attachment) => {
+                  const originalIndex = attachments.indexOf(attachment)
+                  return (
+                    <div key={originalIndex} className="relative rounded-xl overflow-hidden bg-black aspect-video">
+                      <video src={attachment.preview} className="h-full w-full object-cover" />
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                        <div className="h-10 w-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/10">
+                          <HugeiconsIcon icon={Video01Icon} size={18} className="text-white" />
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => removeAttachment(originalIndex)}
+                        className="absolute top-1.5 right-1.5 h-6 w-6 rounded-full bg-black/40 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/60 transition-colors"
+                      >
+                        <HugeiconsIcon icon={Cancel01Icon} size={12} />
+                      </button>
+                    </div>
+                  )
+                })}
+
+                {/* File previews */}
+                {others.map((attachment) => {
+                  const originalIndex = attachments.indexOf(attachment)
+                  return (
+                    <div key={originalIndex} className="relative flex items-center gap-2 px-3 py-2 rounded-lg bg-muted">
+                      <HugeiconsIcon icon={FileEditIcon} size={14} className="text-muted-foreground" />
+                      <span className="text-[11px] truncate flex-1">{attachment.file.name}</span>
+                      <button
+                        onClick={() => removeAttachment(originalIndex)}
+                        className="h-5 w-5 rounded-full bg-black/10 flex items-center justify-center hover:bg-black/20 transition-colors"
+                      >
+                        <HugeiconsIcon icon={Cancel01Icon} size={10} />
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })()}
         </div>
       )}
 

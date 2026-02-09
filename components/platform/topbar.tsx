@@ -73,7 +73,7 @@ export function Topbar({ title, variant = "platform" }: TopbarProps) {
   const user = useUser()
   const [isPending, startTransition] = useTransition()
 
-  const userInitials = `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
+  const userInitials = `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`.toUpperCase() || "U"
   const isInstructor = user.role === "INSTRUCTOR" || user.role === "ADMIN"
 
   function handleLogout() {

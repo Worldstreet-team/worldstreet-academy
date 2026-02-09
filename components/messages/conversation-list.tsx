@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { Search01Icon } from "@hugeicons/core-free-icons"
+import { Search01Icon, Image02Icon, Video01Icon, Mic01Icon, Attachment01Icon } from "@hugeicons/core-free-icons"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -13,6 +13,8 @@ export type Conversation = {
   name: string
   avatar?: string
   lastMessage: string
+  lastMessageType?: "text" | "image" | "video" | "audio" | "file"
+  isOwnLastMessage?: boolean
   timestamp: Date
   unread: number
   isOnline?: boolean
@@ -53,6 +55,31 @@ export function ConversationList({
     if (days === 1) return "Yesterday"
     if (days < 7) return date.toLocaleDateString("en-US", { weekday: "short" })
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+  }
+
+  const getMessagePreview = (c: Conversation) => {
+    const type = c.lastMessageType || "text"
+    const prefix = c.isOwnLastMessage ? "You: " : ""
+    
+    const typeConfig: Record<string, { icon: typeof Image02Icon; label: string }> = {
+      audio: { icon: Mic01Icon, label: "Voice note" },
+      image: { icon: Image02Icon, label: "Photo" },
+      video: { icon: Video01Icon, label: "Video" },
+      file: { icon: Attachment01Icon, label: "File" },
+    }
+
+    if (type !== "text" && typeConfig[type]) {
+      const config = typeConfig[type]
+      return (
+        <span className="flex items-center gap-1">
+          {prefix && <span>{prefix}</span>}
+          <HugeiconsIcon icon={config.icon} size={12} className="shrink-0 opacity-60" />
+          <span>{c.lastMessage ? `${config.label} · ${c.lastMessage}` : config.label}</span>
+        </span>
+      )
+    }
+
+    return `${prefix}${c.lastMessage || "No messages yet"}`
   }
 
   return (
@@ -114,7 +141,7 @@ export function ConversationList({
                     "text-sm truncate",
                     c.unread > 0 ? "text-foreground" : "text-muted-foreground"
                   )}>
-                    {c.lastMessage}
+                    {getMessagePreview(c)}
                   </p>
                 </div>
 

@@ -31,7 +31,7 @@ export function ChatHeader({
   showBackButton = false,
 }: ChatHeaderProps) {
   return (
-    <div className="border-b bg-background px-3 py-2.5">
+    <div className="shrink-0 border-b bg-background px-3 py-2.5">
       <div className="flex items-center gap-2 max-w-4xl mx-auto">
         {showBackButton && (
           <Button size="icon" variant="ghost" className="h-9 w-9 md:hidden" onClick={onBack}>
