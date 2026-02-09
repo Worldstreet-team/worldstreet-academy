@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
+import dynamic from "next/dynamic"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   MailSend01Icon,
@@ -14,6 +15,7 @@ import {
   PlayIcon,
   Delete02Icon,
   PauseIcon,
+  SmileIcon,
 } from "@hugeicons/core-free-icons"
 import { cn } from "@/lib/utils"
 import {
@@ -21,6 +23,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import type { EmojiClickData } from "emoji-picker-react"
+
+// Dynamically import emoji picker to avoid SSR issues
+const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false })
 
 type Attachment = {
   file: File
@@ -45,6 +51,7 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [isPopoverOpen, setIsPopoverOpen] = useState(false)
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false)
   const [audioLevels, setAudioLevels] = useState<number[]>(Array(WAVEFORM_BARS).fill(4))
   const [waveformData, setWaveformData] = useState<number[]>([])
   const [isPlayingPreview, setIsPlayingPreview] = useState(false)
@@ -61,6 +68,7 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
   const streamRef = useRef<MediaStream | null>(null)
   const waveformSamplesRef = useRef<number[]>([])
   const previewAudioRef = useRef<HTMLAudioElement | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   const hasContent = message.trim().length > 0 || attachments.length > 0 || audioBlob
 
@@ -351,6 +359,12 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
     }
   }
 
+  const handleEmojiClick = (emojiData: EmojiClickData) => {
+    setMessage((prev) => prev + emojiData.emoji)
+    setIsEmojiPickerOpen(false)
+    inputRef.current?.focus()
+  }
+
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
@@ -370,6 +384,27 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
       currentAttachments.forEach((a) => a.preview && URL.revokeObjectURL(a.preview))
     }
   }, [attachments])
+
+  // Handle mobile keyboard pushing the input up (iOS Safari fallback)
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+
+    const handleResize = () => {
+      if (!containerRef.current) return
+      // When keyboard opens, visualViewport height shrinks
+      const offsetFromBottom = window.innerHeight - vv.height - vv.offsetTop
+      containerRef.current.style.transform =
+        offsetFromBottom > 0 ? `translateY(-${offsetFromBottom}px)` : ""
+    }
+
+    vv.addEventListener("resize", handleResize)
+    vv.addEventListener("scroll", handleResize)
+    return () => {
+      vv.removeEventListener("resize", handleResize)
+      vv.removeEventListener("scroll", handleResize)
+    }
+  }, [])
 
   // Voice recording UI
   if (isRecording || audioBlob) {
@@ -451,7 +486,7 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
   }
 
   return (
-    <div className="shrink-0 px-2 py-2 bg-background border-t">
+    <div ref={containerRef} className="shrink-0 px-2 py-2 bg-background border-t">
       <input ref={fileInputRef} type="file" className="hidden" />
 
       {/* Attachments Preview */}
@@ -612,6 +647,29 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
           disabled={disabled}
           className="flex-1 bg-transparent py-2 px-2 text-sm outline-none placeholder:text-muted-foreground/50"
         />
+
+        {/* Emoji Button */}
+        <Popover open={isEmojiPickerOpen} onOpenChange={setIsEmojiPickerOpen}>
+          <PopoverTrigger
+            render={
+              <button
+                className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
+                disabled={disabled}
+              >
+                <HugeiconsIcon icon={SmileIcon} size={18} />
+              </button>
+            }
+          />
+          <PopoverContent side="top" align="end" className="w-auto p-0 border-0 bg-transparent shadow-none">
+            <EmojiPicker
+              onEmojiClick={handleEmojiClick}
+              autoFocusSearch={false}
+              width={320}
+              height={400}
+              lazyLoadEmojis
+            />
+          </PopoverContent>
+        </Popover>
 
         {/* Voice / Send Button */}
         {hasContent ? (

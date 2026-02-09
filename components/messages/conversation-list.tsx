@@ -2,11 +2,12 @@
 
 import { useState } from "react"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { Search01Icon, Image02Icon, Video01Icon, Mic01Icon, Attachment01Icon } from "@hugeicons/core-free-icons"
+import { Search01Icon, Image02Icon, Video01Icon, Mic01Icon, Attachment01Icon, Call02Icon } from "@hugeicons/core-free-icons"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
+import { motion, AnimatePresence, LayoutGroup } from "motion/react"
 
 export type Conversation = {
   id: string
@@ -79,6 +80,42 @@ export function ConversationList({
       )
     }
 
+    // Handle CALL_EVENT structured format
+    if (c.lastMessage.startsWith("CALL_EVENT:")) {
+      const parts = c.lastMessage.split(":")
+      const callType = parts[1] === "video" ? "video" : "audio"
+      const status = parts[2] || "completed"
+      const durationStr = parts[3] || "0"
+      const icon = callType === "video" ? Video01Icon : Call02Icon
+      const label = callType === "video" ? "Video call" : "Voice call"
+      let statusText = ""
+      if (status === "completed" && durationStr !== "0") statusText = ` · ${durationStr}`
+      else if (status === "missed") statusText = " · Missed"
+      else if (status === "declined") statusText = " · Declined"
+      else if (status === "failed") statusText = " · Failed"
+      return (
+        <span className="flex items-center gap-1">
+          {prefix && <span>{prefix}</span>}
+          <HugeiconsIcon icon={icon} size={12} className="shrink-0 opacity-60" />
+          <span>{label}{statusText}</span>
+        </span>
+      )
+    }
+
+    // Handle legacy emoji call format
+    if (c.lastMessage.startsWith("📹") || c.lastMessage.startsWith("📞")) {
+      const isVideo = c.lastMessage.startsWith("📹")
+      const icon = isVideo ? Video01Icon : Call02Icon
+      const text = c.lastMessage.replace(/^📹\s*/, "").replace(/^📞\s*/, "")
+      return (
+        <span className="flex items-center gap-1">
+          {prefix && <span>{prefix}</span>}
+          <HugeiconsIcon icon={icon} size={12} className="shrink-0 opacity-60" />
+          <span>{text}</span>
+        </span>
+      )
+    }
+
     return `${prefix}${c.lastMessage || "No messages yet"}`
   }
 
@@ -108,16 +145,28 @@ export function ConversationList({
             {search ? "No results" : "No conversations"}
           </div>
         ) : (
-          <div>
-            {filtered.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => onSelect(c.id)}
-                className={cn(
-                  "w-full px-3 py-2.5 text-left hover:bg-muted/50 transition-colors flex items-center gap-3",
-                  selectedId === c.id && "bg-muted"
-                )}
-              >
+          <LayoutGroup>
+            <div>
+              <AnimatePresence initial={false}>
+                {filtered.map((c) => (
+                  <motion.button
+                    key={c.id}
+                    layout
+                    layoutId={c.id}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{
+                      layout: { type: "spring", stiffness: 500, damping: 35 },
+                      opacity: { duration: 0.15 },
+                      scale: { duration: 0.15 },
+                    }}
+                    onClick={() => onSelect(c.id)}
+                    className={cn(
+                      "w-full px-3 py-2.5 text-left hover:bg-muted/50 transition-colors flex items-center gap-3",
+                      selectedId === c.id && "bg-muted"
+                    )}
+                  >
                 <div className="relative shrink-0">
                   <Avatar className="h-12 w-12">
                     <AvatarImage src={c.avatar} />
@@ -150,9 +199,11 @@ export function ConversationList({
                     {c.unread > 99 ? "99+" : c.unread}
                   </div>
                 )}
-              </button>
+              </motion.button>
             ))}
-          </div>
+              </AnimatePresence>
+            </div>
+          </LayoutGroup>
         )}
       </ScrollArea>
     </div>

@@ -28,6 +28,7 @@ export type MessageWithDetails = {
   content: string
   type: "text" | "image" | "video" | "audio" | "file"
   fileUrl?: string
+  fileUrls?: string[]
   fileName?: string
   fileSize?: string
   duration?: string
@@ -153,6 +154,7 @@ export async function getMessages(conversationId: string): Promise<{
       content: msg.content,
       type: msg.type,
       fileUrl: msg.fileUrl,
+      fileUrls: msg.fileUrls,
       fileName: msg.fileName,
       fileSize: msg.fileSize,
       duration: msg.duration,
@@ -175,7 +177,7 @@ export async function sendMessage(
   receiverId: string,
   content: string,
   type: "text" | "image" | "video" | "audio" | "file" = "text",
-  fileData?: { url: string; name?: string; size?: string; duration?: string; waveform?: number[] }
+  fileData?: { url: string; urls?: string[]; name?: string; size?: string; duration?: string; waveform?: number[] }
 ): Promise<{ success: boolean; message?: MessageWithDetails; error?: string }> {
   try {
     await connectDB()
@@ -207,6 +209,7 @@ export async function sendMessage(
       content,
       type,
       fileUrl: fileData?.url,
+      fileUrls: fileData?.urls,
       fileName: fileData?.name,
       fileSize: fileData?.size,
       duration: fileData?.duration,
@@ -231,6 +234,7 @@ export async function sendMessage(
         content,
         type,
         fileUrl: fileData?.url,
+        fileUrls: fileData?.urls,
         fileName: fileData?.name,
         fileSize: fileData?.size,
         duration: fileData?.duration,
@@ -415,5 +419,44 @@ export async function getRecentUsers(): Promise<{
   } catch (error) {
     console.error("Error fetching recent users:", error)
     return { success: false, error: "Failed to fetch recent users" }
+  }
+}
+
+// Delete a message (only own messages)
+export async function deleteMessage(messageId: string): Promise<{
+  success: boolean
+  error?: string
+}> {
+  try {
+    await connectDB()
+    const currentUser = await getCurrentUser()
+    if (!currentUser) return { success: false, error: "Unauthorized" }
+
+    const message = await Message.findById(messageId)
+    if (!message) return { success: false, error: "Message not found" }
+
+    if (message.senderId.toString() !== currentUser.id) {
+      return { success: false, error: "Can only delete your own messages" }
+    }
+
+    const conversationId = message.conversationId
+    await Message.findByIdAndDelete(messageId)
+
+    // Update conversation's last message if this was the latest
+    const lastMsg = await Message.findOne({ conversationId })
+      .sort({ createdAt: -1 })
+      .lean()
+
+    if (lastMsg) {
+      await Conversation.findByIdAndUpdate(conversationId, {
+        lastMessage: lastMsg._id,
+        lastMessageAt: lastMsg.createdAt,
+      })
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error deleting message:", error)
+    return { success: false, error: "Failed to delete message" }
   }
 }

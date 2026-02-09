@@ -1,27 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 
 export default function NotFound() {
-  const [countdown, setCountdown] = useState(10)
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          window.location.href = "https://worldstreetgold.com"
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-
-    return () => clearInterval(timer)
-  }, [])
-
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {/* Logo at top left */}
@@ -59,8 +42,8 @@ export default function NotFound() {
             </p>
           </div>
 
-          {/* CTA with countdown */}
-          <div className="space-y-3 pt-2">
+          {/* CTA */}
+          <div className="pt-2">
             <Button 
               size="lg" 
               className="w-full" 
@@ -68,9 +51,6 @@ export default function NotFound() {
             >
               Go to WorldStreetGold.com
             </Button>
-            <p className="text-xs text-muted-foreground">
-              Redirecting in {countdown} second{countdown !== 1 ? "s" : ""}
-            </p>
           </div>
         </div>
       </div>

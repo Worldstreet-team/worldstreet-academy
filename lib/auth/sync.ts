@@ -39,6 +39,7 @@ export type LocalUser = {
   role: "USER" | "INSTRUCTOR" | "ADMIN"
   verified: boolean
   walletBalance: number
+  hasOnboarded: boolean
   createdAt: string
   updatedAt: string
 }
@@ -115,6 +116,7 @@ export async function syncUserToLocal(authUser: AuthUser, updateNames = true): P
     role: user.role,
     verified: user.verified,
     walletBalance: user.walletBalance,
+    hasOnboarded: user.hasOnboarded ?? false,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
   }
@@ -144,6 +146,7 @@ export async function getLocalUserByAuthId(authUserId: string): Promise<LocalUse
     role: user.role,
     verified: user.verified,
     walletBalance: user.walletBalance,
+    hasOnboarded: user.hasOnboarded ?? false,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
   }
@@ -173,6 +176,7 @@ export async function getLocalUserById(id: string): Promise<LocalUser | null> {
     role: user.role,
     verified: user.verified,
     walletBalance: user.walletBalance,
+    hasOnboarded: user.hasOnboarded ?? false,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
   }

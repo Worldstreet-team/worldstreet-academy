@@ -4,6 +4,7 @@ import { AppSidebar } from "@/components/platform/app-sidebar"
 import { PlatformBottomNav } from "@/components/platform/bottom-nav"
 import { CommandSearch } from "@/components/shared/command-search"
 import { UserProvider } from "@/components/providers/user-provider"
+import { IncomingCallProvider } from "@/components/messages/incoming-call-provider"
 import { getCurrentUser } from "@/lib/auth"
 
 export default async function PlatformLayout({
@@ -19,14 +20,16 @@ export default async function PlatformLayout({
 
   return (
     <UserProvider user={user}>
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset>
-          {children}
-        </SidebarInset>
-        <PlatformBottomNav />
-        <CommandSearch />
-      </SidebarProvider>
+      <IncomingCallProvider>
+        <SidebarProvider>
+          <AppSidebar />
+          <SidebarInset>
+            {children}
+          </SidebarInset>
+          <PlatformBottomNav />
+          <CommandSearch />
+        </SidebarProvider>
+      </IncomingCallProvider>
     </UserProvider>
   )
 }

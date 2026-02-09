@@ -5,3 +5,4 @@ export { Enrollment, type IEnrollment, type EnrollmentStatus } from "./enrollmen
 export { Review, type IReview } from "./review"
 export { Bookmark, type IBookmark } from "./bookmark"
 export { Message, Conversation, type IMessage, type IConversation } from "./message"
+export { Call, type ICall, type CallStatus, type CallType } from "./call"

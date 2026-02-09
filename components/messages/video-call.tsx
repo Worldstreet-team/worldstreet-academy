@@ -11,14 +11,12 @@ import {
   VideoOffIcon,
   SpeakerIcon,
   Speaker01Icon,
-  MoreHorizontalIcon,
   FlipHorizontalIcon,
-  MaximizeScreenIcon,
   MinimizeScreenIcon,
 } from "@hugeicons/core-free-icons"
 import { cn } from "@/lib/utils"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { initiateCall, answerCall, endCall as endCallAction, getCallStatus } from "@/lib/actions/calls"
 
 type CallType = "video" | "audio"
 type CallState = "ringing" | "connecting" | "connected" | "ended"
@@ -30,11 +28,13 @@ type VideoCallProps = {
   callerName: string
   callerAvatar?: string
   isIncoming?: boolean
-  onAnswer?: () => void
-  onDecline?: () => void
+  incomingCallId?: string
+  receiverId?: string
+  onCallStarted?: (callId: string) => void
+  onCallEnded?: () => void
 }
 
-// Glassmorphic button component
+// Glassmorphic button — no borders, clean
 function GlassButton({
   onClick,
   children,
@@ -50,24 +50,10 @@ function GlassButton({
   className?: string
   disabled?: boolean
 }) {
-  const baseStyles = {
-    default: {
-      background: "rgba(255, 255, 255, 0.12)",
-      hoverBg: "rgba(255, 255, 255, 0.2)",
-    },
-    danger: {
-      background: "rgba(239, 68, 68, 0.8)",
-      hoverBg: "rgba(239, 68, 68, 0.9)",
-    },
-    success: {
-      background: "rgba(34, 197, 94, 0.8)",
-      hoverBg: "rgba(34, 197, 94, 0.9)",
-    },
-  }
-
-  const sizeClasses = {
-    default: "w-12 h-12",
-    large: "w-16 h-16",
+  const bg = {
+    default: "rgba(255,255,255,0.12)",
+    danger: "rgba(239,68,68,0.85)",
+    success: "rgba(34,197,94,0.85)",
   }
 
   return (
@@ -76,14 +62,14 @@ function GlassButton({
       disabled={disabled}
       className={cn(
         "rounded-full flex items-center justify-center transition-all duration-200",
-        "hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100",
-        sizeClasses[size],
+        "active:scale-95 disabled:opacity-50",
+        size === "large" ? "w-16 h-16" : "w-12 h-12",
         className
       )}
       style={{
-        background: baseStyles[variant].background,
-        backdropFilter: "blur(12px)",
-        boxShadow: "0 4px 30px rgba(0, 0, 0, 0.1)",
+        background: bg[variant],
+        backdropFilter: "blur(16px)",
+        WebkitBackdropFilter: "blur(16px)",
       }}
     >
       {children}
@@ -91,7 +77,6 @@ function GlassButton({
   )
 }
 
-// Call timer display
 function CallTimer({ startTime }: { startTime: Date | null }) {
   const [elapsed, setElapsed] = useState(0)
 
@@ -107,7 +92,7 @@ function CallTimer({ startTime }: { startTime: Date | null }) {
   const seconds = elapsed % 60
 
   return (
-    <span className="text-white/80 text-sm font-medium tabular-nums">
+    <span className="text-white/70 text-sm font-medium tabular-nums">
       {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
     </span>
   )
@@ -120,24 +105,27 @@ export function VideoCall({
   callerName,
   callerAvatar,
   isIncoming = false,
-  onAnswer,
-  onDecline,
+  incomingCallId,
+  receiverId,
+  onCallStarted,
+  onCallEnded,
 }: VideoCallProps) {
   const [callState, setCallState] = useState<CallState>(isIncoming ? "ringing" : "connecting")
   const [isMuted, setIsMuted] = useState(false)
   const [isVideoOff, setIsVideoOff] = useState(callType === "audio")
   const [isSpeakerOn, setIsSpeakerOn] = useState(true)
-  const [isFullscreen, setIsFullscreen] = useState(false)
   const [isFrontCamera, setIsFrontCamera] = useState(true)
   const [callStartTime, setCallStartTime] = useState<Date | null>(null)
   const [showControls, setShowControls] = useState(true)
-  
+  const [callId, setCallId] = useState<string | null>(incomingCallId || null)
+  const [isMinimized, setIsMinimized] = useState(false)
+  const [isEnding, setIsEnding] = useState(false)
+
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
   const localStreamRef = useRef<MediaStream | null>(null)
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Initialize local media stream
   const initializeMedia = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -153,7 +141,6 @@ export function VideoCall({
     }
   }, [callType, isFrontCamera])
 
-  // Cleanup media stream
   const cleanupMedia = useCallback(() => {
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((track) => track.stop())
@@ -162,68 +149,152 @@ export function VideoCall({
   }, [])
 
   useEffect(() => {
-    if (open && (callState === "connecting" || callState === "connected")) {
+    if (open && (callState === "connecting" || callState === "connected" || callState === "ringing")) {
       initializeMedia()
     }
-    return () => cleanupMedia()
+    return () => {
+      if (!open) cleanupMedia()
+    }
   }, [open, callState, initializeMedia, cleanupMedia])
 
-  // Simulate connection (replace with actual WebRTC/Cloudflare logic)
+  // Initiate outgoing call
   useEffect(() => {
-    if (callState === "connecting") {
-      const timeout = setTimeout(() => {
-        setCallState("connected")
-        setCallStartTime(new Date())
-      }, 2000)
-      return () => clearTimeout(timeout)
-    }
-  }, [callState])
+    if (!open || isIncoming || callState !== "connecting" || callId) return
+    let cancelled = false
 
-  // Auto-hide controls
+    async function startCall() {
+      if (!receiverId) {
+        setCallState("ended")
+        return
+      }
+      const result = await initiateCall(receiverId, callType)
+      if (cancelled) return
+      if (result.success && result.callId) {
+        setCallId(result.callId)
+        onCallStarted?.(result.callId)
+        setCallState("ringing")
+      } else {
+        setCallState("ended")
+      }
+    }
+
+    startCall()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, isIncoming, callState, receiverId, callType])
+
+  // Poll for outgoing call status
   useEffect(() => {
-    if (callState === "connected" && showControls) {
+    if (!open || isIncoming || callState !== "ringing" || !callId) return
+    let cancelled = false
+
+    const pollInterval = setInterval(async () => {
+      if (cancelled) return
+      const result = await getCallStatus(callId)
+      if (cancelled) return
+      if (result.success && result.status) {
+        if (result.status === "ongoing") {
+          setCallState("connected")
+          setCallStartTime(new Date())
+        } else if (["declined", "missed", "failed"].includes(result.status)) {
+          setCallState("ended")
+          cleanupMedia()
+          onCallEnded?.()
+          setTimeout(onClose, 1500)
+        }
+      }
+    }, 2000)
+
+    return () => {
+      cancelled = true
+      clearInterval(pollInterval)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, isIncoming, callState, callId])
+
+  // Reset state when dialog opens
+  useEffect(() => {
+    if (open) {
+      setCallState(isIncoming ? "ringing" : "connecting")
+      setIsMuted(false)
+      setIsVideoOff(callType === "audio")
+      setCallStartTime(null)
+      setShowControls(true)
+      setIsMinimized(false)
+      setIsEnding(false)
+      if (!isIncoming) setCallId(null)
+    }
+  }, [open, isIncoming, callType])
+
+  // Auto-hide controls in connected state
+  useEffect(() => {
+    if (callState === "connected" && showControls && !isMinimized) {
       if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current)
-      controlsTimeoutRef.current = setTimeout(() => setShowControls(false), 4000)
+      controlsTimeoutRef.current = setTimeout(() => setShowControls(false), 5000)
     }
     return () => {
       if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current)
     }
-  }, [showControls, callState])
+  }, [showControls, callState, isMinimized])
 
-  const handleAnswer = () => {
+  const handleAnswer = async () => {
+    if (!incomingCallId) return
     setCallState("connecting")
-    onAnswer?.()
+    const result = await answerCall(incomingCallId)
+    if (result.success) {
+      setCallState("connected")
+      setCallStartTime(new Date())
+    } else {
+      setCallState("ended")
+    }
   }
 
-  const handleDecline = () => {
+  const handleDecline = async () => {
+    if (incomingCallId) {
+      const { declineCall } = await import("@/lib/actions/calls")
+      await declineCall(incomingCallId)
+    }
     setCallState("ended")
     cleanupMedia()
-    onDecline?.()
+    onCallEnded?.()
     setTimeout(onClose, 500)
   }
 
-  const handleEndCall = () => {
+  const handleEndCall = async () => {
+    if (isEnding) return
+    setIsEnding(true)
+    try {
+      if (callId) {
+        await endCallAction(callId)
+      }
+    } catch (e) {
+      console.error("End call error:", e)
+    }
     setCallState("ended")
     cleanupMedia()
+    onCallEnded?.()
     setTimeout(onClose, 500)
+  }
+
+  const handleMinimize = () => {
+    setIsMinimized(true)
+  }
+
+  const handleRestore = () => {
+    setIsMinimized(false)
+    setShowControls(true)
   }
 
   const toggleMute = () => {
-    setIsMuted(!isMuted)
-    if (localStreamRef.current) {
-      localStreamRef.current.getAudioTracks().forEach((track) => {
-        track.enabled = isMuted
-      })
-    }
+    const next = !isMuted
+    setIsMuted(next)
+    localStreamRef.current?.getAudioTracks().forEach((t) => { t.enabled = !next })
   }
 
   const toggleVideo = () => {
-    setIsVideoOff(!isVideoOff)
-    if (localStreamRef.current) {
-      localStreamRef.current.getVideoTracks().forEach((track) => {
-        track.enabled = isVideoOff
-      })
-    }
+    const next = !isVideoOff
+    setIsVideoOff(next)
+    localStreamRef.current?.getVideoTracks().forEach((t) => { t.enabled = !next })
   }
 
   const switchCamera = async () => {
@@ -233,238 +304,206 @@ export function VideoCall({
   }
 
   const getInitials = (name: string) =>
-    name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2)
+    name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
 
-  return (
-    <Dialog open={open} onOpenChange={(o) => !o && handleEndCall()}>
-      <DialogContent
-        className={cn(
-          "p-0 gap-0 overflow-hidden border-0 transition-all duration-300",
-          isFullscreen ? "max-w-full w-screen h-screen" : "max-w-md aspect-9/16"
-        )}
-        style={{ background: "#0a0a0a" }}
+  if (!open) return null
+
+  // ── Minimized floating pip ──
+  if (isMinimized) {
+    return (
+      <div
+        className="fixed bottom-20 right-4 z-50 cursor-pointer animate-in slide-in-from-bottom-4 fade-in duration-200"
+        onClick={handleRestore}
       >
         <div
-          className="relative w-full h-full flex flex-col"
-          onClick={() => callState === "connected" && setShowControls(!showControls)}
+          className="flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl"
+          style={{
+            background: "rgba(0,0,0,0.85)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+          }}
         >
-          {/* Background - Remote Video or Avatar */}
-          {callState === "connected" && callType === "video" && !isVideoOff ? (
-            <video
-              ref={remoteVideoRef}
-              autoPlay
-              playsInline
-              className="absolute inset-0 w-full h-full object-cover"
-              style={{ background: "#1a1a1a" }}
-            />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center bg-linear-to-b from-zinc-900 to-black">
-              {/* Animated rings for ringing state */}
-              {callState === "ringing" && (
-                <>
-                  <div className="absolute w-40 h-40 rounded-full border border-white/10 animate-ping" style={{ animationDuration: "2s" }} />
-                  <div className="absolute w-52 h-52 rounded-full border border-white/5 animate-ping" style={{ animationDuration: "2s", animationDelay: "0.5s" }} />
-                </>
-              )}
-              <Avatar className="w-28 h-28 border-2 border-white/20">
-                <AvatarImage src={callerAvatar} alt={callerName} />
-                <AvatarFallback className="text-3xl bg-zinc-800 text-white">
-                  {getInitials(callerName)}
-                </AvatarFallback>
-              </Avatar>
-            </div>
-          )}
-
-          {/* Local Video PIP */}
-          {callState === "connected" && callType === "video" && !isVideoOff && (
-            <div
+          <Avatar className="w-10 h-10">
+            <AvatarImage src={callerAvatar} alt={callerName} />
+            <AvatarFallback className="text-xs bg-zinc-700 text-white">
+              {getInitials(callerName)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex flex-col">
+            <span className="text-white text-sm font-medium">{callerName}</span>
+            <CallTimer startTime={callStartTime} />
+          </div>
+          <div className="flex items-center gap-2 ml-2">
+            <button
+              onClick={(e) => { e.stopPropagation(); toggleMute() }}
               className={cn(
-                "absolute top-20 right-4 w-28 aspect-3/4 rounded-2xl overflow-hidden transition-all duration-300",
-                showControls ? "opacity-100" : "opacity-70"
+                "w-8 h-8 rounded-full flex items-center justify-center",
+                isMuted ? "bg-white/90" : "bg-white/15"
               )}
-              style={{
-                background: "rgba(0, 0, 0, 0.3)",
-                backdropFilter: "blur(4px)",
-                boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3)",
-              }}
-              onClick={(e) => e.stopPropagation()}
             >
-              <video
-                ref={localVideoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full h-full object-cover"
-                style={{ transform: isFrontCamera ? "scaleX(-1)" : "none" }}
-              />
-            </div>
-          )}
+              <HugeiconsIcon icon={isMuted ? MicOff01Icon : Mic01Icon} size={14} className={isMuted ? "text-black" : "text-white"} />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); handleEndCall() }}
+              className="w-8 h-8 rounded-full flex items-center justify-center"
+              style={{ background: "rgba(239,68,68,0.9)" }}
+            >
+              <HugeiconsIcon icon={CallEnd01Icon} size={14} className="text-white" />
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
-          {/* Top Info Bar */}
+  // ── Full-screen call UI ──
+  return (
+    <div className="fixed inset-0 z-50 bg-black">
+      <div
+        className="relative w-full h-full flex flex-col"
+        onClick={() => callState === "connected" && setShowControls(!showControls)}
+      >
+        {/* Background */}
+        {callState === "connected" && callType === "video" && !isVideoOff ? (
+          <video
+            ref={remoteVideoRef}
+            autoPlay
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        ) : (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-zinc-900 via-zinc-950 to-black">
+            <Avatar className="w-28 h-28 mb-5">
+              <AvatarImage src={callerAvatar} alt={callerName} />
+              <AvatarFallback className="text-3xl bg-zinc-800 text-white">
+                {getInitials(callerName)}
+              </AvatarFallback>
+            </Avatar>
+            <h3 className="text-white font-semibold text-xl">{callerName}</h3>
+            <p className="text-white/50 text-sm mt-1">
+              {callState === "ringing" && (isIncoming ? "Incoming call..." : "Ringing...")}
+              {callState === "connecting" && "Connecting..."}
+              {callState === "connected" && <CallTimer startTime={callStartTime} />}
+              {callState === "ended" && "Call ended"}
+            </p>
+          </div>
+        )}
+
+        {/* Local PIP (video calls when connected) */}
+        {callState === "connected" && callType === "video" && !isVideoOff && (
           <div
-            className={cn(
-              "absolute top-0 left-0 right-0 flex items-center justify-between px-5 py-6 transition-all duration-300",
-              showControls || callState !== "connected" ? "opacity-100" : "opacity-0 pointer-events-none"
-            )}
-            style={{
-              background: "linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, transparent 100%)",
-            }}
+            className="absolute top-14 right-4 w-28 aspect-[3/4] rounded-2xl overflow-hidden"
+            style={{ background: "rgba(0,0,0,0.3)", backdropFilter: "blur(4px)" }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex flex-col">
-              <h3 className="text-white font-semibold text-lg">{callerName}</h3>
-              <p className="text-white/60 text-sm">
-                {callState === "ringing" && (isIncoming ? "Incoming call..." : "Calling...")}
-                {callState === "connecting" && "Connecting..."}
-                {callState === "connected" && <CallTimer startTime={callStartTime} />}
-                {callState === "ended" && "Call ended"}
-              </p>
-            </div>
-
-            {callState === "connected" && (
-              <div className="flex items-center gap-2">
-                <GlassButton onClick={() => setIsFullscreen(!isFullscreen)}>
-                  <HugeiconsIcon
-                    icon={isFullscreen ? MinimizeScreenIcon : MaximizeScreenIcon}
-                    size={20}
-                    className="text-white"
-                  />
-                </GlassButton>
-              </div>
-            )}
+            <video
+              ref={localVideoRef}
+              autoPlay playsInline muted
+              className="w-full h-full object-cover"
+              style={{ transform: isFrontCamera ? "scaleX(-1)" : "none" }}
+            />
           </div>
+        )}
 
-          {/* Ringing / Incoming Call UI */}
-          {callState === "ringing" && isIncoming && (
-            <div
-              className="absolute bottom-0 left-0 right-0 pb-12 pt-8 px-6"
-              style={{
-                background: "linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 100%)",
-              }}
-            >
-              <div className="flex items-center justify-center gap-16">
-                <div className="flex flex-col items-center gap-2">
-                  <GlassButton variant="danger" size="large" onClick={handleDecline}>
-                    <HugeiconsIcon icon={CallEnd01Icon} size={28} className="text-white" />
-                  </GlassButton>
-                  <span className="text-white/70 text-xs">Decline</span>
-                </div>
-                <div className="flex flex-col items-center gap-2">
-                  <GlassButton variant="success" size="large" onClick={handleAnswer}>
-                    <HugeiconsIcon icon={callType === "video" ? Video01Icon : Call02Icon} size={28} className="text-white" />
-                  </GlassButton>
-                  <span className="text-white/70 text-xs">Answer</span>
-                </div>
+        {/* Top bar — name + timer (video connected) + minimize */}
+        {callState === "connected" && callType === "video" && (
+          <div
+            className={cn(
+              "absolute top-0 left-0 right-0 flex items-center justify-between px-5 pt-12 pb-16 transition-all duration-300",
+              showControls ? "opacity-100" : "opacity-0 pointer-events-none"
+            )}
+            style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 100%)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div>
+              <h3 className="text-white font-semibold text-lg">{callerName}</h3>
+              <CallTimer startTime={callStartTime} />
+            </div>
+            <GlassButton onClick={handleMinimize}>
+              <HugeiconsIcon icon={MinimizeScreenIcon} size={18} className="text-white" />
+            </GlassButton>
+          </div>
+        )}
+
+        {/* Incoming call — answer/decline */}
+        {callState === "ringing" && isIncoming && (
+          <div
+            className="absolute bottom-0 left-0 right-0 pb-14 pt-8 px-6"
+            style={{ background: "linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 100%)" }}
+          >
+            <div className="flex items-center justify-center gap-20">
+              <div className="flex flex-col items-center gap-2">
+                <GlassButton variant="danger" size="large" onClick={handleDecline}>
+                  <HugeiconsIcon icon={CallEnd01Icon} size={28} className="text-white" />
+                </GlassButton>
+                <span className="text-white/60 text-xs">Decline</span>
+              </div>
+              <div className="flex flex-col items-center gap-2">
+                <GlassButton variant="success" size="large" onClick={handleAnswer}>
+                  <HugeiconsIcon icon={callType === "video" ? Video01Icon : Call02Icon} size={28} className="text-white" />
+                </GlassButton>
+                <span className="text-white/60 text-xs">Answer</span>
               </div>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Connecting State */}
-          {callState === "connecting" && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="flex flex-col items-center gap-4">
-                <div className="flex gap-1">
-                  {[0, 1, 2].map((i) => (
-                    <div
-                      key={i}
-                      className="w-2 h-2 rounded-full bg-white animate-bounce"
-                      style={{ animationDelay: `${i * 0.15}s` }}
-                    />
-                  ))}
-                </div>
-                <p className="text-white/60 text-sm">Connecting...</p>
-              </div>
-            </div>
-          )}
+        {/* Controls — outgoing ringing or connected */}
+        {(callState === "connected" || (callState === "ringing" && !isIncoming) || (callState === "connecting" && !isIncoming)) && (
+          <div
+            className={cn(
+              "absolute bottom-0 left-0 right-0 pb-12 pt-8 px-6 transition-all duration-300",
+              showControls || callState !== "connected" ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
+            )}
+            style={{ background: "linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-center gap-4">
+              <GlassButton onClick={toggleMute} className={isMuted ? "!bg-white/90" : ""}>
+                <HugeiconsIcon icon={isMuted ? MicOff01Icon : Mic01Icon} size={20} className={isMuted ? "text-black" : "text-white"} />
+              </GlassButton>
 
-          {/* Connected Call Controls */}
-          {(callState === "connected" || (callState === "ringing" && !isIncoming)) && (
-            <div
-              className={cn(
-                "absolute bottom-0 left-0 right-0 pb-10 pt-6 px-6 transition-all duration-300",
-                showControls || callState === "ringing" ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
+              {callType === "video" && (
+                <GlassButton onClick={toggleVideo} className={isVideoOff ? "!bg-white/90" : ""}>
+                  <HugeiconsIcon icon={isVideoOff ? VideoOffIcon : Video01Icon} size={20} className={isVideoOff ? "text-black" : "text-white"} />
+                </GlassButton>
               )}
-              style={{
-                background: "linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 100%)",
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Secondary Controls */}
-              <div className="flex items-center justify-center gap-4 mb-6">
-                {callType === "video" && (
-                  <GlassButton onClick={switchCamera}>
-                    <HugeiconsIcon icon={FlipHorizontalIcon} size={20} className="text-white" />
-                  </GlassButton>
-                )}
-                <GlassButton onClick={() => setIsSpeakerOn(!isSpeakerOn)}>
-                  <HugeiconsIcon
-                    icon={isSpeakerOn ? SpeakerIcon : Speaker01Icon}
-                    size={20}
-                    className="text-white"
-                  />
-                </GlassButton>
-                <GlassButton>
-                  <HugeiconsIcon icon={MoreHorizontalIcon} size={20} className="text-white" />
-                </GlassButton>
-              </div>
 
-              {/* Primary Controls */}
-              <div className="flex items-center justify-center gap-5">
-                <GlassButton
-                  onClick={toggleMute}
-                  className={isMuted ? "bg-white/90!" : ""}
-                >
-                  <HugeiconsIcon
-                    icon={isMuted ? MicOff01Icon : Mic01Icon}
-                    size={22}
-                    className={isMuted ? "text-black" : "text-white"}
-                  />
+              {callType === "video" && (
+                <GlassButton onClick={switchCamera}>
+                  <HugeiconsIcon icon={FlipHorizontalIcon} size={20} className="text-white" />
                 </GlassButton>
+              )}
 
-                {callType === "video" && (
-                  <GlassButton
-                    onClick={toggleVideo}
-                    className={isVideoOff ? "bg-white/90!" : ""}
-                  >
-                    <HugeiconsIcon
-                      icon={isVideoOff ? VideoOffIcon : Video01Icon}
-                      size={22}
-                      className={isVideoOff ? "text-black" : "text-white"}
-                    />
-                  </GlassButton>
-                )}
+              <GlassButton onClick={() => setIsSpeakerOn(!isSpeakerOn)} className={!isSpeakerOn ? "!bg-white/90" : ""}>
+                <HugeiconsIcon icon={isSpeakerOn ? SpeakerIcon : Speaker01Icon} size={20} className={!isSpeakerOn ? "text-black" : "text-white"} />
+              </GlassButton>
 
-                <GlassButton variant="danger" size="large" onClick={handleEndCall}>
-                  <HugeiconsIcon icon={CallEnd01Icon} size={26} className="text-white" />
+              {callState === "connected" && (
+                <GlassButton onClick={handleMinimize}>
+                  <HugeiconsIcon icon={MinimizeScreenIcon} size={20} className="text-white" />
                 </GlassButton>
-              </div>
+              )}
+
+              <GlassButton variant="danger" size="large" onClick={handleEndCall}>
+                <HugeiconsIcon icon={CallEnd01Icon} size={24} className="text-white" />
+              </GlassButton>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Ended State */}
-          {callState === "ended" && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="flex flex-col items-center gap-3">
-                <div
-                  className="w-16 h-16 rounded-full flex items-center justify-center"
-                  style={{
-                    background: "rgba(239, 68, 68, 0.2)",
-                    backdropFilter: "blur(12px)",
-                  }}
-                >
-                  <HugeiconsIcon icon={CallEnd01Icon} size={28} className="text-red-400" />
-                </div>
-                <p className="text-white/60 text-sm">Call ended</p>
+        {/* Ended state */}
+        {callState === "ended" && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-16 h-16 rounded-full flex items-center justify-center bg-red-500/20">
+                <HugeiconsIcon icon={CallEnd01Icon} size={28} className="text-red-400" />
               </div>
+              <p className="text-white/50 text-sm">Call ended</p>
             </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }

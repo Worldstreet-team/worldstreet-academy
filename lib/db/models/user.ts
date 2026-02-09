@@ -12,6 +12,7 @@ export interface IUser extends Document {
   role: "USER" | "INSTRUCTOR" | "ADMIN"
   verified: boolean
   walletBalance: number
+  hasOnboarded: boolean
   // For instructors
   instructorProfile?: {
     headline: string | null
@@ -82,6 +83,10 @@ const UserSchema = new Schema<IUser>(
     walletBalance: {
       type: Number,
       default: 0,
+    },
+    hasOnboarded: {
+      type: Boolean,
+      default: false,
     },
     instructorProfile: {
       headline: { type: String, default: null },

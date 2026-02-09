@@ -1,8 +1,9 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
+import Image from "next/image"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { Message01Icon, UserAdd01Icon, Search01Icon, Cancel01Icon } from "@hugeicons/core-free-icons"
+import { UserAdd01Icon, Search01Icon, Cancel01Icon } from "@hugeicons/core-free-icons"
 import { Topbar } from "@/components/platform/topbar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
@@ -23,6 +24,9 @@ import {
   DateSeparator,
   groupMessagesByDate,
   VideoCall,
+  CallEvent,
+  isCallEventMessage,
+  MessageContextMenu,
   type Conversation,
   type MessageType,
   type Attachment,
@@ -51,7 +55,7 @@ export default function MessagesPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedParticipant, setSelectedParticipant] = useState<ConversationWithDetails["participant"] | null>(null)
   const [showMobileChat, setShowMobileChat] = useState(false)
-  const [activeCall, setActiveCall] = useState<{ type: "video" | "audio" } | null>(null)
+  const [activeCall, setActiveCall] = useState<{ type: "video" | "audio"; callId?: string } | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   
@@ -159,6 +163,7 @@ export default function MessagesPage() {
     isDelivered: m.isDelivered,
     type: m.type === "text" ? undefined : m.type,
     fileUrl: m.fileUrl,
+    fileUrls: m.fileUrls,
     fileName: m.fileName,
     fileSize: m.fileSize,
     duration: m.duration,
@@ -183,9 +188,10 @@ export default function MessagesPage() {
     // Generate a temporary ID for optimistic update
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`
     
-    let fileData: { url: string; name?: string; size?: string; duration?: string; waveform?: number[] } | undefined
+    let fileData: { url: string; urls?: string[]; name?: string; size?: string; duration?: string; waveform?: number[] } | undefined
     let messageType: "text" | "image" | "video" | "audio" | "file" = "text"
     let previewUrl: string | undefined
+    let previewUrls: string[] | undefined
 
     if (attachments && attachments.length > 0) {
       const attachment = attachments[0]
@@ -196,19 +202,25 @@ export default function MessagesPage() {
       else if (attachment.type === "audio") messageType = "audio"
       else messageType = "file"
       
-      // Create preview URL for optimistic display
-      previewUrl = attachment.preview
+      // Create preview URLs for optimistic display
+      if (messageType === "image" && attachments.length > 1) {
+        previewUrls = attachments.filter(a => a.type === "image").map(a => a.preview || "")
+        previewUrl = previewUrls[0]
+      } else {
+        previewUrl = attachment.preview
+      }
     }
 
     // Create optimistic message immediately
     const optimisticMessage: OptimisticMessage = {
       id: tempId,
-      senderId: selectedParticipant.id, // Will be ignored since isOwn = true
+      senderId: selectedParticipant.id,
       senderName: "You",
       senderAvatar: null,
       content: content || "",
       type: messageType,
       fileUrl: previewUrl,
+      fileUrls: previewUrls,
       fileName: attachments?.[0]?.file.name,
       fileSize: attachments?.[0]?.file ? `${(attachments[0].file.size / 1024 / 1024).toFixed(2)} MB` : undefined,
       duration: attachments?.[0]?.duration,
@@ -224,57 +236,98 @@ export default function MessagesPage() {
     setMessages((prev) => [...prev, optimisticMessage])
 
     try {
-      // Process attachment upload if needed
+      // Process attachment uploads
       if (attachments && attachments.length > 0) {
-        const attachment = attachments[0]
-        const contentType = attachment.file.type || "application/octet-stream"
-        let uploadUrlResult
-        
-        if (messageType === "image") {
-          uploadUrlResult = await getImageUploadUrl(attachment.file.name, contentType)
-        } else if (messageType === "video") {
-          uploadUrlResult = await getVideoUploadUrl(attachment.file.name, contentType)
-        } else if (messageType === "audio") {
-          uploadUrlResult = await getAudioUploadUrl(attachment.file.name, contentType)
+        const imageAttachments = attachments.filter(a => a.type === "image")
+
+        // Multi-image upload
+        if (messageType === "image" && imageAttachments.length > 1) {
+          const uploadedUrls: string[] = []
+          const totalFiles = imageAttachments.length
+
+          for (let i = 0; i < totalFiles; i++) {
+            const attachment = imageAttachments[i]
+            const contentType = attachment.file.type || "application/octet-stream"
+            const uploadUrlResult = await getImageUploadUrl(attachment.file.name, contentType)
+
+            if (!uploadUrlResult.success || !uploadUrlResult.uploadUrl || !uploadUrlResult.publicUrl) {
+              throw new Error("Failed to get upload URL")
+            }
+
+            const uploadOk = await new Promise<boolean>((resolve) => {
+              const xhr = new XMLHttpRequest()
+              xhr.open("PUT", uploadUrlResult.uploadUrl!)
+              xhr.setRequestHeader("Content-Type", contentType)
+              xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable) {
+                  const filePct = (event.loaded / event.total)
+                  const overallPct = Math.round(((i + filePct) / totalFiles) * 100)
+                  setMessages((prev) =>
+                    prev.map((m) => m.id === tempId ? { ...m, uploadProgress: overallPct } : m)
+                  )
+                }
+              }
+              xhr.onload = () => resolve(xhr.status >= 200 && xhr.status < 300)
+              xhr.onerror = () => resolve(false)
+              xhr.send(attachment.file)
+            })
+
+            if (!uploadOk) throw new Error("Upload failed")
+            uploadedUrls.push(uploadUrlResult.publicUrl)
+          }
+
+          fileData = {
+            url: uploadedUrls[0],
+            urls: uploadedUrls,
+            name: imageAttachments[0].file.name,
+            size: `${imageAttachments.reduce((sum, a) => sum + a.file.size, 0) / 1024 / 1024 | 0} MB`,
+          }
         } else {
-          uploadUrlResult = await getImageUploadUrl(attachment.file.name, contentType)
-        }
-        
-        if (uploadUrlResult.success && uploadUrlResult.uploadUrl && uploadUrlResult.publicUrl) {
-          // Use XMLHttpRequest for progress tracking on video uploads
+          // Single file upload (image, video, audio, file)
+          const attachment = attachments[0]
+          const contentType = attachment.file.type || "application/octet-stream"
+          let uploadUrlResult
+
+          if (messageType === "image") {
+            uploadUrlResult = await getImageUploadUrl(attachment.file.name, contentType)
+          } else if (messageType === "video") {
+            uploadUrlResult = await getVideoUploadUrl(attachment.file.name, contentType)
+          } else if (messageType === "audio") {
+            uploadUrlResult = await getAudioUploadUrl(attachment.file.name, contentType)
+          } else {
+            uploadUrlResult = await getImageUploadUrl(attachment.file.name, contentType)
+          }
+
+          if (!uploadUrlResult.success || !uploadUrlResult.uploadUrl || !uploadUrlResult.publicUrl) {
+            throw new Error("Failed to get upload URL")
+          }
+
           const uploadOk = await new Promise<boolean>((resolve) => {
             const xhr = new XMLHttpRequest()
             xhr.open("PUT", uploadUrlResult.uploadUrl!)
             xhr.setRequestHeader("Content-Type", contentType)
-            
             xhr.upload.onprogress = (event) => {
               if (event.lengthComputable) {
                 const pct = Math.round((event.loaded / event.total) * 100)
-                // Update optimistic message with upload progress
-                setMessages((prev) => 
+                setMessages((prev) =>
                   prev.map((m) => m.id === tempId ? { ...m, uploadProgress: pct } : m)
                 )
               }
             }
-            
             xhr.onload = () => resolve(xhr.status >= 200 && xhr.status < 300)
             xhr.onerror = () => resolve(false)
             xhr.send(attachment.file)
           })
-          
-          if (uploadOk) {
-            fileData = {
-              url: uploadUrlResult.publicUrl,
-              name: attachment.file.name,
-              size: `${(attachment.file.size / 1024 / 1024).toFixed(2)} MB`,
-              duration: attachment.duration,
-              waveform: attachment.waveform,
-            }
-          } else {
-            throw new Error("Upload failed")
+
+          if (!uploadOk) throw new Error("Upload failed")
+
+          fileData = {
+            url: uploadUrlResult.publicUrl,
+            name: attachment.file.name,
+            size: `${(attachment.file.size / 1024 / 1024).toFixed(2)} MB`,
+            duration: attachment.duration,
+            waveform: attachment.waveform,
           }
-        } else {
-          throw new Error("Failed to get upload URL")
         }
       }
 
@@ -421,8 +474,20 @@ export default function MessagesPage() {
                   <div className="flex-1 overflow-y-auto max-h-[calc(100vh-16rem)] md:max-h-[calc(100vh-12rem)]">
                     <div className="px-3 py-4 space-y-1 max-w-3xl mx-auto w-full">
                       {messageGroups.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground text-sm">
-                          No messages yet. Start the conversation!
+                        <div className="flex flex-col items-center justify-center py-12 px-4">
+                          <div className="relative w-48 h-48 sm:w-56 sm:h-56 mb-4">
+                            <Image
+                              src="/user/dashboard/no-messages-illustration.png"
+                              alt=""
+                              fill
+                              className="object-contain"
+                              sizes="224px"
+                            />
+                          </div>
+                          <h3 className="text-base font-semibold mb-1">No messages here yet</h3>
+                          <p className="text-sm text-muted-foreground text-center max-w-xs">
+                            Be the first to send a hello! Start a conversation and connect.
+                          </p>
                         </div>
                       ) : (
                         messageGroups.map((group) => (
@@ -431,12 +496,33 @@ export default function MessagesPage() {
                             <div className="space-y-1">
                               {group.messages.map((msg, i) => {
                                 const prev = group.messages[i - 1]
+
+                                // Render call event messages with special UI
+                                if (isCallEventMessage(msg.content)) {
+                                  return (
+                                    <CallEvent
+                                      key={msg.id}
+                                      content={msg.content}
+                                      isOwn={msg.isOwn}
+                                      timestamp={msg.timestamp}
+                                      onCallback={(type) => setActiveCall({ type })}
+                                    />
+                                  )
+                                }
+
                                 return (
-                                  <MessageBubble
+                                  <MessageContextMenu
                                     key={msg.id}
-                                    message={msg}
-                                    showAvatar={!prev || prev.senderId !== msg.senderId}
-                                  />
+                                    messageId={msg.id}
+                                    content={msg.content}
+                                    isOwn={msg.isOwn}
+                                    onDeleted={(id) => setMessages((prev) => prev.filter((m) => m.id !== id))}
+                                  >
+                                    <MessageBubble
+                                      message={msg}
+                                      showAvatar={!prev || prev.senderId !== msg.senderId}
+                                    />
+                                  </MessageContextMenu>
                                 )
                               })}
                             </div>
@@ -456,7 +542,7 @@ export default function MessagesPage() {
           ) : (
             <div className="flex-1 flex items-center justify-center text-muted-foreground">
               <div className="text-center">
-                <HugeiconsIcon icon={Message01Icon} size={40} className="mx-auto mb-3 opacity-40" />
+                <Image src="/user/dashboard/no-messages-illustration.png" alt="No messages" width={180} height={180} className="mx-auto mb-4 opacity-80" />
                 <p className="text-sm">Select a conversation or start a new one</p>
                 <Button
                   variant="outline"
@@ -593,6 +679,9 @@ export default function MessagesPage() {
           callType={activeCall?.type || "video"}
           callerName={selectedParticipant.name}
           callerAvatar={selectedParticipant.avatar || undefined}
+          receiverId={selectedParticipant.id}
+          onCallStarted={(callId) => setActiveCall((prev) => prev ? { ...prev, callId } : prev)}
+          onCallEnded={() => setActiveCall(null)}
         />
       )}
     </>

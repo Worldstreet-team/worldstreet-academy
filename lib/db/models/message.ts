@@ -8,6 +8,7 @@ export interface IMessage extends Document {
   content: string
   type: "text" | "image" | "video" | "audio" | "file"
   fileUrl?: string
+  fileUrls?: string[] // Multiple file URLs (multi-image)
   fileName?: string
   fileSize?: string
   duration?: string // For audio/video
@@ -56,6 +57,10 @@ const MessageSchema = new Schema<IMessage>(
     },
     fileUrl: {
       type: String,
+    },
+    fileUrls: {
+      type: [String],
+      default: undefined,
     },
     fileName: {
       type: String,

@@ -64,6 +64,7 @@ export async function GET(request: NextRequest) {
       content: msg.content,
       type: msg.type,
       fileUrl: msg.fileUrl,
+      fileUrls: msg.fileUrls,
       fileName: msg.fileName,
       fileSize: msg.fileSize,
       duration: msg.duration,

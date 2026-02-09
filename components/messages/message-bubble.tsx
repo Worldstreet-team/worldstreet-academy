@@ -9,6 +9,10 @@ import {
   Tick02Icon,
   TickDouble02Icon,
   Cancel01Icon,
+  ArrowLeft01Icon,
+  ArrowRight01Icon,
+  Image02Icon,
+  Download04Icon,
 } from "@hugeicons/core-free-icons"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
@@ -25,6 +29,7 @@ export type MessageType = {
   isOwn: boolean
   type?: "text" | "image" | "file" | "voice" | "video" | "audio"
   fileUrl?: string
+  fileUrls?: string[]
   fileName?: string
   fileSize?: string
   duration?: string
@@ -43,10 +48,11 @@ type MessageBubbleProps = {
 export function MessageBubble({ message, showAvatar = true }: MessageBubbleProps) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [hasPlayed, setHasPlayed] = useState(false)
+  const [isAudioLoading, setIsAudioLoading] = useState(false)
   const [progress, setProgress] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
   const [audioDuration, setAudioDuration] = useState(0)
-  const [fullscreenMedia, setFullscreenMedia] = useState<"image" | "video" | null>(null)
+  const [fullscreenMedia, setFullscreenMedia] = useState<{ type: "image" | "video"; index?: number } | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const animationFrameRef = useRef<number | null>(null)
 
@@ -95,12 +101,15 @@ export function MessageBubble({ message, showAvatar = true }: MessageBubbleProps
         }
         setIsPlaying(false)
       } else {
+        setIsAudioLoading(true)
         audioRef.current.play().then(() => {
           setIsPlaying(true)
+          setIsAudioLoading(false)
           animationFrameRef.current = requestAnimationFrame(updateAudioProgress)
         }).catch((err) => {
           console.error("Audio play failed:", err)
           setIsPlaying(false)
+          setIsAudioLoading(false)
         })
       }
     }
@@ -119,23 +128,39 @@ export function MessageBubble({ message, showAvatar = true }: MessageBubbleProps
 
   const renderContent = () => {
     switch (message.type) {
-      case "image":
+      case "image": {
+        // Collect all image URLs
+        const urls = message.fileUrls && message.fileUrls.length > 0
+          ? message.fileUrls
+          : message.fileUrl
+            ? [message.fileUrl]
+            : []
+        const count = urls.length
+
+        if (count === 0) {
+          return (
+            <div className="min-w-56 aspect-4/3 bg-muted flex items-center justify-center">
+              <div className="animate-pulse text-muted-foreground text-xs">Loading image...</div>
+            </div>
+          )
+        }
+
         return (
           <div className="space-y-1">
             <button
-              onClick={() => setFullscreenMedia("image")}
-              className="block overflow-hidden w-full min-w-56 relative aspect-4/3 bg-muted cursor-pointer active:scale-[0.98] transition-transform"
+              onClick={() => setFullscreenMedia({ type: "image", index: 0 })}
+              className="block relative bg-muted cursor-pointer active:scale-[0.98] transition-transform overflow-hidden w-full aspect-4/3"
+              style={{ minWidth: 280 }}
             >
-              {message.fileUrl ? (
-                <Image
-                  src={message.fileUrl}
-                  alt=""
-                  fill
-                  className="object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <div className="animate-pulse text-muted-foreground text-xs">Loading image...</div>
+              <Image src={urls[0]} alt="" fill className="object-cover" sizes="280px" />
+              {/* Multi-media badge */}
+              {count > 1 && (
+                <div
+                  className="absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full text-white text-xs font-medium"
+                  style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}
+                >
+                  <HugeiconsIcon icon={Image02Icon} size={12} />
+                  <span>{count}</span>
                 </div>
               )}
             </button>
@@ -144,12 +169,13 @@ export function MessageBubble({ message, showAvatar = true }: MessageBubbleProps
             )}
           </div>
         )
+      }
 
       case "video":
         return (
           <div className="space-y-1">
             <button
-              onClick={() => message.fileUrl && !message.uploadProgress ? setFullscreenMedia("video") : undefined}
+              onClick={() => message.fileUrl && !message.uploadProgress ? setFullscreenMedia({ type: "video" }) : undefined}
               className={cn(
                 "block overflow-hidden w-full min-w-56 relative aspect-video bg-black",
                 message.fileUrl && !message.uploadProgress && "cursor-pointer active:scale-[0.98] transition-transform"
@@ -184,7 +210,7 @@ export function MessageBubble({ message, showAvatar = true }: MessageBubbleProps
                     </div>
                   ) : (
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="h-11 w-11 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center border border-white/10">
+                      <div className="h-11 w-11 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
                         <HugeiconsIcon icon={PlayIcon} size={20} className="text-white ml-0.5" />
                       </div>
                     </div>
@@ -226,7 +252,7 @@ export function MessageBubble({ message, showAvatar = true }: MessageBubbleProps
               <audio
                 ref={audioRef}
                 src={message.fileUrl}
-                preload="metadata"
+                preload="auto"
                 onEnded={() => {
                   setIsPlaying(false)
                   setHasPlayed(true)
@@ -264,13 +290,20 @@ export function MessageBubble({ message, showAvatar = true }: MessageBubbleProps
                 !message.fileUrl && "opacity-50 cursor-not-allowed"
               )}
               onClick={message.fileUrl ? toggleAudio : undefined}
-              disabled={!message.fileUrl}
+              disabled={!message.fileUrl || isAudioLoading}
             >
-              <HugeiconsIcon 
-                icon={isPlaying ? PauseIcon : PlayIcon} 
-                size={16} 
-                className={message.isOwn ? "text-primary-foreground" : ""}
-              />
+              {isAudioLoading ? (
+                <div className={cn(
+                  "h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin",
+                  message.isOwn ? "text-primary-foreground" : ""
+                )} />
+              ) : (
+                <HugeiconsIcon 
+                  icon={isPlaying ? PauseIcon : PlayIcon} 
+                  size={16} 
+                  className={message.isOwn ? "text-primary-foreground" : ""}
+                />
+              )}
             </button>
             {/* Progress bar with thumb */}
             <div 
@@ -327,12 +360,13 @@ export function MessageBubble({ message, showAvatar = true }: MessageBubbleProps
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12, scale: 0.97 }}
-      animate={{ opacity: message.status === "pending" ? 0.5 : 1, y: 0, scale: 1 }}
+      initial={{ y: 12, scale: 0.97 }}
+      animate={{ y: 0, scale: 1 }}
       transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
       className={cn(
-        "flex gap-2",
+        "flex gap-2 transition-opacity duration-200",
         message.isOwn ? "justify-end" : "justify-start",
+        message.status === "pending" ? "opacity-60" : "opacity-100",
       )}
     >
       {!message.isOwn && showAvatar && (
@@ -393,13 +427,29 @@ export function MessageBubble({ message, showAvatar = true }: MessageBubbleProps
       </div>
 
       {/* Fullscreen media viewer */}
-      {fullscreenMedia && message.fileUrl && (
-        <FullscreenMediaViewer
-          type={fullscreenMedia}
-          url={message.fileUrl}
-          onClose={() => setFullscreenMedia(null)}
-        />
-      )}
+      {fullscreenMedia && (() => {
+        let viewerUrl: string | undefined
+        let allUrls: string[] | undefined
+        if (fullscreenMedia.type === "image") {
+          const urls = message.fileUrls && message.fileUrls.length > 0
+            ? message.fileUrls
+            : message.fileUrl ? [message.fileUrl] : []
+          viewerUrl = urls[fullscreenMedia.index ?? 0]
+          allUrls = urls
+        } else {
+          viewerUrl = message.fileUrl
+        }
+        if (!viewerUrl) return null
+        return (
+          <FullscreenMediaViewer
+            type={fullscreenMedia.type}
+            url={viewerUrl}
+            urls={allUrls}
+            initialIndex={fullscreenMedia.index ?? 0}
+            onClose={() => setFullscreenMedia(null)}
+          />
+        )
+      })()}
     </motion.div>
   )
 }
@@ -408,10 +458,14 @@ export function MessageBubble({ message, showAvatar = true }: MessageBubbleProps
 function FullscreenMediaViewer({
   type,
   url,
+  urls,
+  initialIndex = 0,
   onClose,
 }: {
   type: "image" | "video"
   url: string
+  urls?: string[]
+  initialIndex?: number
   onClose: () => void
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
@@ -420,14 +474,33 @@ function FullscreenMediaViewer({
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
   const progressBarRef = useRef<HTMLDivElement | null>(null)
+  const [currentIndex, setCurrentIndex] = useState(initialIndex)
+  const activeUrl = type === "image" && urls && urls.length > 1 ? urls[currentIndex] : url
 
-  // Close on Escape
+  const hasGallery = type === "image" && urls && urls.length > 1
+
+  const togglePlay = useCallback(() => {
+    if (!videoRef.current) return
+    if (videoRef.current.paused) {
+      videoRef.current.play()
+      setIsPlaying(true)
+    } else {
+      videoRef.current.pause()
+      setIsPlaying(false)
+    }
+  }, [])
+
+  // Close on Escape, arrow keys for gallery nav
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose()
       if (e.key === " " && type === "video") {
         e.preventDefault()
         togglePlay()
+      }
+      if (hasGallery) {
+        if (e.key === "ArrowLeft") setCurrentIndex((i) => Math.max(0, i - 1))
+        if (e.key === "ArrowRight") setCurrentIndex((i) => Math.min((urls?.length ?? 1) - 1, i + 1))
       }
     }
     document.addEventListener("keydown", handleKey)
@@ -436,16 +509,22 @@ function FullscreenMediaViewer({
       document.removeEventListener("keydown", handleKey)
       document.body.style.overflow = ""
     }
-  }, [onClose, type])
+  }, [onClose, type, hasGallery, urls?.length, togglePlay])
 
-  const togglePlay = () => {
-    if (!videoRef.current) return
-    if (videoRef.current.paused) {
-      videoRef.current.play()
-      setIsPlaying(true)
-    } else {
-      videoRef.current.pause()
-      setIsPlaying(false)
+  const handleDownload = async () => {
+    try {
+      const response = await fetch(activeUrl)
+      const blob = await response.blob()
+      const blobUrl = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = blobUrl
+      a.download = `image-${currentIndex + 1}.jpg`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(blobUrl)
+    } catch {
+      window.open(activeUrl, "_blank")
     }
   }
 
@@ -487,13 +566,23 @@ function FullscreenMediaViewer({
       {/* Glassmorphic backdrop */}
       <div className="absolute inset-0 bg-black/85 backdrop-blur-xl" />
 
-      {/* Close button */}
-      <button
-        onClick={onClose}
-        className="absolute top-4 right-4 z-10 h-10 w-10 rounded-full bg-white/10 backdrop-blur-md border border-white/15 flex items-center justify-center hover:bg-white/20 transition-colors"
-      >
-        <HugeiconsIcon icon={Cancel01Icon} size={18} className="text-white" />
-      </button>
+      {/* Top bar: close + download */}
+      <div className="absolute top-4 left-4 right-4 z-10 flex items-center justify-between">
+        <button
+          onClick={onClose}
+          className="h-10 w-10 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center hover:bg-white/20 transition-all duration-300"
+        >
+          <HugeiconsIcon icon={Cancel01Icon} size={18} className="text-white" />
+        </button>
+        {type === "image" && (
+          <button
+            onClick={handleDownload}
+            className="h-10 w-10 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center hover:bg-white/20 transition-all duration-300"
+          >
+            <HugeiconsIcon icon={Download04Icon} size={18} className="text-white" />
+          </button>
+        )}
+      </div>
 
       {/* Media content */}
       <div
@@ -501,14 +590,53 @@ function FullscreenMediaViewer({
         onClick={(e) => e.stopPropagation()}
       >
         {type === "image" ? (
-          <Image
-            src={url}
-            alt=""
-            fill
-            className="object-contain p-8"
-            sizes="100vw"
-            priority
-          />
+          <div className="relative w-full h-full flex items-center justify-center">
+            <Image
+              src={activeUrl}
+              alt=""
+              fill
+              className="object-contain p-8"
+              sizes="100vw"
+              priority
+            />
+            {/* Gallery prev/next arrows + dots */}
+            {hasGallery && (
+              <>
+                {/* Left arrow */}
+                {currentIndex > 0 && (
+                  <button
+                    onClick={() => setCurrentIndex((i) => i - 1)}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center hover:bg-black/60 transition-all"
+                  >
+                    <HugeiconsIcon icon={ArrowLeft01Icon} size={20} className="text-white" />
+                  </button>
+                )}
+                {/* Right arrow */}
+                {currentIndex < (urls?.length ?? 1) - 1 && (
+                  <button
+                    onClick={() => setCurrentIndex((i) => i + 1)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center hover:bg-black/60 transition-all"
+                  >
+                    <HugeiconsIcon icon={ArrowRight01Icon} size={20} className="text-white" />
+                  </button>
+                )}
+                {/* Counter + dots */}
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/40 backdrop-blur-sm">
+                  <span className="text-white/80 text-xs tabular-nums mr-1">{currentIndex + 1}/{urls!.length}</span>
+                  {urls!.map((_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setCurrentIndex(i)}
+                      className={cn(
+                        "h-1.5 rounded-full transition-all duration-200",
+                        i === currentIndex ? "w-4 bg-white" : "w-1.5 bg-white/40 hover:bg-white/60"
+                      )}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         ) : (
           <div className="relative max-w-full max-h-full w-full h-full flex flex-col items-center justify-center">
             {/* Video element */}
@@ -527,18 +655,18 @@ function FullscreenMediaViewer({
             {!isPlaying && (
               <button
                 onClick={togglePlay}
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-16 w-16 rounded-full bg-white/15 backdrop-blur-md border border-white/20 flex items-center justify-center hover:bg-white/25 transition-colors"
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-16 w-16 rounded-full bg-white/15 backdrop-blur-md flex items-center justify-center hover:bg-white/25 transition-all duration-300"
               >
                 <HugeiconsIcon icon={PlayIcon} size={28} className="text-white ml-1" />
               </button>
             )}
 
             {/* Bottom control bar */}
-            <div className="absolute bottom-4 left-4 right-4 flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15">
+            <div className="absolute bottom-4 left-4 right-4 flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/10 backdrop-blur-md">
               {/* Play/Pause button */}
               <button
                 onClick={togglePlay}
-                className="h-10 w-10 shrink-0 rounded-full bg-white/15 flex items-center justify-center hover:bg-white/25 transition-colors"
+                className="h-10 w-10 shrink-0 rounded-full bg-white/15 flex items-center justify-center hover:bg-white/25 transition-all duration-300"
               >
                 <HugeiconsIcon icon={isPlaying ? PauseIcon : PlayIcon} size={20} className="text-white" />
               </button>
