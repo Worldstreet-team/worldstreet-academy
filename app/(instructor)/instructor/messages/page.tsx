@@ -1,9 +1,18 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { Message01Icon } from "@hugeicons/core-free-icons"
+import { Message01Icon, UserAdd01Icon, Search01Icon, Cancel01Icon } from "@hugeicons/core-free-icons"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   ConversationList,
   ChatHeader,
@@ -11,141 +20,329 @@ import {
   MessageInput,
   DateSeparator,
   groupMessagesByDate,
-  MediaEditor,
   VideoCall,
   type Conversation,
   type MessageType,
   type Attachment,
 } from "@/components/messages"
+import {
+  getConversations,
+  getMessages,
+  sendMessage,
+  searchUsers,
+  getOrCreateConversation,
+  type ConversationWithDetails,
+  type MessageWithDetails,
+  type UserSearchResult,
+} from "@/lib/actions/messages"
+import { getImageUploadUrl, getVideoUploadUrl, getAudioUploadUrl } from "@/lib/actions/upload"
+import { useMessagePolling } from "@/lib/hooks/use-websocket"
+import { ConversationListSkeleton } from "@/components/skeletons/message-skeletons"
 
-// Mock conversations
-const mockConversations: Conversation[] = [
-  {
-    id: "1",
-    name: "Alex Thompson",
-    lastMessage: "I had a question about lesson 3.",
-    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-    unread: 2,
-    isOnline: true,
-  },
-  {
-    id: "2",
-    name: "Emily Davis",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Emily",
-    lastMessage: "Got it, thanks!",
-    timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000),
-    unread: 0,
-    isOnline: false,
-  },
-  {
-    id: "3",
-    name: "Michael Brown",
-    lastMessage: "When will the next lesson be available?",
-    timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-    unread: 1,
-    isOnline: true,
-  },
-]
-
-// Mock messages
-const mockMessages: MessageType[] = [
-  {
-    id: "1",
-    senderId: "student-1",
-    senderName: "Alex Thompson",
-    content: "Hi! I just enrolled in your course.",
-    timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-    isOwn: false,
-  },
-  {
-    id: "2",
-    senderId: "instructor",
-    content: "Welcome! Feel free to ask any questions.",
-    timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 + 30 * 60 * 1000),
-    isOwn: true,
-    isRead: true,
-  },
-  {
-    id: "3",
-    senderId: "student-1",
-    senderName: "Alex Thompson",
-    content: "I had a question about lesson 3.",
-    timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000),
-    isOwn: false,
-  },
-  {
-    id: "4",
-    senderId: "instructor",
-    content: "Sure! What would you like to know?",
-    timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000 + 15 * 60 * 1000),
-    isOwn: true,
-    isRead: true,
-  },
-  {
-    id: "5",
-    senderId: "student-1",
-    senderName: "Alex Thompson",
-    content: "I'm confused about the trading strategies.",
-    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-    isOwn: false,
-  },
-  {
-    id: "6",
-    senderId: "instructor",
-    content: "Here's a guide that should help",
-    timestamp: new Date(Date.now() - 1.5 * 60 * 60 * 1000),
-    isOwn: true,
-    type: "file",
-    fileName: "Trading_Guide.pdf",
-    fileSize: "2.3 MB",
-    isRead: false,
-  },
-]
+// Extended message type with status for optimistic updates
+type OptimisticMessage = MessageWithDetails & { status?: "pending" | "sent" | "error" }
 
 export default function InstructorMessagesPage() {
-  const [selectedId, setSelectedId] = useState<string | null>("1")
+  const [conversations, setConversations] = useState<ConversationWithDetails[]>([])
+  const [messages, setMessages] = useState<OptimisticMessage[]>([])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedParticipant, setSelectedParticipant] = useState<ConversationWithDetails["participant"] | null>(null)
   const [showMobileChat, setShowMobileChat] = useState(false)
-  const [editingMedia, setEditingMedia] = useState<{ file: File; type: "image" | "video" } | null>(null)
   const [activeCall, setActiveCall] = useState<{ type: "video" | "audio" } | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
   
-  const selected = mockConversations.find((c) => c.id === selectedId)
-  const messageGroups = groupMessagesByDate(mockMessages)
+  // User search state
+  const [showUserSearch, setShowUserSearch] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [searchResults, setSearchResults] = useState<UserSearchResult[]>([])
+  const [isSearching, setIsSearching] = useState(false)
 
-  const handleSelect = (id: string) => {
-    setSelectedId(id)
-    setShowMobileChat(true)
-  }
-
-  const handleSendMessage = (content: string, attachments?: Attachment[]) => {
-    console.log("Send:", content, attachments)
-  }
-
-  const handleEditMedia = (attachment: Attachment) => {
-    if (attachment.type === "image" || attachment.type === "video") {
-      setEditingMedia({ file: attachment.file, type: attachment.type })
+  // Load conversations
+  useEffect(() => {
+    async function loadConversations() {
+      setIsLoading(true)
+      const result = await getConversations()
+      if (result.success && result.conversations) {
+        setConversations(result.conversations)
+      }
+      setIsLoading(false)
     }
-  }
+    loadConversations()
+  }, [])
+
+  // Load messages when conversation changes
+  useEffect(() => {
+    async function loadMessages() {
+      if (!selectedId) {
+        setMessages([])
+        return
+      }
+      const result = await getMessages(selectedId)
+      if (result.success && result.messages) {
+        setMessages(result.messages)
+      }
+    }
+    loadMessages()
+  }, [selectedId])
+
+  // Real-time message polling
+  const lastMessageIdRef = useRef<string | null>(null)
+  
+  useEffect(() => {
+    if (messages.length > 0) {
+      lastMessageIdRef.current = messages[messages.length - 1].id
+    }
+  }, [messages])
+
+  useMessagePolling({
+    conversationId: selectedId,
+    enabled: !!selectedId,
+    interval: 3000,
+    onNewMessages: useCallback((newMessages: MessageWithDetails[]) => {
+      setMessages((prev) => {
+        const existingIds = new Set(prev.map((m) => m.id))
+        const uniqueNew = newMessages.filter((m) => !existingIds.has(m.id))
+        return [...prev, ...uniqueNew]
+      })
+      getConversations().then((result) => {
+        if (result.success && result.conversations) {
+          setConversations(result.conversations)
+        }
+      })
+    }, []),
+  })
+
+  // Map to ConversationList format
+  const mappedConversations: Conversation[] = conversations.map((c) => ({
+    id: c.id,
+    name: c.participant.name,
+    avatar: c.participant.avatar || undefined,
+    lastMessage: c.lastMessage,
+    timestamp: new Date(c.lastMessageAt),
+    unread: c.unreadCount,
+    isOnline: c.participant.isOnline,
+  }))
+
+  // Map to MessageType format
+  const mappedMessages: MessageType[] = messages.map((m) => ({
+    id: m.id,
+    senderId: m.senderId,
+    senderName: m.senderName,
+    senderAvatar: m.senderAvatar || undefined,
+    content: m.content,
+    timestamp: new Date(m.timestamp),
+    isOwn: m.isOwn,
+    isRead: m.isRead,
+    isDelivered: m.isDelivered,
+    type: m.type === "text" ? undefined : m.type,
+    fileUrl: m.fileUrl,
+    fileName: m.fileName,
+    fileSize: m.fileSize,
+    duration: m.duration,
+    waveform: m.waveform,
+    status: m.status,
+  }))
+
+  const messageGroups = groupMessagesByDate(mappedMessages)
+
+  const handleSelect = useCallback((id: string) => {
+    setSelectedId(id)
+    const conv = conversations.find((c) => c.id === id)
+    setSelectedParticipant(conv?.participant || null)
+    setShowMobileChat(true)
+  }, [conversations])
+
+  const handleSendMessage = useCallback(async (content: string, attachments?: Attachment[]) => {
+    if (!selectedParticipant) return
+
+    // Generate a temporary ID for optimistic update
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    
+    let fileData: { url: string; name?: string; size?: string; duration?: string; waveform?: number[] } | undefined
+    let messageType: "text" | "image" | "video" | "audio" | "file" = "text"
+    let previewUrl: string | undefined
+
+    if (attachments && attachments.length > 0) {
+      const attachment = attachments[0]
+      
+      // Determine message type
+      if (attachment.type === "image") messageType = "image"
+      else if (attachment.type === "video") messageType = "video"
+      else if (attachment.type === "audio") messageType = "audio"
+      else messageType = "file"
+      
+      // Create preview URL for optimistic display
+      previewUrl = attachment.preview
+    }
+
+    // Create optimistic message immediately
+    const optimisticMessage: OptimisticMessage = {
+      id: tempId,
+      senderId: selectedParticipant.id, // Will be ignored since isOwn = true
+      senderName: "You",
+      senderAvatar: null,
+      content: content || "",
+      type: messageType,
+      fileUrl: previewUrl,
+      fileName: attachments?.[0]?.file.name,
+      fileSize: attachments?.[0]?.file ? `${(attachments[0].file.size / 1024 / 1024).toFixed(2)} MB` : undefined,
+      duration: attachments?.[0]?.duration,
+      waveform: attachments?.[0]?.waveform,
+      isOwn: true,
+      isRead: false,
+      isDelivered: false,
+      timestamp: new Date(),
+      status: "pending",
+    }
+
+    // Add optimistic message to UI immediately
+    setMessages((prev) => [...prev, optimisticMessage])
+
+    try {
+      // Process attachment upload if needed
+      if (attachments && attachments.length > 0) {
+        const attachment = attachments[0]
+        const contentType = attachment.file.type || "application/octet-stream"
+        let uploadUrlResult
+        
+        if (messageType === "image") {
+          uploadUrlResult = await getImageUploadUrl(attachment.file.name, contentType)
+        } else if (messageType === "video") {
+          uploadUrlResult = await getVideoUploadUrl(attachment.file.name, contentType)
+        } else if (messageType === "audio") {
+          uploadUrlResult = await getAudioUploadUrl(attachment.file.name, contentType)
+        } else {
+          uploadUrlResult = await getImageUploadUrl(attachment.file.name, contentType)
+        }
+        
+        if (uploadUrlResult.success && uploadUrlResult.uploadUrl && uploadUrlResult.publicUrl) {
+          const uploadResponse = await fetch(uploadUrlResult.uploadUrl, {
+            method: "PUT",
+            body: attachment.file,
+            headers: { "Content-Type": contentType },
+          })
+          
+          if (uploadResponse.ok) {
+            fileData = {
+              url: uploadUrlResult.publicUrl,
+              name: attachment.file.name,
+              size: `${(attachment.file.size / 1024 / 1024).toFixed(2)} MB`,
+              duration: attachment.duration,
+              waveform: attachment.waveform,
+            }
+          } else {
+            throw new Error("Upload failed")
+          }
+        } else {
+          throw new Error("Failed to get upload URL")
+        }
+      }
+
+      // Send message to server
+      const result = await sendMessage(
+        selectedParticipant.id,
+        content || (fileData ? "" : ""),
+        messageType,
+        fileData
+      )
+      
+      if (result.success && result.message) {
+        // Replace optimistic message with real one
+        setMessages((prev) => 
+          prev.map((m) => m.id === tempId ? { ...result.message!, status: "sent" as const } : m)
+        )
+        
+        // Refresh conversations to update last message
+        const convResult = await getConversations()
+        if (convResult.success && convResult.conversations) {
+          setConversations(convResult.conversations)
+        }
+      } else {
+        throw new Error(result.error || "Failed to send message")
+      }
+    } catch (error) {
+      console.error("Error sending message:", error)
+      // Mark message as failed
+      setMessages((prev) => 
+        prev.map((m) => m.id === tempId ? { ...m, status: "error" as const } : m)
+      )
+    }
+  }, [selectedParticipant])
+
+  // User search
+  const handleSearch = useCallback(async (query: string) => {
+    setSearchQuery(query)
+    if (query.length < 2) {
+      setSearchResults([])
+      return
+    }
+    
+    setIsSearching(true)
+    const result = await searchUsers(query)
+    if (result.success && result.users) {
+      setSearchResults(result.users)
+    }
+    setIsSearching(false)
+  }, [])
+
+  const handleStartConversation = useCallback(async (user: UserSearchResult) => {
+    const result = await getOrCreateConversation(user.id)
+    if (result.success && result.conversationId) {
+      setShowUserSearch(false)
+      setSearchQuery("")
+      setSearchResults([])
+      
+      // Refresh conversations and select the new one
+      const convResult = await getConversations()
+      if (convResult.success && convResult.conversations) {
+        setConversations(convResult.conversations)
+        setSelectedId(result.conversationId)
+        const conv = convResult.conversations.find((c) => c.id === result.conversationId)
+        setSelectedParticipant(conv?.participant || null)
+        setShowMobileChat(true)
+      }
+    }
+  }, [])
 
   return (
     <div className="flex-1 flex h-screen overflow-hidden">
       {/* Conversation List */}
       <div className={showMobileChat ? "hidden md:flex" : "flex w-full md:w-auto"}>
-        <ConversationList
-          conversations={mockConversations}
-          selectedId={selectedId}
-          onSelect={handleSelect}
-          searchPlaceholder="Search students..."
-        />
+        <div className="w-full md:w-80 lg:w-96 border-r flex flex-col bg-background h-full">
+          {/* Header with New Chat button */}
+          <div className="p-3 border-b flex items-center justify-between">
+            <h2 className="font-semibold">Messages</h2>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowUserSearch(true)}
+              className="h-8 w-8"
+            >
+              <HugeiconsIcon icon={UserAdd01Icon} size={18} />
+            </Button>
+          </div>
+          
+          {isLoading ? (
+            <ConversationListSkeleton count={6} />
+          ) : (
+            <ConversationList
+              conversations={mappedConversations}
+              selectedId={selectedId}
+              onSelect={handleSelect}
+              searchPlaceholder="Search students..."
+            />
+          )}
+        </div>
       </div>
 
       {/* Chat Area */}
       <div className={`flex-1 flex flex-col bg-muted/10 ${!showMobileChat ? "hidden md:flex" : "flex"}`}>
-        {selected ? (
+        {selectedParticipant ? (
           <>
             <ChatHeader
-              name={selected.name}
-              avatar={selected.avatar}
-              isOnline={selected.isOnline}
+              name={selectedParticipant.name}
+              avatar={selectedParticipant.avatar || undefined}
+              isOnline={selectedParticipant.isOnline}
               showBackButton
               onBack={() => setShowMobileChat(false)}
               onVideoCall={() => setActiveCall({ type: "video" })}
@@ -154,61 +351,135 @@ export default function InstructorMessagesPage() {
 
             <ScrollArea className="flex-1">
               <div className="px-3 py-4 space-y-1 max-w-3xl mx-auto">
-                {messageGroups.map((group) => (
-                  <div key={group.date.toISOString()}>
-                    <DateSeparator date={group.date} />
-                    <div className="space-y-1">
-                      {group.messages.map((msg, i) => {
-                        const prev = group.messages[i - 1]
-                        return (
-                          <MessageBubble
-                            key={msg.id}
-                            message={msg}
-                            showAvatar={!prev || prev.senderId !== msg.senderId}
-                          />
-                        )
-                      })}
-                    </div>
+                {messageGroups.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    No messages yet. Start the conversation!
                   </div>
-                ))}
+                ) : (
+                  messageGroups.map((group) => (
+                    <div key={group.date.toISOString()}>
+                      <DateSeparator date={group.date} />
+                      <div className="space-y-1">
+                        {group.messages.map((msg, i) => {
+                          const prev = group.messages[i - 1]
+                          return (
+                            <MessageBubble
+                              key={msg.id}
+                              message={msg}
+                              showAvatar={!prev || prev.senderId !== msg.senderId}
+                            />
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </ScrollArea>
 
             <MessageInput
               onSendMessage={handleSendMessage}
-              onEditMedia={handleEditMedia}
             />
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
             <div className="text-center">
               <HugeiconsIcon icon={Message01Icon} size={40} className="mx-auto mb-3 opacity-40" />
-              <p className="text-sm">Select a conversation</p>
+              <p className="text-sm">Select a conversation or start a new one</p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-4"
+                onClick={() => setShowUserSearch(true)}
+              >
+                <HugeiconsIcon icon={UserAdd01Icon} size={16} className="mr-2" />
+                New Conversation
+              </Button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Media Editor Modal */}
-      <MediaEditor
-        open={!!editingMedia}
-        onClose={() => setEditingMedia(null)}
-        file={editingMedia?.file || null}
-        type={editingMedia?.type || "image"}
-        onSave={(file) => {
-          console.log("Edited file:", file)
-          setEditingMedia(null)
-        }}
-      />
+      {/* User Search Dialog */}
+      <Dialog open={showUserSearch} onOpenChange={setShowUserSearch}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>New Conversation</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="relative">
+              <HugeiconsIcon
+                icon={Search01Icon}
+                size={16}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+              />
+              <Input
+                placeholder="Search users by name or email..."
+                value={searchQuery}
+                onChange={(e) => handleSearch(e.target.value)}
+                className="pl-9"
+              />
+              {searchQuery && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                  onClick={() => {
+                    setSearchQuery("")
+                    setSearchResults([])
+                  }}
+                >
+                  <HugeiconsIcon icon={Cancel01Icon} size={14} />
+                </Button>
+              )}
+            </div>
+            
+            <ScrollArea className="h-[300px]">
+              {isSearching ? (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  Searching...
+                </div>
+              ) : searchResults.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  {searchQuery.length >= 2
+                    ? "No users found"
+                    : "Type at least 2 characters to search"}
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {searchResults.map((user) => (
+                    <button
+                      key={user.id}
+                      onClick={() => handleStartConversation(user)}
+                      className="w-full p-3 text-left hover:bg-muted rounded-lg transition-colors flex items-center gap-3"
+                    >
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={user.avatar || undefined} />
+                        <AvatarFallback>{user.name[0]?.toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{user.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          @{user.username} · {user.role}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Video Call Modal */}
-      {selected && (
+      {selectedParticipant && (
         <VideoCall
           open={!!activeCall}
           onClose={() => setActiveCall(null)}
           callType={activeCall?.type || "video"}
-          callerName={selected.name}
-          callerAvatar={selected.avatar}
+          callerName={selectedParticipant.name}
+          callerAvatar={selectedParticipant.avatar || undefined}
         />
       )}
     </div>

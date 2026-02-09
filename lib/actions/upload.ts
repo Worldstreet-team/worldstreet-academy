@@ -55,6 +55,28 @@ export async function getVideoUploadUrl(
 }
 
 /**
+ * Get a presigned URL for uploading an audio file (voice note)
+ */
+export async function getAudioUploadUrl(
+  filename: string,
+  contentType: string
+): Promise<PresignedUrlResponse> {
+  try {
+    if (!contentType.startsWith("audio/")) {
+      return { success: false, error: "Invalid file type. Please upload an audio file." }
+    }
+
+    const key = generateFileKey("audio", filename)
+    const { uploadUrl, publicUrl } = await generatePresignedUploadUrl(key, contentType)
+
+    return { success: true, uploadUrl, publicUrl, key }
+  } catch (error) {
+    console.error("Audio upload URL error:", error)
+    return { success: false, error: "Failed to prepare upload. Please try again." }
+  }
+}
+
+/**
  * Delete a file from R2
  */
 export async function deleteUploadedFile(key: string): Promise<{ success: boolean; error?: string }> {

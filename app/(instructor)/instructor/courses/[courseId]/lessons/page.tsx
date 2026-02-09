@@ -29,6 +29,7 @@ export default async function CourseLessonsPage({
     description: l.description,
     type: l.type as "video" | "live" | "text",
     videoUrl: l.videoUrl,
+    thumbnailUrl: l.thumbnailUrl ?? null,
     content: l.content,
     duration: l.duration,
     order: idx,

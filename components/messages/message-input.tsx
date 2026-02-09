@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   MailSend01Icon,
@@ -9,13 +9,12 @@ import {
   Image02Icon,
   Video01Icon,
   FileEditIcon,
-  Camera01Icon,
   Cancel01Icon,
   StopIcon,
   PlayIcon,
   Delete02Icon,
+  PauseIcon,
 } from "@hugeicons/core-free-icons"
-import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import {
   Popover,
@@ -27,27 +26,41 @@ type Attachment = {
   file: File
   preview?: string
   type: "image" | "video" | "document" | "audio"
+  waveform?: number[]
+  duration?: string
 }
 
 type MessageInputProps = {
   onSendMessage: (content: string, attachments?: Attachment[]) => void
-  onEditMedia?: (attachment: Attachment) => void
   disabled?: boolean
 }
 
-export function MessageInput({ onSendMessage, onEditMedia, disabled }: MessageInputProps) {
+// Number of bars in the waveform visualization
+const WAVEFORM_BARS = 40
+
+export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
   const [message, setMessage] = useState("")
   const [isRecording, setIsRecording] = useState(false)
   const [recordingTime, setRecordingTime] = useState(0)
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [isPopoverOpen, setIsPopoverOpen] = useState(false)
+  const [audioLevels, setAudioLevels] = useState<number[]>(Array(WAVEFORM_BARS).fill(4))
+  const [waveformData, setWaveformData] = useState<number[]>([])
+  const [isPlayingPreview, setIsPlayingPreview] = useState(false)
+  const [previewProgress, setPreviewProgress] = useState(0)
   
   const inputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const chunksRef = useRef<Blob[]>([])
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const analyserRef = useRef<AnalyserNode | null>(null)
+  const animationFrameRef = useRef<number | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const waveformSamplesRef = useRef<number[]>([])
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null)
 
   const hasContent = message.trim().length > 0 || attachments.length > 0 || audioBlob
 
@@ -57,12 +70,57 @@ export function MessageInput({ onSendMessage, onEditMedia, disabled }: MessageIn
     return `${mins}:${secs.toString().padStart(2, "0")}`
   }
 
+  // Analyze audio and update visualization
+  const analyzeAudio = useCallback(function analyze() {
+    if (!analyserRef.current) return
+
+    const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount)
+    analyserRef.current.getByteFrequencyData(dataArray)
+
+    // Calculate average amplitude
+    const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length
+    const normalizedLevel = Math.min(average / 128, 1) // Normalize to 0-1
+
+    // Store sample for waveform data
+    waveformSamplesRef.current.push(normalizedLevel)
+
+    // Create bars with varying heights based on frequency bands
+    const newLevels: number[] = []
+    const bandSize = Math.floor(dataArray.length / WAVEFORM_BARS)
+    
+    for (let i = 0; i < WAVEFORM_BARS; i++) {
+      let sum = 0
+      for (let j = 0; j < bandSize; j++) {
+        sum += dataArray[i * bandSize + j]
+      }
+      const bandAverage = sum / bandSize
+      // Map to height between 4 and 28 pixels
+      const height = Math.max(4, Math.min(28, (bandAverage / 255) * 28))
+      newLevels.push(height)
+    }
+    
+    setAudioLevels(newLevels)
+
+    animationFrameRef.current = requestAnimationFrame(analyze)
+  }, [])
+
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
+      
+      // Set up audio analysis
+      audioContextRef.current = new AudioContext()
+      analyserRef.current = audioContextRef.current.createAnalyser()
+      analyserRef.current.fftSize = 256
+      
+      const source = audioContextRef.current.createMediaStreamSource(stream)
+      source.connect(analyserRef.current)
+
       const mediaRecorder = new MediaRecorder(stream)
       mediaRecorderRef.current = mediaRecorder
       chunksRef.current = []
+      waveformSamplesRef.current = []
 
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data)
@@ -71,16 +129,38 @@ export function MessageInput({ onSendMessage, onEditMedia, disabled }: MessageIn
       mediaRecorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: "audio/webm" })
         setAudioBlob(blob)
+        
+        // Process waveform data - reduce to WAVEFORM_BARS samples
+        const samples = waveformSamplesRef.current
+        const finalWaveform: number[] = []
+        const step = samples.length / WAVEFORM_BARS
+        
+        for (let i = 0; i < WAVEFORM_BARS; i++) {
+          const start = Math.floor(i * step)
+          const end = Math.floor((i + 1) * step)
+          let sum = 0
+          for (let j = start; j < end; j++) {
+            sum += samples[j] || 0
+          }
+          finalWaveform.push(sum / (end - start))
+        }
+        
+        setWaveformData(finalWaveform)
+        
+        // Cleanup stream
         stream.getTracks().forEach((track) => track.stop())
       }
 
-      mediaRecorder.start()
+      mediaRecorder.start(100) // Collect data every 100ms
       setIsRecording(true)
       setRecordingTime(0)
       
       timerRef.current = setInterval(() => {
         setRecordingTime((prev) => prev + 1)
       }, 1000)
+
+      // Start audio analysis
+      analyzeAudio()
     } catch (err) {
       console.error("Failed to start recording:", err)
     }
@@ -90,10 +170,24 @@ export function MessageInput({ onSendMessage, onEditMedia, disabled }: MessageIn
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop()
       setIsRecording(false)
+      
       if (timerRef.current) {
         clearInterval(timerRef.current)
         timerRef.current = null
       }
+      
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current)
+        animationFrameRef.current = null
+      }
+      
+      if (audioContextRef.current) {
+        audioContextRef.current.close()
+        audioContextRef.current = null
+      }
+      
+      // Reset audio levels to base
+      setAudioLevels(Array(WAVEFORM_BARS).fill(4))
     }
   }
 
@@ -101,12 +195,56 @@ export function MessageInput({ onSendMessage, onEditMedia, disabled }: MessageIn
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop()
     }
+    
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop())
+    }
+    
     setIsRecording(false)
     setAudioBlob(null)
     setRecordingTime(0)
+    setWaveformData([])
+    setAudioLevels(Array(WAVEFORM_BARS).fill(4))
+    
     if (timerRef.current) {
       clearInterval(timerRef.current)
       timerRef.current = null
+    }
+    
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current)
+      animationFrameRef.current = null
+    }
+    
+    if (audioContextRef.current) {
+      audioContextRef.current.close()
+      audioContextRef.current = null
+    }
+  }
+
+  const togglePreview = () => {
+    if (!audioBlob) return
+
+    if (!previewAudioRef.current) {
+      previewAudioRef.current = new Audio(URL.createObjectURL(audioBlob))
+      previewAudioRef.current.onended = () => {
+        setIsPlayingPreview(false)
+        setPreviewProgress(0)
+      }
+      previewAudioRef.current.ontimeupdate = () => {
+        if (previewAudioRef.current) {
+          const progress = (previewAudioRef.current.currentTime / previewAudioRef.current.duration) * 100
+          setPreviewProgress(progress)
+        }
+      }
+    }
+
+    if (isPlayingPreview) {
+      previewAudioRef.current.pause()
+      setIsPlayingPreview(false)
+    } else {
+      previewAudioRef.current.play()
+      setIsPlayingPreview(true)
     }
   }
 
@@ -130,11 +268,6 @@ export function MessageInput({ onSendMessage, onEditMedia, disabled }: MessageIn
     setIsPopoverOpen(false)
   }
 
-  const handleCamera = async () => {
-    setIsPopoverOpen(false)
-    console.log("Camera capture - implement modal")
-  }
-
   const removeAttachment = (index: number) => {
     setAttachments((prev) => {
       const attachment = prev[index]
@@ -146,9 +279,20 @@ export function MessageInput({ onSendMessage, onEditMedia, disabled }: MessageIn
   const handleSend = () => {
     if (audioBlob) {
       const audioFile = new File([audioBlob], `voice_${Date.now()}.webm`, { type: "audio/webm" })
-      onSendMessage("", [{ file: audioFile, type: "audio" }])
+      onSendMessage("", [{
+        file: audioFile,
+        type: "audio",
+        waveform: waveformData,
+        duration: formatTime(recordingTime),
+      }])
       setAudioBlob(null)
       setRecordingTime(0)
+      setWaveformData([])
+      setPreviewProgress(0)
+      if (previewAudioRef.current) {
+        previewAudioRef.current.pause()
+        previewAudioRef.current = null
+      }
     } else if (message.trim() || attachments.length > 0) {
       onSendMessage(message, attachments.length > 0 ? attachments : undefined)
       setMessage("")
@@ -166,6 +310,12 @@ export function MessageInput({ onSendMessage, onEditMedia, disabled }: MessageIn
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current)
+      if (audioContextRef.current) audioContextRef.current.close()
+      if (previewAudioRef.current) {
+        previewAudioRef.current.pause()
+        previewAudioRef.current = null
+      }
     }
   }, [])
 
@@ -180,71 +330,93 @@ export function MessageInput({ onSendMessage, onEditMedia, disabled }: MessageIn
   // Voice recording UI
   if (isRecording || audioBlob) {
     return (
-      <div className="border-t bg-background px-3 py-2">
-        <div className="flex items-center gap-3 max-w-4xl mx-auto">
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-10 w-10 text-destructive"
+      <div className="px-2 py-2 bg-background">
+        <div className="flex items-center gap-1.5 max-w-3xl mx-auto bg-muted/50 rounded-full p-1 pl-2">
+          {/* Cancel button */}
+          <button
+            className="h-7 w-7 rounded-full flex items-center justify-center text-destructive/80 hover:text-destructive hover:bg-destructive/10 transition-colors"
             onClick={cancelRecording}
           >
-            <HugeiconsIcon icon={Delete02Icon} size={20} />
-          </Button>
+            <HugeiconsIcon icon={Delete02Icon} size={16} />
+          </button>
 
-          <div className="flex-1 flex items-center gap-3 bg-muted rounded-full px-4 py-2">
+          {/* Recording/Preview area */}
+          <div className="flex-1 flex items-center gap-2 px-2">
             {isRecording ? (
               <>
-                <span className="h-2 w-2 rounded-full bg-destructive animate-pulse" />
-                <span className="text-sm font-medium">{formatTime(recordingTime)}</span>
-                <div className="flex-1 flex items-center justify-center gap-0.5">
-                  {[8,16,12,20,14,18,10,22,16,12,20,8,18,14,10,24,16,12,20,14].map((h, i) => (
+                <span className="h-1.5 w-1.5 rounded-full bg-destructive animate-pulse shrink-0" />
+                <span className="text-[11px] font-medium text-muted-foreground shrink-0 tabular-nums">{formatTime(recordingTime)}</span>
+                <div className="flex-1 flex items-center justify-center gap-[1.5px] h-5 overflow-hidden">
+                  {audioLevels.map((height, i) => (
                     <div
                       key={i}
-                      className="w-1 bg-primary/60 rounded-full animate-pulse"
-                      style={{
-                        height: `${h}px`,
-                        animationDelay: `${i * 50}ms`,
-                      }}
+                      className="w-[1.5px] bg-muted-foreground/40 rounded-full transition-all duration-75"
+                      style={{ height: `${Math.min(height, 20)}px` }}
                     />
                   ))}
                 </div>
               </>
             ) : (
               <>
-                <Button size="icon" variant="ghost" className="h-8 w-8">
-                  <HugeiconsIcon icon={PlayIcon} size={16} />
-                </Button>
-                <div className="flex-1 h-1 bg-primary/30 rounded-full">
-                  <div className="h-full w-0 bg-primary rounded-full" />
+                <button
+                  className="h-6 w-6 rounded-full flex items-center justify-center hover:bg-muted transition-colors"
+                  onClick={togglePreview}
+                >
+                  <HugeiconsIcon icon={isPlayingPreview ? PauseIcon : PlayIcon} size={12} />
+                </button>
+                <div className="flex-1 flex items-center gap-[1.5px] h-5 overflow-hidden">
+                  {waveformData.length > 0 ? (
+                    waveformData.map((level, i) => {
+                      const isPast = (i / waveformData.length) * 100 <= previewProgress
+                      return (
+                        <div
+                          key={i}
+                          className={cn(
+                            "w-[1.5px] rounded-full transition-colors duration-75",
+                            isPast ? "bg-muted-foreground" : "bg-muted-foreground/25"
+                          )}
+                          style={{ height: `${Math.max(3, level * 20)}px` }}
+                        />
+                      )
+                    })
+                  ) : (
+                    Array(WAVEFORM_BARS).fill(0).map((_, i) => (
+                      <div
+                        key={i}
+                        className="w-[1.5px] bg-muted-foreground/25 rounded-full"
+                        style={{ height: "3px" }}
+                      />
+                    ))
+                  )}
                 </div>
-                <span className="text-xs text-muted-foreground">{formatTime(recordingTime)}</span>
+                <span className="text-[11px] text-muted-foreground shrink-0 tabular-nums">{formatTime(recordingTime)}</span>
               </>
             )}
           </div>
 
-          <Button
-            size="icon"
-            className="h-10 w-10 rounded-full"
+          {/* Stop/Send button */}
+          <button
+            className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center transition-all active:scale-95 hover:bg-primary/90"
             onClick={isRecording ? stopRecording : handleSend}
           >
-            <HugeiconsIcon icon={isRecording ? StopIcon : MailSend01Icon} size={20} />
-          </Button>
+            <HugeiconsIcon icon={isRecording ? StopIcon : MailSend01Icon} size={16} />
+          </button>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="border-t bg-background px-3 py-2">
+    <div className="px-2 py-2 bg-background">
       <input ref={fileInputRef} type="file" className="hidden" />
 
       {/* Attachments Preview */}
       {attachments.length > 0 && (
-        <div className="flex gap-2 mb-2 overflow-x-auto pb-2 max-w-4xl mx-auto">
+        <div className="flex gap-2 mb-2 px-2 overflow-x-auto pb-1 max-w-3xl mx-auto">
           {attachments.map((attachment, index) => (
             <div key={index} className="relative shrink-0 group">
               {attachment.type === "image" && attachment.preview ? (
-                <div className="h-16 w-16 rounded-lg overflow-hidden bg-muted">
+                <div className="h-14 w-14 rounded-lg overflow-hidden bg-muted">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={attachment.preview}
@@ -253,96 +425,67 @@ export function MessageInput({ onSendMessage, onEditMedia, disabled }: MessageIn
                   />
                 </div>
               ) : attachment.type === "video" && attachment.preview ? (
-                <div className="h-16 w-16 rounded-lg overflow-hidden bg-muted relative">
+                <div className="h-14 w-14 rounded-lg overflow-hidden bg-muted relative">
                   <video src={attachment.preview} className="h-full w-full object-cover" />
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                    <HugeiconsIcon icon={Video01Icon} size={20} className="text-white" />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                    <HugeiconsIcon icon={Video01Icon} size={18} className="text-white" />
                   </div>
                 </div>
               ) : (
-                <div className="h-16 px-3 rounded-lg bg-muted flex items-center gap-2">
-                  <HugeiconsIcon icon={FileEditIcon} size={16} />
-                  <span className="text-xs max-w-20 truncate">{attachment.file.name}</span>
+                <div className="h-14 px-2.5 rounded-lg bg-muted flex items-center gap-1.5">
+                  <HugeiconsIcon icon={FileEditIcon} size={14} className="text-muted-foreground" />
+                  <span className="text-[11px] max-w-16 truncate">{attachment.file.name}</span>
                 </div>
-              )}
-              
-              {(attachment.type === "image" || attachment.type === "video") && onEditMedia && (
-                <button
-                  onClick={() => onEditMedia(attachment)}
-                  className="absolute -top-1 -left-1 h-5 w-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <HugeiconsIcon icon={FileEditIcon} size={10} />
-                </button>
               )}
               
               <button
                 onClick={() => removeAttachment(index)}
-                className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"
+                className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-foreground/80 text-background flex items-center justify-center transition-transform hover:scale-110"
               >
-                <HugeiconsIcon icon={Cancel01Icon} size={10} />
+                <HugeiconsIcon icon={Cancel01Icon} size={8} />
               </button>
             </div>
           ))}
         </div>
       )}
 
-      {/* Input Row */}
-      <div className="flex items-center gap-2 max-w-4xl mx-auto">
-        {/* Attachment Popover */}
+      {/* Input Row - Clean pill design */}
+      <div className="flex items-center gap-1.5 max-w-3xl mx-auto bg-muted/50 rounded-full p-1 pl-1.5">
+        {/* Attachment Button */}
         <div className={cn(
-          "transition-all duration-200",
+          "transition-all duration-150",
           hasContent ? "w-0 opacity-0 overflow-hidden" : "w-auto opacity-100"
         )}>
           <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
             <PopoverTrigger
               render={
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-10 w-10 shrink-0"
+                <button
+                  className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
                   disabled={disabled}
                 >
-                  <HugeiconsIcon icon={Add01Icon} size={22} />
-                </Button>
+                  <HugeiconsIcon icon={Add01Icon} size={18} />
+                </button>
               }
             />
-            <PopoverContent side="top" align="start" className="w-auto p-2">
-              <div className="grid grid-cols-4 gap-1">
+            <PopoverContent side="top" align="start" className="w-auto p-1 rounded-xl border-muted">
+              <div className="flex gap-0.5">
                 <button
                   onClick={() => handleFileSelect("image/*", "image")}
-                  className="flex flex-col items-center gap-1 p-3 rounded-lg hover:bg-muted transition-colors"
+                  className="flex flex-col items-center gap-0.5 p-2 rounded-lg hover:bg-muted transition-colors"
                 >
-                  <div className="h-10 w-10 rounded-full bg-violet-500/10 text-violet-500 flex items-center justify-center">
-                    <HugeiconsIcon icon={Image02Icon} size={20} />
+                  <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                    <HugeiconsIcon icon={Image02Icon} size={16} />
                   </div>
-                  <span className="text-xs">Photo</span>
+                  <span className="text-[10px] text-muted-foreground">Photo</span>
                 </button>
                 <button
                   onClick={() => handleFileSelect("video/*", "video")}
-                  className="flex flex-col items-center gap-1 p-3 rounded-lg hover:bg-muted transition-colors"
+                  className="flex flex-col items-center gap-0.5 p-2 rounded-lg hover:bg-muted transition-colors"
                 >
-                  <div className="h-10 w-10 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center">
-                    <HugeiconsIcon icon={Video01Icon} size={20} />
+                  <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                    <HugeiconsIcon icon={Video01Icon} size={16} />
                   </div>
-                  <span className="text-xs">Video</span>
-                </button>
-                <button
-                  onClick={() => handleFileSelect(".pdf,.doc,.docx,.txt,.xls,.xlsx", "document")}
-                  className="flex flex-col items-center gap-1 p-3 rounded-lg hover:bg-muted transition-colors"
-                >
-                  <div className="h-10 w-10 rounded-full bg-orange-500/10 text-orange-500 flex items-center justify-center">
-                    <HugeiconsIcon icon={FileEditIcon} size={20} />
-                  </div>
-                  <span className="text-xs">File</span>
-                </button>
-                <button
-                  onClick={handleCamera}
-                  className="flex flex-col items-center gap-1 p-3 rounded-lg hover:bg-muted transition-colors"
-                >
-                  <div className="h-10 w-10 rounded-full bg-green-500/10 text-green-500 flex items-center justify-center">
-                    <HugeiconsIcon icon={Camera01Icon} size={20} />
-                  </div>
-                  <span className="text-xs">Camera</span>
+                  <span className="text-[10px] text-muted-foreground">Video</span>
                 </button>
               </div>
             </PopoverContent>
@@ -350,39 +493,34 @@ export function MessageInput({ onSendMessage, onEditMedia, disabled }: MessageIn
         </div>
 
         {/* Text Input */}
-        <div className="flex-1 flex items-center bg-muted rounded-full px-4">
-          <input
-            ref={inputRef}
-            type="text"
-            placeholder="Message..."
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={disabled}
-            className="flex-1 bg-transparent py-2.5 text-sm outline-none placeholder:text-muted-foreground"
-          />
-        </div>
+        <input
+          ref={inputRef}
+          type="text"
+          placeholder="Type a message..."
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          onKeyDown={handleKeyDown}
+          disabled={disabled}
+          className="flex-1 bg-transparent py-2 px-2 text-sm outline-none placeholder:text-muted-foreground/50"
+        />
 
-        {/* Send / Voice Button */}
+        {/* Voice / Send Button */}
         {hasContent ? (
-          <Button
-            size="icon"
-            className="h-10 w-10 rounded-full shrink-0"
+          <button
+            className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center transition-all active:scale-95 hover:bg-primary/90"
             onClick={handleSend}
             disabled={disabled}
           >
-            <HugeiconsIcon icon={MailSend01Icon} size={20} />
-          </Button>
+            <HugeiconsIcon icon={MailSend01Icon} size={16} />
+          </button>
         ) : (
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-10 w-10 shrink-0"
+          <button
+            className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
             onClick={startRecording}
             disabled={disabled}
           >
-            <HugeiconsIcon icon={Mic01Icon} size={22} />
-          </Button>
+            <HugeiconsIcon icon={Mic01Icon} size={18} />
+          </button>
         )}
       </div>
     </div>

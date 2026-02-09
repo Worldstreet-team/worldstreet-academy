@@ -17,7 +17,7 @@ const r2Client = new S3Client({
 export const R2_BUCKET = process.env.R2_BUCKET_NAME!
 export const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL!
 
-export type UploadType = "image" | "video"
+export type UploadType = "image" | "video" | "audio"
 
 /**
  * Generate a presigned URL for uploading a file to R2
@@ -69,8 +69,9 @@ export function generateFileKey(
 ): string {
   const timestamp = Date.now()
   const randomId = Math.random().toString(36).substring(2, 10)
-  const extension = originalFilename.split(".").pop()?.toLowerCase() || (type === "image" ? "webp" : "mp4")
-  const folder = type === "image" ? "thumbnails" : "videos"
+  const extension = originalFilename.split(".").pop()?.toLowerCase() || 
+    (type === "image" ? "webp" : type === "video" ? "mp4" : "webm")
+  const folder = type === "image" ? "thumbnails" : type === "video" ? "videos" : "audio"
   
   return `worldstreet-academy/${folder}/${timestamp}-${randomId}.${extension}`
 }
