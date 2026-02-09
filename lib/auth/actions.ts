@@ -191,70 +191,27 @@ export async function loginAction(credentials: LoginCredentials) {
  * Get current authenticated user
  * - Verifies JWT locally using shared secret
  * - Gets/syncs user from local MongoDB
+ * - NEVER sets cookies (safe to call from RSC / Route Handlers)
  */
 export async function getCurrentUser(): Promise<LocalUser | null> {
   const accessToken = await getAccessToken()
   
-  console.log("[Auth] getCurrentUser - accessToken present:", !!accessToken)
-  
-  if (!accessToken) {
-    console.log("[Auth] No access token found in cookies")
-    return null
-  }
+  if (!accessToken) return null
   
   // Verify JWT locally
   const result = await verifyJWT(accessToken)
-  console.log("[Auth] JWT verification result:", result ? (result.expired ? "expired" : "valid") : "failed")
   
   if (result) {
-    const { user: authUser, expired } = result
+    const { user: authUser } = result
     
-    // If token is valid (not expired), return user
-    if (!expired) {
-      // Try to get local user first (faster)
-      const existingUser = await getLocalUserByAuthId(authUser.userId)
-      if (existingUser) {
-        return existingUser
-      }
-      // Sync if not found - but don't update names from JWT (it doesn't have them)
-      return await syncUserToLocal(authUser, false)
-    }
-    
-    // Token is expired - try to refresh
-    console.log("[Auth] Token expired, attempting refresh...")
-    const refreshToken = await getRefreshToken()
-    
-    if (refreshToken) {
-      const refreshResult = await authService.refreshTokens(refreshToken)
-      
-      if (refreshResult.success && refreshResult.data) {
-        console.log("[Auth] Token refresh successful")
-        await setTokens(
-          refreshResult.data.tokens.accessToken,
-          refreshResult.data.tokens.refreshToken
-        )
-        
-        // Return existing user (don't sync from JWT - it doesn't have names)
-        const existingUser = await getLocalUserByAuthId(authUser.userId)
-        if (existingUser) {
-          return existingUser
-        }
-        return await syncUserToLocal(authUser, false)
-      }
-      console.log("[Auth] Token refresh failed:", refreshResult.message)
-    }
-    
-    // Even if refresh failed, if user exists locally, return them
-    // (they'll get a fresh token on next login)
+    // Whether token is valid or expired, return local user if exists
     const existingUser = await getLocalUserByAuthId(authUser.userId)
-    if (existingUser) {
-      console.log("[Auth] Returning existing local user despite expired token")
-      return existingUser
-    }
+    if (existingUser) return existingUser
+    
+    // Sync if not found locally
+    return await syncUserToLocal(authUser, false)
   }
   
-  // Clear tokens if we can't authenticate
-  await clearTokens()
   return null
 }
 
@@ -265,42 +222,21 @@ export async function getCurrentUser(): Promise<LocalUser | null> {
  */
 export async function verifyAuth(): Promise<{ user: LocalUser } | null> {
   const accessToken = await getAccessToken()
-  
-  if (!accessToken) {
-    return null
-  }
+  if (!accessToken) return null
   
   // Verify JWT locally
   const result = await verifyJWT(accessToken)
   
   if (result) {
-    const { user: authUser, expired } = result
+    const { user: authUser } = result
     
-    // Try to get local user first
     const existingUser = await getLocalUserByAuthId(authUser.userId)
-    if (existingUser) {
-      // If expired, try to refresh in background but still return user
-      if (expired) {
-        const refreshToken = await getRefreshToken()
-        if (refreshToken) {
-          authService.refreshTokens(refreshToken).then(async (refreshResult) => {
-            if (refreshResult.success && refreshResult.data) {
-              await setTokens(
-                refreshResult.data.tokens.accessToken,
-                refreshResult.data.tokens.refreshToken
-              )
-            }
-          }).catch(() => {})
-        }
-      }
-      return { user: existingUser }
-    }
+    if (existingUser) return { user: existingUser }
     
     const localUser = await syncUserToLocal(authUser)
     return { user: localUser }
   }
   
-  await clearTokens()
   return null
 }
 

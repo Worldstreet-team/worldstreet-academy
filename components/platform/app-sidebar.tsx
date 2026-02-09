@@ -32,10 +32,12 @@ import {
   Bookmark01Icon,
   Message01Icon,
   TeachingIcon,
+  Call02Icon,
 } from "@hugeicons/core-free-icons"
 import { useUser } from "@/components/providers/user-provider"
 import { logoutAction } from "@/lib/auth/actions"
 import { useUnreadCount } from "@/lib/hooks/use-unread-count"
+import { useOngoingCall } from "@/components/providers/call-provider"
 
 type NavItem = {
   title: string
@@ -108,6 +110,7 @@ export function AppSidebar() {
   const user = useUser()
   const [isPending, startTransition] = useTransition()
   const unreadCount = useUnreadCount()
+  const hasOngoingCall = useOngoingCall()
 
   const userInitials = `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
   const isInstructor = user.role === "INSTRUCTOR" || user.role === "ADMIN"
@@ -151,7 +154,12 @@ export function AppSidebar() {
                   >
                     <HugeiconsIcon icon={item.icon} size={18} />
                     <span>{item.title}</span>
-                    {item.title === "Messages" && unreadCount > 0 && (
+                    {item.title === "Messages" && hasOngoingCall && (
+                      <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-500/15 px-1.5">
+                        <HugeiconsIcon icon={Call02Icon} size={12} className="text-emerald-500" />
+                      </span>
+                    )}
+                    {item.title === "Messages" && !hasOngoingCall && unreadCount > 0 && (
                       <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
                         {unreadCount > 99 ? "99+" : unreadCount}
                       </span>

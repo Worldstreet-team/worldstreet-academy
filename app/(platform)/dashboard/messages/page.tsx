@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import Image from "next/image"
+import { AnimatePresence, motion } from "motion/react"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { UserAdd01Icon, Search01Icon, Cancel01Icon } from "@hugeicons/core-free-icons"
 import { Topbar } from "@/components/platform/topbar"
@@ -23,7 +24,6 @@ import {
   MessageInput,
   DateSeparator,
   groupMessagesByDate,
-  VideoCall,
   CallEvent,
   isCallEventMessage,
   MessageContextMenu,
@@ -45,6 +45,7 @@ import {
 import { getImageUploadUrl, getVideoUploadUrl, getAudioUploadUrl } from "@/lib/actions/upload"
 import { useMessagePolling } from "@/lib/hooks/use-websocket"
 import { ConversationListSkeleton, MessagesAreaSkeleton } from "@/components/skeletons/message-skeletons"
+import { useCall } from "@/components/providers/call-provider"
 
 // Extended message type with status for optimistic updates
 type OptimisticMessage = MessageWithDetails & { status?: "pending" | "sent" | "error"; uploadProgress?: number }
@@ -55,9 +56,10 @@ export default function MessagesPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedParticipant, setSelectedParticipant] = useState<ConversationWithDetails["participant"] | null>(null)
   const [showMobileChat, setShowMobileChat] = useState(false)
-  const [activeCall, setActiveCall] = useState<{ type: "video" | "audio"; callId?: string } | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
+  
+  const { startCall } = useCall()
   
   // User search state
   const [showUserSearch, setShowUserSearch] = useState(false)
@@ -461,8 +463,18 @@ export default function MessagesPage() {
                 isOnline={selectedParticipant.isOnline}
                 showBackButton
                 onBack={() => setShowMobileChat(false)}
-                onVideoCall={() => setActiveCall({ type: "video" })}
-                onAudioCall={() => setActiveCall({ type: "audio" })}
+                onVideoCall={() => selectedParticipant && startCall({
+                  participantId: selectedParticipant.id,
+                  participantName: selectedParticipant.name,
+                  participantAvatar: selectedParticipant.avatar || undefined,
+                  callType: "video",
+                })}
+                onAudioCall={() => selectedParticipant && startCall({
+                  participantId: selectedParticipant.id,
+                  participantName: selectedParticipant.name,
+                  participantAvatar: selectedParticipant.avatar || undefined,
+                  callType: "audio",
+                })}
               />
 
               {isLoadingMessages ? (
@@ -493,26 +505,54 @@ export default function MessagesPage() {
                         messageGroups.map((group) => (
                           <div key={group.date.toISOString()}>
                             <DateSeparator date={group.date} />
-                            <div className="space-y-1">
+                            <div className="space-y-0.5">
+                              <AnimatePresence mode="popLayout">
                               {group.messages.map((msg, i) => {
                                 const prev = group.messages[i - 1]
+                                const next = group.messages[i + 1]
+
+                                // Check if same sender and within same minute
+                                const isSameSenderAsPrev = prev && prev.senderId === msg.senderId
+                                const prevSameMinute = isSameSenderAsPrev && prev &&
+                                  Math.floor(new Date(prev.timestamp).getTime() / 60000) === Math.floor(new Date(msg.timestamp).getTime() / 60000)
+
+                                const isSameSenderAsNext = next && next.senderId === msg.senderId
+                                const nextSameMinute = isSameSenderAsNext && next &&
+                                  Math.floor(new Date(next.timestamp).getTime() / 60000) === Math.floor(new Date(msg.timestamp).getTime() / 60000)
+
+                                const isGroupStart = !prevSameMinute
+                                const isGroupEnd = !nextSameMinute
 
                                 // Render call event messages with special UI
                                 if (isCallEventMessage(msg.content)) {
                                   return (
-                                    <CallEvent
+                                    <motion.div
                                       key={msg.id}
+                                      layout
+                                      exit={{ opacity: 0, height: 0, scale: 0.95, transition: { duration: 0.2 } }}
+                                    >
+                                    <CallEvent
                                       content={msg.content}
                                       isOwn={msg.isOwn}
                                       timestamp={msg.timestamp}
-                                      onCallback={(type) => setActiveCall({ type })}
+                                      onCallback={(type) => selectedParticipant && startCall({
+                                        participantId: selectedParticipant.id,
+                                        participantName: selectedParticipant.name,
+                                        participantAvatar: selectedParticipant.avatar || undefined,
+                                        callType: type,
+                                      })}
                                     />
+                                    </motion.div>
                                   )
                                 }
 
                                 return (
-                                  <MessageContextMenu
+                                  <motion.div
                                     key={msg.id}
+                                    layout
+                                    exit={{ opacity: 0, height: 0, scale: 0.95, transition: { duration: 0.2 } }}
+                                  >
+                                  <MessageContextMenu
                                     messageId={msg.id}
                                     content={msg.content}
                                     isOwn={msg.isOwn}
@@ -520,11 +560,14 @@ export default function MessagesPage() {
                                   >
                                     <MessageBubble
                                       message={msg}
-                                      showAvatar={!prev || prev.senderId !== msg.senderId}
+                                      showAvatar={isGroupStart}
+                                      showTimestamp={isGroupEnd}
                                     />
                                   </MessageContextMenu>
+                                  </motion.div>
                                 )
                               })}
+                              </AnimatePresence>
                             </div>
                           </div>
                         ))
@@ -670,20 +713,6 @@ export default function MessagesPage() {
           </div>
         </ResponsiveModalContent>
       </ResponsiveModal>
-
-      {/* Video Call Modal */}
-      {selectedParticipant && (
-        <VideoCall
-          open={!!activeCall}
-          onClose={() => setActiveCall(null)}
-          callType={activeCall?.type || "video"}
-          callerName={selectedParticipant.name}
-          callerAvatar={selectedParticipant.avatar || undefined}
-          receiverId={selectedParticipant.id}
-          onCallStarted={(callId) => setActiveCall((prev) => prev ? { ...prev, callId } : prev)}
-          onCallEnded={() => setActiveCall(null)}
-        />
-      )}
     </>
   )
 }

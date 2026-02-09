@@ -66,7 +66,7 @@ export function PlatformBottomNav() {
               className={cn(
                 "flex flex-col items-center gap-0.5 py-1.5 px-3 text-[10px] transition-colors",
                 active
-                  ? "text-primary"
+                  ? "text-foreground font-medium"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
@@ -84,7 +84,7 @@ export function PlatformBottomNav() {
           <div className="flex h-13 w-13 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 ring-4 ring-background">
             <HugeiconsIcon icon={Search01Icon} size={22} />
           </div>
-          <span className="text-[10px] font-medium text-primary mt-0.5">
+          <span className="text-[10px] font-medium text-foreground mt-0.5">
             Browse
           </span>
         </Link>
@@ -98,7 +98,7 @@ export function PlatformBottomNav() {
               className={cn(
                 "flex flex-col items-center gap-0.5 py-1.5 px-3 text-[10px] transition-colors",
                 active
-                  ? "text-primary"
+                  ? "text-foreground font-medium"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >

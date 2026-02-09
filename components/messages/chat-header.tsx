@@ -56,12 +56,12 @@ export function ChatHeader({
           )}
         </div>
 
-        <div className="flex items-center gap-1">
-          <Button size="icon" variant="ghost" className="h-9 w-9" onClick={onAudioCall}>
-            <HugeiconsIcon icon={Call02Icon} size={20} />
+        <div className="flex items-center border rounded-lg overflow-hidden divide-x">
+          <Button size="icon" variant="ghost" className="h-9 w-9 rounded-none border-0" onClick={onAudioCall}>
+            <HugeiconsIcon icon={Call02Icon} size={18} />
           </Button>
-          <Button size="icon" variant="ghost" className="h-9 w-9" onClick={onVideoCall}>
-            <HugeiconsIcon icon={Video01Icon} size={20} />
+          <Button size="icon" variant="ghost" className="h-9 w-9 rounded-none border-0" onClick={onVideoCall}>
+            <HugeiconsIcon icon={Video01Icon} size={18} />
           </Button>
         </div>
       </div>

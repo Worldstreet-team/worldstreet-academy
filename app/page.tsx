@@ -5,16 +5,13 @@ import { WelcomePageClient } from "@/components/welcome/welcome-page-client"
 export default async function WelcomePage() {
   const user = await getCurrentUser()
 
-  // Redirect already-onboarded users straight to dashboard
-  if (user?.hasOnboarded) {
-    redirect("/dashboard")
-  }
+  // Not logged in — send to login
+  if (!user) redirect("/unauthorized")
 
   return (
     <WelcomePageClient
-      firstName={user?.firstName ?? null}
-      hasOnboarded={user?.hasOnboarded ?? false}
-      isAuthenticated={!!user}
+      firstName={user.firstName}
+      hasOnboarded={user.hasOnboarded}
     />
   )
 }

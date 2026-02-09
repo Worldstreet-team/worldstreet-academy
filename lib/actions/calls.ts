@@ -67,6 +67,22 @@ export async function initiateCall(
       })
     }
 
+    // Expire ALL previous ringing calls between these two users (either direction)
+    // This prevents the receiver from picking up a stale call from any prior attempt
+    const expireResult = await Call.updateMany(
+      {
+        status: "ringing",
+        $or: [
+          { callerId, receiverId: recipientId },
+          { callerId: recipientId, receiverId: callerId },
+        ],
+      },
+      { status: "missed", endedAt: new Date() }
+    )
+    if (expireResult.modifiedCount > 0) {
+      console.log(`[InitiateCall] Expired ${expireResult.modifiedCount} previous ringing calls between pair`)
+    }
+
     const caller = await User.findById(callerId).lean()
     const receiver = await User.findById(recipientId).lean()
     if (!caller || !receiver) return { success: false, error: "User not found" }
@@ -107,6 +123,8 @@ export async function initiateCall(
       receiverToken: receiverParticipant.authToken,
     })
 
+    console.log(`[InitiateCall] Created call ${call._id} from ${callerId} to ${recipientId}`)
+
     return {
       success: true,
       callId: call._id.toString(),
@@ -144,6 +162,8 @@ export async function answerCall(callId: string): Promise<{
     call.status = "ongoing"
     call.answeredAt = new Date()
     await call.save()
+    
+    console.log(`[AnswerCall] Call ${callId} status updated to: ongoing`)
 
     return {
       success: true,
@@ -357,9 +377,11 @@ export async function getCallStatus(callId: string): Promise<{
     const currentUser = await getCurrentUser()
     if (!currentUser) return { success: false, error: "Unauthorized" }
 
-    const call = await Call.findById(callId).lean()
+    // Force fresh read - findOne creates a new query each time
+    const call = await Call.findOne({ _id: callId })
     if (!call) return { success: false, error: "Call not found" }
 
+    console.log(`[GetCallStatus] Call ${callId} status: ${call.status}`)
     return { success: true, status: call.status }
   } catch (error) {
     console.error("Error getting call status:", error)
@@ -384,5 +406,75 @@ export async function expireRingingCalls(): Promise<void> {
     call.endedAt = new Date()
     await call.save()
     await insertCallSystemMessage(call)
+  }
+}
+
+// ──────────────────────────────────────────────
+// Poll for incoming calls (server action replacement for /api/calls/poll)
+// ──────────────────────────────────────────────
+
+export async function pollIncomingCall(): Promise<{
+  incoming: {
+    callId: string
+    callerId: string
+    callerName: string
+    callerAvatar: string | null
+    callType: CallType
+    conversationId: string
+  } | null
+}> {
+  try {
+    await connectDB()
+    const currentUser = await getCurrentUser()
+    if (!currentUser) return { incoming: null }
+
+    const userId = new Types.ObjectId(currentUser.id)
+
+    // Expire stale ringing calls (>30 seconds old)
+    const staleThreshold = new Date(Date.now() - 30_000)
+    const expireResult = await Call.updateMany(
+      { status: "ringing", createdAt: { $lt: staleThreshold } },
+      { status: "missed", endedAt: new Date() }
+    )
+    if (expireResult.modifiedCount > 0) {
+      console.log(`[PollIncoming] Expired ${expireResult.modifiedCount} stale calls`)
+    }
+
+    // Find the NEWEST ringing call where this user is the receiver
+    const incomingCall = await Call.findOne({
+      receiverId: userId,
+      status: "ringing",
+    })
+      .sort({ createdAt: -1 })
+      .lean()
+
+    if (!incomingCall) {
+      return { incoming: null }
+    }
+
+    console.log(`[PollIncoming] Found incoming call ${incomingCall._id} with status: ${incomingCall.status}`)
+
+    // Get caller info
+    const caller = await User.findById(incomingCall.callerId)
+      .select<Pick<import("@/lib/db/models").IUser, "firstName" | "lastName" | "avatarUrl">>(
+        "firstName lastName avatarUrl"
+      )
+      .lean()
+
+    return {
+      incoming: {
+        callId: incomingCall._id.toString(),
+        callerId: incomingCall.callerId.toString(),
+        callerName: caller
+          ? `${caller.firstName} ${caller.lastName}`.trim()
+          : "Unknown",
+        callerAvatar: caller?.avatarUrl || null,
+        callType: incomingCall.type,
+        conversationId: incomingCall.conversationId.toString(),
+      },
+    }
+  } catch (error) {
+    console.error("Error polling incoming calls:", error)
+    return { incoming: null }
   }
 }

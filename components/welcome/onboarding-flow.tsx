@@ -41,6 +41,7 @@ export function OnboardingFlow({ userName, onComplete, showSetupLoading = false 
   const router = useRouter()
   const [current, setCurrent] = useState(0)
   const [isAnimating, setIsAnimating] = useState(false)
+  const [isFinishing, setIsFinishing] = useState(false)
   const [phase, setPhase] = useState<"loading" | "fading" | "ready">(
     showSetupLoading ? "loading" : "ready"
   )
@@ -64,12 +65,14 @@ export function OnboardingFlow({ userName, onComplete, showSetupLoading = false 
   }, [phase])
 
   const finish = useCallback(async () => {
+    if (isFinishing) return
+    setIsFinishing(true)
     await completeOnboarding()
     router.push("/dashboard")
-  }, [router])
+  }, [router, isFinishing])
 
   const goNext = useCallback(() => {
-    if (isAnimating) return
+    if (isAnimating || isFinishing) return
     if (isLast) {
       finish()
       return
@@ -97,8 +100,22 @@ export function OnboardingFlow({ userName, onComplete, showSetupLoading = false 
 
   return (
     <div className="relative z-10 flex flex-col min-h-screen">
+      {/* Finishing overlay */}
+      {isFinishing && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="flex flex-col items-center gap-4">
+            <HugeiconsIcon
+              icon={Loading03Icon}
+              size={32}
+              className="text-primary animate-spin"
+            />
+            <p className="text-sm text-muted-foreground font-medium">Taking you to your dashboard…</p>
+          </div>
+        </div>
+      )}
+
       {/* Skip — top right, glassmorphic */}
-      {!isLast && (
+      {!isLast && !isFinishing && (
         <div className="absolute top-5 right-5 z-20">
           <button
             onClick={finish}
@@ -225,11 +242,12 @@ export function OnboardingFlow({ userName, onComplete, showSetupLoading = false 
                   )}
                   <button
                     onClick={goNext}
+                    disabled={isFinishing}
                     className="flex-1 h-12 rounded-full bg-primary text-primary-foreground
                       text-sm font-semibold tracking-wide transition-all hover:opacity-90
-                      active:scale-[0.98]"
+                      active:scale-[0.98] disabled:opacity-70"
                   >
-                    {isLast ? "Get Started" : "Continue"}
+                    {isLast ? (isFinishing ? "Setting up…" : "Get Started") : "Continue"}
                   </button>
                 </div>
               </div>
@@ -330,11 +348,12 @@ export function OnboardingFlow({ userName, onComplete, showSetupLoading = false 
                 )}
                   <button
                     onClick={goNext}
+                    disabled={isFinishing}
                     className="flex-1 h-12 rounded-full bg-primary text-primary-foreground
                       text-sm font-semibold tracking-wide transition-all hover:opacity-90
-                      active:scale-[0.98]"
+                      active:scale-[0.98] disabled:opacity-70"
                   >
-                    {isLast ? "Get Started" : "Continue"}
+                    {isLast ? (isFinishing ? "Setting up…" : "Get Started") : "Continue"}
                   </button>
                 </div>
 

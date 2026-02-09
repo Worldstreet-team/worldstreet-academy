@@ -43,9 +43,10 @@ export type MessageType = {
 type MessageBubbleProps = {
   message: MessageType
   showAvatar?: boolean
+  showTimestamp?: boolean
 }
 
-export function MessageBubble({ message, showAvatar = true }: MessageBubbleProps) {
+export function MessageBubble({ message, showAvatar = true, showTimestamp = true }: MessageBubbleProps) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [hasPlayed, setHasPlayed] = useState(false)
   const [isAudioLoading, setIsAudioLoading] = useState(false)
@@ -383,14 +384,51 @@ export function MessageBubble({ message, showAvatar = true }: MessageBubbleProps
         {/* Determine if this is a media message for edge-to-edge rendering */}
         {(() => {
           const isMedia = message.type === "image" || message.type === "video"
+          
+          // Derive grouping position from showAvatar and showTimestamp
+          const isSingle = showAvatar && showTimestamp
+          const isGroupStart = showAvatar && !showTimestamp
+          const isGroupMiddle = !showAvatar && !showTimestamp
+          const isGroupEnd = !showAvatar && showTimestamp
+          
+          // Calculate border radii based on grouping position
+          // For own messages: tail is on right side
+          // For others: tail is on left side
+          const getBubbleRadius = () => {
+            if (isSingle) {
+              // Single message: full radius with small tail corner
+              return message.isOwn ? "rounded-2xl rounded-br-md" : "rounded-2xl rounded-bl-md"
+            }
+            if (isGroupStart) {
+              // First in group: full top, small bottom tail corner
+              return message.isOwn
+                ? "rounded-2xl rounded-br-sm"
+                : "rounded-2xl rounded-bl-sm"
+            }
+            if (isGroupMiddle) {
+              // Middle: small radius on tail side
+              return message.isOwn
+                ? "rounded-l-2xl rounded-r-md"
+                : "rounded-r-2xl rounded-l-md"
+            }
+            if (isGroupEnd) {
+              // Last in group: small top tail, larger bottom tail
+              return message.isOwn
+                ? "rounded-2xl rounded-tr-sm rounded-br-md"
+                : "rounded-2xl rounded-tl-sm rounded-bl-md"
+            }
+            return "rounded-2xl"
+          }
+          
           return (
             <div
               className={cn(
-                "rounded-2xl shadow-sm",
+                "shadow-sm",
+                getBubbleRadius(),
                 isMedia ? "p-0 overflow-hidden" : "px-3 py-2",
                 message.isOwn
-                  ? "bg-primary text-primary-foreground rounded-br-md"
-                  : "bg-muted/80 rounded-bl-md",
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted/80",
                 message.status === "error" && "bg-destructive/90 text-destructive-foreground"
               )}
             >
@@ -406,6 +444,7 @@ export function MessageBubble({ message, showAvatar = true }: MessageBubbleProps
           )
         })()}
         
+        {(showTimestamp || message.status === "pending" || message.status === "error") && (
         <div className="flex items-center gap-1 mt-0.5 px-0.5">
           <span className="text-[10px] text-muted-foreground/70">
             {message.status === "pending" 
@@ -424,6 +463,7 @@ export function MessageBubble({ message, showAvatar = true }: MessageBubbleProps
             />
           )}
         </div>
+        )}
       </div>
 
       {/* Fullscreen media viewer */}

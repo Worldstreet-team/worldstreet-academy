@@ -62,7 +62,7 @@ async function cfFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
 export async function createMeeting(title: string): Promise<string> {
   const data = await cfFetch<MeetingResponse>("/meetings", {
     method: "POST",
-    body: JSON.stringify({ title }),
+    body: JSON.stringify({ title, live: true }),
   })
 
   const meeting = data.result || data.data

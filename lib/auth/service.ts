@@ -38,6 +38,7 @@ async function authFetch<T>(
       headers,
       body: body ? JSON.stringify(body) : undefined,
       cache: "no-store",
+      signal: AbortSignal.timeout(10000),
     })
 
     const data = await response.json()

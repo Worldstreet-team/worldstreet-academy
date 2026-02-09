@@ -34,6 +34,7 @@ export function MessageContextMenu({
   const [isOpen, setIsOpen] = useState(false)
   const [position, setPosition] = useState({ x: 0, y: 0 })
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const longPressTimer = useRef<NodeJS.Timeout | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -121,8 +122,10 @@ export function MessageContextMenu({
   }, [])
 
   const handleDeleteConfirm = useCallback(async () => {
-    setShowDeleteConfirm(false)
+    setIsDeleting(true)
     const result = await deleteMessage(messageId)
+    setShowDeleteConfirm(false)
+    setIsDeleting(false)
     if (result.success) {
       onDeleted?.(messageId)
     }
@@ -180,9 +183,9 @@ export function MessageContextMenu({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={handleDeleteConfirm}>
-              Delete
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={handleDeleteConfirm} disabled={isDeleting}>
+              {isDeleting ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
