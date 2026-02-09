@@ -232,6 +232,12 @@ export async function endCall(callId: string): Promise<{
       call.receiverId.toString() === currentUser.id
     if (!isParticipant) return { success: false, error: "Not authorized" }
 
+    // Guard: if call is already in a terminal state, skip (prevents duplicate messages)
+    if (["completed", "missed", "declined", "failed"].includes(call.status)) {
+      console.log(`[EndCall] Call ${callId} already in terminal state: ${call.status}, skipping`)
+      return { success: true }
+    }
+
     // Calculate duration
     const endTime = new Date()
     let duration = 0
@@ -242,18 +248,34 @@ export async function endCall(callId: string): Promise<{
     // If it was ringing and the caller ends it, mark as missed
     const wasRinging = call.status === "ringing"
     const callerEnded = call.callerId.toString() === currentUser.id
-
-    call.status = wasRinging
+    const newStatus = wasRinging
       ? callerEnded
         ? "missed"
         : "declined"
       : "completed"
-    call.endedAt = endTime
-    call.duration = duration
-    await call.save()
 
-    // Insert system message
-    await insertCallSystemMessage(call)
+    // Atomic update: only if call is still in a non-terminal state
+    // This prevents race conditions where both participants call endCall simultaneously
+    const updated = await Call.findOneAndUpdate(
+      {
+        _id: callId,
+        status: { $nin: ["completed", "missed", "declined", "failed"] },
+      },
+      {
+        status: newStatus,
+        endedAt: endTime,
+        duration,
+      },
+      { new: true }
+    )
+
+    // Only insert system message if WE were the one who actually updated (won the race)
+    if (updated) {
+      await insertCallSystemMessage(updated)
+      console.log(`[EndCall] Call ${callId} ended with status: ${newStatus}`)
+    } else {
+      console.log(`[EndCall] Call ${callId} was already ended by the other participant`)
+    }
 
     return { success: true }
   } catch (error) {
@@ -402,10 +424,15 @@ export async function expireRingingCalls(): Promise<void> {
   })
 
   for (const call of staleCalls) {
-    call.status = "missed"
-    call.endedAt = new Date()
-    await call.save()
-    await insertCallSystemMessage(call)
+    // Atomic update: only expire if still ringing (prevents race with endCall/declineCall)
+    const updated = await Call.findOneAndUpdate(
+      { _id: call._id, status: "ringing" },
+      { status: "missed", endedAt: new Date() },
+      { new: true }
+    )
+    if (updated) {
+      await insertCallSystemMessage(updated)
+    }
   }
 }
 

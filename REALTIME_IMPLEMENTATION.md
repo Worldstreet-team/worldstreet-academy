@@ -676,6 +676,128 @@ rtkClient.client?.self.audioTrack    // Should be MediaStreamTrack
 
 ---
 
+## Session 2 Fixes (Feb 2026)
+
+### 7. Remote Audio Not Playing
+
+**Problem**: Users could see remote video but couldn't hear each other. For audio-only calls, no media was played at all.
+
+**Root Cause**: The Dyte/RTK SDK's `registerVideoElement()` only handles the video track. Remote audio was never explicitly played — the code relied on the SDK to auto-manage audio, but with Cloudflare RealtimeKit that auto-management doesn't work reliably.
+
+**Solution**: **Explicit remote audio handling via hidden `<audio>` element**
+
+```typescript
+// Hidden audio element in render
+<audio ref={remoteAudioRef} autoPlay playsInline style={{ display: "none" }} />
+
+// In handleParticipantJoined:
+if (participant.audioTrack) {
+  const stream = new MediaStream([participant.audioTrack])
+  remoteAudioRef.current.srcObject = stream
+  remoteAudioRef.current.play().catch(console.warn)
+}
+
+// Listen for audio track changes via audioUpdate event
+rtkClient.on("audioUpdate", "participants", (participant, { audioEnabled, audioTrack }) => {
+  setIsRemoteMuted(!audioEnabled)
+  if (audioEnabled && audioTrack) {
+    const stream = new MediaStream([audioTrack])
+    remoteAudioRef.current.srcObject = stream
+    remoteAudioRef.current.play().catch(() => {})
+  }
+})
+```
+
+**Also**: Resume `AudioContext` during user gesture (click Answer/Call) to satisfy browser autoplay policies.
+
+---
+
+### 8. Duplicate Call System Messages
+
+**Problem**: Multiple "call ended" messages appeared in chat for a single call. Both participants could trigger `endCall()` simultaneously (one via button click, other via `participantLeft` event), each inserting a system message.
+
+**Solution**: **Atomic `findOneAndUpdate` with terminal-state guard**
+
+```typescript
+// Guard: skip if already terminal
+if (["completed", "missed", "declined", "failed"].includes(call.status)) {
+  return { success: true }  // Already ended, no-op
+}
+
+// Atomic update: only ONE participant wins the race
+const updated = await Call.findOneAndUpdate(
+  { _id: callId, status: { $nin: ["completed", "missed", "declined", "failed"] } },
+  { status: newStatus, endedAt: endTime, duration },
+  { new: true }
+)
+
+// Only the winner inserts the system message
+if (updated) await insertCallSystemMessage(updated)
+```
+
+Same pattern applied to `expireRingingCalls()` — uses `findOneAndUpdate` with `{ status: "ringing" }` filter.
+
+---
+
+### 9. Minimized Call Showing Accept UI on Restore
+
+**Problem**: When minimizing a connected call and restoring it, the UI reset to "ringing" state showing Accept/Decline buttons even though the call was ongoing.
+
+**Root Cause**: The reset effect had `externalMinimized` as a dependency. When `externalMinimized` toggled, it re-fired the effect which reset `callState` to the initial value.
+
+**Solution**: **Guard against resetting active calls**
+
+```typescript
+useEffect(() => {
+  if (open) {
+    // Skip reset if already in an active call (restoring from minimize)
+    if (hasJoinedRoomRef.current || isConnectedRef.current) return
+
+    setCallState(isIncoming ? "ringing" : "connecting")
+    // ... rest of reset
+  }
+}, [open, isIncoming, callType, externalMinimized])
+```
+
+---
+
+### 10. Call Sounds
+
+**Implementation**: Synthesized tones via Web Audio API (`lib/call-sounds.ts`) — no external sound files needed.
+
+| Event | Sound | Pattern |
+|---|---|---|
+| Outgoing ring | 440+480 Hz dual tone | 2s on / 4s off, repeating |
+| Incoming ring | C5→E5 chirps | Double-chirp every 2.5s |
+| Connected | C5→E5→G5 arpeggio | Single ascending chord |
+| Ended | B4→G4→E4 | Single descending tone |
+| Declined | 480 Hz beep-beep | Two short low beeps |
+
+`AudioContext` is resumed during user gesture (click) to satisfy autoplay policies.
+
+---
+
+### 11. Mute Indicator
+
+**Implementation**: Track remote participant's mute state via `audioUpdate` event on `participants.joined`. Display in UI:
+
+- **Video calls**: "Muted" pill overlay on remote video (top-left)
+- **Audio calls**: Red "Muted" text next to call timer
+- **Minimized PIP**: Visible in compact view
+
+---
+
+### 12. Ringing UI Feedback
+
+**Problem**: Ringing state was set correctly but lacked visual/audio feedback, making it feel unresponsive.
+
+**Solution**:
+- Changed "Calling..." to "Ringing..." for outgoing calls
+- Added pulsing dot animation during ringing state
+- Added sound effects (outgoing dial tone / incoming ring)
+
+---
+
 ## Future Enhancements
 
 ### 1. Screen Sharing
