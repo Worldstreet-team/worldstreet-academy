@@ -7,6 +7,7 @@
 class CallSoundManager {
   private ctx: AudioContext | null = null
   private ringInterval: ReturnType<typeof setInterval> | null = null
+  private _preloaded = false
 
   private getContext(): AudioContext {
     if (!this.ctx || this.ctx.state === "closed") {
@@ -16,6 +17,29 @@ class CallSoundManager {
       this.ctx.resume().catch(() => {})
     }
     return this.ctx
+  }
+
+  /**
+   * Preload / warm the AudioContext on page load.
+   * Plays a silent tone so the context is initialized and ready for instant playback later.
+   * Safe to call multiple times — only runs once.
+   */
+  preload() {
+    if (this._preloaded) return
+    this._preloaded = true
+    try {
+      const ctx = this.getContext()
+      // Play an inaudible tone to warm up the audio pipeline
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      gain.gain.value = 0 // completely silent
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.start()
+      osc.stop(ctx.currentTime + 0.01)
+    } catch {
+      // AudioContext not available (SSR)
+    }
   }
 
   /** Resume audio context — call during user gesture (click) to satisfy autoplay policy */

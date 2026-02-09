@@ -41,7 +41,8 @@ import {
 } from "@/lib/actions/messages"
 import { getImageUploadUrl, getVideoUploadUrl, getAudioUploadUrl } from "@/lib/actions/upload"
 import { cn } from "@/lib/utils"
-import { useMessagePolling } from "@/lib/hooks/use-websocket"
+import { useMessageEvents } from "@/lib/hooks/use-call-events"
+import { useUser } from "@/components/providers/user-provider"
 import { ConversationListSkeleton, MessagesAreaSkeleton } from "@/components/skeletons/message-skeletons"
 import { useCall } from "@/components/providers/call-provider"
 
@@ -58,6 +59,9 @@ export default function InstructorMessagesPage() {
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   
   const { startCall } = useCall()
+  const user = useUser()
+  const selectedIdRef = useRef<string | null>(null)
+  selectedIdRef.current = selectedId
   
   // User search state
   const [showUserSearch, setShowUserSearch] = useState(false)
@@ -99,34 +103,50 @@ export default function InstructorMessagesPage() {
     loadMessages()
   }, [selectedId])
 
-  // Real-time message polling
-  const lastMessageIdRef = useRef<string | null>(null)
-  
-  useEffect(() => {
-    if (messages.length > 0) {
-      lastMessageIdRef.current = messages[messages.length - 1].id
-    }
-  }, [messages])
-
-  useMessagePolling({
-    conversationId: selectedId,
-    enabled: !!selectedId,
-    interval: 3000,
-    onNewMessages: useCallback((newMessages: MessageWithDetails[]) => {
-      setMessages((prev) => {
-        const existingIds = new Set(prev.map((m) => m.id))
-        const uniqueNew = newMessages
-          .filter((m) => !existingIds.has(m.id))
-          .map((m) => ({ ...m, isNew: true }))
-        return [...prev, ...uniqueNew]
-      })
+  // Real-time messages via SSE
+  const handleMessageEvent = useCallback((event: import("@/lib/call-events").MessageEventPayload) => {
+    if (event.type === "message:new") {
+      const currentConvId = selectedIdRef.current
+      if (currentConvId && event.conversationId === currentConvId) {
+        const newMsg: MessageWithDetails = {
+          id: event.messageId,
+          senderId: event.senderId,
+          senderName: event.senderName,
+          senderAvatar: event.senderAvatar,
+          content: event.content,
+          type: event.messageType,
+          fileUrl: event.fileUrl,
+          fileUrls: event.fileUrls,
+          fileName: event.fileName,
+          fileSize: event.fileSize,
+          duration: event.duration,
+          waveform: event.waveform,
+          isOwn: false,
+          isRead: false,
+          isDelivered: true,
+          timestamp: new Date(event.timestamp),
+        }
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === event.messageId)) return prev
+          return [...prev, { ...newMsg, isNew: true } as OptimisticMessage & { isNew?: boolean }]
+        })
+      }
       getConversations().then((result) => {
         if (result.success && result.conversations) {
           setConversations(result.conversations)
         }
       })
-    }, []),
-  })
+    } else if (event.type === "message:deleted") {
+      setMessages((prev) => prev.filter((m) => m.id !== event.messageId))
+      getConversations().then((result) => {
+        if (result.success && result.conversations) {
+          setConversations(result.conversations)
+        }
+      })
+    }
+  }, [])
+
+  useMessageEvents(user.id, handleMessageEvent)
 
   // Scroll to bottom when messages change
   useEffect(() => {

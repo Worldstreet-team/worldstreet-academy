@@ -33,6 +33,8 @@ import {
   Message01Icon,
   TeachingIcon,
   Call02Icon,
+  MeetingRoomIcon,
+  LiveStreamingIcon,
 } from "@hugeicons/core-free-icons"
 import { useUser } from "@/components/providers/user-provider"
 import { logoutAction } from "@/lib/auth/actions"
@@ -71,11 +73,26 @@ const mainItems: NavItem[] = [
     icon: Bookmark01Icon,
     match: (p) => p === "/dashboard/bookmarks",
   },
+]
+
+const connectItems: NavItem[] = [
   {
     title: "Messages",
     href: "/dashboard/messages",
     icon: Message01Icon,
     match: (p) => p === "/dashboard/messages",
+  },
+  {
+    title: "Meetings",
+    href: "/dashboard/meetings",
+    icon: MeetingRoomIcon,
+    match: (p) => p.startsWith("/dashboard/meetings"),
+  },
+  {
+    title: "Live",
+    href: "/dashboard/live",
+    icon: LiveStreamingIcon,
+    match: (p) => p.startsWith("/dashboard/live"),
   },
 ]
 
@@ -147,6 +164,27 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {mainItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    render={<Link href={item.href} />}
+                    isActive={isActive(item, pathname)}
+                  >
+                    <HugeiconsIcon icon={item.icon} size={18} />
+                    <span>{item.title}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarSeparator />
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Connect</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {connectItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     render={<Link href={item.href} />}

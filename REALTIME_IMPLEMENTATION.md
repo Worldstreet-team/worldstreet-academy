@@ -22,13 +22,92 @@ This document captures the complete implementation of audio/video calling using 
 
 3. **CallProvider** (`components/providers/call-provider.tsx`)
    - Global call state management
-   - Incoming call polling via server actions
+   - SSE-driven incoming call detection and call lifecycle events
    - Renders VideoCall as modal overlay
 
 4. **Server Actions** (`lib/actions/calls.ts`)
    - Call CRUD operations via MongoDB
    - Dyte REST API integration for meeting/participant management
-   - Polling endpoints for call status and incoming calls
+   - Emits SSE events on every call state change
+
+5. **SSE Call Event Bus** (`lib/call-events.ts`)
+   - In-memory pub/sub for real-time call signaling
+   - Server actions emit events; SSE connections subscribe per-user
+   - Event types: `call:incoming`, `call:answered`, `call:declined`, `call:ended`, `call:cancelled`
+
+6. **SSE Route Handler** (`app/api/calls/events/route.ts`)
+   - Streaming GET endpoint using ReadableStream
+   - Per-user subscription with 25s heartbeat
+   - Auto-cleanup on client disconnect
+
+7. **Client SSE Hook** (`lib/hooks/use-call-events.ts`)
+   - EventSource wrapper with exponential backoff reconnection
+   - Dispatches `CallEventPayload` events to consumer callbacks
+
+---
+
+## SSE Call Signaling (Replaced HTTP Polling)
+
+### Why SSE Over WebSockets
+
+Next.js App Router route handlers cannot perform WebSocket upgrades. SSE (Server-Sent Events) was chosen because:
+- **One-directional push** is sufficient — mutations happen via server actions, only server→client push is needed
+- **No external dependencies** — no Pusher/Ably/Redis required
+- **Native Next.js support** — ReadableStream works in Route Handlers
+- **Built-in reconnection** — EventSource API auto-reconnects on disconnect
+
+### Architecture Flow
+
+```
+[Caller] → Server Action (initiateCall) → DB write + emitCallEvent("call:incoming", receiverId)
+                                                          ↓
+                                              call-events.ts event bus
+                                                          ↓
+                                              SSE route (/api/calls/events)
+                                                          ↓
+                                              [Receiver] EventSource → CallProvider shows incoming UI
+```
+
+### Event Types
+
+| Event | Emitted By | Sent To | Trigger |
+|-------|-----------|---------|---------|
+| `call:incoming` | `initiateCall()` | Receiver | New call created |
+| `call:answered` | `answerCall()` | Caller | Receiver accepts |
+| `call:declined` | `declineCall()` | Caller | Receiver declines |
+| `call:cancelled` | `endCall()` | Receiver | Caller hangs up before answer |
+| `call:ended` | `endCall()` | Other participant | Either party ends active call |
+
+### Event Payload
+
+```typescript
+type CallEventPayload = {
+  type: CallEventType
+  callId: string
+  callType: "audio" | "video"
+  callerId: string
+  callerName: string
+  callerAvatar: string
+  receiverId: string
+  conversationId: string
+  status?: string
+}
+```
+
+### In-Memory Event Bus (`lib/call-events.ts`)
+
+Module-level `Map<string, Set<callback>>` acts as pub/sub:
+- SSE route subscribes on connection, unsubscribes on disconnect
+- Server actions emit after successful DB mutations
+- Works in development and single-process production (VPS/Docker)
+- **Note**: Won't work across serverless function instances (would need Redis pub/sub for Vercel)
+
+### Caller-Cancel Bug Fix
+
+Previously, when the caller hung up before the receiver answered, the receiver's incoming call UI kept ringing because polling was too slow or the status transition was missed. Now:
+1. Caller calls `endCall()` → status set to "missed"
+2. `endCall()` emits `call:cancelled` to receiver via SSE
+3. Receiver's `CallProvider` immediately handles the event and dismisses the UI
 
 ---
 

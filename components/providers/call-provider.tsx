@@ -4,17 +4,17 @@ import {
   createContext,
   useContext,
   useState,
-  useEffect,
   useCallback,
   useRef,
+  useEffect,
   ReactNode,
 } from "react"
 import { VideoCall } from "@/components/messages/video-call"
-import {
-  getCallStatus,
-  pollIncomingCall,
-  endCall as endCallAction,
-} from "@/lib/actions/calls"
+import { endCall as endCallAction, pollIncomingCall } from "@/lib/actions/calls"
+import { useCallEvents } from "@/lib/hooks/use-call-events"
+import { useUser } from "@/components/providers/user-provider"
+import { callSounds } from "@/lib/call-sounds"
+import type { CallEventPayload } from "@/lib/call-events"
 
 type CallType = "video" | "audio"
 type CallState = "idle" | "ringing" | "connecting" | "connected" | "ended"
@@ -27,6 +27,8 @@ type CallInfo = {
   participantAvatar?: string
   isIncoming: boolean
   conversationId?: string
+  /** Pre-fetched auth token for fast answer (receiver only) */
+  authToken?: string
 }
 
 type CallContextType = {
@@ -62,98 +64,146 @@ export function useOngoingCall() {
 }
 
 export function CallProvider({ children }: { children: ReactNode }) {
+  const user = useUser()
   const [activeCall, setActiveCall] = useState<CallInfo | null>(null)
   const [callState, setCallState] = useState<CallState>("idle")
   const [isMinimized, setIsMinimized] = useState(false)
   const [showCallUI, setShowCallUI] = useState(false)
   const dismissedCallsRef = useRef<Set<string>>(new Set())
 
+  // Preload call sounds on mount so they're ready for instant playback
+  useEffect(() => {
+    callSounds.preload()
+  }, [])
+  // Ref to access latest state in the SSE callback without re-subscribing
+  const activeCallRef = useRef<CallInfo | null>(null)
+  const callStateRef = useRef<CallState>("idle")
+
   const hasOngoingCall =
     callState === "connecting" ||
     callState === "connected" ||
     callState === "ringing"
 
-  // Refresh prevention when call is active
+  // Keep refs in sync (must be in useEffect for React 19)
   useEffect(() => {
-    if (!hasOngoingCall) return
+    activeCallRef.current = activeCall
+    callStateRef.current = callState
+  }, [activeCall, callState])
 
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      e.preventDefault()
-      e.returnValue = "You have an ongoing call. Leaving will end the call."
-      return e.returnValue
-    }
+  // Handle SSE call events
+  const handleCallEvent = useCallback(
+    (event: CallEventPayload) => {
+      console.log("[CallProvider] SSE event:", event.type, event.callId)
 
-    window.addEventListener("beforeunload", handleBeforeUnload)
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload)
-  }, [hasOngoingCall])
-
-  // Poll for incoming calls using server action
-  useEffect(() => {
-    if (hasOngoingCall) return
-    let active = true
-
-    async function poll() {
-      try {
-        const data = await pollIncomingCall()
-        if (!active) return
-
-        if (
-          data.incoming &&
-          !dismissedCallsRef.current.has(data.incoming.callId)
-        ) {
-          const incoming = data.incoming
+      switch (event.type) {
+        case "call:incoming": {
+          // Only show if we don't already have an active call and haven't dismissed this one
+          if (
+            callStateRef.current !== "idle" &&
+            callStateRef.current !== "ended"
+          ) {
+            console.log("[CallProvider] Already in a call, ignoring incoming")
+            return
+          }
+          if (dismissedCallsRef.current.has(event.callId)) {
+            console.log("[CallProvider] Call already dismissed, ignoring")
+            return
+          }
           setActiveCall({
-            callId: incoming.callId,
-            callType: incoming.callType,
-            participantId: incoming.callerId,
-            participantName: incoming.callerName,
-            participantAvatar: incoming.callerAvatar || undefined,
+            callId: event.callId,
+            callType: event.callType,
+            participantId: event.callerId,
+            participantName: event.callerName,
+            participantAvatar: event.callerAvatar || undefined,
             isIncoming: true,
-            conversationId: incoming.conversationId,
+            conversationId: event.conversationId,
+            authToken: event.authToken,
+          })
+          setCallState("ringing")
+          setShowCallUI(true)
+          setIsMinimized(false)
+          break
+        }
+
+        case "call:cancelled": {
+          // Caller hung up before we answered — dismiss the incoming call
+          const current = activeCallRef.current
+          if (current?.callId === event.callId) {
+            console.log("[CallProvider] Call cancelled by caller")
+            dismissedCallsRef.current.add(event.callId)
+            setCallState("ended")
+          }
+          break
+        }
+
+        case "call:declined": {
+          // Receiver declined — notify caller
+          const current = activeCallRef.current
+          if (current?.callId === event.callId) {
+            console.log("[CallProvider] Call declined by receiver")
+            dismissedCallsRef.current.add(event.callId)
+            setCallState("ended")
+          }
+          break
+        }
+
+        case "call:answered": {
+          // Receiver answered — the VideoCall component handles room join
+          console.log("[CallProvider] Call answered, VideoCall will handle room join")
+          break
+        }
+
+        case "call:ended": {
+          // Call ended by the other participant
+          const current = activeCallRef.current
+          if (current?.callId === event.callId) {
+            console.log("[CallProvider] Call ended by remote participant")
+            dismissedCallsRef.current.add(event.callId)
+            setCallState("ended")
+          }
+          break
+        }
+      }
+    },
+    [] // No deps — uses refs for latest state
+  )
+
+  // Connect to SSE for real-time call events
+  useCallEvents(user.id, handleCallEvent)
+
+  // Polling fallback for incoming calls (safety net if SSE misses an event)
+  useEffect(() => {
+    const poll = async () => {
+      // Only poll when idle — SSE handles events during active calls
+      if (callStateRef.current !== "idle" && callStateRef.current !== "ended") return
+      try {
+        const result = await pollIncomingCall()
+        if (result.incoming && callStateRef.current === "idle") {
+          // Check if not already dismissed
+          if (dismissedCallsRef.current.has(result.incoming.callId)) return
+          console.log("[CallProvider] Fallback poll detected incoming call:", result.incoming.callId)
+          setActiveCall({
+            callId: result.incoming.callId,
+            callType: result.incoming.callType,
+            participantId: result.incoming.callerId,
+            participantName: result.incoming.callerName,
+            participantAvatar: result.incoming.callerAvatar || undefined,
+            isIncoming: true,
+            conversationId: result.incoming.conversationId,
+            authToken: result.incoming.authToken,
           })
           setCallState("ringing")
           setShowCallUI(true)
           setIsMinimized(false)
         }
       } catch {
-        // Silently ignore poll errors
+        // Ignore poll errors
       }
     }
 
-    const interval = setInterval(poll, 1500)
-    poll()
-
-    return () => {
-      active = false
-      clearInterval(interval)
-    }
-  }, [hasOngoingCall])
-
-  // Poll active call status to detect remote end
-  useEffect(() => {
-    if (!activeCall?.callId) return
-    // Poll as long as we have an active call that isn't ended
-    if (callState === "idle" || callState === "ended") return
-    let active = true
-
-    const interval = setInterval(async () => {
-      if (!active || !activeCall?.callId) return
-      const result = await getCallStatus(activeCall.callId)
-      if (!active) return
-      if (
-        result.success &&
-        result.status &&
-        ["completed", "missed", "declined", "failed"].includes(result.status)
-      ) {
-        setCallState("ended")
-      }
-    }, 2000)
-
-    return () => {
-      active = false
-      clearInterval(interval)
-    }
-  }, [activeCall?.callId, callState])
+    const interval = setInterval(poll, 5000)
+    return () => clearInterval(interval)
+  }, [])
 
   const startCall = useCallback(
     (params: {
@@ -178,40 +228,38 @@ export function CallProvider({ children }: { children: ReactNode }) {
   )
 
   const endCall = useCallback(() => {
-    if (activeCall?.callId) {
-      dismissedCallsRef.current.add(activeCall.callId)
+    if (activeCallRef.current?.callId) {
+      dismissedCallsRef.current.add(activeCallRef.current.callId)
     }
     setCallState("ended")
-  }, [activeCall])
+  }, [])
 
   const onCallConnected = useCallback((callId: string) => {
-    // Only update the callId on the active call — don't change callState here.
-    // The VideoCall component manages its own internal state transitions.
-    // The provider callState is only for: idle → ringing/connecting → ended lifecycle.
     setActiveCall((prev) => (prev ? { ...prev, callId } : prev))
   }, [])
 
   const onCallEnded = useCallback(() => {
-    if (activeCall?.callId) {
-      dismissedCallsRef.current.add(activeCall.callId)
+    const current = activeCallRef.current
+    if (current?.callId) {
+      dismissedCallsRef.current.add(current.callId)
     }
     setActiveCall(null)
     setCallState("idle")
     setShowCallUI(false)
     setIsMinimized(false)
-  }, [activeCall])
+  }, [])
 
   const handleClose = useCallback(() => {
-    if (activeCall?.callId) {
-      dismissedCallsRef.current.add(activeCall.callId)
-      // End the call on the server if it's still active
-      endCallAction(activeCall.callId).catch(() => {})
+    const current = activeCallRef.current
+    if (current?.callId) {
+      dismissedCallsRef.current.add(current.callId)
+      endCallAction(current.callId).catch(() => {})
     }
     setActiveCall(null)
     setCallState("idle")
     setShowCallUI(false)
     setIsMinimized(false)
-  }, [activeCall])
+  }, [])
 
   return (
     <CallContext.Provider
@@ -239,6 +287,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
           isIncoming={activeCall.isIncoming}
           incomingCallId={
             activeCall.isIncoming ? activeCall.callId || undefined : undefined
+          }
+          incomingAuthToken={
+            activeCall.isIncoming ? activeCall.authToken : undefined
           }
           receiverId={
             !activeCall.isIncoming ? activeCall.participantId : undefined

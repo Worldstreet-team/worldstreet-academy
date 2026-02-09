@@ -51,6 +51,7 @@ interface RTKClientManager {
 let _client: RTKClientInstance | null = null
 let _isInRoom = false
 let _isInitializing = false
+let _isJoining = false
 const _listeners: Array<{
   event: string
   target: "self" | "participants"
@@ -120,10 +121,22 @@ export const rtkClient: RTKClientManager = {
       console.log("[RTK-Client] Already in room, skipping join")
       return
     }
-    console.log("[RTK-Client] Joining room...")
-    await _client.joinRoom()
-    _isInRoom = true
-    console.log("[RTK-Client] Joined room")
+    if (_isJoining) {
+      console.log("[RTK-Client] Join already in progress, waiting...")
+      while (_isJoining) {
+        await new Promise((r) => setTimeout(r, 50))
+      }
+      return
+    }
+    _isJoining = true
+    try {
+      console.log("[RTK-Client] Joining room...")
+      await _client.joinRoom()
+      _isInRoom = true
+      console.log("[RTK-Client] Joined room")
+    } finally {
+      _isJoining = false
+    }
   },
 
   async leaveRoom() {

@@ -4,6 +4,7 @@ import { Types } from "mongoose"
 import connectDB from "@/lib/db"
 import { Message, Conversation, User, type IMessage, type IConversation, type IUser } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth"
+import { emitEvent, type MessageEventPayload } from "@/lib/call-events"
 
 export type ConversationWithDetails = {
   id: string
@@ -222,15 +223,36 @@ export async function sendMessage(
     conversation.lastMessageAt = new Date()
     await conversation.save()
 
-    const sender = await User.findById(senderId).lean()
+    const senderName = `${currentUser.firstName} ${currentUser.lastName}`.trim()
+    const senderAvatar = currentUser.avatarUrl || null
+
+    // Emit SSE event to the receiver for instant delivery
+    const msgEvent: MessageEventPayload = {
+      type: "message:new",
+      messageId: message._id.toString(),
+      conversationId: conversation._id.toString(),
+      senderId: senderId.toString(),
+      senderName,
+      senderAvatar,
+      content,
+      messageType: type,
+      fileUrl: fileData?.url,
+      fileUrls: fileData?.urls,
+      fileName: fileData?.name,
+      fileSize: fileData?.size,
+      duration: fileData?.duration,
+      waveform: fileData?.waveform,
+      timestamp: message.createdAt.toISOString(),
+    }
+    emitEvent(recipientId.toString(), msgEvent)
 
     return {
       success: true,
       message: {
         id: message._id.toString(),
         senderId: senderId.toString(),
-        senderName: sender ? `${sender.firstName} ${sender.lastName}`.trim() : "You",
-        senderAvatar: sender?.avatarUrl || null,
+        senderName,
+        senderAvatar,
         content,
         type,
         fileUrl: fileData?.url,
@@ -440,7 +462,23 @@ export async function deleteMessage(messageId: string): Promise<{
     }
 
     const conversationId = message.conversationId
+    const receiverId = message.receiverId
     await Message.findByIdAndDelete(messageId)
+
+    // Notify the other participant about deletion
+    if (receiverId) {
+      emitEvent(receiverId.toString(), {
+        type: "message:deleted",
+        messageId,
+        conversationId: conversationId.toString(),
+        senderId: currentUser.id,
+        senderName: "",
+        senderAvatar: null,
+        content: "",
+        messageType: "text",
+        timestamp: new Date().toISOString(),
+      } as MessageEventPayload)
+    }
 
     // Update conversation's last message if this was the latest
     const lastMsg = await Message.findOne({ conversationId })

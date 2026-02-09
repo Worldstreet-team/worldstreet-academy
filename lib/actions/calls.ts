@@ -5,6 +5,7 @@ import connectDB from "@/lib/db"
 import { Call, Conversation, User, Message, type ICall, type CallType } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth"
 import { createMeeting, addParticipant } from "@/lib/realtime"
+import { emitCallEvent, type CallEventPayload } from "@/lib/call-events"
 
 // ──────────────────────────────────────────────
 // Types
@@ -83,8 +84,10 @@ export async function initiateCall(
       console.log(`[InitiateCall] Expired ${expireResult.modifiedCount} previous ringing calls between pair`)
     }
 
-    const caller = await User.findById(callerId).lean()
-    const receiver = await User.findById(recipientId).lean()
+    const [caller, receiver] = await Promise.all([
+      User.findById(callerId).lean(),
+      User.findById(recipientId).lean(),
+    ])
     if (!caller || !receiver) return { success: false, error: "User not found" }
 
     const callerName = `${caller.firstName} ${caller.lastName}`.trim()
@@ -98,18 +101,19 @@ export async function initiateCall(
     // Use a voice preset for audio-only, group_call_host for video
     const presetName = type === "audio" ? "group_call_host" : "group_call_host"
 
-    // Add both participants
-    const callerParticipant = await addParticipant(meetingId, {
-      name: callerName,
-      customParticipantId: currentUser.id,
-      presetName,
-    })
-
-    const receiverParticipant = await addParticipant(meetingId, {
-      name: receiverName,
-      customParticipantId: receiverId,
-      presetName,
-    })
+    // Add both participants in parallel for faster call setup
+    const [callerParticipant, receiverParticipant] = await Promise.all([
+      addParticipant(meetingId, {
+        name: callerName,
+        customParticipantId: currentUser.id,
+        presetName,
+      }),
+      addParticipant(meetingId, {
+        name: receiverName,
+        customParticipantId: receiverId,
+        presetName,
+      }),
+    ])
 
     // Create call record
     const call = await Call.create({
@@ -124,6 +128,20 @@ export async function initiateCall(
     })
 
     console.log(`[InitiateCall] Created call ${call._id} from ${callerId} to ${recipientId}`)
+
+    // Emit SSE event to the receiver
+    const eventPayload: CallEventPayload = {
+      type: "call:incoming",
+      callId: call._id.toString(),
+      callType: type,
+      callerId: currentUser.id,
+      callerName,
+      callerAvatar: caller.avatarUrl || null,
+      receiverId,
+      conversationId: conversation._id.toString(),
+      authToken: receiverParticipant.authToken,
+    }
+    emitCallEvent(receiverId, eventPayload)
 
     return {
       success: true,
@@ -165,6 +183,19 @@ export async function answerCall(callId: string): Promise<{
     
     console.log(`[AnswerCall] Call ${callId} status updated to: ongoing`)
 
+    // Emit SSE event to the caller so they know to join the room
+    const eventPayload: CallEventPayload = {
+      type: "call:answered",
+      callId,
+      callType: call.type,
+      callerId: call.callerId.toString(),
+      callerName: "", // Caller already knows their own name
+      callerAvatar: null,
+      receiverId: currentUser.id,
+      conversationId: call.conversationId.toString(),
+    }
+    emitCallEvent(call.callerId.toString(), eventPayload)
+
     return {
       success: true,
       authToken: call.receiverToken,
@@ -203,6 +234,20 @@ export async function declineCall(callId: string): Promise<{
 
     // Insert a system message into the conversation
     await insertCallSystemMessage(call)
+
+    // Emit SSE event to the caller
+    const eventPayload: CallEventPayload = {
+      type: "call:declined",
+      callId,
+      callType: call.type,
+      callerId: call.callerId.toString(),
+      callerName: "",
+      callerAvatar: null,
+      receiverId: currentUser.id,
+      conversationId: call.conversationId.toString(),
+      status: "declined",
+    }
+    emitCallEvent(call.callerId.toString(), eventPayload)
 
     return { success: true }
   } catch (error) {
@@ -273,6 +318,28 @@ export async function endCall(callId: string): Promise<{
     if (updated) {
       await insertCallSystemMessage(updated)
       console.log(`[EndCall] Call ${callId} ended with status: ${newStatus}`)
+
+      // Determine who to notify (the other participant)
+      const otherUserId =
+        call.callerId.toString() === currentUser.id
+          ? call.receiverId.toString()
+          : call.callerId.toString()
+
+      // Use the appropriate event type
+      const eventType = wasRinging ? "call:cancelled" as const : "call:ended" as const
+
+      const eventPayload: CallEventPayload = {
+        type: eventType,
+        callId,
+        callType: call.type,
+        callerId: call.callerId.toString(),
+        callerName: "",
+        callerAvatar: null,
+        receiverId: call.receiverId.toString(),
+        conversationId: call.conversationId.toString(),
+        status: newStatus,
+      }
+      emitCallEvent(otherUserId, eventPayload)
     } else {
       console.log(`[EndCall] Call ${callId} was already ended by the other participant`)
     }
@@ -432,6 +499,21 @@ export async function expireRingingCalls(): Promise<void> {
     )
     if (updated) {
       await insertCallSystemMessage(updated)
+
+      // Notify both participants
+      const eventPayload: CallEventPayload = {
+        type: "call:ended",
+        callId: call._id.toString(),
+        callType: updated.type,
+        callerId: updated.callerId.toString(),
+        callerName: "",
+        callerAvatar: null,
+        receiverId: updated.receiverId.toString(),
+        conversationId: updated.conversationId.toString(),
+        status: "missed",
+      }
+      emitCallEvent(updated.callerId.toString(), eventPayload)
+      emitCallEvent(updated.receiverId.toString(), eventPayload)
     }
   }
 }
@@ -448,6 +530,7 @@ export async function pollIncomingCall(): Promise<{
     callerAvatar: string | null
     callType: CallType
     conversationId: string
+    authToken?: string
   } | null
 }> {
   try {
@@ -498,6 +581,7 @@ export async function pollIncomingCall(): Promise<{
         callerAvatar: caller?.avatarUrl || null,
         callType: incomingCall.type,
         conversationId: incomingCall.conversationId.toString(),
+        authToken: incomingCall.receiverToken,
       },
     }
   } catch (error) {

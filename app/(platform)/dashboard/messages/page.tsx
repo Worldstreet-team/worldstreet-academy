@@ -43,7 +43,8 @@ import {
   type UserSearchResult,
 } from "@/lib/actions/messages"
 import { getImageUploadUrl, getVideoUploadUrl, getAudioUploadUrl } from "@/lib/actions/upload"
-import { useMessagePolling } from "@/lib/hooks/use-websocket"
+import { useMessageEvents } from "@/lib/hooks/use-call-events"
+import { useUser } from "@/components/providers/user-provider"
 import { ConversationListSkeleton, MessagesAreaSkeleton } from "@/components/skeletons/message-skeletons"
 import { useCall } from "@/components/providers/call-provider"
 
@@ -60,6 +61,9 @@ export default function MessagesPage() {
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   
   const { startCall } = useCall()
+  const user = useUser()
+  const selectedIdRef = useRef<string | null>(null)
+  selectedIdRef.current = selectedId
   
   // User search state
   const [showUserSearch, setShowUserSearch] = useState(false)
@@ -101,41 +105,64 @@ export default function MessagesPage() {
     loadMessages()
   }, [selectedId])
 
-  // Real-time message polling
-  const lastMessageIdRef = useRef<string | null>(null)
-  
-  useEffect(() => {
-    if (messages.length > 0) {
-      lastMessageIdRef.current = messages[messages.length - 1].id
-    }
-  }, [messages])
-
-  useMessagePolling({
-    conversationId: selectedId,
-    enabled: !!selectedId,
-    interval: 3000,
-    onNewMessages: useCallback((newMessages: MessageWithDetails[]) => {
-      setMessages((prev) => {
-        // Filter out messages we already have
-        const existingIds = new Set(prev.map((m) => m.id))
-        const uniqueNew = newMessages
-          .filter((m) => !existingIds.has(m.id))
-          .map((m) => ({ ...m, isNew: true }))
-        return [...prev, ...uniqueNew]
-      })
-      // Refresh conversations to update unread counts
+  // Real-time messages via SSE
+  const handleMessageEvent = useCallback((event: import("@/lib/call-events").MessageEventPayload) => {
+    if (event.type === "message:new") {
+      const currentConvId = selectedIdRef.current
+      // If this message is for the active conversation, add it to the list
+      if (currentConvId && event.conversationId === currentConvId) {
+        const newMsg: MessageWithDetails = {
+          id: event.messageId,
+          senderId: event.senderId,
+          senderName: event.senderName,
+          senderAvatar: event.senderAvatar,
+          content: event.content,
+          type: event.messageType,
+          fileUrl: event.fileUrl,
+          fileUrls: event.fileUrls,
+          fileName: event.fileName,
+          fileSize: event.fileSize,
+          duration: event.duration,
+          waveform: event.waveform,
+          isOwn: false,
+          isRead: false,
+          isDelivered: true,
+          timestamp: new Date(event.timestamp),
+        }
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === event.messageId)) return prev
+          return [...prev, { ...newMsg, isNew: true } as OptimisticMessage & { isNew?: boolean }]
+        })
+      }
+      // Always refresh conversations for unread counts
       getConversations().then((result) => {
         if (result.success && result.conversations) {
           setConversations(result.conversations)
         }
       })
-    }, []),
-  })
+    } else if (event.type === "message:deleted") {
+      setMessages((prev) => prev.filter((m) => m.id !== event.messageId))
+      getConversations().then((result) => {
+        if (result.success && result.conversations) {
+          setConversations(result.conversations)
+        }
+      })
+    }
+  }, [])
 
-  // Scroll to bottom when messages change
+  useMessageEvents(user.id, handleMessageEvent)
+
+  // Scroll to bottom when messages change (debounced to avoid mid-animation flicker)
+  const prevMessagesLenRef = useRef(0)
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "auto" })
+    if (!messagesEndRef.current) return
+    const isNewMessage = messages.length > prevMessagesLenRef.current
+    prevMessagesLenRef.current = messages.length
+    // Instant scroll for initial load or new messages
+    if (isNewMessage) {
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "instant" })
+      })
     }
   }, [messages])
 
@@ -347,11 +374,12 @@ export default function MessagesPage() {
           prev.map((m) => m.id === tempId ? { ...result.message!, status: "sent" as const } : m)
         )
         
-        // Refresh conversations to update last message
-        const convResult = await getConversations()
-        if (convResult.success && convResult.conversations) {
-          setConversations(convResult.conversations)
-        }
+        // Refresh conversations in background (non-blocking)
+        getConversations().then((convResult) => {
+          if (convResult.success && convResult.conversations) {
+            setConversations(convResult.conversations)
+          }
+        })
       } else {
         throw new Error(result.error || "Failed to send message")
       }
@@ -506,7 +534,7 @@ export default function MessagesPage() {
                           <div key={group.date.toISOString()}>
                             <DateSeparator date={group.date} />
                             <div className="space-y-0.5">
-                              <AnimatePresence mode="popLayout">
+                              <AnimatePresence initial={false}>
                               {group.messages.map((msg, i) => {
                                 const prev = group.messages[i - 1]
                                 const next = group.messages[i + 1]
@@ -528,8 +556,9 @@ export default function MessagesPage() {
                                   return (
                                     <motion.div
                                       key={msg.id}
-                                      layout
-                                      exit={{ opacity: 0, height: 0, scale: 0.95, transition: { duration: 0.2 } }}
+                                      initial={msg.isNew ? { opacity: 0, y: 10 } : false}
+                                      animate={{ opacity: 1, y: 0 }}
+                                      exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.15 } }}
                                     >
                                     <CallEvent
                                       content={msg.content}
@@ -549,8 +578,9 @@ export default function MessagesPage() {
                                 return (
                                   <motion.div
                                     key={msg.id}
-                                    layout
-                                    exit={{ opacity: 0, height: 0, scale: 0.95, transition: { duration: 0.2 } }}
+                                    initial={msg.isNew ? { opacity: 0, y: 10 } : false}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.15 } }}
                                   >
                                   <MessageContextMenu
                                     messageId={msg.id}

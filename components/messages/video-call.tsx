@@ -23,6 +23,9 @@ import {
   endCall as endCallAction,
   getCallStatus,
 } from "@/lib/actions/calls"
+import { useCallEvents } from "@/lib/hooks/use-call-events"
+import { useUser } from "@/components/providers/user-provider"
+import type { CallEventPayload } from "@/lib/call-events"
 
 type CallType = "video" | "audio"
 type CallState = "ringing" | "connecting" | "connected" | "ended"
@@ -35,6 +38,8 @@ type VideoCallProps = {
   callerAvatar?: string
   isIncoming?: boolean
   incomingCallId?: string
+  /** Pre-fetched auth token for fast answer (skips waiting for answerCall response) */
+  incomingAuthToken?: string
   receiverId?: string
   onCallStarted?: (callId: string) => void
   onCallEnded?: () => void
@@ -116,6 +121,7 @@ export function VideoCall({
   callerAvatar,
   isIncoming = false,
   incomingCallId,
+  incomingAuthToken,
   receiverId,
   onCallStarted,
   onCallEnded,
@@ -148,6 +154,73 @@ export function VideoCall({
   const hasJoinedRoomRef = useRef(false)
   const participantLeftTimerRef = useRef<NodeJS.Timeout | null>(null)
   const isConnectedRef = useRef(false)
+
+  // Get user for SSE subscription
+  const user = useUser()
+
+  // ── Handle SSE call events (answer/decline/cancel/end) ──
+  const handleCallSSE = useCallback(
+    (event: CallEventPayload) => {
+      // Only handle events for our current call
+      const currentCallId = callIdRef.current
+      if (!currentCallId || event.callId !== currentCallId) return
+
+      console.log("[VideoCall] SSE event:", event.type, event.callId)
+
+      switch (event.type) {
+        case "call:answered": {
+          // Receiver answered — caller should join room (RTK may already be pre-initialized)
+          if (!isIncoming && !hasJoinedRoomRef.current) {
+            const token = authTokenRef.current
+            if (token) {
+              ;(async () => {
+                try {
+                  // Only init if not already initialized (pre-init during ringing)
+                  if (!rtkClient.client) {
+                    await rtkClient.init(token, {
+                      audio: true,
+                      video: callType === "video",
+                    })
+                  }
+                  console.log("[Caller] Joining room via SSE...")
+                  await rtkClient.joinRoom()
+                  hasJoinedRoomRef.current = true
+                  try { await rtkClient.client?.self.enableAudio() } catch {}
+                  if (callType === "video") {
+                    try { await rtkClient.client?.self.enableVideo() } catch {}
+                  }
+                } catch (err) {
+                  console.error("[Caller] RTK init/join failed:", err)
+                  setCallState("ended")
+                }
+              })()
+            }
+          }
+          break
+        }
+
+        case "call:declined":
+        case "call:cancelled":
+        case "call:ended": {
+          // Remote end/cancel/decline — end the call
+          if (!isEndingRef.current) {
+            isEndingRef.current = true
+            setCallState("ended")
+            rtkClient.leaveRoom().catch(() => {})
+          }
+          break
+        }
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isIncoming, callType]
+  )
+
+  useCallEvents(user.id, handleCallSSE)
+
+  // Keep a ref to callId so the SSE callback can access the latest value
+  const callIdRef = useRef<string | null>(callId)
+  callIdRef.current = callId
 
   // ── RTK event listeners (registered via singleton, survive re-renders) ──
   useEffect(() => {
@@ -297,6 +370,13 @@ export function VideoCall({
     }
   }, [callType, isMinimized, callState])
 
+  // ── Loudspeaker toggle: control remote audio volume ──
+  useEffect(() => {
+    if (!remoteAudioRef.current) return
+    // Speaker ON = full volume (loudspeaker), OFF = low volume (earpiece simulation)
+    remoteAudioRef.current.volume = isSpeakerOn ? 1.0 : 0.15
+  }, [isSpeakerOn])
+
   // ── Initiate outgoing call ──
   useEffect(() => {
     if (!open || isIncoming || callState !== "connecting" || callId) return
@@ -316,6 +396,15 @@ export function VideoCall({
         authTokenRef.current = result.authToken
         onCallStarted?.(result.callId)
         setCallState("ringing")
+        // Pre-init RTK during ringing so joinRoom() is instant when answer arrives
+        rtkClient.init(result.authToken, {
+          audio: true,
+          video: callType === "video",
+        }).then(() => {
+          console.log("[Caller] RTK pre-initialized during ringing")
+        }).catch((err) => {
+          console.warn("[Caller] RTK pre-init failed (will retry on answer):", err)
+        })
       } else {
         console.log("[Caller] Failed to initiate call:", result.error)
         setCallState("ended")
@@ -329,87 +418,55 @@ export function VideoCall({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, isIncoming, callState, receiverId, callType])
 
-  // ── Poll outgoing call status (to detect answer/decline/miss) ──
+  // Polling fallback for outgoing call answer detection (safety net if SSE misses the event)
   useEffect(() => {
-    if (!open || isIncoming || !callId) return
-    if (callState !== "ringing") return
+    if (!open || isIncoming || !callId || callState !== "ringing") return
     let cancelled = false
-    let joined = false
 
     const pollInterval = setInterval(async () => {
-      if (cancelled || joined) return
-      const result = await getCallStatus(callId)
-      if (cancelled || joined) return
-      console.log("[Poll] Call", callId, "status:", result.status)
-      if (result.success && result.status) {
-        if (result.status === "ongoing") {
-          joined = true
-          clearInterval(pollInterval)
-          console.log("[Caller] Receiver answered! Init + joining room...")
-          const token = authTokenRef.current
-          if (token) {
-            try {
-              await rtkClient.init(token, {
-                audio: true,
-                video: callType === "video",
-              })
-              console.log("[Caller] Joining room...")
-              await rtkClient.joinRoom()
-              hasJoinedRoomRef.current = true
-              console.log("[Caller] Joined room")
-              // Explicitly enable audio after join
-              try { await rtkClient.client?.self.enableAudio() } catch {}
-              if (callType === "video") {
-                try { await rtkClient.client?.self.enableVideo() } catch {}
+      if (cancelled) return
+      try {
+        const result = await getCallStatus(callId)
+        if (cancelled) return
+        if (result.success && result.status) {
+          if (result.status === "ongoing" && !hasJoinedRoomRef.current && !rtkClient.isInRoom) {
+            // SSE missed the answer event — join room now
+            console.log("[Caller] Fallback poll: detected answer, joining room...")
+            clearInterval(pollInterval)
+            const token = authTokenRef.current
+            if (token) {
+              try {
+                await rtkClient.init(token, { audio: true, video: callType === "video" })
+                await rtkClient.joinRoom()
+                hasJoinedRoomRef.current = true
+                try { await rtkClient.client?.self.enableAudio() } catch {}
+                if (callType === "video") {
+                  try { await rtkClient.client?.self.enableVideo() } catch {}
+                }
+              } catch (err) {
+                console.error("[Caller] Fallback RTK join failed:", err)
+                setCallState("ended")
               }
-            } catch (err) {
-              console.error("[Caller] RTK init/join failed:", err)
+            }
+          } else if (["declined", "missed", "failed", "completed"].includes(result.status)) {
+            clearInterval(pollInterval)
+            if (!isEndingRef.current) {
+              isEndingRef.current = true
               setCallState("ended")
             }
           }
-          // State will be set to "connected" when participantJoined fires
-        } else if (["declined", "missed", "failed", "completed"].includes(result.status)) {
-          clearInterval(pollInterval)
-          setCallState("ended")
         }
+      } catch {
+        // Ignore poll errors
       }
-    }, 1000)
+    }, 4000) // 4s interval — SSE should handle this instantly, poll is just a safety net
 
     return () => {
       cancelled = true
       clearInterval(pollInterval)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, isIncoming, callState, callId])
-
-  // ── Poll active call to detect remote end (fallback for RTK events) ──
-  useEffect(() => {
-    if (!callId || callState !== "connected") return
-    let cancelled = false
-
-    const pollInterval = setInterval(async () => {
-      if (cancelled) return
-      const result = await getCallStatus(callId)
-      if (cancelled) return
-      if (
-        result.success &&
-        result.status &&
-        ["completed", "missed", "declined", "failed"].includes(result.status)
-      ) {
-        if (!isEndingRef.current) {
-          isEndingRef.current = true
-          setCallState("ended")
-          await rtkClient.leaveRoom()
-        }
-      }
-    }, 2000)
-
-    return () => {
-      cancelled = true
-      clearInterval(pollInterval)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [callId, callState])
+  }, [open, isIncoming, callState, callId, callType])
 
   // Reset state when dialog opens (but NOT when restoring from minimized)
   useEffect(() => {
@@ -447,7 +504,11 @@ export function VideoCall({
     } else if (callState === "connected") {
       callSounds.playConnected()
     } else if (callState === "ended") {
-      callSounds.playEnded()
+      // Only play ended sound if we were actually connected or explicitly ended by user
+      // This prevents the "ended" sound from firing during the connecting→connected transition
+      if (isConnectedRef.current || isEndingRef.current) {
+        callSounds.playEnded()
+      }
     } else {
       callSounds.stopRing()
     }
@@ -471,8 +532,14 @@ export function VideoCall({
   }, [showControls, callState, isMinimized])
 
   // Auto-close after ended state shows for 2s
+  // Only auto-close if we were actually connected or explicitly ending
   useEffect(() => {
     if (callState !== "ended") return
+    // If we never connected and aren't explicitly ending, skip straight to close
+    // (this handles the phantom "ended" flash during connection setup)
+    if (!isConnectedRef.current && !isEndingRef.current) {
+      return // Don't show ended screen — just wait for actual connection
+    }
     const timer = setTimeout(() => {
       onCallEnded?.()
       onClose()
@@ -480,40 +547,103 @@ export function VideoCall({
     return () => clearTimeout(timer)
   }, [callState, onCallEnded, onClose])
 
-  // ── Answer incoming call ──
+  // ── Answer incoming call (optimized: RTK init in parallel with server action) ──
   const handleAnswer = async () => {
     if (!incomingCallId) return
     console.log("[Receiver] Answering call ID:", incomingCallId)
     setCallState("connecting")
-    const result = await answerCall(incomingCallId)
-    console.log("[Receiver] answerCall result:", result.success, result.authToken ? "token received" : result.error)
-    if (result.success && result.authToken) {
-      authTokenRef.current = result.authToken
-      // Resume audio context during user gesture to satisfy autoplay policy
-      callSounds.resume()
-      try {
-        await rtkClient.init(result.authToken, {
-          audio: true,
-          video: callType === "video",
-        })
-        console.log("[RTK] Receiver joining room...")
-        await rtkClient.joinRoom()
-        hasJoinedRoomRef.current = true
-        console.log("[RTK] Receiver joined room")
-        // Explicitly enable audio after join
-        try { await rtkClient.client?.self.enableAudio() } catch {}
-        if (callType === "video") {
-          try { await rtkClient.client?.self.enableVideo() } catch {}
-        }
-        onCallStarted?.(incomingCallId)
-      } catch (err) {
-        console.error("[Receiver] RTK init/join failed:", err)
-        setCallState("ended")
+
+    // Resume audio context during user gesture to satisfy autoplay policy
+    callSounds.resume()
+
+    // Determine the auth token — prefer pre-fetched one from SSE
+    const token = incomingAuthToken || authTokenRef.current
+
+    if (token) {
+      // FAST PATH: We already have the token, start RTK init in parallel with server ack
+      authTokenRef.current = token
+      console.log("[Receiver] Fast path — starting RTK init in parallel with answerCall")
+
+      const [answerResult] = await Promise.all([
+        answerCall(incomingCallId),
+        (async () => {
+          try {
+            await rtkClient.init(token, {
+              audio: true,
+              video: callType === "video",
+            })
+            console.log("[RTK] Receiver joining room (parallel)...")
+            await rtkClient.joinRoom()
+            hasJoinedRoomRef.current = true
+            console.log("[RTK] Receiver joined room (parallel)")
+            try { await rtkClient.client?.self.enableAudio() } catch {}
+            if (callType === "video") {
+              try { await rtkClient.client?.self.enableVideo() } catch {}
+            }
+          } catch (err) {
+            console.error("[Receiver] Parallel RTK init/join failed:", err)
+          }
+        })(),
+      ])
+
+      if (!answerResult.success) {
+        console.error("[Receiver] Answer failed:", answerResult.error)
+        onCallEnded?.()
+        onClose()
+        return
       }
+
+      // If RTK didn't join via parallel path (shouldn't happen), try with returned token
+      if (!hasJoinedRoomRef.current && answerResult.authToken) {
+        authTokenRef.current = answerResult.authToken
+        try {
+          await rtkClient.init(answerResult.authToken, {
+            audio: true,
+            video: callType === "video",
+          })
+          await rtkClient.joinRoom()
+          hasJoinedRoomRef.current = true
+          try { await rtkClient.client?.self.enableAudio() } catch {}
+          if (callType === "video") {
+            try { await rtkClient.client?.self.enableVideo() } catch {}
+          }
+        } catch (err) {
+          console.error("[Receiver] Fallback RTK init/join failed:", err)
+          setCallState("ended")
+          return
+        }
+      }
+
+      onCallStarted?.(incomingCallId)
     } else {
-      console.error("[Receiver] Answer failed:", result.error)
-      onCallEnded?.()
-      onClose()
+      // SLOW PATH: No pre-fetched token, must wait for answerCall
+      console.log("[Receiver] Slow path — waiting for answerCall token")
+      const result = await answerCall(incomingCallId)
+      if (result.success && result.authToken) {
+        authTokenRef.current = result.authToken
+        try {
+          await rtkClient.init(result.authToken, {
+            audio: true,
+            video: callType === "video",
+          })
+          console.log("[RTK] Receiver joining room...")
+          await rtkClient.joinRoom()
+          hasJoinedRoomRef.current = true
+          console.log("[RTK] Receiver joined room")
+          try { await rtkClient.client?.self.enableAudio() } catch {}
+          if (callType === "video") {
+            try { await rtkClient.client?.self.enableVideo() } catch {}
+          }
+          onCallStarted?.(incomingCallId)
+        } catch (err) {
+          console.error("[Receiver] RTK init/join failed:", err)
+          setCallState("ended")
+        }
+      } else {
+        console.error("[Receiver] Answer failed:", result.error)
+        onCallEnded?.()
+        onClose()
+      }
     }
   }
 
@@ -712,7 +842,7 @@ export function VideoCall({
       />
 
       <div
-        className="relative w-full max-w-sm aspect-[3/4] rounded-3xl overflow-hidden shadow-2xl bg-black animate-in fade-in zoom-in-95 duration-200"
+        className="relative w-full max-w-sm md:max-w-lg aspect-[2/3] md:aspect-[3/4] rounded-3xl overflow-hidden shadow-2xl bg-black animate-in fade-in zoom-in-95 duration-200"
         onClick={() =>
           callState === "connected" && setShowControls(!showControls)
         }
@@ -810,7 +940,7 @@ export function VideoCall({
         {/* Local PIP (video calls when connected) */}
         {callState === "connected" && callType === "video" && !isVideoOff && (
           <div
-            className="absolute top-4 right-4 w-24 aspect-[3/4] rounded-2xl overflow-hidden shadow-lg"
+            className="absolute top-4 right-4 w-24 md:w-36 aspect-[3/4] rounded-2xl overflow-hidden shadow-lg"
             style={{
               background: "rgba(0,0,0,0.3)",
               backdropFilter: "blur(4px)",
@@ -985,8 +1115,8 @@ export function VideoCall({
           </div>
         )}
 
-        {/* Ended state */}
-        {callState === "ended" && (
+        {/* Ended state — only show if we were connected or user explicitly ended */}
+        {callState === "ended" && (isConnectedRef.current || isEndingRef.current) && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-zinc-900 via-zinc-950 to-black">
             <div className="flex flex-col items-center gap-3">
               <div className="w-16 h-16 rounded-full flex items-center justify-center bg-red-500/20 mb-1">
