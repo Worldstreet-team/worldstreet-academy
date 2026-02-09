@@ -39,6 +39,27 @@ export type MessageEventType =
   | "message:read"
   | "message:deleted"
 
+// ── Meeting event types ──
+
+export type MeetingEventType =
+  | "meeting:join-request"
+  | "meeting:admitted"
+  | "meeting:declined"
+  | "meeting:ended"
+  | "meeting:participant-joined"
+  | "meeting:participant-left"
+
+export type MeetingEventPayload = {
+  type: MeetingEventType
+  meetingId: string
+  meetingTitle: string
+  userId: string
+  userName: string
+  userAvatar: string | null
+  /** RTK auth token — included in meeting:admitted so joiner can init immediately */
+  authToken?: string
+}
+
 export type MessageEventPayload = {
   type: MessageEventType
   messageId: string
@@ -59,7 +80,7 @@ export type MessageEventPayload = {
 
 // ── Unified event type ──
 
-export type SSEEventPayload = CallEventPayload | MessageEventPayload
+export type SSEEventPayload = CallEventPayload | MessageEventPayload | MeetingEventPayload
 
 type EventCallback = (event: SSEEventPayload) => void
 

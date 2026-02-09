@@ -11,10 +11,10 @@ import {
 } from "react"
 import { VideoCall } from "@/components/messages/video-call"
 import { endCall as endCallAction, pollIncomingCall } from "@/lib/actions/calls"
-import { useCallEvents } from "@/lib/hooks/use-call-events"
+import { useSSEEvents } from "@/lib/hooks/use-call-events"
 import { useUser } from "@/components/providers/user-provider"
 import { callSounds } from "@/lib/call-sounds"
-import type { CallEventPayload } from "@/lib/call-events"
+import type { CallEventPayload, SSEEventPayload } from "@/lib/call-events"
 
 type CallType = "video" | "audio"
 type CallState = "idle" | "ringing" | "connecting" | "connected" | "ended"
@@ -168,8 +168,25 @@ export function CallProvider({ children }: { children: ReactNode }) {
     [] // No deps — uses refs for latest state
   )
 
-  // Connect to SSE for real-time call events
-  useCallEvents(user.id, handleCallEvent)
+  // Forward ALL SSE events to window so other components (meetings, etc.) can listen
+  const handleAllSSEEvents = useCallback(
+    (event: SSEEventPayload) => {
+      // Dispatch to window for cross-component consumption
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("sse:event", { detail: event }),
+        )
+      }
+      // Handle call events locally
+      if (event.type.startsWith("call:")) {
+        handleCallEvent(event as CallEventPayload)
+      }
+    },
+    [handleCallEvent],
+  )
+
+  // Connect to SSE for real-time events
+  useSSEEvents(user.id, handleAllSSEEvents)
 
   // Polling fallback for incoming calls (safety net if SSE misses an event)
   useEffect(() => {

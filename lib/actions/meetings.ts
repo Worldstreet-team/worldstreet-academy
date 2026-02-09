@@ -5,9 +5,16 @@ import connectDB from "@/lib/db"
 import { Meeting, User, type IMeeting, type IMeetingParticipant, type MeetingStatus } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth"
 import { createMeeting as createRTKMeeting, addParticipant } from "@/lib/realtime"
-import { emitEvent, type CallEventPayload } from "@/lib/call-events"
+import { emitEvent, emitEventToMany, type MeetingEventPayload } from "@/lib/call-events"
 
 // ── Types ──
+
+export type MeetingSettings = {
+  allowScreenShare: boolean
+  muteOnEntry: boolean
+  requireApproval: boolean
+  maxParticipants: number
+}
 
 export type MeetingWithDetails = {
   id: string
@@ -20,18 +27,28 @@ export type MeetingWithDetails = {
   meetingId: string
   participantCount: number
   maxParticipants: number
-  settings: IMeeting["settings"]
-  createdAt: Date
-  startedAt?: Date
+  settings: MeetingSettings
+  createdAt: string
+  startedAt?: string
+}
+
+/** Converts a Mongoose settings subdocument to a plain object */
+function serializeSettings(s: IMeeting["settings"]): MeetingSettings {
+  return {
+    allowScreenShare: !!s.allowScreenShare,
+    muteOnEntry: !!s.muteOnEntry,
+    requireApproval: !!s.requireApproval,
+    maxParticipants: s.maxParticipants ?? 50,
+  }
 }
 
 export type MeetingParticipantDetails = {
   userId: string
   name: string
   avatar: string | null
-  role: IMeetingParticipant["role"]
-  status: IMeetingParticipant["status"]
-  joinedAt?: Date
+  role: "host" | "co-host" | "participant"
+  status: "pending" | "admitted" | "declined" | "left"
+  joinedAt?: string
 }
 
 // ── Create a new meeting ──
@@ -98,8 +115,8 @@ export async function createMeeting(
         meetingId: rtkMeetingId,
         participantCount: 1,
         maxParticipants: 50,
-        settings: meeting.settings,
-        createdAt: meeting.createdAt,
+        settings: serializeSettings(meeting.settings),
+        createdAt: meeting.createdAt.toISOString(),
       },
     }
   } catch (error) {
@@ -126,6 +143,30 @@ export async function joinMeeting(meetingId: string): Promise<{
     if (!meeting) return { success: false, error: "Meeting not found" }
 
     if (meeting.status === "ended") return { success: false, error: "Meeting has ended" }
+
+    // Host already has access — redirect to meeting directly
+    if (meeting.hostId.toString() === currentUser.id) {
+      const host = await User.findById(meeting.hostId).select("firstName lastName avatarUrl").lean()
+      return {
+        success: true,
+        authToken: meeting.hostToken,
+        meeting: {
+          id: meeting._id.toString(),
+          title: meeting.title,
+          description: meeting.description,
+          hostId: meeting.hostId.toString(),
+          hostName: host ? `${host.firstName} ${host.lastName}`.trim() : "Host",
+          hostAvatar: host?.avatarUrl || null,
+          status: meeting.status,
+          meetingId: meeting.meetingId,
+          participantCount: meeting.participants.filter((p) => p.status === "admitted").length,
+          maxParticipants: meeting.settings.maxParticipants,
+          settings: serializeSettings(meeting.settings),
+          createdAt: meeting.createdAt.toISOString(),
+          startedAt: meeting.startedAt?.toISOString(),
+        },
+      }
+    }
 
     const userId = new Types.ObjectId(currentUser.id)
     const existingP = meeting.participants.find(
@@ -156,16 +197,16 @@ export async function joinMeeting(meetingId: string): Promise<{
           meetingId: meeting.meetingId,
           participantCount: meeting.participants.filter((p) => p.status === "admitted").length,
           maxParticipants: meeting.settings.maxParticipants,
-          settings: meeting.settings,
-          createdAt: meeting.createdAt,
-          startedAt: meeting.startedAt,
+          settings: serializeSettings(meeting.settings),
+          createdAt: meeting.createdAt.toISOString(),
+          startedAt: meeting.startedAt?.toISOString(),
         },
       }
     }
 
     // Already pending
     if (existingP?.status === "pending") {
-      return { success: true, requiresApproval: true }
+      return { success: true, requiresApproval: true, meeting: { id: meeting._id.toString(), title: meeting.title, hostId: meeting.hostId.toString(), hostName: "", hostAvatar: null, status: meeting.status, meetingId: meeting.meetingId, participantCount: 0, maxParticipants: meeting.settings.maxParticipants, settings: serializeSettings(meeting.settings), createdAt: meeting.createdAt.toISOString() } }
     }
 
     // Add as new participant
@@ -180,20 +221,17 @@ export async function joinMeeting(meetingId: string): Promise<{
 
     if (meeting.settings.requireApproval) {
       // Notify the host about join request
-      const eventPayload: CallEventPayload = {
-        type: "call:incoming", // Reuse call:incoming for meeting join notifications
-        callId: meeting._id.toString(),
-        callType: "video",
-        callerId: currentUser.id,
-        callerName: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
-        callerAvatar: currentUser.avatarUrl,
-        receiverId: meeting.hostId.toString(),
-        conversationId: meeting._id.toString(),
-        status: "meeting:join-request",
+      const eventPayload: MeetingEventPayload = {
+        type: "meeting:join-request",
+        meetingId: meeting._id.toString(),
+        meetingTitle: meeting.title,
+        userId: currentUser.id,
+        userName: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
+        userAvatar: currentUser.avatarUrl,
       }
       emitEvent(meeting.hostId.toString(), eventPayload)
 
-      return { success: true, requiresApproval: true }
+      return { success: true, requiresApproval: true, meeting: { id: meeting._id.toString(), title: meeting.title, hostId: meeting.hostId.toString(), hostName: "", hostAvatar: null, status: meeting.status, meetingId: meeting.meetingId, participantCount: 0, maxParticipants: meeting.settings.maxParticipants, settings: serializeSettings(meeting.settings), createdAt: meeting.createdAt.toISOString() } }
     }
 
     // Auto-admit — generate token
@@ -219,9 +257,9 @@ export async function joinMeeting(meetingId: string): Promise<{
         meetingId: meeting.meetingId,
         participantCount: meeting.participants.filter((p) => p.status === "admitted").length,
         maxParticipants: meeting.settings.maxParticipants,
-        settings: meeting.settings,
-        createdAt: meeting.createdAt,
-        startedAt: meeting.startedAt,
+        settings: serializeSettings(meeting.settings),
+        createdAt: meeting.createdAt.toISOString(),
+        startedAt: meeting.startedAt?.toISOString(),
       },
     }
   } catch (error) {
@@ -265,16 +303,13 @@ export async function admitParticipant(
     })
 
     // Notify the participant that they've been admitted
-    const eventPayload: CallEventPayload = {
-      type: "call:answered", // Reuse for meeting admit notification
-      callId: meeting._id.toString(),
-      callType: "video",
-      callerId: currentUser.id,
-      callerName: "",
-      callerAvatar: null,
-      receiverId: userId,
-      conversationId: meeting._id.toString(),
-      status: "meeting:admitted",
+    const eventPayload: MeetingEventPayload = {
+      type: "meeting:admitted",
+      meetingId: meeting._id.toString(),
+      meetingTitle: meeting.title,
+      userId: currentUser.id,
+      userName: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
+      userAvatar: currentUser.avatarUrl,
       authToken: rtkParticipant.authToken,
     }
     emitEvent(userId, eventPayload)
@@ -312,16 +347,13 @@ export async function declineParticipant(
     await meeting.save()
 
     // Notify the participant
-    const eventPayload: CallEventPayload = {
-      type: "call:declined",
-      callId: meeting._id.toString(),
-      callType: "video",
-      callerId: currentUser.id,
-      callerName: "",
-      callerAvatar: null,
-      receiverId: userId,
-      conversationId: meeting._id.toString(),
-      status: "meeting:declined",
+    const eventPayload: MeetingEventPayload = {
+      type: "meeting:declined",
+      meetingId: meeting._id.toString(),
+      meetingTitle: meeting.title,
+      userId: currentUser.id,
+      userName: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
+      userAvatar: currentUser.avatarUrl,
     }
     emitEvent(userId, eventPayload)
 
@@ -379,6 +411,10 @@ export async function endMeeting(meetingId: string): Promise<{
 
     meeting.status = "ended"
     meeting.endedAt = new Date()
+    // Collect participant IDs to notify before marking as left
+    const participantIdsToNotify = meeting.participants
+      .filter((p) => p.status === "admitted" && p.userId.toString() !== currentUser.id)
+      .map((p) => p.userId.toString())
     // Mark all admitted participants as left
     for (const p of meeting.participants) {
       if (p.status === "admitted") {
@@ -387,6 +423,19 @@ export async function endMeeting(meetingId: string): Promise<{
       }
     }
     await meeting.save()
+
+    // Notify all participants that the meeting has ended
+    if (participantIdsToNotify.length > 0) {
+      const endPayload: MeetingEventPayload = {
+        type: "meeting:ended",
+        meetingId: meeting._id.toString(),
+        meetingTitle: meeting.title,
+        userId: currentUser.id,
+        userName: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
+        userAvatar: currentUser.avatarUrl,
+      }
+      emitEventToMany(participantIdsToNotify, endPayload)
+    }
 
     return { success: true }
   } catch (error) {
@@ -440,9 +489,9 @@ export async function getMyMeetings(): Promise<{
           meetingId: m.meetingId,
           participantCount: m.participants.filter((p) => p.status === "admitted").length,
           maxParticipants: m.settings.maxParticipants,
-          settings: m.settings,
-          createdAt: m.createdAt,
-          startedAt: m.startedAt,
+          settings: serializeSettings(m.settings),
+          createdAt: m.createdAt.toISOString(),
+          startedAt: m.startedAt?.toISOString(),
         }
       }),
     }
@@ -510,9 +559,9 @@ export async function getMeetingDetails(meetingId: string): Promise<{
         meetingId: meeting.meetingId,
         participantCount: meeting.participants.filter((p) => p.status === "admitted").length,
         maxParticipants: meeting.settings.maxParticipants,
-        settings: meeting.settings,
-        createdAt: meeting.createdAt,
-        startedAt: meeting.startedAt,
+        settings: serializeSettings(meeting.settings),
+        createdAt: meeting.createdAt.toISOString(),
+        startedAt: meeting.startedAt?.toISOString(),
       },
       participants: meeting.participants.map((p) => {
         const u = userMap.get(p.userId.toString())
@@ -522,7 +571,7 @@ export async function getMeetingDetails(meetingId: string): Promise<{
           avatar: u?.avatarUrl || null,
           role: p.role,
           status: p.status,
-          joinedAt: p.joinedAt,
+          joinedAt: p.joinedAt?.toISOString(),
         }
       }),
     }
