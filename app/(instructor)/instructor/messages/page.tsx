@@ -12,6 +12,7 @@ import {
   DateSeparator,
   groupMessagesByDate,
   MediaEditor,
+  VideoCall,
   type Conversation,
   type MessageType,
   type Attachment,
@@ -105,6 +106,7 @@ export default function InstructorMessagesPage() {
   const [selectedId, setSelectedId] = useState<string | null>("1")
   const [showMobileChat, setShowMobileChat] = useState(false)
   const [editingMedia, setEditingMedia] = useState<{ file: File; type: "image" | "video" } | null>(null)
+  const [activeCall, setActiveCall] = useState<{ type: "video" | "audio" } | null>(null)
   
   const selected = mockConversations.find((c) => c.id === selectedId)
   const messageGroups = groupMessagesByDate(mockMessages)
@@ -146,8 +148,8 @@ export default function InstructorMessagesPage() {
               isOnline={selected.isOnline}
               showBackButton
               onBack={() => setShowMobileChat(false)}
-              onVideoCall={() => console.log("Video call")}
-              onAudioCall={() => console.log("Audio call")}
+              onVideoCall={() => setActiveCall({ type: "video" })}
+              onAudioCall={() => setActiveCall({ type: "audio" })}
             />
 
             <ScrollArea className="flex-1">
@@ -198,6 +200,17 @@ export default function InstructorMessagesPage() {
           setEditingMedia(null)
         }}
       />
+
+      {/* Video Call Modal */}
+      {selected && (
+        <VideoCall
+          open={!!activeCall}
+          onClose={() => setActiveCall(null)}
+          callType={activeCall?.type || "video"}
+          callerName={selected.name}
+          callerAvatar={selected.avatar}
+        />
+      )}
     </div>
   )
 }
