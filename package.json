@@ -13,6 +13,7 @@
     "@aws-sdk/client-s3": "^3.985.0",
     "@aws-sdk/s3-request-presigner": "^3.985.0",
     "@base-ui/react": "^1.1.0",
+    "@cloudflare/realtimekit": "1.2.4",
     "@cloudflare/realtimekit-react": "^1.2.4",
     "@hugeicons/core-free-icons": "^3.1.1",
     "@hugeicons/react": "^1.1.4",

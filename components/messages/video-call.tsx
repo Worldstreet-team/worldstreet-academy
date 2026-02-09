@@ -11,12 +11,11 @@ import {
   VideoOffIcon,
   SpeakerIcon,
   Speaker01Icon,
-  FlipHorizontalIcon,
   MinimizeScreenIcon,
 } from "@hugeicons/core-free-icons"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { useRealtimeKitClient } from "@cloudflare/realtimekit-react"
+import { rtkClient } from "@/lib/rtk-client"
 import {
   initiateCall,
   answerCall,
@@ -143,105 +142,43 @@ export function VideoCall({
   const isEndingRef = useRef(false)
   const authTokenRef = useRef<string | null>(null)
   const remoteParticipantRef = useRef<unknown>(null)
-
-  // ── RealtimeKit SDK ──
-  const [meeting, initMeeting] = useRealtimeKitClient()
   const hasJoinedRoomRef = useRef(false)
-  const meetingRef = useRef(meeting)
-  const isInitializingRef = useRef(false)
-  
-  // Keep meetingRef in sync with meeting state
+  const participantLeftTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const isConnectedRef = useRef(false)
+
+  // ── RTK event listeners (registered via singleton, survive re-renders) ──
   useEffect(() => {
-    meetingRef.current = meeting
-  }, [meeting])
-
-  // Initialize RTK client (prepare local media) but DON'T join room yet
-  const initializeRTKClient = useCallback(
-    async (authToken: string) => {
-      // Guard against double-init (React strict mode or re-renders)
-      if (isInitializingRef.current) {
-        console.log("[RTK] Init already in progress, skipping")
-        return meetingRef.current
-      }
-      if (meetingRef.current) {
-        console.log("[RTK] Meeting already initialized, reusing")
-        return meetingRef.current
-      }
-      isInitializingRef.current = true
-      try {
-        const m = await initMeeting({
-          authToken,
-          defaults: {
-            audio: !isMuted,
-            video: callType === "video" && !isVideoOff,
-          },
-        })
-        if (!m) {
-          console.error("Failed to init RTK meeting")
-          isInitializingRef.current = false
-          return null
-        }
-        console.log("[RTK] Client initialized (not joined yet)")
-        // Store in ref immediately so joinRoom can access it
-        meetingRef.current = m
-        isInitializingRef.current = false
-        return m
-      } catch (err) {
-        console.error("RTK init error:", err)
-        isInitializingRef.current = false
-        return null
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [initMeeting, callType]
-  )
-
-  // Actually join the RTK room (call this only when ready to connect)
-  const joinRoom = useCallback(async () => {
-    const m = meetingRef.current
-    if (!m || hasJoinedRoomRef.current) {
-      console.log("[RTK] joinRoom skipped - meeting:", !!m, "hasJoined:", hasJoinedRoomRef.current)
-      return
-    }
-    hasJoinedRoomRef.current = true
-    try {
-      console.log("[RTK] Joining room...")
-      await m.joinRoom()
-      console.log("[RTK] Room join called")
-    } catch (err) {
-      console.error("RTK joinRoom error:", err)
-      hasJoinedRoomRef.current = false
-    }
-  }, [])
-
-  // ── RTK event listeners ──
-  useEffect(() => {
-    if (!meeting) return
-
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handleRoomJoined = () => {
       console.log("[RTK] Room joined")
-      // Register local video element
       if (localVideoRef.current && callType === "video") {
-        meeting.self.registerVideoElement(localVideoRef.current, true)
+        rtkClient.client?.self.registerVideoElement(localVideoRef.current, true)
+      }
+      // Explicitly enable audio after joining to ensure mic is publishing
+      rtkClient.client?.self.enableAudio().catch(() => {})
+      if (callType === "video") {
+        rtkClient.client?.self.enableVideo().catch(() => {})
       }
     }
 
     const handleRoomLeft = () => {
-      console.log("[RTK] Room left | callState:", callState)
-      // Do NOT auto-end the call from roomLeft events.
-      // roomLeft fires for many reasons: HMR, brief disconnects, leaveRoom() calls.
-      // The participantLeft event + server polling are the reliable signals.
-      // Only end if we explicitly triggered it (isEndingRef is true).
+      console.log("[RTK] Room left")
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handleParticipantJoined = (participant: any) => {
       console.log("[RTK] Participant joined:", participant.name)
+      // Cancel any pending "participant left" timer — they reconnected
+      if (participantLeftTimerRef.current) {
+        clearTimeout(participantLeftTimerRef.current)
+        participantLeftTimerRef.current = null
+        console.log("[RTK] Cancelled pending participantLeft timer")
+      }
       remoteParticipantRef.current = participant
-      // Connected — the other side has joined
+      isConnectedRef.current = true
+      isEndingRef.current = false  // Reset so end button works
       setCallState("connected")
-      setCallStartTime(new Date())
-      // Register remote video element
+      setCallStartTime((prev) => prev ?? new Date())
       if (remoteVideoRef.current && callType === "video") {
         participant.registerVideoElement(remoteVideoRef.current)
       }
@@ -249,54 +186,64 @@ export function VideoCall({
 
     const handleParticipantLeft = () => {
       console.log("[RTK] Participant left")
-      remoteParticipantRef.current = null
-      // Remote user left — end the call
-      if (!isEndingRef.current) {
-        isEndingRef.current = true
-        if (callId) {
-          endCallAction(callId).catch(console.error)
-        }
-        setCallState("ended")
+      // Debounce: Dyte fires phantom participantLeft during initial connection.
+      // Wait 3 seconds and check if the participant came back.
+      if (participantLeftTimerRef.current) {
+        clearTimeout(participantLeftTimerRef.current)
       }
+      participantLeftTimerRef.current = setTimeout(() => {
+        participantLeftTimerRef.current = null
+        // Check if participant rejoined during the wait
+        if (remoteParticipantRef.current) {
+          console.log("[RTK] Participant left debounce — participant is back, ignoring")
+          return
+        }
+        // Only end call if we were actually connected at some point
+        if (!isConnectedRef.current) {
+          console.log("[RTK] Participant left during setup — ignoring")
+          return
+        }
+        console.log("[RTK] Participant left confirmed — ending call")
+        if (!isEndingRef.current) {
+          isEndingRef.current = true
+          if (callId) endCallAction(callId).catch(console.error)
+          setCallState("ended")
+        }
+      }, 3000)
+      // Clear the participant ref immediately so the debounce check works
+      remoteParticipantRef.current = null
     }
 
-    meeting.self.on("roomJoined", handleRoomJoined)
-    meeting.self.on("roomLeft", handleRoomLeft)
-    meeting.participants.joined.on("participantJoined", handleParticipantJoined)
-    meeting.participants.joined.on("participantLeft", handleParticipantLeft)
+    rtkClient.on("roomJoined", "self", handleRoomJoined)
+    rtkClient.on("roomLeft", "self", handleRoomLeft)
+    rtkClient.on("participantJoined", "participants", handleParticipantJoined)
+    rtkClient.on("participantLeft", "participants", handleParticipantLeft)
 
     return () => {
-      meeting.self.removeListener("roomJoined", handleRoomJoined)
-      meeting.self.removeListener("roomLeft", handleRoomLeft)
-      meeting.participants.joined.removeListener(
-        "participantJoined",
-        handleParticipantJoined
-      )
-      meeting.participants.joined.removeListener(
-        "participantLeft",
-        handleParticipantLeft
-      )
+      rtkClient.off("roomJoined", "self", handleRoomJoined)
+      rtkClient.off("roomLeft", "self", handleRoomLeft)
+      rtkClient.off("participantJoined", "participants", handleParticipantJoined)
+      rtkClient.off("participantLeft", "participants", handleParticipantLeft)
+      if (participantLeftTimerRef.current) {
+        clearTimeout(participantLeftTimerRef.current)
+        participantLeftTimerRef.current = null
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [meeting, callType, callId])
+  }, [callType, callId])
 
-  // NOTE: We intentionally do NOT call leaveRoom() on unmount.
-  // Fast Refresh / HMR triggers unmount/remount which would kill active RTK connections.
-  // Room cleanup is handled explicitly by handleEndCall, handleDismiss, and participantLeft.
-
-  // Re-register video elements when refs become available or minimized state changes
+  // Re-register video elements when minimized state changes
   useEffect(() => {
-    if (!meeting || callType !== "video") return
-
-    if (localVideoRef.current && meeting.self.roomJoined) {
-      meeting.self.registerVideoElement(localVideoRef.current, true)
+    if (callType !== "video" || !rtkClient.client) return
+    if (localVideoRef.current && rtkClient.isInRoom) {
+      rtkClient.client.self.registerVideoElement(localVideoRef.current, true)
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const remote = remoteParticipantRef.current as any
     if (remoteVideoRef.current && remote) {
       remote.registerVideoElement(remoteVideoRef.current)
     }
-  }, [meeting, callType, isMinimized, callState])
+  }, [callType, isMinimized, callState])
 
   // ── Initiate outgoing call ──
   useEffect(() => {
@@ -317,8 +264,6 @@ export function VideoCall({
         authTokenRef.current = result.authToken
         onCallStarted?.(result.callId)
         setCallState("ringing")
-        // DON'T init RTK yet — wait for receiver to answer
-        // We init + join ONLY when poll detects status="ongoing"
       } else {
         console.log("[Caller] Failed to initiate call:", result.error)
         setCallState("ended")
@@ -349,15 +294,25 @@ export function VideoCall({
           joined = true
           clearInterval(pollInterval)
           console.log("[Caller] Receiver answered! Init + joining room...")
-          // NOW init RTK and join — both in one go
           const token = authTokenRef.current
           if (token) {
-            const m = await initializeRTKClient(token)
-            if (m) {
-              hasJoinedRoomRef.current = true
+            try {
+              await rtkClient.init(token, {
+                audio: true,
+                video: callType === "video",
+              })
               console.log("[Caller] Joining room...")
-              await m.joinRoom()
+              await rtkClient.joinRoom()
+              hasJoinedRoomRef.current = true
               console.log("[Caller] Joined room")
+              // Explicitly enable audio after join
+              try { await rtkClient.client?.self.enableAudio() } catch {}
+              if (callType === "video") {
+                try { await rtkClient.client?.self.enableVideo() } catch {}
+              }
+            } catch (err) {
+              console.error("[Caller] RTK init/join failed:", err)
+              setCallState("ended")
             }
           }
           // State will be set to "connected" when participantJoined fires
@@ -392,12 +347,7 @@ export function VideoCall({
         if (!isEndingRef.current) {
           isEndingRef.current = true
           setCallState("ended")
-          const m = meetingRef.current
-          if (m) {
-            try {
-              await m.leaveRoom()
-            } catch {}
-          }
+          await rtkClient.leaveRoom()
         }
       }
     }, 2000)
@@ -419,7 +369,7 @@ export function VideoCall({
       setShowControls(true)
       isEndingRef.current = false
       hasJoinedRoomRef.current = false
-      isInitializingRef.current = false
+      isConnectedRef.current = false
       authTokenRef.current = null
       remoteParticipantRef.current = null
       if (!isIncoming) setCallId(null)
@@ -462,22 +412,27 @@ export function VideoCall({
     console.log("[Receiver] answerCall result:", result.success, result.error)
     if (result.success && result.authToken) {
       authTokenRef.current = result.authToken
-      // Receiver: init RTK client AND join room immediately
-      const m = await initializeRTKClient(result.authToken)
-      if (m) {
-        hasJoinedRoomRef.current = true
+      try {
+        await rtkClient.init(result.authToken, {
+          audio: true,
+          video: callType === "video",
+        })
         console.log("[RTK] Receiver joining room...")
-        await m.joinRoom()
+        await rtkClient.joinRoom()
+        hasJoinedRoomRef.current = true
         console.log("[RTK] Receiver joined room")
-        // Notify parent AFTER successfully joining
+        // Explicitly enable audio after join
+        try { await rtkClient.client?.self.enableAudio() } catch {}
+        if (callType === "video") {
+          try { await rtkClient.client?.self.enableVideo() } catch {}
+        }
         onCallStarted?.(incomingCallId)
-      } else {
-        console.error("[Receiver] Failed to init RTK client")
+      } catch (err) {
+        console.error("[Receiver] RTK init/join failed:", err)
         setCallState("ended")
       }
     } else {
       console.error("[Receiver] Answer failed:", result.error)
-      // Call was already expired/answered — dismiss immediately so poll finds the real call
       onCallEnded?.()
       onClose()
     }
@@ -494,19 +449,17 @@ export function VideoCall({
   const handleEndCall = async () => {
     if (isEndingRef.current) return
     isEndingRef.current = true
-    try {
-      if (callId) {
-        await endCallAction(callId)
-      }
-      const m = meetingRef.current
-      if (m) {
-        try {
-          await m.leaveRoom()
-        } catch {}
-      }
-    } catch (e) {
-      console.error("End call error:", e)
+    // Cancel any pending participantLeft timer
+    if (participantLeftTimerRef.current) {
+      clearTimeout(participantLeftTimerRef.current)
+      participantLeftTimerRef.current = null
     }
+    // End on server (don't let failure block room leave)
+    if (callId) {
+      try { await endCallAction(callId) } catch (e) { console.error("End call server error:", e) }
+    }
+    // Leave RTK room
+    try { await rtkClient.leaveRoom() } catch (e) { console.error("Leave room error:", e) }
     setCallState("ended")
   }
 
@@ -528,19 +481,11 @@ export function VideoCall({
   }
 
   const handleDismiss = useCallback(async () => {
-    // Clean up the call on the server if it wasn't properly ended
     if (callId && !isEndingRef.current) {
       isEndingRef.current = true
-      try {
-        await endCallAction(callId)
-      } catch {}
+      try { await endCallAction(callId) } catch {}
     }
-    const m = meetingRef.current
-    if (m) {
-      try {
-        m.leaveRoom()
-      } catch {}
-    }
+    await rtkClient.leaveRoom()
     onCallEnded?.()
     onClose()
   }, [callId, onCallEnded, onClose])
@@ -549,14 +494,11 @@ export function VideoCall({
   const toggleMute = async () => {
     const next = !isMuted
     setIsMuted(next)
-    const m = meetingRef.current
-    if (m?.self) {
+    const c = rtkClient.client
+    if (c?.self) {
       try {
-        if (next) {
-          await m.self.disableAudio()
-        } else {
-          await m.self.enableAudio()
-        }
+        if (next) await c.self.disableAudio()
+        else await c.self.enableAudio()
       } catch (e) {
         console.error("Toggle mute error:", e)
       }
@@ -566,14 +508,11 @@ export function VideoCall({
   const toggleVideo = async () => {
     const next = !isVideoOff
     setIsVideoOff(next)
-    const m = meetingRef.current
-    if (m?.self) {
+    const c = rtkClient.client
+    if (c?.self) {
       try {
-        if (next) {
-          await m.self.disableVideo()
-        } else {
-          await m.self.enableVideo()
-        }
+        if (next) await c.self.disableVideo()
+        else await c.self.enableVideo()
       } catch (e) {
         console.error("Toggle video error:", e)
       }
