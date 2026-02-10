@@ -244,7 +244,7 @@ export async function sendMessage(
       waveform: fileData?.waveform,
       timestamp: message.createdAt.toISOString(),
     }
-    emitEvent(recipientId.toString(), msgEvent)
+    await emitEvent(recipientId.toString(), msgEvent)
 
     return {
       success: true,
@@ -467,7 +467,7 @@ export async function deleteMessage(messageId: string): Promise<{
 
     // Notify the other participant about deletion
     if (receiverId) {
-      emitEvent(receiverId.toString(), {
+      await emitEvent(receiverId.toString(), {
         type: "message:deleted",
         messageId,
         conversationId: conversationId.toString(),

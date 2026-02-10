@@ -83,12 +83,12 @@ function GlassButton({
     success: "rgba(34,197,94,0.85)",
   }
   return (
-    <div className="flex flex-col items-center gap-1.5">
+    <div className="flex flex-col items-center gap-1">
       <button
         onClick={onClick}
         disabled={disabled}
         className={cn(
-          "w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200",
+          "w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center transition-all duration-200",
           "hover:scale-105 active:scale-95 disabled:opacity-40 disabled:pointer-events-none",
           className,
         )}
@@ -102,7 +102,7 @@ function GlassButton({
         {children}
       </button>
       {label && (
-        <span className="text-[10px] text-white/50 font-medium">{label}</span>
+        <span className="text-[10px] text-white/50 font-medium hidden md:block">{label}</span>
       )}
     </div>
   )
@@ -1171,6 +1171,8 @@ export default function MeetingsPage() {
 
     return (
       <div className="flex flex-col h-dvh bg-zinc-950 relative overflow-hidden">
+        {/* Hide the platform bottom nav when in active meeting */}
+        <style>{`nav.safe-area-bottom { display: none !important; }`}</style>
         <div className="absolute inset-0 bg-linear-to-br from-zinc-900 via-zinc-950 to-black" />
 
         {/* ── Hidden audio players for every remote participant ── */}
@@ -1291,21 +1293,25 @@ export default function MeetingsPage() {
         {/* ── People side-panel ── */}
         {showPanel && (
           <div
-            className="absolute top-14 right-4 z-20 w-72 max-h-[calc(100dvh-120px)] rounded-2xl p-3 overflow-y-auto animate-in slide-in-from-right-4 fade-in duration-200"
+            className="fixed md:absolute inset-0 md:inset-auto md:top-14 md:right-4 z-30 md:z-20 md:w-72 md:max-h-[calc(100dvh-120px)] md:rounded-2xl p-4 md:p-3 overflow-y-auto animate-in slide-in-from-right-4 fade-in duration-200"
             style={{
-              background: "rgba(20,20,25,0.9)",
+              background: "rgba(20,20,25,0.97)",
               backdropFilter: "blur(24px)",
               WebkitBackdropFilter: "blur(24px)",
               border: "1px solid rgba(255,255,255,0.08)",
             }}
           >
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-white text-sm font-semibold">People</h3>
-              <button onClick={() => setShowPanel(false)}>
+            {/* Mobile: safe area top + bigger header */}
+            <div className="flex items-center justify-between mb-3 pt-[env(safe-area-inset-top)] md:pt-0">
+              <h3 className="text-white text-base md:text-sm font-semibold">People</h3>
+              <button
+                onClick={() => setShowPanel(false)}
+                className="w-8 h-8 md:w-auto md:h-auto rounded-full bg-white/10 md:bg-transparent flex items-center justify-center"
+              >
                 <HugeiconsIcon
                   icon={Cancel01Icon}
-                  size={16}
-                  className="text-white/40 hover:text-white/70 transition-colors"
+                  size={18}
+                  className="text-white/60 hover:text-white/90 transition-colors md:text-white/40 md:hover:text-white/70"
                 />
               </button>
             </div>
@@ -1494,7 +1500,7 @@ export default function MeetingsPage() {
         )}
 
         {/* ── Video area (unified carousel) ── */}
-        <div className="relative z-10 flex-1 p-3 md:p-4 overflow-hidden flex flex-col gap-2">
+        <div className="relative z-10 flex-1 p-2 md:p-4 overflow-hidden flex flex-col gap-1.5 md:gap-2">
           <div className="relative flex-1 flex flex-col gap-2">
             {/* Current slide */}
             {activeSlide?.type === "screenshare" ? (
@@ -1509,7 +1515,7 @@ export default function MeetingsPage() {
                   "grid gap-2 md:gap-3 flex-1 auto-rows-fr",
                   activeSlide.entries.length <= 1
                     ? "grid-cols-1"
-                    : "grid-cols-2",
+                    : "grid-cols-1 md:grid-cols-2",
                 )}
               >
                 {activeSlide.entries.map((entry) =>
@@ -1610,7 +1616,7 @@ export default function MeetingsPage() {
 
         {/* ── Bottom controls ── */}
         <div
-          className="relative z-10 flex items-center justify-center gap-3 md:gap-4 px-4 py-4 md:py-5"
+          className="relative z-10 flex items-center justify-center gap-2 md:gap-4 px-3 md:px-4 py-2 md:py-5 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:pb-5"
           style={{
             background: "rgba(0,0,0,0.4)",
             backdropFilter: "blur(20px)",
@@ -1681,7 +1687,7 @@ export default function MeetingsPage() {
             </GlassButton>
             {showReactionPicker && (
               <div
-                className="absolute bottom-16 left-1/2 -translate-x-1/2 flex gap-1 px-2 py-1.5 rounded-full animate-in fade-in zoom-in-95 duration-150"
+                className="absolute bottom-14 md:bottom-16 left-1/2 -translate-x-1/2 flex gap-0.5 md:gap-1 px-1.5 md:px-2 py-1 md:py-1.5 rounded-full animate-in fade-in zoom-in-95 duration-150"
                 style={{
                   background: "rgba(30,30,35,0.95)",
                   backdropFilter: "blur(20px)",
@@ -1692,7 +1698,7 @@ export default function MeetingsPage() {
                   <button
                     key={emoji}
                     onClick={() => handleReaction(emoji)}
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-xl hover:bg-white/10 transition-colors hover:scale-110 active:scale-95"
+                    className="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-base md:text-xl hover:bg-white/10 transition-colors hover:scale-110 active:scale-95"
                   >
                     {emoji}
                   </button>

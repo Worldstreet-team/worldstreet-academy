@@ -229,7 +229,7 @@ export async function joinMeeting(meetingId: string): Promise<{
         userName: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
         userAvatar: currentUser.avatarUrl,
       }
-      emitEvent(meeting.hostId.toString(), eventPayload)
+      await emitEvent(meeting.hostId.toString(), eventPayload)
 
       return { success: true, requiresApproval: true, meeting: { id: meeting._id.toString(), title: meeting.title, hostId: meeting.hostId.toString(), hostName: "", hostAvatar: null, status: meeting.status, meetingId: meeting.meetingId, participantCount: 0, maxParticipants: meeting.settings.maxParticipants, settings: serializeSettings(meeting.settings), createdAt: meeting.createdAt.toISOString() } }
     }
@@ -312,7 +312,7 @@ export async function admitParticipant(
       userAvatar: currentUser.avatarUrl,
       authToken: rtkParticipant.authToken,
     }
-    emitEvent(userId, eventPayload)
+    await emitEvent(userId, eventPayload)
 
     return { success: true, authToken: rtkParticipant.authToken }
   } catch (error) {
@@ -355,7 +355,7 @@ export async function declineParticipant(
       userName: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
       userAvatar: currentUser.avatarUrl,
     }
-    emitEvent(userId, eventPayload)
+    await emitEvent(userId, eventPayload)
 
     return { success: true }
   } catch (error) {
@@ -434,7 +434,7 @@ export async function endMeeting(meetingId: string): Promise<{
         userName: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
         userAvatar: currentUser.avatarUrl,
       }
-      emitEventToMany(participantIdsToNotify, endPayload)
+      await emitEventToMany(participantIdsToNotify, endPayload)
     }
 
     return { success: true }
@@ -681,7 +681,7 @@ export async function inviteToStage(
       userName: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
       userAvatar: currentUser.avatarUrl,
     }
-    emitEvent(userId, eventPayload)
+    await emitEvent(userId, eventPayload)
 
     // Also notify all other admitted participants so they update their state
     const otherParticipantIds = meeting.participants
@@ -697,7 +697,7 @@ export async function inviteToStage(
         userName: user ? `${user.firstName} ${user.lastName}`.trim() : "Participant",
         userAvatar: user?.avatarUrl || null,
       }
-      emitEventToMany(otherParticipantIds, broadcastPayload)
+      await emitEventToMany(otherParticipantIds, broadcastPayload)
     }
 
     return { success: true }
@@ -733,7 +733,7 @@ export async function removeFromStage(
       userName: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
       userAvatar: currentUser.avatarUrl,
     }
-    emitEvent(userId, eventPayload)
+    await emitEvent(userId, eventPayload)
 
     // Also notify others
     const otherParticipantIds = meeting.participants
@@ -749,7 +749,7 @@ export async function removeFromStage(
         userName: user ? `${user.firstName} ${user.lastName}`.trim() : "Participant",
         userAvatar: user?.avatarUrl || null,
       }
-      emitEventToMany(otherParticipantIds, broadcastPayload)
+      await emitEventToMany(otherParticipantIds, broadcastPayload)
     }
 
     return { success: true }
@@ -791,7 +791,7 @@ export async function toggleHandRaise(
     if (!participantIds.includes(meeting.hostId.toString())) {
       participantIds.push(meeting.hostId.toString())
     }
-    emitEventToMany(participantIds, eventPayload)
+    await emitEventToMany(participantIds, eventPayload)
 
     return { success: true }
   } catch (error) {
@@ -832,7 +832,7 @@ export async function sendReaction(
     if (meeting.hostId.toString() !== currentUser.id && !participantIds.includes(meeting.hostId.toString())) {
       participantIds.push(meeting.hostId.toString())
     }
-    emitEventToMany(participantIds, eventPayload)
+    await emitEventToMany(participantIds, eventPayload)
 
     return { success: true }
   } catch (error) {

@@ -141,7 +141,7 @@ export async function initiateCall(
       conversationId: conversation._id.toString(),
       authToken: receiverParticipant.authToken,
     }
-    emitCallEvent(receiverId, eventPayload)
+    await emitCallEvent(receiverId, eventPayload)
 
     return {
       success: true,
@@ -194,7 +194,7 @@ export async function answerCall(callId: string): Promise<{
       receiverId: currentUser.id,
       conversationId: call.conversationId.toString(),
     }
-    emitCallEvent(call.callerId.toString(), eventPayload)
+    await emitCallEvent(call.callerId.toString(), eventPayload)
 
     return {
       success: true,
@@ -247,7 +247,7 @@ export async function declineCall(callId: string): Promise<{
       conversationId: call.conversationId.toString(),
       status: "declined",
     }
-    emitCallEvent(call.callerId.toString(), eventPayload)
+    await emitCallEvent(call.callerId.toString(), eventPayload)
 
     return { success: true }
   } catch (error) {
@@ -339,7 +339,7 @@ export async function endCall(callId: string): Promise<{
         conversationId: call.conversationId.toString(),
         status: newStatus,
       }
-      emitCallEvent(otherUserId, eventPayload)
+      await emitCallEvent(otherUserId, eventPayload)
     } else {
       console.log(`[EndCall] Call ${callId} was already ended by the other participant`)
     }
@@ -512,8 +512,8 @@ export async function expireRingingCalls(): Promise<void> {
         conversationId: updated.conversationId.toString(),
         status: "missed",
       }
-      emitCallEvent(updated.callerId.toString(), eventPayload)
-      emitCallEvent(updated.receiverId.toString(), eventPayload)
+      await emitCallEvent(updated.callerId.toString(), eventPayload)
+      await emitCallEvent(updated.receiverId.toString(), eventPayload)
     }
   }
 }

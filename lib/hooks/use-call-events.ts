@@ -1,25 +1,42 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useCallback } from "react"
+import * as Ably from "ably"
 import type { CallEventPayload, MessageEventPayload, SSEEventPayload } from "@/lib/call-events"
 
-type SSEEventHandler = (event: SSEEventPayload) => void
+type RealtimeEventHandler = (event: SSEEventPayload) => void
+
+// Singleton Ably Realtime client — shared across all hook instances
+let _ablyClient: Ably.Realtime | null = null
+
+function getAblyClient(): Ably.Realtime {
+  if (!_ablyClient) {
+    const key = process.env.NEXT_PUBLIC_ABLY_KEY
+    if (!key) {
+      throw new Error("[Ably] NEXT_PUBLIC_ABLY_KEY is not set")
+    }
+    _ablyClient = new Ably.Realtime({
+      key,
+      // Auto-reconnect with exponential backoff (built-in)
+      disconnectedRetryTimeout: 1000,
+      suspendedRetryTimeout: 5000,
+    })
+  }
+  return _ablyClient
+}
 
 /**
- * Client-side hook that connects to the SSE endpoint for real-time events.
- * Handles both call events and message events.
- * Automatically reconnects on disconnection with exponential backoff.
+ * Client-side hook that connects to Ably Realtime for real-time events.
+ * Handles call events, message events, and meeting events.
+ * Ably handles reconnection automatically with exponential backoff.
  */
 export function useSSEEvents(
   userId: string | null,
-  onEvent: SSEEventHandler
+  onEvent: RealtimeEventHandler
 ) {
   const [isConnected, setIsConnected] = useState(false)
-  const eventSourceRef = useRef<EventSource | null>(null)
-  const reconnectAttemptRef = useRef(0)
-  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const onEventRef = useRef(onEvent)
-  const mountedRef = useRef(true)
+  const channelRef = useRef<Ably.RealtimeChannel | null>(null)
 
   // Keep handler ref up to date without re-triggering effect
   useEffect(() => {
@@ -28,74 +45,44 @@ export function useSSEEvents(
 
   useEffect(() => {
     if (!userId) return
-    mountedRef.current = true
 
-    function connect() {
-      if (!userId || !mountedRef.current) return
+    const ably = getAblyClient()
+    const channelName = `user:${userId}`
 
-      // Close existing connection
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close()
-        eventSourceRef.current = null
-      }
+    // Monitor connection state
+    const onConnectionStateChange = (stateChange: Ably.ConnectionStateChange) => {
+      console.log(`[Ably] Connection state: ${stateChange.current}`)
+      setIsConnected(stateChange.current === "connected")
+    }
+    ably.connection.on(onConnectionStateChange)
 
-      console.log("[SSE Client] Connecting to /api/calls/events...")
-      const es = new EventSource("/api/calls/events")
-      eventSourceRef.current = es
+    // Set initial connection state
+    setIsConnected(ably.connection.state === "connected")
 
-      es.onopen = () => {
-        if (!mountedRef.current) return
-        console.log("[SSE Client] Connected")
-        setIsConnected(true)
-        reconnectAttemptRef.current = 0
-      }
+    // Subscribe to the user's channel
+    const channel = ably.channels.get(channelName)
+    channelRef.current = channel
 
-      es.onmessage = (event) => {
-        if (!mountedRef.current) return
-        try {
-          const data = JSON.parse(event.data)
-          if (data.type === "connected") {
-            console.log("[SSE Client] Server confirmed connection for user:", data.userId)
-            return
-          }
-          // Dispatch the call event
-          onEventRef.current(data as CallEventPayload)
-        } catch (err) {
-          console.error("[SSE Client] Failed to parse event:", err)
+    const onMessage = (message: Ably.Message) => {
+      try {
+        const data = message.data as SSEEventPayload
+        if (data && data.type) {
+          onEventRef.current(data)
         }
-      }
-
-      es.onerror = () => {
-        if (!mountedRef.current) return
-        console.log("[SSE Client] Connection error/closed")
-        setIsConnected(false)
-        es.close()
-        eventSourceRef.current = null
-
-        // Exponential backoff reconnect: 1s, 2s, 4s, 8s, max 30s
-        const attempt = reconnectAttemptRef.current
-        const delay = Math.min(1000 * Math.pow(2, attempt), 30_000)
-        reconnectAttemptRef.current = attempt + 1
-
-        console.log(`[SSE Client] Reconnecting in ${delay}ms (attempt ${attempt + 1})`)
-        reconnectTimeoutRef.current = setTimeout(() => {
-          if (mountedRef.current) connect()
-        }, delay)
+      } catch (err) {
+        console.error("[Ably] Failed to process message:", err)
       }
     }
 
-    connect()
+    channel.subscribe("event", onMessage)
+    console.log(`[Ably] Subscribed to channel: ${channelName}`)
 
     return () => {
-      mountedRef.current = false
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close()
-        eventSourceRef.current = null
-      }
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current)
-        reconnectTimeoutRef.current = null
-      }
+      console.log(`[Ably] Unsubscribing from channel: ${channelName}`)
+      channel.unsubscribe("event", onMessage)
+      ably.connection.off(onConnectionStateChange)
+      channelRef.current = null
+      // Don't close the Ably client — it's shared across hook instances
     }
   }, [userId])
 
@@ -107,11 +94,15 @@ export function useCallEvents(
   userId: string | null,
   onEvent: (event: CallEventPayload) => void
 ) {
-  return useSSEEvents(userId, (event) => {
-    if (event.type.startsWith("call:")) {
-      onEvent(event as CallEventPayload)
-    }
-  })
+  const handler = useCallback(
+    (event: SSEEventPayload) => {
+      if (event.type.startsWith("call:")) {
+        onEvent(event as CallEventPayload)
+      }
+    },
+    [onEvent]
+  )
+  return useSSEEvents(userId, handler)
 }
 
 // Hook for message-only consumers
@@ -119,9 +110,13 @@ export function useMessageEvents(
   userId: string | null,
   onEvent: (event: MessageEventPayload) => void
 ) {
-  return useSSEEvents(userId, (event) => {
-    if (event.type.startsWith("message:")) {
-      onEvent(event as MessageEventPayload)
-    }
-  })
+  const handler = useCallback(
+    (event: SSEEventPayload) => {
+      if (event.type.startsWith("message:")) {
+        onEvent(event as MessageEventPayload)
+      }
+    },
+    [onEvent]
+  )
+  return useSSEEvents(userId, handler)
 }

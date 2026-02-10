@@ -1,13 +1,15 @@
 /**
- * Server-side in-memory event bus for real-time signaling.
- * Handles both call events and message events via SSE.
+ * Server-side real-time event bus using Ably.
+ * Handles call events, message events, and meeting events.
  *
- * CRITICAL: Uses globalThis to share state across Next.js module boundaries.
- * Next.js bundles server actions and route handlers separately, so a plain
- * module-level variable would be different instances in each context.
- * globalThis ensures both read/write the same Map (same Node.js process).
- * This is the same pattern Prisma recommends for its client singleton.
+ * Server actions publish events via Ably REST API.
+ * Clients subscribe via Ably Realtime WebSocket (see use-call-events.ts).
+ *
+ * Channel naming: `user:<userId>` — one channel per user.
+ * Event name: `event` — payload contains the type discriminator.
  */
+
+import Ably from "ably"
 
 // ── Call event types ──
 
@@ -89,90 +91,49 @@ export type MessageEventPayload = {
 
 export type SSEEventPayload = CallEventPayload | MessageEventPayload | MeetingEventPayload
 
-type EventCallback = (event: SSEEventPayload) => void
+// ── Ably REST client (server-side, lazy-initialized) ──
 
-// Use globalThis to share subscribers across Next.js bundle boundaries
-const globalForEvents = globalThis as unknown as {
-  __sseEventSubscribers?: Map<string, Set<EventCallback>>
+let _ablyRest: Ably.Rest | null = null
+
+function getAblyRest(): Ably.Rest {
+  if (!_ablyRest) {
+    const key = process.env.ABLY_API_KEY
+    if (!key) {
+      throw new Error("[Ably] ABLY_API_KEY environment variable is not set")
+    }
+    _ablyRest = new Ably.Rest({ key })
+  }
+  return _ablyRest
 }
-
-if (!globalForEvents.__sseEventSubscribers) {
-  globalForEvents.__sseEventSubscribers = new Map()
-}
-
-const _subscribers = globalForEvents.__sseEventSubscribers
 
 /**
- * Subscribe a user to all SSE events (calls + messages).
- * Returns an unsubscribe function.
+ * Publish an event to a specific user's Ably channel.
  */
-export function subscribeToEvents(
-  userId: string,
-  callback: EventCallback
-): () => void {
-  if (!_subscribers.has(userId)) {
-    _subscribers.set(userId, new Set())
-  }
-  _subscribers.get(userId)!.add(callback)
-
-  return () => {
-    const subs = _subscribers.get(userId)
-    if (subs) {
-      subs.delete(callback)
-      if (subs.size === 0) {
-        _subscribers.delete(userId)
-      }
-    }
+export async function emitEvent(userId: string, event: SSEEventPayload): Promise<void> {
+  try {
+    const ably = getAblyRest()
+    const channel = ably.channels.get(`user:${userId}`)
+    await channel.publish("event", event)
+    console.log(`[Ably] Published ${event.type} to user:${userId}`)
+  } catch (err) {
+    console.error(`[Ably] Failed to publish ${event.type} to user:${userId}:`, err)
   }
 }
 
 // Backwards-compat alias
-export const subscribeToCallEvents = subscribeToEvents
-
-/**
- * Emit an event to a specific user.
- */
-export function emitEvent(userId: string, event: SSEEventPayload): void {
-  const subs = _subscribers.get(userId)
-  if (subs && subs.size > 0) {
-    console.log(`[SSE Events] Emitting ${event.type} to user ${userId} (${subs.size} subscribers)`)
-    for (const callback of subs) {
-      try {
-        callback(event)
-      } catch (err) {
-        console.error("[SSE Events] Subscriber error:", err)
-      }
-    }
-  } else {
-    console.log(`[SSE Events] No subscribers for user ${userId}, event ${event.type} dropped`)
-  }
-}
-
-// Backwards-compat aliases
 export const emitCallEvent = emitEvent
 
 /**
- * Emit an event to multiple users.
+ * Publish an event to multiple users' Ably channels.
  */
-export function emitEventToMany(
+export async function emitEventToMany(
   userIds: string[],
   event: SSEEventPayload
-): void {
-  for (const userId of userIds) {
-    emitEvent(userId, event)
-  }
+): Promise<void> {
+  await Promise.allSettled(
+    userIds.map((userId) => emitEvent(userId, event))
+  )
 }
 
 // Backwards-compat alias
 export const emitCallEventToMany = emitEventToMany
-
-/**
- * Get count of active subscribers (for debugging).
- */
-export function getSubscriberCount(): number {
-  let count = 0
-  for (const subs of _subscribers.values()) {
-    count += subs.size
-  }
-  return count
-}
