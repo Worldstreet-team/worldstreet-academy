@@ -129,7 +129,7 @@ export function AppSidebar() {
   const unreadCount = useUnreadCount()
   const hasOngoingCall = useOngoingCall()
 
-  const userInitials = `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
+  const userInitials = `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`.toUpperCase() || "U"
   const isInstructor = user.role === "INSTRUCTOR" || user.role === "ADMIN"
 
   function handleLogout() {

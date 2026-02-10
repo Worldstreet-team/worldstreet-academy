@@ -20,6 +20,7 @@ export type CallEventType =
   | "call:declined"
   | "call:cancelled"
   | "call:busy"
+  | "call:participant-rejoined"
 
 export type CallEventPayload = {
   type: CallEventType

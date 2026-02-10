@@ -19,11 +19,15 @@ import {
   Loading03Icon,
   Clock01Icon,
   ArrowRight01Icon,
+  WavingHand01Icon,
+  SmileIcon,
   BubbleChatIcon,
   ChartColumnIcon,
   VolumeHighIcon,
-  MinimizeScreenIcon,
-  More02Icon,
+  Clapping01Icon,
+  FavouriteIcon,
+  LaughingIcon,
+  ThumbsUpIcon,
 } from "@hugeicons/core-free-icons"
 import { Topbar } from "@/components/platform/topbar"
 import { Button } from "@/components/ui/button"
@@ -39,7 +43,6 @@ import {
 import { cn } from "@/lib/utils"
 import { rtkClient } from "@/lib/rtk-client"
 import { useUser } from "@/components/providers/user-provider"
-import { useMeeting } from "@/components/providers/meeting-provider"
 import type { MeetingEventPayload } from "@/lib/call-events"
 import {
   createMeeting,
@@ -78,11 +81,10 @@ import {
    ═══════════════════════════════════════════════════════ */
 
 const REACTIONS = [
-  { id: "👏", emoji: "👏", label: "Clap" },
-  { id: "❤️", emoji: "❤️", label: "Love" },
-  { id: "😂", emoji: "😂", label: "Haha" },
-  { id: "🎉", emoji: "🎉", label: "Party" },
-  { id: "👍", emoji: "👍", label: "Like" },
+  { id: "clap", icon: Clapping01Icon, label: "Clap" },
+  { id: "heart", icon: FavouriteIcon, label: "Love" },
+  { id: "laugh", icon: LaughingIcon, label: "Haha" },
+  { id: "thumbsup", icon: ThumbsUpIcon, label: "Like" },
 ] as const
 const TILES_PER_PAGE = 4
 
@@ -199,14 +201,17 @@ function ParticipantTile({
 
       {(handRaised || reactionId) && (
         <div className="absolute top-2 right-2 flex items-center gap-1.5 z-10">
-          {reactionId && (
-            <div className="w-8 h-8 rounded-full bg-background/70 backdrop-blur-sm flex items-center justify-center animate-bounce">
-              <span className="text-lg leading-none">{reactionId}</span>
-            </div>
-          )}
+          {reactionId && (() => {
+            const r = REACTIONS.find((rx) => rx.id === reactionId)
+            return r ? (
+              <div className="w-8 h-8 rounded-full bg-background/70 backdrop-blur-sm flex items-center justify-center animate-bounce">
+                <HugeiconsIcon icon={r.icon} size={18} className="text-foreground" />
+              </div>
+            ) : null
+          })()}
           {handRaised && (
             <div className="w-8 h-8 rounded-full bg-amber-500/20 backdrop-blur-sm flex items-center justify-center animate-bounce">
-              <span className="text-lg leading-none">✋</span>
+              <HugeiconsIcon icon={WavingHand01Icon} size={18} className="text-amber-500" />
             </div>
           )}
         </div>
@@ -460,7 +465,6 @@ export default function MeetingsPage() {
   const user = useUser()
   const searchParams = useSearchParams()
   const router = useRouter()
-  const meeting = useMeeting()
 
   const [meetings, setMeetings] = useState<MeetingWithDetails[]>([])
   const [isLoadingMeetings, setIsLoadingMeetings] = useState(true)
@@ -487,7 +491,6 @@ export default function MeetingsPage() {
   const [raisedHands, setRaisedHands] = useState<Set<string>>(new Set())
   const [myHandRaised, setMyHandRaised] = useState(false)
   const [showReactionPicker, setShowReactionPicker] = useState(false)
-  const [showMobileMore, setShowMobileMore] = useState(false)
   const [tileReactions, setTileReactions] = useState<Map<string, string>>(new Map())
   const tileReactionTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
@@ -675,17 +678,8 @@ export default function MeetingsPage() {
           }
           break
         case "meeting:mute-participant":
-          rtkClient.client?.self.disableAudio().then(() => {
-            setIsMuted(true)
-          }).catch(() => {
-            // Fallback: directly disable the audio track
-            try {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const audioTrack = (rtkClient.client?.self as any)?.audioTrack
-              if (audioTrack) audioTrack.enabled = false
-            } catch { /* ignore */ }
-            setIsMuted(true)
-          })
+          rtkClient.client?.self.disableAudio().catch(() => {})
+          setIsMuted(true)
           break
         case "meeting:screen-share-permission":
           break
@@ -786,45 +780,6 @@ export default function MeetingsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isJoined])
 
-  // Register/unregister meeting with global provider for minimize support
-  useEffect(() => {
-    if (activeMeeting && isJoined) {
-      meeting.registerMeeting({
-        meetingId: activeMeeting.id,
-        title: activeMeeting.title,
-        isHost: activeMeeting.hostId === user.id,
-        startTime: meetingStartTime,
-        participantCount: remoteParticipants.size + 1,
-      })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeMeeting?.id, isJoined])
-
-  // Keep participant count in sync
-  useEffect(() => {
-    if (activeMeeting && isJoined) {
-      meeting.updateMeeting({ participantCount: remoteParticipants.size + 1 })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [remoteParticipants.size])
-
-  // Set callbacks so PIP bar can control mute/end
-  useEffect(() => {
-    if (activeMeeting && isJoined) {
-      meeting.setMeetingCallbacks({
-        onToggleMute: () => {
-          const next = !isMuted
-          setIsMuted(next)
-          if (next) rtkClient.client?.self.disableAudio().catch(() => {})
-          else rtkClient.client?.self.enableAudio().catch(() => {})
-        },
-        onEndMeeting: () => handleEndMeeting(),
-      })
-      meeting.setMeetingMuted(isMuted)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeMeeting?.id, isJoined, isMuted])
-
   /* ---- HANDLERS ---- */
 
   const joinRTKAndSetup = useCallback(
@@ -908,7 +863,6 @@ export default function MeetingsPage() {
 
   function resetMeetingState() {
     rtkClient.leaveRoom().catch(() => {})
-    meeting.unregisterMeeting()
     setActiveMeeting(null)
     setIsJoined(false)
     setRemoteParticipants(new Map())
@@ -1147,29 +1101,6 @@ export default function MeetingsPage() {
 
     const panelOpen = activeTab !== null
 
-    // When minimized, don't render the full meeting UI — PIP bar handles it
-    if (meeting.isMinimized) {
-      return (
-        <div className="relative flex flex-col h-dvh min-h-0">
-          <Topbar title="Meetings" />
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center space-y-3">
-              <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto">
-                <HugeiconsIcon icon={Video01Icon} size={28} className="text-emerald-500" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-sm">{activeMeeting.title}</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">Meeting is minimized</p>
-              </div>
-              <Button onClick={() => meeting.setMinimized(false)} size="sm" variant="outline" className="gap-1.5">
-                Return to meeting
-              </Button>
-            </div>
-          </div>
-        </div>
-      )
-    }
-
     return (
       <div className="fixed inset-0 z-50 flex flex-col bg-neutral-100 dark:bg-zinc-950 overflow-hidden">
         <style>{"nav.safe-area-bottom { display: none !important; }"}</style>
@@ -1187,42 +1118,33 @@ export default function MeetingsPage() {
             <span className="text-muted-foreground/40">·</span>
             <span className="text-muted-foreground text-xs">{totalParticipants}</span>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={copyMeetingLink}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-muted-foreground hover:text-foreground transition-colors border border-border/50"
-            >
-              <HugeiconsIcon icon={copiedLink ? CheckmarkCircle01Icon : Link01Icon} size={12} />
-              {copiedLink ? "Copied!" : "Invite"}
-            </button>
-            <button
-              onClick={() => meeting.setMinimized(true)}
-              className="flex items-center justify-center w-8 h-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-              title="Minimize meeting"
-            >
-              <HugeiconsIcon icon={MinimizeScreenIcon} size={16} />
-            </button>
-          </div>
+          <button
+            onClick={copyMeetingLink}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-muted-foreground hover:text-foreground transition-colors border border-border/50"
+          >
+            <HugeiconsIcon icon={copiedLink ? CheckmarkCircle01Icon : Link01Icon} size={12} />
+            {copiedLink ? "Copied!" : "Invite"}
+          </button>
         </div>
 
         {/* Pending admission requests */}
         {isHost && pendingRequests.length > 0 && (
-          <div className="relative z-10 px-3 pb-1">
-            <div className="flex flex-col gap-1">
+          <div className="relative z-10 px-4 pb-1">
+            <div className="flex flex-col gap-1.5">
               {pendingRequests.map((req) => (
-                <div key={req.userId} className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-amber-500/6 border border-amber-500/10 animate-in fade-in slide-in-from-top-2 duration-200">
-                  <Avatar className="w-6 h-6 shrink-0">
+                <div key={req.userId} className="flex items-center gap-3 px-4 py-2 rounded-xl bg-amber-500/8 dark:bg-amber-500/6 border border-amber-500/15 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <Avatar className="w-7 h-7 shrink-0">
                     {req.avatar && <AvatarImage src={req.avatar} alt={req.name} />}
-                    <AvatarFallback className="text-[8px] bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                    <AvatarFallback className="text-[9px] bg-amber-500/15 text-amber-600 dark:text-amber-400">
                       {req.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="text-xs text-foreground font-medium flex-1 truncate">{req.name} <span className="text-muted-foreground/60 font-normal">wants to join</span></span>
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => handleAdmit(req.userId)} className="h-6 px-2.5 rounded-md text-[10px] font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors">
+                  <span className="text-sm text-foreground font-medium flex-1 truncate">{req.name} <span className="text-muted-foreground font-normal">wants to join</span></span>
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => handleAdmit(req.userId)} className="h-7 px-3 rounded-lg text-xs font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors">
                       Admit
                     </button>
-                    <button onClick={() => handleDecline(req.userId)} className="h-6 px-2 rounded-md text-[10px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                    <button onClick={() => handleDecline(req.userId)} className="h-7 px-3 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
                       Decline
                     </button>
                   </div>
@@ -1300,133 +1222,87 @@ export default function MeetingsPage() {
 
         {/* Side panel */}
         {panelOpen && (
-          <div className="fixed md:absolute inset-0 md:inset-auto md:top-12 md:right-3 md:bottom-24 z-40 md:w-80 md:rounded-2xl flex flex-col overflow-hidden animate-in slide-in-from-right-4 fade-in duration-200 bg-background dark:bg-neutral-950 border border-border/30 dark:border-white/8 shadow-xl">
-            {/* Tab header */}
-            <div className="flex items-center gap-1 px-2 pt-[max(0.5rem,env(safe-area-inset-top))] md:pt-2 pb-0">
+          <div className="fixed md:absolute inset-0 md:inset-auto md:top-12 md:right-3 md:bottom-24 z-40 md:w-80 md:rounded-2xl flex flex-col overflow-hidden animate-in slide-in-from-right-4 fade-in duration-200 bg-background/95 backdrop-blur-2xl border border-border/50 dark:border-white/8">
+            <div className="flex items-center border-b border-border/40 px-3 pt-[max(0.5rem,env(safe-area-inset-top))] md:pt-2">
               {(["people", "chat", "polls"] as ActiveTab[]).map((tab) => (
                 <button key={tab} onClick={() => setActiveTab(tab)}
-                  className={cn("flex-1 py-2 text-xs font-medium capitalize transition-all relative rounded-lg",
-                    activeTab === tab ? "text-foreground bg-muted/60" : "text-muted-foreground hover:text-foreground/80 hover:bg-muted/30")}>
+                  className={cn("flex-1 py-2.5 text-xs font-semibold capitalize transition-colors relative",
+                    activeTab === tab ? "text-foreground" : "text-muted-foreground hover:text-foreground/70")}>
                   {tab}
                   {tab === "chat" && unreadChat > 0 && activeTab !== "chat" && (
-                    <span className="absolute top-1 right-1/4 w-4 h-4 rounded-full bg-primary text-[9px] flex items-center justify-center text-primary-foreground font-bold">{unreadChat > 9 ? "9+" : unreadChat}</span>
+                    <span className="absolute top-1.5 right-1/4 w-4 h-4 rounded-full bg-primary text-[9px] flex items-center justify-center text-primary-foreground font-bold">{unreadChat > 9 ? "9+" : unreadChat}</span>
                   )}
+                  {activeTab === tab && <div className="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-foreground rounded-full" />}
                 </button>
               ))}
-              <button onClick={() => setActiveTab(null)} className="w-8 h-8 rounded-lg flex items-center justify-center ml-0.5 hover:bg-muted/50 transition-colors shrink-0">
-                <HugeiconsIcon icon={Cancel01Icon} size={14} className="text-muted-foreground" />
+              <button onClick={() => setActiveTab(null)} className="w-8 h-8 rounded-full flex items-center justify-center ml-1 hover:bg-muted transition-colors">
+                <HugeiconsIcon icon={Cancel01Icon} size={16} className="text-muted-foreground" />
               </button>
             </div>
 
-            <div className="h-px bg-border/30 dark:bg-white/6 mx-3 mt-2" />
-
             {activeTab === "people" && (
-              <div className="flex-1 overflow-y-auto p-3 space-y-1">
-                {/* Pending requests */}
-                {isHost && pendingRequests.length > 0 && (
-                  <div className="mb-3 space-y-1.5">
-                    <p className="text-[10px] uppercase tracking-wider text-amber-500 font-semibold px-1 mb-1">Waiting ({pendingRequests.length})</p>
-                    {pendingRequests.map((req) => (
-                      <div key={req.userId} className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-amber-500/5 border border-amber-500/10">
-                        <Avatar className="w-7 h-7 shrink-0">
-                          {req.avatar && <AvatarImage src={req.avatar} alt={req.name} />}
-                          <AvatarFallback className="text-[9px] bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                            {req.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="text-xs text-foreground font-medium flex-1 truncate">{req.name}</span>
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => handleAdmit(req.userId)} className="h-6 px-2.5 rounded-md text-[10px] font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors">
-                            Admit
-                          </button>
-                          <button onClick={() => handleDecline(req.userId)} className="h-6 px-2 rounded-md text-[10px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
-                            Decline
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    <div className="h-px bg-border/30 dark:bg-white/6 my-2" />
-                  </div>
-                )}
-
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-semibold px-1 mb-1.5">Participants ({totalParticipants})</p>
-
-                {/* Self */}
-                <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-muted/40 transition-colors">
-                  <Avatar className="w-7 h-7 shrink-0">
+              <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">In meeting ({totalParticipants})</p>
+                <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-muted/50 transition-colors">
+                  <Avatar className="w-8 h-8">
                     {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt="You" />}
-                    <AvatarFallback className="text-[9px] bg-primary/10 text-primary">{(user.firstName?.[0] || "") + (user.lastName?.[0] || "")}</AvatarFallback>
+                    <AvatarFallback className="text-[10px] bg-muted text-muted-foreground">{(user.firstName?.[0] || "") + (user.lastName?.[0] || "")}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <span className="text-xs font-medium text-foreground truncate block">{user.firstName} {user.lastName}</span>
-                    <span className="text-[10px] text-muted-foreground/60">{isHost ? "Host · You" : "You"}</span>
+                    <span className="text-sm text-foreground truncate block">{user.firstName} {user.lastName}</span>
+                    <span className="text-[10px] text-muted-foreground">{isHost ? "Host · You" : "You"}</span>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    {myHandRaised && <span className="text-sm animate-bounce">✋</span>}
-                    <div className={cn("w-6 h-6 rounded-md flex items-center justify-center", isMuted ? "bg-red-500/10" : "bg-emerald-500/10")}>
-                      <HugeiconsIcon icon={isMuted ? MicOff01Icon : Mic01Icon} size={12} className={isMuted ? "text-red-400" : "text-emerald-500"} />
-                    </div>
-                  </div>
+                  {myHandRaised && <HugeiconsIcon icon={WavingHand01Icon} size={16} className="text-amber-500 animate-bounce" />}
+                  {isMuted && <HugeiconsIcon icon={MicOff01Icon} size={14} className="text-red-400" />}
                 </div>
 
-                {/* Remote participants */}
                 {Array.from(remoteParticipants.entries()).map(([id, p]) => {
                   const uid = p.userId || id
                   const isParticipantHost = uid === activeMeeting.hostId
                   return (
-                    <div key={id} className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-muted/40 transition-colors group">
-                      <Avatar className="w-7 h-7 shrink-0">
-                        <AvatarFallback className="text-[9px] bg-muted text-muted-foreground">
+                    <div key={id} className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-muted/50 transition-colors group">
+                      <Avatar className="w-8 h-8">
+                        <AvatarFallback className="text-[10px] bg-muted text-muted-foreground">
                           {p.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <span className="text-xs font-medium text-foreground truncate block">{p.name}</span>
-                        {isParticipantHost && <span className="text-[10px] text-muted-foreground/60">Host</span>}
+                        <span className="text-sm text-foreground truncate block">{p.name}</span>
+                        {isParticipantHost && <span className="text-[10px] text-muted-foreground">Host</span>}
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        {raisedHands.has(uid) && <span className="text-sm">✋</span>}
-                        {isHost && !isParticipantHost ? (
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={() => handleMuteParticipant(uid)}
-                              title={p.audioEnabled ? "Mute" : "Already muted"}
-                              className={cn("w-6 h-6 rounded-md flex items-center justify-center transition-colors",
-                                p.audioEnabled ? "bg-muted hover:bg-red-500/10 hover:text-red-400" : "bg-red-500/10")}
-                            >
-                              <HugeiconsIcon icon={p.audioEnabled ? Mic01Icon : MicOff01Icon} size={12} className={p.audioEnabled ? "text-muted-foreground" : "text-red-400"} />
+                      {raisedHands.has(uid) && <HugeiconsIcon icon={WavingHand01Icon} size={14} className="text-amber-500" />}
+                      {!p.audioEnabled && <HugeiconsIcon icon={MicOff01Icon} size={14} className="text-red-400" />}
+                      {isHost && !isParticipantHost && (
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {p.audioEnabled && (
+                            <button onClick={() => handleMuteParticipant(uid)} title="Mute" className="w-7 h-7 rounded-full border border-border/60 flex items-center justify-center hover:bg-muted transition-colors">
+                              <HugeiconsIcon icon={MicOff01Icon} size={12} className="text-muted-foreground" />
                             </button>
-                            <button onClick={() => handleToggleScreenSharePerm(uid)} title={screenSharePermissions.get(uid) === false ? "Allow share" : "Revoke share"}
-                              className={cn("w-6 h-6 rounded-md flex items-center justify-center transition-colors",
-                                screenSharePermissions.get(uid) === false ? "bg-red-500/10" : "bg-muted hover:bg-muted/80")}>
-                              <HugeiconsIcon icon={ComputerScreenShareIcon} size={12} className={screenSharePermissions.get(uid) === false ? "text-red-400" : "text-muted-foreground"} />
-                            </button>
-                            <button onClick={() => handleKick(uid)} title="Remove"
-                              className="w-6 h-6 rounded-md flex items-center justify-center bg-muted hover:bg-red-500/10 transition-colors">
-                              <HugeiconsIcon icon={Cancel01Icon} size={12} className="text-muted-foreground hover:text-red-400" />
-                            </button>
-                          </div>
-                        ) : (
-                          <div className={cn("w-6 h-6 rounded-md flex items-center justify-center", !p.audioEnabled ? "bg-red-500/10" : "bg-emerald-500/10")}>
-                            <HugeiconsIcon icon={p.audioEnabled ? Mic01Icon : MicOff01Icon} size={12} className={p.audioEnabled ? "text-emerald-500" : "text-red-400"} />
-                          </div>
-                        )}
-                      </div>
+                          )}
+                          <button onClick={() => handleToggleScreenSharePerm(uid)} title={screenSharePermissions.get(uid) === false ? "Allow screen share" : "Revoke screen share"}
+                            className={cn("w-7 h-7 rounded-full border flex items-center justify-center hover:bg-muted transition-colors",
+                              screenSharePermissions.get(uid) === false ? "border-red-400/40" : "border-border/60")}>
+                            <HugeiconsIcon icon={ComputerScreenShareIcon} size={12} className={screenSharePermissions.get(uid) === false ? "text-red-400" : "text-muted-foreground"} />
+                          </button>
+                          <button onClick={() => handleKick(uid)} title="Remove" className="w-7 h-7 rounded-full border border-red-400/40 flex items-center justify-center hover:bg-red-500/10 transition-colors">
+                            <HugeiconsIcon icon={Cancel01Icon} size={12} className="text-red-400" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )
                 })}
 
-                {/* Offline admitted */}
                 {admittedParticipants
                   .filter((p) => p.userId !== user.id && !Array.from(remoteParticipants.values()).some((rp) => rp.name === p.name))
                   .map((p) => (
-                    <div key={p.userId} className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl opacity-30">
-                      <Avatar className="w-7 h-7 shrink-0">
+                    <div key={p.userId} className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl opacity-40">
+                      <Avatar className="w-8 h-8">
                         {p.avatar && <AvatarImage src={p.avatar} alt={p.name} />}
-                        <AvatarFallback className="text-[9px] bg-muted text-muted-foreground">{p.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}</AvatarFallback>
+                        <AvatarFallback className="text-[10px] bg-muted text-muted-foreground">{p.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}</AvatarFallback>
                       </Avatar>
-                      <span className="text-xs text-muted-foreground flex-1 truncate">{p.name}</span>
-                      <span className="text-[9px] text-muted-foreground/40 bg-muted/50 px-1.5 py-0.5 rounded">offline</span>
+                      <span className="text-sm text-muted-foreground flex-1 truncate">{p.name}</span>
+                      <span className="text-[10px] text-muted-foreground/60">offline</span>
                     </div>
                   ))}
               </div>
@@ -1434,11 +1310,11 @@ export default function MeetingsPage() {
 
             {activeTab === "chat" && (
               <div className="flex-1 flex flex-col min-h-0">
-                <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5">
+                <div className="flex-1 overflow-y-auto p-3 space-y-3">
                   {chatMessages.length === 0 && (
-                    <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground/30">
-                      <HugeiconsIcon icon={BubbleChatIcon} size={28} />
-                      <p className="text-[11px]">No messages yet</p>
+                    <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground/40">
+                      <HugeiconsIcon icon={BubbleChatIcon} size={32} />
+                      <p className="text-xs">No messages yet</p>
                     </div>
                   )}
                   {chatMessages.map((msg) => {
@@ -1452,36 +1328,34 @@ export default function MeetingsPage() {
                           </AvatarFallback>
                         </Avatar>
                         <div className={cn("max-w-[75%]", isMe && "text-right")}>
-                          <p className="text-[10px] text-muted-foreground/60 mb-0.5">{isMe ? "You" : msg.userName}</p>
+                          <p className="text-[10px] text-muted-foreground mb-0.5">{isMe ? "You" : msg.userName}</p>
                           {msg.message && (
-                            <div className={cn("px-3 py-1.5 rounded-2xl text-[13px] leading-relaxed",
-                              isMe ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-muted/60 text-foreground rounded-tl-sm")}>
+                            <div className={cn("px-3 py-1.5 rounded-2xl text-sm", isMe ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-muted text-foreground rounded-tl-sm")}>
                               {msg.message}
                             </div>
                           )}
                           {msg.imageUrl && (
-                            <Image src={msg.imageUrl} alt="" width={240} height={180} className="mt-1.5 rounded-xl max-w-full object-cover" />
+                            <Image src={msg.imageUrl} alt="" width={240} height={180} className="mt-1 rounded-xl max-w-full object-cover" />
                           )}
-                          {msg.videoUrl && <video src={msg.videoUrl} controls className="mt-1.5 rounded-xl max-w-full max-h-48" />}
+                          {msg.videoUrl && <video src={msg.videoUrl} controls className="mt-1 rounded-xl max-w-full max-h-48" />}
                         </div>
                       </div>
                     )
                   })}
                   <div ref={chatEndRef} />
                 </div>
-                <div className="px-3 py-2.5 border-t border-border/30 dark:border-white/6 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-2.5">
-                  <div className="flex items-center gap-2">
+                <div className="p-3 border-t border-border/40 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-3">
+                  <div className="flex gap-2">
                     <Input
                       value={chatInput}
                       onChange={(e) => setChatInput(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendChat()}
                       placeholder="Type a message..."
-                      className="flex-1 h-8 text-xs border-border/30 bg-muted/30 focus-visible:ring-1 focus-visible:ring-primary/30"
+                      className="flex-1 h-9 text-sm"
                     />
-                    <button onClick={handleSendChat} disabled={!chatInput.trim()}
-                      className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground disabled:opacity-30 hover:bg-primary/90 transition-colors shrink-0">
+                    <Button onClick={handleSendChat} size="sm" disabled={!chatInput.trim()} className="h-9 px-3">
                       <HugeiconsIcon icon={ArrowRight01Icon} size={14} />
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -1489,60 +1363,56 @@ export default function MeetingsPage() {
 
             {activeTab === "polls" && (
               <div className="flex-1 flex flex-col min-h-0">
-                <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
+                <div className="flex-1 overflow-y-auto p-3 space-y-3">
                   {polls.length === 0 && !showCreatePoll && (
-                    <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground/30">
-                      <HugeiconsIcon icon={ChartColumnIcon} size={28} />
-                      <p className="text-[11px]">No polls yet</p>
+                    <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground/40">
+                      <HugeiconsIcon icon={ChartColumnIcon} size={32} />
+                      <p className="text-xs">No polls yet</p>
                     </div>
                   )}
                   {polls.map((poll) => {
                     const totalVotes = Object.values(poll.votes).reduce((a, b) => a + b, 0)
                     const hasVoted = myVotes.has(poll.id)
-                    const maxVotes = Math.max(...Object.values(poll.votes), 1)
                     return (
-                      <div key={poll.id} className="rounded-xl bg-muted/30 p-3 space-y-2.5">
+                      <div key={poll.id} className="rounded-xl border border-border/60 p-3 space-y-2.5">
                         <div className="flex items-start justify-between gap-2">
-                          <p className="text-xs font-semibold text-foreground leading-snug">{poll.question}</p>
-                          <span className="text-[10px] text-muted-foreground/60 whitespace-nowrap shrink-0">{totalVotes} vote{totalVotes !== 1 ? "s" : ""}</span>
+                          <p className="text-sm font-medium text-foreground">{poll.question}</p>
+                          <span className="text-[10px] text-muted-foreground whitespace-nowrap">{totalVotes} vote{totalVotes !== 1 ? "s" : ""}</span>
                         </div>
                         <div className="space-y-1.5">
                           {poll.options.map((opt, i) => {
                             const count = poll.votes[String(i)] || 0
                             const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0
-                            const isWinning = hasVoted && count === maxVotes && count > 0
                             return (
                               <button
                                 key={i}
                                 disabled={hasVoted}
                                 onClick={() => handleVotePoll(poll.id, i)}
                                 className={cn(
-                                  "relative w-full text-left px-3 py-2 rounded-lg transition-all overflow-hidden",
-                                  hasVoted ? "cursor-default bg-background/50" : "bg-background/80 hover:bg-background cursor-pointer active:scale-[0.98]",
+                                  "relative w-full text-left px-3 py-2 rounded-lg border transition-all overflow-hidden",
+                                  hasVoted ? "border-border/40 cursor-default" : "border-border/60 hover:border-primary/40 cursor-pointer",
                                 )}
                               >
                                 {hasVoted && (
-                                  <div className={cn("absolute inset-y-0 left-0 transition-all duration-500 rounded-lg",
-                                    isWinning ? "bg-primary/15" : "bg-muted/60")}
-                                    style={{ width: `${pct}%` }} />
+                                  <div className="absolute inset-y-0 left-0 bg-primary/10 transition-all duration-500" style={{ width: `${pct}%` }} />
                                 )}
-                                <div className="relative flex items-center justify-between gap-2">
-                                  <span className={cn("text-xs", hasVoted && isWinning ? "font-medium text-foreground" : "text-foreground/80")}>{opt}</span>
-                                  {hasVoted && <span className={cn("text-[10px] font-semibold tabular-nums", isWinning ? "text-primary" : "text-muted-foreground")}>{pct}%</span>}
+                                <div className="relative flex items-center justify-between">
+                                  <span className="text-xs text-foreground">{opt}</span>
+                                  {hasVoted && <span className="text-[10px] font-medium text-muted-foreground">{pct}%</span>}
                                 </div>
                               </button>
                             )
                           })}
                         </div>
-                        <p className="text-[10px] text-muted-foreground/40">by {poll.createdByName}</p>
+                        <p className="text-[10px] text-muted-foreground/60">by {poll.createdByName}</p>
                       </div>
                     )
                   })}
                   {showCreatePoll && (
-                    <div className="rounded-xl bg-muted/30 p-3 space-y-2.5">
-                      <Input value={pollQuestion} onChange={(e) => setPollQuestion(e.target.value)} placeholder="Ask a question..." className="h-8 text-xs border-border/30 bg-background/80" autoFocus />
+                    <div className="rounded-xl border border-primary/30 p-3 space-y-3">
+                      <Input value={pollQuestion} onChange={(e) => setPollQuestion(e.target.value)} placeholder="Poll question..." className="h-9 text-sm" autoFocus />
                       {pollOptions.map((opt, i) => (
-                        <div key={i} className="flex gap-1.5">
+                        <div key={i} className="flex gap-2">
                           <Input
                             value={opt}
                             onChange={(e) => {
@@ -1551,40 +1421,37 @@ export default function MeetingsPage() {
                               setPollOptions(next)
                             }}
                             placeholder={`Option ${i + 1}`}
-                            className="h-7 text-[11px] flex-1 border-border/30 bg-background/80"
+                            className="h-8 text-xs flex-1"
                           />
                           {pollOptions.length > 2 && (
-                            <button onClick={() => setPollOptions(pollOptions.filter((_, j) => j !== i))} className="w-7 h-7 rounded-md flex items-center justify-center hover:bg-muted transition-colors shrink-0">
+                            <button onClick={() => setPollOptions(pollOptions.filter((_, j) => j !== i))} className="w-8 h-8 rounded-full border border-border/40 flex items-center justify-center hover:bg-muted">
                               <HugeiconsIcon icon={Cancel01Icon} size={10} className="text-muted-foreground" />
                             </button>
                           )}
                         </div>
                       ))}
                       {pollOptions.length < 6 && (
-                        <button onClick={() => setPollOptions([...pollOptions, ""])} className="text-[11px] text-primary/80 hover:text-primary transition-colors">
+                        <button onClick={() => setPollOptions([...pollOptions, ""])} className="text-xs text-primary hover:underline">
                           + Add option
                         </button>
                       )}
-                      <div className="flex gap-1.5 pt-0.5">
-                        <button onClick={handleCreatePoll} disabled={!pollQuestion.trim() || pollOptions.filter((o) => o.trim()).length < 2}
-                          className="flex-1 h-7 rounded-lg text-[11px] font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-30 transition-colors">
-                          Create
-                        </button>
-                        <button onClick={() => setShowCreatePoll(false)}
-                          className="h-7 px-3 rounded-lg text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                      <div className="flex gap-2">
+                        <Button onClick={handleCreatePoll} size="sm" disabled={!pollQuestion.trim() || pollOptions.filter((o) => o.trim()).length < 2} className="flex-1 h-8 text-xs">
+                          Create Poll
+                        </Button>
+                        <Button onClick={() => setShowCreatePoll(false)} variant="outline" size="sm" className="h-8 text-xs">
                           Cancel
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   )}
                 </div>
-                {!showCreatePoll && isHost && (
-                  <div className="px-3 py-2.5 border-t border-border/30 dark:border-white/6 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-2.5">
-                    <button onClick={() => setShowCreatePoll(true)}
-                      className="w-full h-8 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground bg-muted/40 hover:bg-muted/60 flex items-center justify-center gap-1.5 transition-colors">
+                {!showCreatePoll && (
+                  <div className="p-3 border-t border-border/40 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-3">
+                    <Button onClick={() => setShowCreatePoll(true)} variant="outline" size="sm" className="w-full h-9 gap-1.5 text-xs">
                       <HugeiconsIcon icon={Add01Icon} size={12} />
                       Create Poll
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>
@@ -1593,188 +1460,111 @@ export default function MeetingsPage() {
         )}
 
         {/* Bottom controls dock */}
-        <div className="absolute bottom-0 left-0 right-0 z-30 flex justify-center pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-4 px-2 md:px-3 pointer-events-none">
-          <div className="pointer-events-auto flex items-center gap-0.5 md:gap-1 px-1.5 md:px-2.5 py-1.5 md:py-2 rounded-2xl bg-white/8 dark:bg-white/6 backdrop-blur-2xl border border-white/10 dark:border-white/8 shadow-2xl shadow-black/20">
-            <button onClick={toggleMute} className="flex flex-col items-center gap-0.5 px-1 md:px-2 shrink-0">
-              <div className={cn("w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
+        <div className="absolute bottom-0 left-0 right-0 z-30 flex justify-center pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-4 px-3 pointer-events-none">
+          <div className="pointer-events-auto flex items-center gap-1 px-2.5 py-2 rounded-2xl bg-white/8 dark:bg-white/6 backdrop-blur-2xl border border-white/10 dark:border-white/8 shadow-2xl shadow-black/20">
+            <button onClick={toggleMute} className="flex flex-col items-center gap-0.5 px-1.5 md:px-2">
+              <div className={cn("w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
                 isMuted ? "bg-foreground/90" : "bg-transparent")}>
-                <HugeiconsIcon icon={isMuted ? MicOff01Icon : Mic01Icon} size={16} className={cn("md:w-4.5! md:h-4.5!", isMuted ? "text-background" : "text-foreground")} />
+                <HugeiconsIcon icon={isMuted ? MicOff01Icon : Mic01Icon} size={18} className={isMuted ? "text-background" : "text-foreground"} />
               </div>
               <span className="text-[9px] text-muted-foreground font-medium hidden md:block">{isMuted ? "Unmute" : "Mute"}</span>
             </button>
 
-            <button onClick={toggleVideo} className="flex flex-col items-center gap-0.5 px-1 md:px-2 shrink-0">
-              <div className={cn("w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
+            <button onClick={toggleVideo} className="flex flex-col items-center gap-0.5 px-1.5 md:px-2">
+              <div className={cn("w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
                 isVideoOff ? "bg-foreground/90" : "bg-transparent")}>
-                <HugeiconsIcon icon={isVideoOff ? VideoOffIcon : Video01Icon} size={16} className={cn("md:w-4.5! md:h-4.5!", isVideoOff ? "text-background" : "text-foreground")} />
+                <HugeiconsIcon icon={isVideoOff ? VideoOffIcon : Video01Icon} size={18} className={isVideoOff ? "text-background" : "text-foreground"} />
               </div>
               <span className="text-[9px] text-muted-foreground font-medium hidden md:block">{isVideoOff ? "Start" : "Stop"}</span>
             </button>
 
             {!isMobile && (
               <button onClick={toggleScreenShare} disabled={!!screenSharer && !isScreenSharing}
-                className="flex flex-col items-center gap-0.5 px-2 disabled:opacity-30 shrink-0">
-                <div className={cn("w-11 h-11 rounded-full flex items-center justify-center transition-all",
+                className="flex flex-col items-center gap-0.5 px-1.5 md:px-2 disabled:opacity-30">
+                <div className={cn("w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
                   isScreenSharing ? "bg-foreground/90" : "bg-transparent")}>
                   <HugeiconsIcon icon={ComputerScreenShareIcon} size={18} className={isScreenSharing ? "text-background" : "text-foreground"} />
                 </div>
-                <span className="text-[9px] text-muted-foreground font-medium">Share</span>
+                <span className="text-[9px] text-muted-foreground font-medium hidden md:block">Share</span>
               </button>
             )}
 
             {isMobile && (
-              <button onClick={toggleLoudspeaker} className="flex flex-col items-center gap-0.5 px-1 shrink-0">
-                <div className={cn("w-9 h-9 rounded-full flex items-center justify-center transition-all",
+              <button onClick={toggleLoudspeaker} className="flex flex-col items-center gap-0.5 px-1.5">
+                <div className={cn("w-10 h-10 rounded-full flex items-center justify-center transition-all",
                   isLoudspeaker ? "bg-foreground/90" : "bg-transparent")}>
-                  <HugeiconsIcon icon={VolumeHighIcon} size={16} className={isLoudspeaker ? "text-background" : "text-foreground"} />
+                  <HugeiconsIcon icon={VolumeHighIcon} size={18} className={isLoudspeaker ? "text-background" : "text-foreground"} />
                 </div>
               </button>
             )}
 
-            <div className="w-px h-6 md:h-8 bg-white/10 dark:bg-white/6 mx-0.5 shrink-0 md:hidden" />
+            <div className="w-px h-8 bg-white/10 dark:bg-white/6 mx-0.5" />
 
-            {/* Mobile More Menu */}
-            {isMobile && (
-              <div className="relative shrink-0">
-                <button onClick={() => setShowMobileMore(!showMobileMore)} className="flex flex-col items-center gap-0.5 px-1">
-                  <div className={cn("w-9 h-9 rounded-full flex items-center justify-center transition-all",
-                    showMobileMore ? "bg-foreground/90" : "bg-transparent")}>
-                    <HugeiconsIcon icon={More02Icon} size={16} className={showMobileMore ? "text-background" : "text-foreground"} />
-                  </div>
-                </button>
-                {showMobileMore && (
-                  <div className="absolute bottom-12 right-0 rounded-2xl animate-in fade-in zoom-in-95 duration-150 bg-white/8 dark:bg-white/6 backdrop-blur-2xl border border-white/10 dark:border-white/8 shadow-2xl shadow-black/20 p-1.5">
-                    {/* Triangular arrow */}
-                    <div className="absolute -bottom-2 right-4 w-4 h-4 bg-white/8 dark:bg-white/6 backdrop-blur-2xl border-r border-b border-white/10 dark:border-white/8 rotate-45" />
-                    
-                    <div className="relative flex items-center gap-0.5">
-                      <button
-                        onClick={() => { handleToggleHand(); setShowMobileMore(false) }}
-                        className="flex flex-col items-center gap-0.5 px-1 shrink-0"
-                      >
-                        <div className={cn("w-9 h-9 rounded-full flex items-center justify-center transition-all",
-                          myHandRaised ? "bg-amber-500/20" : "bg-transparent")}>
-                          <span className={cn("text-base leading-none transition-transform", myHandRaised && "animate-bounce")}>✋</span>
-                        </div>
-                      </button>
-
-                      <button
-                        onClick={() => { setShowReactionPicker(true); setShowMobileMore(false) }}
-                        className="flex flex-col items-center gap-0.5 px-1 shrink-0"
-                      >
-                        <div className="w-9 h-9 rounded-full flex items-center justify-center bg-transparent">
-                          <span className="text-base leading-none">😊</span>
-                        </div>
-                      </button>
-
-                      <button
-                        onClick={() => { setActiveTab(activeTab === "people" ? null : "people"); setShowMobileMore(false) }}
-                        className="flex flex-col items-center gap-0.5 px-1 relative shrink-0"
-                      >
-                        <div className={cn("w-9 h-9 rounded-full flex items-center justify-center transition-all",
-                          activeTab === "people" ? "bg-foreground/90" : "bg-transparent")}>
-                          <HugeiconsIcon icon={UserGroupIcon} size={16} className={activeTab === "people" ? "text-background" : "text-foreground"} />
-                        </div>
-                        {pendingRequests.length > 0 && (
-                          <span className="absolute -top-0.5 right-0 w-4 h-4 rounded-full bg-amber-500 text-[9px] flex items-center justify-center text-white font-bold">{pendingRequests.length}</span>
-                        )}
-                      </button>
-
-                      <button
-                        onClick={() => { setActiveTab(activeTab === "chat" ? null : "chat"); setUnreadChat(0); setShowMobileMore(false) }}
-                        className="flex flex-col items-center gap-0.5 px-1 relative shrink-0"
-                      >
-                        <div className={cn("w-9 h-9 rounded-full flex items-center justify-center transition-all",
-                          activeTab === "chat" ? "bg-foreground/90" : "bg-transparent")}>
-                          <HugeiconsIcon icon={BubbleChatIcon} size={16} className={activeTab === "chat" ? "text-background" : "text-foreground"} />
-                        </div>
-                        {unreadChat > 0 && activeTab !== "chat" && (
-                          <span className="absolute -top-0.5 right-0 w-4 h-4 rounded-full bg-primary text-[9px] flex items-center justify-center text-primary-foreground font-bold">{unreadChat > 9 ? "9+" : unreadChat}</span>
-                        )}
-                      </button>
-
-                      <button
-                        onClick={() => { setActiveTab(activeTab === "polls" ? null : "polls"); setShowMobileMore(false) }}
-                        className="flex flex-col items-center gap-0.5 px-1 shrink-0"
-                      >
-                        <div className={cn("w-9 h-9 rounded-full flex items-center justify-center transition-all",
-                          activeTab === "polls" ? "bg-foreground/90" : "bg-transparent")}>
-                          <HugeiconsIcon icon={ChartColumnIcon} size={16} className={activeTab === "polls" ? "text-background" : "text-foreground"} />
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="w-px h-6 md:h-8 bg-white/10 dark:bg-white/6 mx-0.5 shrink-0 hidden md:block" />
-
-            <button onClick={handleToggleHand} className="hidden md:flex flex-col items-center gap-0.5 px-2 shrink-0">
-              <div className={cn("w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
+            <button onClick={handleToggleHand} className="flex flex-col items-center gap-0.5 px-1.5 md:px-2">
+              <div className={cn("w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
                 myHandRaised ? "bg-amber-500/20" : "bg-transparent")}>
-                <span className={cn("text-base md:text-lg leading-none transition-transform", myHandRaised && "animate-bounce")}>✋</span>
+                <HugeiconsIcon icon={WavingHand01Icon} size={18} className={cn("transition-colors", myHandRaised ? "text-amber-500" : "text-foreground", myHandRaised && "animate-bounce")} />
               </div>
               <span className="text-[9px] text-muted-foreground font-medium hidden md:block">{myHandRaised ? "Lower" : "Raise"}</span>
             </button>
 
-            <div className="relative shrink-0 hidden md:block">
-              <button onClick={() => setShowReactionPicker(!showReactionPicker)} className="flex flex-col items-center gap-0.5 px-2">
-                <div className="w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center bg-transparent">
-                  <span className="text-base md:text-lg leading-none">😊</span>
+            <div className="relative">
+              <button onClick={() => setShowReactionPicker(!showReactionPicker)} className="flex flex-col items-center gap-0.5 px-1.5 md:px-2">
+                <div className="w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center bg-transparent">
+                  <HugeiconsIcon icon={SmileIcon} size={18} className="text-foreground" />
                 </div>
                 <span className="text-[9px] text-muted-foreground font-medium hidden md:block">React</span>
               </button>
               {showReactionPicker && (
-                <div className="absolute bottom-12 md:bottom-16 left-1/2 -translate-x-1/2 flex gap-1 px-2 py-1.5 rounded-2xl animate-in fade-in zoom-in-95 duration-150 bg-background/95 backdrop-blur-xl border border-border dark:border-white/10 shadow-lg">
+                <div className="absolute bottom-14 md:bottom-16 left-1/2 -translate-x-1/2 flex gap-1 px-2 py-1.5 rounded-2xl animate-in fade-in zoom-in-95 duration-150 bg-background/95 backdrop-blur-xl border border-border dark:border-white/10 shadow-lg">
                   {REACTIONS.map((r) => (
                     <button key={r.id} onClick={() => handleReaction(r.id)}
                       className="w-9 h-9 md:w-10 md:h-10 rounded-xl flex items-center justify-center hover:bg-muted transition-colors hover:scale-110 active:scale-95"
                       title={r.label}>
-                      <span className="text-xl leading-none">{r.emoji}</span>
+                      <HugeiconsIcon icon={r.icon} size={20} className="text-foreground" />
                     </button>
                   ))}
                 </div>
               )}
             </div>
 
-            <div className="w-px h-8 bg-white/10 dark:bg-white/6 mx-0.5 shrink-0 hidden md:block" />
+            <div className="w-px h-8 bg-white/10 dark:bg-white/6 mx-0.5" />
 
-            <button onClick={() => setActiveTab(activeTab === "people" ? null : "people")} className="hidden md:flex flex-col items-center gap-0.5 px-2 relative shrink-0">
-              <div className={cn("w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
+            <button onClick={() => setActiveTab(activeTab === "people" ? null : "people")} className="flex flex-col items-center gap-0.5 px-1.5 md:px-2 relative">
+              <div className={cn("w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
                 activeTab === "people" ? "bg-foreground/90" : "bg-transparent")}>
-                <HugeiconsIcon icon={UserGroupIcon} size={16} className={cn("md:w-4.5! md:h-4.5!", activeTab === "people" ? "text-background" : "text-foreground")} />
+                <HugeiconsIcon icon={UserGroupIcon} size={18} className={activeTab === "people" ? "text-background" : "text-foreground"} />
               </div>
               {pendingRequests.length > 0 && (
-                <span className="absolute -top-0.5 right-0 w-4 h-4 rounded-full bg-amber-500 text-[9px] flex items-center justify-center text-white font-bold">{pendingRequests.length}</span>
+                <span className="absolute top-0 right-0.5 w-4 h-4 rounded-full bg-amber-500 text-[9px] flex items-center justify-center text-white font-bold">{pendingRequests.length}</span>
               )}
               <span className="text-[9px] text-muted-foreground font-medium hidden md:block">People</span>
             </button>
 
-            <button onClick={() => { setActiveTab(activeTab === "chat" ? null : "chat"); setUnreadChat(0) }} className="hidden md:flex flex-col items-center gap-0.5 px-2 relative shrink-0">
-              <div className={cn("w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
+            <button onClick={() => { setActiveTab(activeTab === "chat" ? null : "chat"); setUnreadChat(0) }} className="flex flex-col items-center gap-0.5 px-1.5 md:px-2 relative">
+              <div className={cn("w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
                 activeTab === "chat" ? "bg-foreground/90" : "bg-transparent")}>
-                <HugeiconsIcon icon={BubbleChatIcon} size={16} className={cn("md:w-4.5! md:h-4.5!", activeTab === "chat" ? "text-background" : "text-foreground")} />
+                <HugeiconsIcon icon={BubbleChatIcon} size={18} className={activeTab === "chat" ? "text-background" : "text-foreground"} />
               </div>
               {unreadChat > 0 && activeTab !== "chat" && (
-                <span className="absolute -top-0.5 right-0 w-4 h-4 rounded-full bg-primary text-[9px] flex items-center justify-center text-primary-foreground font-bold">{unreadChat > 9 ? "9+" : unreadChat}</span>
+                <span className="absolute top-0 right-0.5 w-4 h-4 rounded-full bg-primary text-[9px] flex items-center justify-center text-primary-foreground font-bold">{unreadChat > 9 ? "9+" : unreadChat}</span>
               )}
               <span className="text-[9px] text-muted-foreground font-medium hidden md:block">Chat</span>
             </button>
 
-            <button onClick={() => setActiveTab(activeTab === "polls" ? null : "polls")} className="hidden md:flex flex-col items-center gap-0.5 px-2 shrink-0">
-              <div className={cn("w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
+            <button onClick={() => setActiveTab(activeTab === "polls" ? null : "polls")} className="flex flex-col items-center gap-0.5 px-1.5 md:px-2">
+              <div className={cn("w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
                 activeTab === "polls" ? "bg-foreground/90" : "bg-transparent")}>
-                <HugeiconsIcon icon={ChartColumnIcon} size={16} className={cn("md:w-4.5! md:h-4.5!", activeTab === "polls" ? "text-background" : "text-foreground")} />
+                <HugeiconsIcon icon={ChartColumnIcon} size={18} className={activeTab === "polls" ? "text-background" : "text-foreground"} />
               </div>
               <span className="text-[9px] text-muted-foreground font-medium hidden md:block">Polls</span>
             </button>
 
-            <div className="w-px h-6 md:h-8 bg-white/10 dark:bg-white/6 mx-0.5 shrink-0" />
+            <div className="w-px h-8 bg-white/10 dark:bg-white/6 mx-0.5" />
 
-            <button onClick={handleEndMeeting} className="flex flex-col items-center gap-0.5 px-1 md:px-2 shrink-0">
-              <div className="w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center bg-red-500/85">
-                <HugeiconsIcon icon={CallEnd01Icon} size={18} className="text-white" />
+            <button onClick={handleEndMeeting} className="flex flex-col items-center gap-0.5 px-1.5 md:px-2">
+              <div className="w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center bg-red-500/85">
+                <HugeiconsIcon icon={CallEnd01Icon} size={20} className="text-white" />
               </div>
               <span className="text-[9px] text-muted-foreground font-medium hidden md:block">{isHost ? "End" : "Leave"}</span>
             </button>

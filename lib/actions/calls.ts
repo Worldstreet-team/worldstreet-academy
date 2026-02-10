@@ -91,11 +91,12 @@ export async function initiateCall(
         },
         { status: "missed", endedAt: new Date() }
       ),
-      // Also expire any globally stale ringing calls (>60s old)
+      // Also expire stale ringing calls involving this caller (>60s old)
       Call.updateMany(
         {
           status: "ringing",
           createdAt: { $lt: new Date(Date.now() - 60_000) },
+          $or: [{ callerId }, { receiverId: callerId }],
         },
         { status: "missed", endedAt: new Date() }
       ),
@@ -562,8 +563,14 @@ export async function pollIncomingCall(): Promise<{
     // Parallelize stale call expiry + incoming call query
     const staleThreshold = new Date(Date.now() - 30_000)
     const [expireResult, incomingCall] = await Promise.all([
+      // Only expire stale ringing calls where THIS user is a participant
+      // (not global — global cleanup was killing other users' active ringing calls)
       Call.updateMany(
-        { status: "ringing", createdAt: { $lt: staleThreshold } },
+        {
+          status: "ringing",
+          createdAt: { $lt: staleThreshold },
+          $or: [{ callerId: userId }, { receiverId: userId }],
+        },
         { status: "missed", endedAt: new Date() }
       ),
       Call.findOne({
@@ -575,7 +582,7 @@ export async function pollIncomingCall(): Promise<{
         .lean(),
     ])
     if (expireResult.modifiedCount > 0) {
-      console.log(`[PollIncoming] Expired ${expireResult.modifiedCount} stale calls`)
+      console.log(`[PollIncoming] Expired ${expireResult.modifiedCount} stale calls for user ${currentUser.id}`)
     }
 
     if (!incomingCall) {
@@ -611,8 +618,134 @@ export async function pollIncomingCall(): Promise<{
 }
 
 // ──────────────────────────────────────────────
+// Get active call for the current user (for reconnection after refresh)
+// Returns the ongoing call if one exists, with auth token
+// ──────────────────────────────────────────────
+
+export type ActiveCallInfo = {
+  callId: string
+  callType: CallType
+  participantId: string
+  participantName: string
+  participantAvatar: string | null
+  isIncoming: boolean
+  conversationId: string
+  authToken: string
+  answeredAt: string
+}
+
+export async function getActiveCall(): Promise<{
+  activeCall: ActiveCallInfo | null
+}> {
+  try {
+    const currentUser = await initAction()
+    if (!currentUser) return { activeCall: null }
+
+    const userId = new Types.ObjectId(currentUser.id)
+    // Only return calls that are "ongoing" (answered, not ended) and recent (< 2 hours)
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000)
+
+    const call = await Call.findOne({
+      $or: [{ callerId: userId }, { receiverId: userId }],
+      status: "ongoing",
+      answeredAt: { $gte: twoHoursAgo },
+    })
+      .sort({ answeredAt: -1 })
+      .lean()
+
+    if (!call) return { activeCall: null }
+
+    const isCaller = call.callerId.toString() === currentUser.id
+    const otherUserId = isCaller ? call.receiverId : call.callerId
+    const authToken = isCaller ? call.callerToken : call.receiverToken
+
+    if (!authToken) return { activeCall: null }
+
+    const otherUser = await User.findById(otherUserId)
+      .select("firstName lastName avatarUrl")
+      .lean()
+
+    return {
+      activeCall: {
+        callId: call._id.toString(),
+        callType: call.type,
+        participantId: otherUserId.toString(),
+        participantName: otherUser
+          ? `${otherUser.firstName} ${otherUser.lastName}`.trim()
+          : "Unknown",
+        participantAvatar: otherUser?.avatarUrl || null,
+        isIncoming: !isCaller,
+        conversationId: call.conversationId.toString(),
+        authToken,
+        answeredAt: call.answeredAt?.toISOString() || new Date().toISOString(),
+      },
+    }
+  } catch (error) {
+    console.error("Error getting active call:", error)
+    return { activeCall: null }
+  }
+}
+
+// ──────────────────────────────────────────────
+// Rejoin an active call (emit event to the other participant)
+// ──────────────────────────────────────────────
+
+export async function rejoinCall(callId: string): Promise<{
+  success: boolean
+  authToken?: string
+  error?: string
+}> {
+  try {
+    const currentUser = await initAction()
+    if (!currentUser) return { success: false, error: "Unauthorized" }
+
+    const call = await Call.findById(callId).lean()
+    if (!call) return { success: false, error: "Call not found" }
+
+    // Only allow rejoin for ongoing calls
+    if (call.status !== "ongoing") {
+      return { success: false, error: "Call is not ongoing" }
+    }
+
+    const isCaller = call.callerId.toString() === currentUser.id
+    const isReceiver = call.receiverId.toString() === currentUser.id
+    if (!isCaller && !isReceiver) {
+      return { success: false, error: "Not a participant" }
+    }
+
+    const authToken = isCaller ? call.callerToken : call.receiverToken
+    if (!authToken) return { success: false, error: "No auth token available" }
+
+    // Notify the other participant that this user has rejoined
+    const otherUserId = isCaller
+      ? call.receiverId.toString()
+      : call.callerId.toString()
+
+    const callerUser = await User.findById(call.callerId).select("firstName lastName avatarUrl").lean()
+
+    const eventPayload: CallEventPayload = {
+      type: "call:participant-rejoined",
+      callId: call._id.toString(),
+      callType: call.type,
+      callerId: call.callerId.toString(),
+      callerName: callerUser ? `${callerUser.firstName} ${callerUser.lastName}`.trim() : "",
+      callerAvatar: callerUser?.avatarUrl || null,
+      receiverId: call.receiverId.toString(),
+      conversationId: call.conversationId.toString(),
+    }
+    await emitCallEvent(otherUserId, eventPayload)
+
+    return { success: true, authToken }
+  } catch (error) {
+    console.error("Error rejoining call:", error)
+    return { success: false, error: "Failed to rejoin call" }
+  }
+}
+
+// ──────────────────────────────────────────────
 // Cleanup orphaned calls for the current user
 // Called on page load to recover from crashes, HMR, navigation, etc.
+// Only cleans STALE calls — recent ongoing calls are kept for reconnection
 // ──────────────────────────────────────────────
 
 export async function cleanupOrphanedCalls(): Promise<{
@@ -624,13 +757,24 @@ export async function cleanupOrphanedCalls(): Promise<{
 
     const userId = new Types.ObjectId(currentUser.id)
     const now = new Date()
+    // Only clean calls older than 2 hours — recent ongoing calls may be reconnectable
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000)
+    // Ringing calls are stale after 60 seconds
+    const sixtySecondsAgo = new Date(Date.now() - 60_000)
 
-    // Find ALL non-terminal calls this user is part of.
-    // If the user is loading the page, they cannot have an active call — any
-    // "ringing" or "ongoing" record is orphaned by definition.
+    // Find stale calls:
+    // - "ringing" calls older than 60s (they timed out)
+    // - "ongoing" calls older than 2h (abandoned)
     const orphanedCalls = await Call.find({
-      $or: [{ callerId: userId }, { receiverId: userId }],
-      status: { $in: ["ringing", "ongoing"] },
+      $and: [
+        { $or: [{ callerId: userId }, { receiverId: userId }] },
+        {
+          $or: [
+            { status: "ringing", createdAt: { $lt: sixtySecondsAgo } },
+            { status: "ongoing", answeredAt: { $lt: twoHoursAgo } },
+          ],
+        },
+      ],
     }).lean()
 
     let cleaned = 0

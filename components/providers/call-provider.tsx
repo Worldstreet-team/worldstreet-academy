@@ -9,8 +9,22 @@ import {
   useEffect,
   ReactNode,
 } from "react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import {
+  Call02Icon,
+  CallEnd01Icon,
+  Video01Icon,
+  WifiConnected01Icon,
+} from "@hugeicons/core-free-icons"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { VideoCall } from "@/components/messages/video-call"
-import { endCall as endCallAction, pollIncomingCall, cleanupOrphanedCalls } from "@/lib/actions/calls"
+import {
+  endCall as endCallAction,
+  pollIncomingCall,
+  cleanupOrphanedCalls,
+  getActiveCall,
+  rejoinCall,
+} from "@/lib/actions/calls"
 import { useSSEEvents } from "@/lib/hooks/use-call-events"
 import { useUser } from "@/components/providers/user-provider"
 import { callSounds } from "@/lib/call-sounds"
@@ -18,7 +32,14 @@ import { rtkClient } from "@/lib/rtk-client"
 import type { CallEventPayload, SSEEventPayload } from "@/lib/call-events"
 
 type CallType = "video" | "audio"
-type CallState = "idle" | "ringing" | "connecting" | "connected" | "ended" | "busy"
+type CallState =
+  | "idle"
+  | "ringing"
+  | "connecting"
+  | "connected"
+  | "ended"
+  | "busy"
+  | "reconnecting"
 
 type CallInfo = {
   callId: string | null
@@ -30,12 +51,18 @@ type CallInfo = {
   conversationId?: string
   /** Pre-fetched auth token for fast answer (receiver only) */
   authToken?: string
+  /** Whether this is a reconnection to an existing call */
+  isReconnection?: boolean
+  /** When the call was originally answered (for reconnection timer) */
+  originalAnsweredAt?: string
 }
 
 type CallContextType = {
   activeCall: CallInfo | null
   callState: CallState
   isMinimized: boolean
+  /** Whether the remote participant has rejoined after a disconnect */
+  remoteRejoined: boolean
   startCall: (params: {
     participantId: string
     participantName: string
@@ -70,6 +97,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const [callState, setCallState] = useState<CallState>("idle")
   const [isMinimized, setIsMinimized] = useState(false)
   const [showCallUI, setShowCallUI] = useState(false)
+  const [remoteRejoined, setRemoteRejoined] = useState(false)
   const dismissedCallsRef = useRef<Set<string>>(new Set())
 
   // Preload call sounds on mount so they're ready for instant playback
@@ -77,45 +105,85 @@ export function CallProvider({ children }: { children: ReactNode }) {
     callSounds.preload()
   }, [])
 
-  // On mount: clean up any orphaned calls from previous sessions
-  // (page refresh, HMR, crash, navigation, etc.)
+  // On mount: check for active ongoing call (reconnection), then clean stale calls
   useEffect(() => {
-    cleanupOrphanedCalls()
-      .then(({ cleaned }) => {
-        if (cleaned > 0) {
-          console.log(`[CallProvider] Cleaned ${cleaned} orphaned calls on mount`)
-        }
-      })
-      .catch(() => {})
+    let cancelled = false
 
-    // Also destroy any leftover RTK client from a previous session
-    if (rtkClient.isInRoom || rtkClient.client) {
-      console.log("[CallProvider] Destroying leftover RTK client from previous session")
-      rtkClient.destroy().catch(() => {})
+    async function checkAndCleanup() {
+      try {
+        // First, check if we have an active ongoing call to rejoin
+        const { activeCall: existingCall } = await getActiveCall()
+        if (cancelled) return
+
+        if (existingCall) {
+          console.log(
+            `[CallProvider] Found active call ${existingCall.callId} — showing reconnection UI`
+          )
+          setActiveCall({
+            callId: existingCall.callId,
+            callType: existingCall.callType,
+            participantId: existingCall.participantId,
+            participantName: existingCall.participantName,
+            participantAvatar: existingCall.participantAvatar || undefined,
+            isIncoming: existingCall.isIncoming,
+            conversationId: existingCall.conversationId,
+            authToken: existingCall.authToken,
+            isReconnection: true,
+            originalAnsweredAt: existingCall.answeredAt,
+          })
+          setCallState("reconnecting")
+          setShowCallUI(true)
+          setIsMinimized(true)
+          return // Don't clean up — this call is active
+        }
+
+        // No active call — destroy any leftover RTK client
+        // Guard: don't destroy if a call was started while getActiveCall was pending
+        const currentState = callStateRef.current
+        if (
+          currentState === "idle" &&
+          (rtkClient.isInRoom || rtkClient.client)
+        ) {
+          console.log("[CallProvider] Destroying leftover RTK client")
+          rtkClient.destroy().catch(() => {})
+        }
+
+        // Clean up only stale orphaned calls (ringing >60s, ongoing >2h)
+        const { cleaned } = await cleanupOrphanedCalls()
+        if (cleaned > 0) {
+          console.log(`[CallProvider] Cleaned ${cleaned} orphaned calls`)
+        }
+      } catch {
+        // Ignore errors
+      }
+    }
+
+    checkAndCleanup()
+    return () => {
+      cancelled = true
     }
   }, [])
 
-  // On page unload: try to end the active call so it doesn't stay stuck in DB
+  // On page unload: try to end the active call
   useEffect(() => {
     const handleBeforeUnload = () => {
       const current = activeCallRef.current
       const state = callStateRef.current
       if (!current?.callId) return
-      if (state !== "connecting" && state !== "connected" && state !== "ringing") return
+      if (
+        state !== "connecting" &&
+        state !== "connected" &&
+        state !== "ringing"
+      )
+        return
 
-      // Use sendBeacon for reliable delivery during page unload
-      // We can't use server actions here because they're async and won't complete during unload
-      // Instead, send a beacon to a lightweight API route
       try {
         const payload = JSON.stringify({ callId: current.callId })
         navigator.sendBeacon("/api/calls/end", payload)
-        console.log("[CallProvider] Sent beacon to end call", current.callId)
       } catch {
-        // Last resort: fire-and-forget server action (may not complete)
         endCallAction(current.callId).catch(() => {})
       }
 
-      // Clean up RTK client synchronously
       try {
         rtkClient.destroy().catch(() => {})
       } catch {
@@ -127,16 +195,17 @@ export function CallProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload)
   }, [])
 
-  // Ref to access latest state in the SSE callback without re-subscribing
+  // Refs for accessing latest state in callbacks
   const activeCallRef = useRef<CallInfo | null>(null)
   const callStateRef = useRef<CallState>("idle")
 
   const hasOngoingCall =
     callState === "connecting" ||
     callState === "connected" ||
-    callState === "ringing"
+    callState === "ringing" ||
+    callState === "reconnecting"
 
-  // When a user is busy, auto-close after showing the busy state briefly
+  // Auto-close busy state
   useEffect(() => {
     if (callState !== "busy") return
     callSounds.playDeclined()
@@ -149,27 +218,48 @@ export function CallProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer)
   }, [callState])
 
-  // Keep refs in sync (must be in useEffect for React 19)
+  // Keep refs in sync
   useEffect(() => {
     activeCallRef.current = activeCall
     callStateRef.current = callState
   }, [activeCall, callState])
 
-  // Handle SSE call events
+  // Handle call events via Ably
   const handleCallEvent = useCallback(
     (event: CallEventPayload) => {
-      console.log("[CallProvider] SSE event:", event.type, event.callId)
+      console.log("[CallProvider] Ably event:", event.type, event.callId)
 
       switch (event.type) {
         case "call:incoming": {
-          // Check LIVE connection state — if RTK is in a room, we're in an active call
           const isInActiveCall =
             rtkClient.isInRoom ||
-            (callStateRef.current !== "idle" && callStateRef.current !== "ended")
+            (callStateRef.current !== "idle" &&
+              callStateRef.current !== "ended" &&
+              callStateRef.current !== "reconnecting")
 
           if (isInActiveCall) {
-            console.log("[CallProvider] Already in a call (RTK.isInRoom:", rtkClient.isInRoom, "), auto-declining incoming")
-            // Auto-decline the incoming call and notify the caller they're busy
+            // If we're already ringing from the SAME caller, update to the newer call
+            // (handles React Strict Mode double-initiation + rapid re-calls)
+            const current = activeCallRef.current
+            if (
+              current &&
+              current.participantId === event.callerId &&
+              callStateRef.current === "ringing"
+            ) {
+              console.log("[CallProvider] Same caller calling again — updating to new call")
+              setActiveCall((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      callId: event.callId,
+                      authToken: event.authToken,
+                    }
+                  : prev
+              )
+              return
+            }
+
+            console.log("[CallProvider] Already in a call, auto-declining")
             ;(async () => {
               try {
                 const { declineCall } = await import("@/lib/actions/calls")
@@ -180,10 +270,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
             })()
             return
           }
-          if (dismissedCallsRef.current.has(event.callId)) {
-            console.log("[CallProvider] Call already dismissed, ignoring")
-            return
-          }
+          if (dismissedCallsRef.current.has(event.callId)) return
+
           setActiveCall({
             callId: event.callId,
             callType: event.callType,
@@ -196,16 +284,13 @@ export function CallProvider({ children }: { children: ReactNode }) {
           })
           setCallState("ringing")
           setShowCallUI(true)
-          // Incoming calls start minimized — user can tap to expand or answer from there
           setIsMinimized(true)
           break
         }
 
         case "call:cancelled": {
-          // Caller hung up before we answered — dismiss the incoming call
           const current = activeCallRef.current
           if (current?.callId === event.callId) {
-            console.log("[CallProvider] Call cancelled by caller")
             dismissedCallsRef.current.add(event.callId)
             setCallState("ended")
           }
@@ -213,10 +298,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
         }
 
         case "call:declined": {
-          // Receiver declined — notify caller
           const current = activeCallRef.current
           if (current?.callId === event.callId) {
-            console.log("[CallProvider] Call declined by receiver")
             dismissedCallsRef.current.add(event.callId)
             setCallState("ended")
           }
@@ -224,16 +307,13 @@ export function CallProvider({ children }: { children: ReactNode }) {
         }
 
         case "call:answered": {
-          // Receiver answered — the VideoCall component handles room join
-          console.log("[CallProvider] Call answered, VideoCall will handle room join")
+          console.log("[CallProvider] Call answered, VideoCall handles join")
           break
         }
 
         case "call:ended": {
-          // Call ended by the other participant
           const current = activeCallRef.current
           if (current?.callId === event.callId) {
-            console.log("[CallProvider] Call ended by remote participant")
             dismissedCallsRef.current.add(event.callId)
             setCallState("ended")
           }
@@ -241,49 +321,55 @@ export function CallProvider({ children }: { children: ReactNode }) {
         }
 
         case "call:busy": {
-          // Receiver is on another call
-          console.log("[CallProvider] Receiver is busy/on another call")
           setCallState("busy")
+          break
+        }
+
+        case "call:participant-rejoined": {
+          const current = activeCallRef.current
+          if (current?.callId === event.callId) {
+            console.log("[CallProvider] Remote participant rejoined")
+            setRemoteRejoined(true)
+            setTimeout(() => setRemoteRejoined(false), 5000)
+          }
           break
         }
       }
     },
-    [] // No deps — uses refs for latest state
+    []
   )
 
-  // Forward ALL SSE events to window so other components (meetings, etc.) can listen
-  const handleAllSSEEvents = useCallback(
+  // Forward ALL events to window for cross-component consumption
+  const handleAllEvents = useCallback(
     (event: SSEEventPayload) => {
-      // Dispatch to window for cross-component consumption
       if (typeof window !== "undefined") {
         window.dispatchEvent(
-          new CustomEvent("sse:event", { detail: event }),
+          new CustomEvent("sse:event", { detail: event })
         )
       }
-      // Handle call events locally
       if (event.type.startsWith("call:")) {
         handleCallEvent(event as CallEventPayload)
       }
     },
-    [handleCallEvent],
+    [handleCallEvent]
   )
 
-  // Connect to SSE for real-time events
-  useSSEEvents(user.id, handleAllSSEEvents)
+  // Connect to Ably for real-time events
+  useSSEEvents(user.id, handleAllEvents)
 
-  // Polling fallback for incoming calls (safety net if SSE misses an event)
+  // Polling fallback for incoming calls
   useEffect(() => {
     const poll = async () => {
-      // Check LIVE connection state — don't poll if already in a call
       if (rtkClient.isInRoom) return
-      // Only poll when idle — SSE handles events during active calls
-      if (callStateRef.current !== "idle" && callStateRef.current !== "ended") return
+      if (
+        callStateRef.current !== "idle" &&
+        callStateRef.current !== "ended"
+      )
+        return
       try {
         const result = await pollIncomingCall()
         if (result.incoming && callStateRef.current === "idle") {
-          // Check if not already dismissed
           if (dismissedCallsRef.current.has(result.incoming.callId)) return
-          console.log("[CallProvider] Fallback poll detected incoming call:", result.incoming.callId)
           setActiveCall({
             callId: result.incoming.callId,
             callType: result.incoming.callType,
@@ -296,7 +382,6 @@ export function CallProvider({ children }: { children: ReactNode }) {
           })
           setCallState("ringing")
           setShowCallUI(true)
-          // Incoming calls start minimized
           setIsMinimized(true)
         }
       } catch {
@@ -315,21 +400,14 @@ export function CallProvider({ children }: { children: ReactNode }) {
       participantAvatar?: string
       callType: CallType
     }) => {
-      // Check LIVE connection state — if RTK is in a room, we're actually in a call
-      if (rtkClient.isInRoom) {
-        console.log("[CallProvider] RTK is in a room, cannot start new call")
-        return
-      }
-      // Also check our state (for UI consistency)
+      if (rtkClient.isInRoom) return
       if (
         callStateRef.current === "connecting" ||
         callStateRef.current === "connected" ||
         callStateRef.current === "ringing"
-      ) {
-        console.log("[CallProvider] Already in a call state, ignoring startCall")
+      )
         return
-      }
-      // Instant UI update — show the call modal immediately before any network requests
+
       setActiveCall({
         callId: null,
         callType: params.callType,
@@ -341,11 +419,78 @@ export function CallProvider({ children }: { children: ReactNode }) {
       setCallState("connecting")
       setShowCallUI(true)
       setIsMinimized(false)
-      // Resume audio context on user gesture so sounds play instantly
       callSounds.resume()
     },
     []
   )
+
+  // Rejoin an active call after refresh
+  const handleRejoin = useCallback(async () => {
+    const current = activeCallRef.current
+    if (!current?.callId || !current.authToken) return
+
+    console.log("[CallProvider] Rejoining call:", current.callId)
+    setCallState("connecting")
+
+    try {
+      const result = await rejoinCall(current.callId)
+      if (!result.success) {
+        console.error("[CallProvider] Rejoin failed:", result.error)
+        // Call is no longer active — clean up
+        setActiveCall(null)
+        setCallState("idle")
+        setShowCallUI(false)
+        setIsMinimized(false)
+        return
+      }
+
+      const token = result.authToken || current.authToken
+      await rtkClient.init(token, {
+        audio: true,
+        video: current.callType === "video",
+      })
+      await rtkClient.joinRoom()
+      try {
+        await rtkClient.client?.self.enableAudio()
+      } catch {}
+      if (current.callType === "video") {
+        try {
+          await rtkClient.client?.self.enableVideo()
+        } catch {}
+      }
+
+      console.log("[CallProvider] Rejoin successful")
+      setActiveCall((prev) =>
+        prev ? { ...prev, isReconnection: false } : prev
+      )
+      // Don't set connected yet — participantJoined RTK event will do that
+      // Just keep connecting state so the UI shows progress
+    } catch (err) {
+      console.error("[CallProvider] Rejoin RTK failed:", err)
+      setActiveCall(null)
+      setCallState("idle")
+      setShowCallUI(false)
+      setIsMinimized(false)
+    }
+  }, [])
+
+  // Dismiss the reconnection banner
+  const handleDismissReconnection = useCallback(async () => {
+    const current = activeCallRef.current
+    if (current?.callId) {
+      dismissedCallsRef.current.add(current.callId)
+      try {
+        await endCallAction(current.callId)
+      } catch {}
+    }
+    try {
+      await rtkClient.leaveRoom()
+    } catch {}
+    setActiveCall(null)
+    setCallState("idle")
+    setShowCallUI(false)
+    setIsMinimized(false)
+  }, [])
 
   const endCall = useCallback(() => {
     if (activeCallRef.current?.callId) {
@@ -367,6 +512,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     setCallState("idle")
     setShowCallUI(false)
     setIsMinimized(false)
+    setRemoteRejoined(false)
   }, [])
 
   const handleClose = useCallback(() => {
@@ -379,6 +525,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     setCallState("idle")
     setShowCallUI(false)
     setIsMinimized(false)
+    setRemoteRejoined(false)
   }, [])
 
   return (
@@ -387,6 +534,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
         activeCall,
         callState,
         isMinimized,
+        remoteRejoined,
         startCall,
         endCall,
         setMinimized: setIsMinimized,
@@ -397,7 +545,18 @@ export function CallProvider({ children }: { children: ReactNode }) {
     >
       {children}
 
-      {activeCall && showCallUI && (
+      {/* Reconnection banner — shown when user refreshed during an active call */}
+      {activeCall && showCallUI && callState === "reconnecting" && (
+        <ReconnectionBanner
+          callInfo={activeCall}
+          remoteRejoined={remoteRejoined}
+          onRejoin={handleRejoin}
+          onDismiss={handleDismissReconnection}
+        />
+      )}
+
+      {/* Normal call UI */}
+      {activeCall && showCallUI && callState !== "reconnecting" && (
         <VideoCall
           open={!isMinimized}
           onClose={handleClose}
@@ -406,7 +565,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
           callerAvatar={activeCall.participantAvatar}
           isIncoming={activeCall.isIncoming}
           incomingCallId={
-            activeCall.isIncoming ? activeCall.callId || undefined : undefined
+            activeCall.isIncoming
+              ? activeCall.callId || undefined
+              : undefined
           }
           incomingAuthToken={
             activeCall.isIncoming ? activeCall.authToken : undefined
@@ -419,8 +580,109 @@ export function CallProvider({ children }: { children: ReactNode }) {
           isMinimized={isMinimized}
           onMinimize={() => setIsMinimized(true)}
           onRestore={() => setIsMinimized(false)}
+          isReconnection={activeCall.isReconnection}
+          reconnectionAuthToken={
+            activeCall.isReconnection ? activeCall.authToken : undefined
+          }
+          originalAnsweredAt={activeCall.originalAnsweredAt}
+          remoteRejoined={remoteRejoined}
         />
       )}
     </CallContext.Provider>
+  )
+}
+
+// ── Reconnection Banner Component ──
+
+function ReconnectionBanner({
+  callInfo,
+  remoteRejoined,
+  onRejoin,
+  onDismiss,
+}: {
+  callInfo: CallInfo
+  remoteRejoined: boolean
+  onRejoin: () => void
+  onDismiss: () => void
+}) {
+  const [isRejoining, setIsRejoining] = useState(false)
+
+  const getInitials = (name: string) =>
+    name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2)
+
+  const handleRejoin = async () => {
+    setIsRejoining(true)
+    await onRejoin()
+    setIsRejoining(false)
+  }
+
+  return (
+    <div className="fixed bottom-24 right-4 z-[9999] animate-in slide-in-from-bottom-4 fade-in duration-200">
+      <div className="flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl border border-border/50 bg-background">
+        <div className="relative">
+          <Avatar className="w-10 h-10">
+            <AvatarImage
+              src={callInfo.participantAvatar}
+              alt={callInfo.participantName}
+            />
+            <AvatarFallback className="text-xs">
+              {getInitials(callInfo.participantName)}
+            </AvatarFallback>
+          </Avatar>
+          {remoteRejoined && (
+            <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-green-500 border-2 border-background flex items-center justify-center">
+              <HugeiconsIcon
+                icon={WifiConnected01Icon}
+                size={8}
+                className="text-white"
+              />
+            </div>
+          )}
+        </div>
+        <div className="flex flex-col">
+          <span className="text-sm font-medium text-foreground">
+            {callInfo.participantName}
+          </span>
+          <span className="text-xs text-muted-foreground">
+            {remoteRejoined
+              ? "Participant is back"
+              : `Active ${callInfo.callType} call`}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 ml-2">
+          <button
+            onClick={onDismiss}
+            disabled={isRejoining}
+            className="w-9 h-9 rounded-full flex items-center justify-center bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50"
+          >
+            <HugeiconsIcon icon={CallEnd01Icon} size={16} />
+          </button>
+          <button
+            onClick={handleRejoin}
+            disabled={isRejoining}
+            className="h-9 px-3 rounded-full flex items-center justify-center gap-1.5 bg-green-500 text-white hover:bg-green-600 transition-colors disabled:opacity-50 text-xs font-medium"
+          >
+            {isRejoining ? (
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <>
+                <HugeiconsIcon
+                  icon={
+                    callInfo.callType === "video" ? Video01Icon : Call02Icon
+                  }
+                  size={14}
+                />
+                Rejoin
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }

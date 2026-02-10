@@ -12,6 +12,8 @@ import {
   SpeakerIcon,
   Speaker01Icon,
   MinimizeScreenIcon,
+  WifiConnected01Icon,
+  Cancel01Icon,
 } from "@hugeicons/core-free-icons"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -46,6 +48,14 @@ type VideoCallProps = {
   isMinimized?: boolean
   onMinimize?: () => void
   onRestore?: () => void
+  /** Whether this is a reconnection to an existing call */
+  isReconnection?: boolean
+  /** Auth token for reconnection (already authenticated) */
+  reconnectionAuthToken?: string
+  /** Original answered time for reconnection timer continuity */
+  originalAnsweredAt?: string
+  /** Whether the remote participant has rejoined */
+  remoteRejoined?: boolean
 }
 
 // Glassmorphic button
@@ -128,6 +138,10 @@ export function VideoCall({
   isMinimized: externalMinimized,
   onMinimize,
   onRestore,
+  isReconnection = false,
+  reconnectionAuthToken,
+  originalAnsweredAt,
+  remoteRejoined: externalRemoteRejoined = false,
 }: VideoCallProps) {
   const [callState, setCallState] = useState<CallState>(
     isIncoming ? "ringing" : "connecting"
@@ -156,6 +170,8 @@ export function VideoCall({
   const hasJoinedRoomRef = useRef(false)
   const participantLeftTimerRef = useRef<NodeJS.Timeout | null>(null)
   const isConnectedRef = useRef(false)
+  const isAnsweringRef = useRef(false)
+  const isInitiatingRef = useRef(false)
 
   // Get user for SSE subscription
   const user = useUser()
@@ -467,16 +483,18 @@ export function VideoCall({
   // ── Initiate outgoing call ──
   useEffect(() => {
     if (!open || isIncoming || callState !== "connecting" || callId) return
-    let cancelled = false
+    // Guard: prevent double-initiation (React Strict Mode fires effects twice)
+    if (isInitiatingRef.current) return
+    isInitiatingRef.current = true
 
     async function startCall() {
       if (!receiverId) {
+        isInitiatingRef.current = false
         setCallState("ended")
         return
       }
       console.log("[Caller] Initiating call to:", receiverId)
       const result = await initiateCall(receiverId, callType)
-      if (cancelled) return
       if (result.success && result.callId && result.authToken) {
         console.log("[Caller] Call created with ID:", result.callId)
         setCallId(result.callId)
@@ -494,6 +512,7 @@ export function VideoCall({
         })
       } else {
         console.log("[Caller] Failed to initiate call:", result.error)
+        isInitiatingRef.current = false
         // If the error is "busy" — show busy state instead of ended
         if (result.error === "User is on another call") {
           setCallState("busy")
@@ -504,9 +523,6 @@ export function VideoCall({
     }
 
     startCall()
-    return () => {
-      cancelled = true
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, isIncoming, callState, receiverId, callType])
 
@@ -560,11 +576,20 @@ export function VideoCall({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, isIncoming, callState, callId, callType])
 
-  // Reset state when dialog opens (but NOT when restoring from minimized)
+  // Reset state when dialog opens (but NOT when restoring from minimized or reconnecting)
   useEffect(() => {
     if (open) {
       // Guard: skip reset if already in an active/connected call (e.g. restoring from minimize)
       if (hasJoinedRoomRef.current || isConnectedRef.current) {
+        return
+      }
+      // Guard: skip reset during reconnection — the reconnection effect handles state
+      if (isReconnection) {
+        return
+      }
+      // Guard: skip reset if user is in the process of answering
+      // (handleAnswer sets this ref before calling handleRestore which changes open)
+      if (isAnsweringRef.current) {
         return
       }
       setCallState(isIncoming ? "ringing" : "connecting")
@@ -578,6 +603,7 @@ export function VideoCall({
       isEndingRef.current = false
       hasJoinedRoomRef.current = false
       isConnectedRef.current = false
+      isInitiatingRef.current = false
       authTokenRef.current = null
       remoteParticipantRef.current = null
       if (!isIncoming) setCallId(null)
@@ -585,7 +611,48 @@ export function VideoCall({
         setInternalMinimized(false)
       }
     }
-  }, [open, isIncoming, callType, externalMinimized])
+  }, [open, isIncoming, callType, externalMinimized, isReconnection])
+
+  // ── Reconnection: auto-join RTK when reconnecting to an active call ──
+  useEffect(() => {
+    if (!isReconnection || !reconnectionAuthToken) return
+    if (hasJoinedRoomRef.current || rtkClient.isInRoom) return
+
+    // Set the original start time so the timer continues from where it was
+    if (originalAnsweredAt) {
+      setCallStartTime(new Date(originalAnsweredAt))
+    }
+
+    let cancelled = false
+
+    async function reconnect() {
+      console.log("[VideoCall] Reconnection: joining RTK with existing token")
+      try {
+        await rtkClient.init(reconnectionAuthToken!, {
+          audio: true,
+          video: callType === "video",
+        })
+        if (cancelled) return
+        await rtkClient.joinRoom()
+        hasJoinedRoomRef.current = true
+        try { await rtkClient.client?.self.enableAudio() } catch {}
+        if (callType === "video") {
+          try { await rtkClient.client?.self.enableVideo() } catch {}
+        }
+        console.log("[VideoCall] Reconnection: joined room")
+        // The participantJoined RTK event will set callState to "connected"
+      } catch (err) {
+        console.error("[VideoCall] Reconnection failed:", err)
+        if (!cancelled) {
+          setCallState("ended")
+        }
+      }
+    }
+
+    reconnect()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isReconnection, reconnectionAuthToken, callType])
 
   // ── Start local camera preview immediately for video calls ──
   // Shows the user's own camera while connecting/ringing (before RTK init)
@@ -673,6 +740,7 @@ export function VideoCall({
   // ── Answer incoming call (optimized: RTK init in parallel with server action) ──
   const handleAnswer = async () => {
     if (!incomingCallId || isAnswering) return
+    isAnsweringRef.current = true
     setIsAnswering(true)
     console.log("[Receiver] Answering call ID:", incomingCallId)
     setCallState("connecting")
@@ -908,6 +976,12 @@ export function VideoCall({
               </span>
               <span className="text-xs text-muted-foreground">Call ended</span>
             </div>
+            <button
+              onClick={handleDismiss}
+              className="ml-1 w-7 h-7 rounded-full flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+            >
+              <HugeiconsIcon icon={Cancel01Icon} size={14} />
+            </button>
           </div>
         </div>
       )
@@ -920,12 +994,19 @@ export function VideoCall({
       >
         {remoteAudioElement}
         <div className="flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl border border-border/50 bg-background">
-          <Avatar className="w-10 h-10">
-            <AvatarImage src={callerAvatar} alt={callerName} />
-            <AvatarFallback className="text-xs">
-              {getInitials(callerName)}
-            </AvatarFallback>
-          </Avatar>
+          <div className="relative">
+            <Avatar className="w-10 h-10">
+              <AvatarImage src={callerAvatar} alt={callerName} />
+              <AvatarFallback className="text-xs">
+                {getInitials(callerName)}
+              </AvatarFallback>
+            </Avatar>
+            {externalRemoteRejoined && (
+              <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-green-500 border-2 border-background flex items-center justify-center">
+                <HugeiconsIcon icon={WifiConnected01Icon} size={8} className="text-white" />
+              </div>
+            )}
+          </div>
           <div className="flex flex-col">
             <span className="text-sm font-medium text-foreground">
               {callerName}
@@ -1031,6 +1112,16 @@ export function VideoCall({
           callState === "connected" && setShowControls(!showControls)
         }
       >
+        {/* Universal close button — always visible */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            handleDismiss()
+          }}
+          className="absolute top-4 right-4 z-50 w-9 h-9 rounded-full flex items-center justify-center bg-black/40 backdrop-blur-sm hover:bg-black/60 text-white/70 hover:text-white transition-all"
+        >
+          <HugeiconsIcon icon={Cancel01Icon} size={18} />
+        </button>
         {/* Background — local camera preview during ringing/connecting */}
         {callType === "video" &&
         !isVideoOff &&
@@ -1093,7 +1184,16 @@ export function VideoCall({
                 {getInitials(callerName)}
               </AvatarFallback>
             </Avatar>
-            <h3 className="text-white font-semibold text-xl">{callerName}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-white font-semibold text-xl">{callerName}</h3>
+              {externalRemoteRejoined && callState === "connected" && (
+                <HugeiconsIcon
+                  icon={WifiConnected01Icon}
+                  size={16}
+                  className="text-green-400 animate-pulse"
+                />
+              )}
+            </div>
             <p className="text-white/50 text-sm mt-1">
               {callState === "ringing" &&
                 (isIncoming ? "Incoming call..." : "Ringing...")}
@@ -1156,11 +1256,20 @@ export function VideoCall({
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div>
-              <h3 className="text-white font-semibold text-lg">
-                {callerName}
-              </h3>
-              <CallTimer startTime={callStartTime} />
+            <div className="flex items-center gap-2">
+              <div>
+                <h3 className="text-white font-semibold text-lg">
+                  {callerName}
+                </h3>
+                <CallTimer startTime={callStartTime} />
+              </div>
+              {externalRemoteRejoined && (
+                <HugeiconsIcon
+                  icon={WifiConnected01Icon}
+                  size={16}
+                  className="text-green-400 animate-pulse"
+                />
+              )}
             </div>
             <GlassButton onClick={handleMinimize}>
               <HugeiconsIcon
