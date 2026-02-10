@@ -140,6 +140,7 @@ function ParticipantTile({
   isSpeaking,
   isScreenShare,
   handRaised,
+  reactionEmoji,
   videoRef,
   className: cls,
 }: {
@@ -151,6 +152,7 @@ function ParticipantTile({
   isSpeaking?: boolean
   isScreenShare?: boolean
   handRaised?: boolean
+  reactionEmoji?: string | null
   videoRef?: React.RefObject<HTMLVideoElement | null>
   className?: string
 }) {
@@ -197,8 +199,16 @@ function ParticipantTile({
         </div>
       )}
 
-      {handRaised && (
-        <div className="absolute top-2 right-2 text-lg animate-bounce">✋</div>
+      {/* Hand raise / reaction overlay */}
+      {(handRaised || reactionEmoji) && (
+        <div className="absolute top-2 right-2 flex items-center gap-1.5 z-10">
+          {reactionEmoji && (
+            <span className="text-2xl drop-shadow-lg animate-bounce">{reactionEmoji}</span>
+          )}
+          {handRaised && (
+            <span className="text-lg animate-bounce">✋</span>
+          )}
+        </div>
       )}
 
       <div
@@ -269,11 +279,13 @@ function RemoteParticipantTile({
   participantId,
   participant,
   handRaised,
+  reactionEmoji,
   className,
 }: {
   participantId: string
   participant: { name: string; audioEnabled: boolean; videoEnabled: boolean }
   handRaised?: boolean
+  reactionEmoji?: string | null
   className?: string
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -295,6 +307,7 @@ function RemoteParticipantTile({
       isMuted={!participant.audioEnabled}
       isVideoOff={!participant.videoEnabled}
       handRaised={handRaised}
+      reactionEmoji={reactionEmoji}
       videoRef={videoRef}
       className={className}
     />
@@ -403,26 +416,6 @@ function ScreenShareView({
   )
 }
 
-/* ── Floating Reaction ───────────────────────────────────────── */
-function FloatingReaction({
-  emoji,
-  onDone,
-}: {
-  emoji: string
-  onDone: () => void
-}) {
-  useEffect(() => {
-    const t = setTimeout(onDone, 2500)
-    return () => clearTimeout(t)
-  }, [onDone])
-
-  return (
-    <div className="animate-float-up text-3xl pointer-events-none select-none">
-      {emoji}
-    </div>
-  )
-}
-
 /* ── Setup Overlay ───────────────────────────────────────────── */
 function SetupOverlay({ message }: { message: string }) {
   return (
@@ -499,7 +492,6 @@ function WaitingRoom({
    ═══════════════════════════════════════════════════════════════ */
 
 type ScreenSharer = { id: string; name: string; isLocal: boolean }
-type ReactionItem = { id: string; emoji: string; left: number }
 
 export default function MeetingsPage() {
   const user = useUser()
@@ -538,8 +530,11 @@ export default function MeetingsPage() {
   /* ── Hand-raise & reactions ── */
   const [raisedHands, setRaisedHands] = useState<Set<string>>(new Set())
   const [myHandRaised, setMyHandRaised] = useState(false)
-  const [reactions, setReactions] = useState<ReactionItem[]>([])
   const [showReactionPicker, setShowReactionPicker] = useState(false)
+
+  /* ── Per-tile reaction display (auto-clears after 3s) ── */
+  const [tileReactions, setTileReactions] = useState<Map<string, string>>(new Map())
+  const tileReactionTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
   /* ── Grid carousel ── */
   const [gridPage, setGridPage] = useState(0)
@@ -606,12 +601,19 @@ export default function MeetingsPage() {
     return () => cancelAnimationFrame(raf)
   }, [isJoined, isVideoOff])
 
-  /* ── Auto-reset grid page when participant count changes ── */
+  /* ── Reset grid page on screen share change ── */
+  const isScreenShareActive = !!screenSharer
   useEffect(() => {
-    const total = remoteParticipants.size + 1
-    const maxPage = Math.max(0, Math.ceil(total / TILES_PER_PAGE) - 1)
+    setGridPage(0)
+  }, [isScreenShareActive])
+
+  /* ── Auto-clamp grid page when participant count changes ── */
+  useEffect(() => {
+    const participantPages = Math.ceil((remoteParticipants.size + 1) / TILES_PER_PAGE)
+    const totalSlides = (screenSharer ? 1 : 0) + participantPages
+    const maxPage = Math.max(0, totalSlides - 1)
     setGridPage((prev) => Math.min(prev, maxPage))
-  }, [remoteParticipants.size])
+  }, [remoteParticipants.size, screenSharer])
 
   /* ── SSE listener for meeting events ── */
   useEffect(() => {
@@ -667,10 +669,20 @@ export default function MeetingsPage() {
           break
 
         case "meeting:reaction":
-          if (e.emoji) {
-            const id = `${Date.now()}-${Math.random()}`
-            const left = 10 + Math.random() * 80
-            setReactions((prev) => [...prev, { id, emoji: e.emoji!, left }])
+          if (e.emoji && e.userId) {
+            const uid = e.userId
+            const prevTimer = tileReactionTimers.current.get(uid)
+            if (prevTimer) clearTimeout(prevTimer)
+            setTileReactions((prev) => new Map(prev).set(uid, e.emoji!))
+            const t = setTimeout(() => {
+              setTileReactions((prev) => {
+                const next = new Map(prev)
+                next.delete(uid)
+                return next
+              })
+              tileReactionTimers.current.delete(uid)
+            }, 3000)
+            tileReactionTimers.current.set(uid, t)
           }
           break
       }
@@ -998,7 +1010,10 @@ export default function MeetingsPage() {
     setSetupMessage(null)
     setRaisedHands(new Set())
     setMyHandRaised(false)
-    setReactions([])
+    setTileReactions(new Map())
+    // Clear tile reaction timers
+    tileReactionTimers.current.forEach((t) => clearTimeout(t))
+    tileReactionTimers.current.clear()
     setGridPage(0)
     getMyMeetings().then((r) => {
       if (r.success && r.meetings) setMeetings(r.meetings)
@@ -1084,14 +1099,20 @@ export default function MeetingsPage() {
   async function handleReaction(emoji: string) {
     if (!activeMeeting) return
     setShowReactionPicker(false)
-    const id = `${Date.now()}-${Math.random()}`
-    const left = 10 + Math.random() * 80
-    setReactions((prev) => [...prev, { id, emoji, left }])
+    // Show on own tile
+    const existingTimer = tileReactionTimers.current.get(user.id)
+    if (existingTimer) clearTimeout(existingTimer)
+    setTileReactions((prev) => new Map(prev).set(user.id, emoji))
+    const timer = setTimeout(() => {
+      setTileReactions((prev) => {
+        const next = new Map(prev)
+        next.delete(user.id)
+        return next
+      })
+      tileReactionTimers.current.delete(user.id)
+    }, 3000)
+    tileReactionTimers.current.set(user.id, timer)
     await sendReaction(activeMeeting.id, emoji)
-  }
-
-  function removeReaction(id: string) {
-    setReactions((prev) => prev.filter((r) => r.id !== id))
   }
 
   function copyMeetingLink() {
@@ -1124,7 +1145,7 @@ export default function MeetingsPage() {
     const totalParticipants = remoteParticipants.size + 1
     const hasScreenShare = !!screenSharer
 
-    // Build all grid entries: self + all remote participants
+    // Build all participant entries
     const allGridEntries: Array<{ id: string; isLocal: boolean }> = [
       { id: "local", isLocal: true },
       ...Array.from(remoteParticipants.keys()).map((id) => ({
@@ -1133,19 +1154,20 @@ export default function MeetingsPage() {
       })),
     ]
 
-    // Carousel pagination
-    const totalPages = Math.ceil(allGridEntries.length / TILES_PER_PAGE)
-    const currentPage = Math.min(gridPage, Math.max(0, totalPages - 1))
-    const pageEntries = allGridEntries.slice(
-      currentPage * TILES_PER_PAGE,
-      (currentPage + 1) * TILES_PER_PAGE,
-    )
+    // Unified slides: screen share as page 0 (when active) + participant grid pages (4 per page)
+    type Slide =
+      | { type: "screenshare" }
+      | { type: "participants"; entries: typeof allGridEntries }
 
-    const gridCols = hasScreenShare
-      ? ""
-      : pageEntries.length <= 1
-        ? "grid-cols-1"
-        : "grid-cols-2"
+    const slides: Slide[] = []
+    if (hasScreenShare) slides.push({ type: "screenshare" })
+    for (let i = 0; i < allGridEntries.length; i += TILES_PER_PAGE) {
+      slides.push({ type: "participants", entries: allGridEntries.slice(i, i + TILES_PER_PAGE) })
+    }
+
+    const totalSlideCount = slides.length
+    const currentSlide = Math.min(gridPage, Math.max(0, totalSlideCount - 1))
+    const activeSlide = slides[currentSlide]
 
     return (
       <div className="flex flex-col h-dvh bg-zinc-950 relative overflow-hidden">
@@ -1159,22 +1181,6 @@ export default function MeetingsPage() {
             audioEnabled={p.audioEnabled}
           />
         ))}
-
-        {/* ── Floating reactions ── */}
-        <div className="fixed bottom-28 left-0 right-0 z-30 pointer-events-none flex flex-col items-center">
-          {reactions.map((r) => (
-            <div
-              key={r.id}
-              className="absolute"
-              style={{ left: `${r.left}%`, bottom: 0 }}
-            >
-              <FloatingReaction
-                emoji={r.emoji}
-                onDone={() => removeReaction(r.id)}
-              />
-            </div>
-          ))}
-        </div>
 
         {/* ── Pending request banner (minimal, inline) ── */}
         {isHost && pendingRequests.length > 0 && (
@@ -1487,51 +1493,26 @@ export default function MeetingsPage() {
           </div>
         )}
 
-        {/* ── Video area ── */}
+        {/* ── Video area (unified carousel) ── */}
         <div className="relative z-10 flex-1 p-3 md:p-4 overflow-hidden flex flex-col gap-2">
-          {hasScreenShare ? (
-            /* ── Screen-share layout: large share + thumbnail strip ── */
-            <>
+          <div className="relative flex-1 flex flex-col gap-2">
+            {/* Current slide */}
+            {activeSlide?.type === "screenshare" ? (
               <ScreenShareView
-                participantId={screenSharer.id}
-                participantName={screenSharer.name}
-                isLocal={screenSharer.isLocal}
+                participantId={screenSharer!.id}
+                participantName={screenSharer!.name}
+                isLocal={screenSharer!.isLocal}
               />
-              <div className="flex gap-2 overflow-x-auto pb-1 shrink-0">
-                <div className="w-32 h-24 shrink-0">
-                  <ParticipantTile
-                    name={`${user.firstName} ${user.lastName}`}
-                    avatar={user.avatarUrl}
-                    isMuted={isMuted}
-                    isVideoOff={isVideoOff}
-                    isLocal
-                    handRaised={myHandRaised}
-                    videoRef={localVideoRef}
-                    className="w-full h-full"
-                  />
-                </div>
-                {Array.from(remoteParticipants.entries()).map(([id, p]) => (
-                  <div key={id} className="w-32 h-24 shrink-0">
-                    <RemoteParticipantTile
-                      participantId={id}
-                      participant={p}
-                      handRaised={raisedHands.has(id)}
-                      className="w-full h-full"
-                    />
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            /* ── Normal grid layout with carousel pagination ── */
-            <div className="relative flex-1 flex flex-col gap-2">
+            ) : activeSlide?.type === "participants" ? (
               <div
                 className={cn(
                   "grid gap-2 md:gap-3 flex-1 auto-rows-fr",
-                  gridCols,
+                  activeSlide.entries.length <= 1
+                    ? "grid-cols-1"
+                    : "grid-cols-2",
                 )}
               >
-                {pageEntries.map((entry) =>
+                {activeSlide.entries.map((entry) =>
                   entry.isLocal ? (
                     <ParticipantTile
                       key="local"
@@ -1541,6 +1522,7 @@ export default function MeetingsPage() {
                       isVideoOff={isVideoOff}
                       isLocal
                       handRaised={myHandRaised}
+                      reactionEmoji={tileReactions.get(user.id) || null}
                       videoRef={localVideoRef}
                     />
                   ) : (
@@ -1549,79 +1531,81 @@ export default function MeetingsPage() {
                       participantId={entry.id}
                       participant={remoteParticipants.get(entry.id)!}
                       handRaised={raisedHands.has(entry.id)}
+                      reactionEmoji={tileReactions.get(entry.id) || null}
                     />
                   ),
                 )}
               </div>
+            ) : null}
 
-              {/* Carousel navigation (appears when > 4 participants) */}
-              {totalPages > 1 && (
-                <>
-                  {/* Prev / Next arrows */}
-                  <div className="absolute top-1/2 -translate-y-1/2 left-1 right-1 flex justify-between pointer-events-none z-10">
-                    <button
-                      onClick={() =>
-                        setGridPage((p) => Math.max(0, p - 1))
-                      }
-                      className={cn(
-                        "pointer-events-auto w-9 h-9 rounded-full flex items-center justify-center transition-all",
-                        currentPage <= 0
-                          ? "opacity-0 pointer-events-none"
-                          : "opacity-80 hover:opacity-100 hover:scale-110",
-                      )}
-                      style={{
-                        background: "rgba(0,0,0,0.5)",
-                        backdropFilter: "blur(8px)",
-                        border: "1px solid rgba(255,255,255,0.1)",
-                      }}
-                    >
-                      <span className="text-white text-lg font-bold leading-none">
-                        ‹
-                      </span>
-                    </button>
-                    <button
-                      onClick={() =>
-                        setGridPage((p) =>
-                          Math.min(totalPages - 1, p + 1),
-                        )
-                      }
-                      className={cn(
-                        "pointer-events-auto w-9 h-9 rounded-full flex items-center justify-center transition-all",
-                        currentPage >= totalPages - 1
-                          ? "opacity-0 pointer-events-none"
-                          : "opacity-80 hover:opacity-100 hover:scale-110",
-                      )}
-                      style={{
-                        background: "rgba(0,0,0,0.5)",
-                        backdropFilter: "blur(8px)",
-                        border: "1px solid rgba(255,255,255,0.1)",
-                      }}
-                    >
-                      <span className="text-white text-lg font-bold leading-none">
-                        ›
-                      </span>
-                    </button>
-                  </div>
+            {/* Carousel navigation */}
+            {totalSlideCount > 1 && (
+              <>
+                <div className="absolute top-1/2 -translate-y-1/2 left-1 right-1 flex justify-between pointer-events-none z-10">
+                  <button
+                    onClick={() =>
+                      setGridPage((p) => Math.max(0, p - 1))
+                    }
+                    className={cn(
+                      "pointer-events-auto w-9 h-9 rounded-full flex items-center justify-center transition-all",
+                      currentSlide <= 0
+                        ? "opacity-0 pointer-events-none"
+                        : "opacity-80 hover:opacity-100 hover:scale-110",
+                    )}
+                    style={{
+                      background: "rgba(0,0,0,0.5)",
+                      backdropFilter: "blur(8px)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                    }}
+                  >
+                    <span className="text-white text-lg font-bold leading-none">
+                      ‹
+                    </span>
+                  </button>
+                  <button
+                    onClick={() =>
+                      setGridPage((p) =>
+                        Math.min(totalSlideCount - 1, p + 1),
+                      )
+                    }
+                    className={cn(
+                      "pointer-events-auto w-9 h-9 rounded-full flex items-center justify-center transition-all",
+                      currentSlide >= totalSlideCount - 1
+                        ? "opacity-0 pointer-events-none"
+                        : "opacity-80 hover:opacity-100 hover:scale-110",
+                    )}
+                    style={{
+                      background: "rgba(0,0,0,0.5)",
+                      backdropFilter: "blur(8px)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                    }}
+                  >
+                    <span className="text-white text-lg font-bold leading-none">
+                      ›
+                    </span>
+                  </button>
+                </div>
 
-                  {/* Dot indicators */}
-                  <div className="flex gap-1.5 justify-center py-1">
-                    {Array.from({ length: totalPages }).map((_, i) => (
-                      <button
-                        key={i}
-                        onClick={() => setGridPage(i)}
-                        className={cn(
-                          "h-1.5 rounded-full transition-all duration-200",
-                          i === currentPage
-                            ? "bg-white w-4"
-                            : "bg-white/30 hover:bg-white/50 w-1.5",
-                        )}
-                      />
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
+                {/* Dot indicators — green dot for screen share slide */}
+                <div className="flex gap-1.5 justify-center py-1">
+                  {slides.map((slide, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setGridPage(i)}
+                      className={cn(
+                        "h-1.5 rounded-full transition-all duration-200",
+                        i === currentSlide
+                          ? slide.type === "screenshare"
+                            ? "bg-emerald-400 w-4"
+                            : "bg-white w-4"
+                          : "bg-white/30 hover:bg-white/50 w-1.5",
+                      )}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         {/* ── Bottom controls ── */}
@@ -1660,11 +1644,12 @@ export default function MeetingsPage() {
             />
           </GlassButton>
 
-          {/* Screen share — available for everyone */}
+          {/* Screen share — disabled when someone else is sharing */}
           <GlassButton
             onClick={toggleScreenShare}
             active={isScreenSharing}
             label="Share"
+            disabled={!!screenSharer && !isScreenSharing}
           >
             <HugeiconsIcon
               icon={ComputerScreenShareIcon}
