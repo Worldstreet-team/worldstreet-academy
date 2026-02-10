@@ -38,6 +38,7 @@ import {
   searchUsers,
   getOrCreateConversation,
   getRecentUsers,
+  markMessagesAsRead,
   type ConversationWithDetails,
   type MessageWithDetails,
   type UserSearchResult,
@@ -101,6 +102,13 @@ export default function MessagesPage() {
         setMessages(result.messages)
       }
       setIsLoadingMessages(false)
+      // Mark as read and emit read receipts to sender
+      markMessagesAsRead(selectedId).then(() => {
+        // Refresh conversations to update unread counts
+        getConversations().then((r) => {
+          if (r.success && r.conversations) setConversations(r.conversations)
+        })
+      })
     }
     loadMessages()
   }, [selectedId])
@@ -133,8 +141,23 @@ export default function MessagesPage() {
           if (prev.some((m) => m.id === event.messageId)) return prev
           return [...prev, { ...newMsg, isNew: true } as OptimisticMessage & { isNew?: boolean }]
         })
+        // Auto-mark as read since the conversation is open
+        markMessagesAsRead(currentConvId)
       }
       // Always refresh conversations for unread counts
+      getConversations().then((result) => {
+        if (result.success && result.conversations) {
+          setConversations(result.conversations)
+        }
+      })
+    } else if (event.type === "message:read") {
+      // Update read receipts on own messages when the other user reads them
+      if (event.conversationId === selectedIdRef.current) {
+        setMessages((prev) => prev.map((m) => 
+          m.isOwn && !m.isRead ? { ...m, isRead: true } : m
+        ))
+      }
+      // Refresh conversations to update unread counts
       getConversations().then((result) => {
         if (result.success && result.conversations) {
           setConversations(result.conversations)

@@ -137,3 +137,21 @@ export async function emitEventToMany(
 
 // Backwards-compat alias
 export const emitCallEventToMany = emitEventToMany
+
+/**
+ * Create an Ably token for client-side use.
+ * The token is scoped to subscribe on the user's channel only.
+ */
+export async function createAblyToken(
+  userId: string
+): Promise<Ably.TokenDetails> {
+  const ably = getAblyRest()
+  const tokenRequest = await ably.auth.createTokenRequest({
+    clientId: userId,
+    capability: { [`user:${userId}`]: ["subscribe"] },
+    ttl: 60 * 60 * 1000, // 1 hour
+  })
+  // Exchange the token request for an actual token
+  const token = await ably.auth.requestToken(tokenRequest)
+  return token
+}

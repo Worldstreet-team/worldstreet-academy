@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react"
 import * as Ably from "ably"
 import type { CallEventPayload, MessageEventPayload, SSEEventPayload } from "@/lib/call-events"
+import { getAblyTokenAction } from "@/lib/actions/ably"
 
 type RealtimeEventHandler = (event: SSEEventPayload) => void
 
@@ -11,13 +12,16 @@ let _ablyClient: Ably.Realtime | null = null
 
 function getAblyClient(): Ably.Realtime {
   if (!_ablyClient) {
-    const key = process.env.NEXT_PUBLIC_ABLY_KEY
-    if (!key) {
-      throw new Error("[Ably] NEXT_PUBLIC_ABLY_KEY is not set")
-    }
     _ablyClient = new Ably.Realtime({
-      key,
-      // Auto-reconnect with exponential backoff (built-in)
+      authCallback: async (_data, callback) => {
+        try {
+          const tokenDetails = await getAblyTokenAction()
+          callback(null, tokenDetails)
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Token request failed"
+          callback({ message: msg, name: "AuthError", code: 40000, statusCode: 500 }, null)
+        }
+      },
       disconnectedRetryTimeout: 1000,
       suspendedRetryTimeout: 5000,
     })

@@ -82,9 +82,10 @@ export async function createMeeting(
       title,
       description,
       hostId: new Types.ObjectId(currentUser.id),
-      status: "waiting",
+      status: "active",
       meetingId: rtkMeetingId,
       hostToken: hostParticipant.authToken,
+      startedAt: new Date(),
       participants: [
         {
           userId: new Types.ObjectId(currentUser.id),
@@ -117,6 +118,7 @@ export async function createMeeting(
         maxParticipants: 50,
         settings: serializeSettings(meeting.settings),
         createdAt: meeting.createdAt.toISOString(),
+        startedAt: meeting.startedAt?.toISOString(),
       },
     }
   } catch (error) {
@@ -761,6 +763,92 @@ export async function removeFromStage(
 
 // ── Raise / lower hand ──
 
+// ── Meeting history types ──
+
+export type MeetingHistoryEntry = {
+  id: string
+  title: string
+  hostName: string
+  hostAvatar: string | null
+  wasHost: boolean
+  status: MeetingStatus
+  participantCount: number
+  startedAt: string | null
+  endedAt: string | null
+  duration: number | null // seconds
+  createdAt: string
+}
+
+// ── Get meeting history (ended meetings) ──
+
+export async function getMeetingHistory(): Promise<{
+  success: boolean
+  meetings?: MeetingHistoryEntry[]
+  error?: string
+}> {
+  try {
+    await connectDB()
+    const currentUser = await getCurrentUser()
+    if (!currentUser) return { success: false, error: "Unauthorized" }
+
+    const userId = new Types.ObjectId(currentUser.id)
+
+    const meetings = await Meeting.find({
+      $or: [
+        { hostId: userId },
+        {
+          "participants": {
+            $elemMatch: {
+              userId,
+              status: { $in: ["admitted", "left"] },
+            },
+          },
+        },
+      ],
+      status: "ended",
+    })
+      .sort({ endedAt: -1, createdAt: -1 })
+      .limit(50)
+      .lean()
+
+    const hostIds = [...new Set(meetings.map((m) => m.hostId.toString()))]
+    const hosts = await User.find({ _id: { $in: hostIds } })
+      .select("firstName lastName avatarUrl")
+      .lean()
+    const hostMap = new Map(hosts.map((h) => [h._id.toString(), h]))
+
+    return {
+      success: true,
+      meetings: meetings.map((m) => {
+        const host = hostMap.get(m.hostId.toString())
+        const isHost = m.hostId.toString() === currentUser.id
+        const duration =
+          m.startedAt && m.endedAt
+            ? Math.floor((new Date(m.endedAt).getTime() - new Date(m.startedAt).getTime()) / 1000)
+            : m.endedAt && m.createdAt
+              ? Math.floor((new Date(m.endedAt).getTime() - new Date(m.createdAt).getTime()) / 1000)
+              : null
+        return {
+          id: m._id.toString(),
+          title: m.title,
+          hostName: host ? `${host.firstName} ${host.lastName}`.trim() : "Unknown",
+          hostAvatar: host?.avatarUrl || null,
+          wasHost: isHost,
+          status: m.status,
+          participantCount: m.participants.filter((p) => p.status === "admitted" || p.status === "left").length,
+          startedAt: m.startedAt?.toISOString() || null,
+          endedAt: m.endedAt?.toISOString() || null,
+          duration,
+          createdAt: m.createdAt.toISOString(),
+        }
+      }),
+    }
+  } catch (error) {
+    console.error("Error fetching meeting history:", error)
+    return { success: false, error: "Failed to fetch meeting history" }
+  }
+}
+
 export async function toggleHandRaise(
   meetingId: string,
   raised: boolean
@@ -783,13 +871,14 @@ export async function toggleHandRaise(
       userAvatar: currentUser.avatarUrl,
     }
 
-    // Send to all admitted participants so everyone sees the hand
+    // Send to all admitted participants so everyone sees the hand (excluding self)
     const participantIds = meeting.participants
       .filter((p) => p.status === "admitted" && p.userId.toString() !== currentUser.id)
       .map((p) => p.userId.toString())
-    // Include host
-    if (!participantIds.includes(meeting.hostId.toString())) {
-      participantIds.push(meeting.hostId.toString())
+    // Include host only if not the current user and not already in list
+    const hostId = meeting.hostId.toString()
+    if (hostId !== currentUser.id && !participantIds.includes(hostId)) {
+      participantIds.push(hostId)
     }
     await emitEventToMany(participantIds, eventPayload)
 

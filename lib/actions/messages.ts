@@ -77,11 +77,12 @@ export async function getConversations(): Promise<{
           (p) => p._id.toString() !== currentUser.id
         )
 
-        // Count unread messages
+        // Count unread messages (exclude call event system messages)
         const unreadCount = await Message.countDocuments({
           conversationId: conv._id,
           receiverId: userId,
           isRead: false,
+          content: { $not: /^CALL_EVENT:/ },
         })
 
         return {
@@ -368,10 +369,35 @@ export async function markMessagesAsRead(conversationId: string): Promise<{
     const userId = new Types.ObjectId(currentUser.id)
     const convId = new Types.ObjectId(conversationId)
 
+    // Find unread messages to know who to notify
+    const unreadMessages = await Message.find(
+      { conversationId: convId, receiverId: userId, isRead: false }
+    ).select("senderId").lean()
+
+    if (unreadMessages.length === 0) return { success: true }
+
     await Message.updateMany(
       { conversationId: convId, receiverId: userId, isRead: false },
       { isRead: true }
     )
+
+    // Emit message:read event to senders so their UI updates read receipts
+    const senderIds = [...new Set(unreadMessages.map((m) => m.senderId.toString()))]
+    for (const senderId of senderIds) {
+      if (senderId !== currentUser.id) {
+        await emitEvent(senderId, {
+          type: "message:read",
+          messageId: "",
+          conversationId,
+          senderId: currentUser.id,
+          senderName: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
+          senderAvatar: currentUser.avatarUrl || null,
+          content: "",
+          messageType: "text",
+          timestamp: new Date().toISOString(),
+        })
+      }
+    }
 
     return { success: true }
   } catch (error) {
@@ -398,6 +424,7 @@ export async function getTotalUnreadCount(): Promise<{
     const count = await Message.countDocuments({
       receiverId: userId,
       isRead: false,
+      content: { $not: /^CALL_EVENT:/ },
     })
 
     return { success: true, count }

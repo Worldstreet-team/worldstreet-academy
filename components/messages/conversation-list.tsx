@@ -182,23 +182,24 @@ export function ConversationList({
                     <span className={cn("font-medium text-sm truncate", c.unread > 0 && "font-semibold")}>
                       {c.name}
                     </span>
-                    <span className="text-xs text-muted-foreground shrink-0">
-                      {formatTime(c.timestamp)}
-                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-[11px] text-muted-foreground">
+                        {formatTime(c.timestamp)}
+                      </span>
+                      {c.unread > 0 && (
+                        <div className="h-5 min-w-5 px-1.5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-medium">
+                          {c.unread > 99 ? "99+" : c.unread}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <p className={cn(
-                    "text-sm truncate",
+                    "text-sm truncate mt-0.5",
                     c.unread > 0 ? "text-foreground" : "text-muted-foreground"
                   )}>
                     {getMessagePreview(c)}
                   </p>
                 </div>
-
-                {c.unread > 0 && (
-                  <div className="h-5 min-w-5 px-1.5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-medium shrink-0">
-                    {c.unread > 99 ? "99+" : c.unread}
-                  </div>
-                )}
               </motion.button>
             ))}
               </AnimatePresence>

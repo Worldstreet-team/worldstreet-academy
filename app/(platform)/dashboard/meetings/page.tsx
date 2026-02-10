@@ -17,6 +17,8 @@ import {
   UserGroupIcon,
   Link01Icon,
   Loading03Icon,
+  Clock01Icon,
+  ArrowRight01Icon,
 } from "@hugeicons/core-free-icons"
 import { Topbar } from "@/components/platform/topbar"
 import { Button } from "@/components/ui/button"
@@ -38,6 +40,7 @@ import {
   joinMeeting,
   getMyMeetings,
   getMeetingDetails,
+  getMeetingHistory,
   endMeeting as endMeetingAction,
   leaveMeeting,
   admitParticipant,
@@ -46,7 +49,15 @@ import {
   sendReaction,
   type MeetingWithDetails,
   type MeetingParticipantDetails,
+  type MeetingHistoryEntry,
 } from "@/lib/actions/meetings"
+import {
+  playMeetingCreating,
+  playMeetingJoined,
+  playScreenShare,
+  playHandRaise,
+  playReaction,
+} from "@/lib/sounds"
 
 /* ═══════════════════════════════════════════════════════════════
    CONSTANTS
@@ -77,32 +88,25 @@ function GlassButton({
   disabled?: boolean
   className?: string
 }) {
-  const bg = {
-    default: active ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.12)",
-    danger: "rgba(239,68,68,0.85)",
-    success: "rgba(34,197,94,0.85)",
-  }
   return (
     <div className="flex flex-col items-center gap-1">
       <button
         onClick={onClick}
         disabled={disabled}
         className={cn(
-          "w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center transition-all duration-200",
+          "w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center transition-all duration-200 backdrop-blur-xl border",
           "hover:scale-105 active:scale-95 disabled:opacity-40 disabled:pointer-events-none",
+          variant === "danger" && "bg-red-500/85 border-red-500/20",
+          variant === "success" && "bg-emerald-500/85 border-emerald-500/20",
+          variant === "default" && active && "bg-foreground/90 border-foreground/20",
+          variant === "default" && !active && "bg-black/8 dark:bg-white/12 border-black/5 dark:border-white/10",
           className,
         )}
-        style={{
-          background: bg[variant],
-          backdropFilter: "blur(16px)",
-          WebkitBackdropFilter: "blur(16px)",
-          border: "1px solid rgba(255,255,255,0.1)",
-        }}
       >
         {children}
       </button>
       {label && (
-        <span className="text-[10px] text-white/50 font-medium hidden md:block">{label}</span>
+        <span className="text-[10px] text-muted-foreground font-medium hidden md:block">{label}</span>
       )}
     </div>
   )
@@ -123,7 +127,7 @@ function MeetingTimer({ startTime }: { startTime: Date | null }) {
   const m = Math.floor((elapsed % 3600) / 60)
   const s = elapsed % 60
   return (
-    <span className="tabular-nums text-sm font-medium text-white/70">
+    <span className="tabular-nums text-sm font-medium text-muted-foreground">
       {h > 0 && `${h}:`}
       {String(m).padStart(2, "0")}:{String(s).padStart(2, "0")}
     </span>
@@ -166,16 +170,11 @@ function ParticipantTile({
   return (
     <div
       className={cn(
-        "relative rounded-2xl overflow-hidden flex items-center justify-center transition-all duration-300",
+        "relative rounded-2xl overflow-hidden flex items-center justify-center transition-all duration-300 backdrop-blur-xl border",
+        "bg-white/80 dark:bg-zinc-900/70 border-black/5 dark:border-white/8",
         isSpeaking && "ring-2 ring-emerald-400/60 ring-offset-1 ring-offset-transparent",
         cls,
       )}
-      style={{
-        background: "rgba(30,30,35,0.7)",
-        backdropFilter: "blur(20px)",
-        WebkitBackdropFilter: "blur(20px)",
-        border: "1px solid rgba(255,255,255,0.08)",
-      }}
     >
       {!isVideoOff && videoRef ? (
         <video
@@ -192,7 +191,7 @@ function ParticipantTile({
         <div className="flex flex-col items-center gap-2">
           <Avatar className="w-16 h-16 ring-2 ring-white/10">
             {avatar && <AvatarImage src={avatar} alt={name} />}
-            <AvatarFallback className="text-xl bg-white/10 text-white/80">
+            <AvatarFallback className="text-xl bg-black/5 dark:bg-white/10 text-foreground/80">
               {initials}
             </AvatarFallback>
           </Avatar>
@@ -212,10 +211,7 @@ function ParticipantTile({
       )}
 
       <div
-        className="absolute bottom-0 left-0 right-0 px-3 py-2 flex items-center justify-between"
-        style={{
-          background: "linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 100%)",
-        }}
+        className="absolute bottom-0 left-0 right-0 px-3 py-2 flex items-center justify-between bg-black/40 dark:bg-black/50"
       >
         <span className="text-xs font-medium text-white truncate">
           {isLocal ? "You" : name}
@@ -379,12 +375,7 @@ function ScreenShareView({
 
   return (
     <div
-      className="relative flex-1 rounded-2xl overflow-hidden flex items-center justify-center min-h-0"
-      style={{
-        background: "rgba(0,0,0,0.6)",
-        backdropFilter: "blur(20px)",
-        border: "1px solid rgba(255,255,255,0.08)",
-      }}
+      className="relative flex-1 rounded-2xl overflow-hidden flex items-center justify-center min-h-0 bg-black/80 dark:bg-black/60 backdrop-blur-xl border border-black/10 dark:border-white/8"
     >
       <video
         ref={videoRef}
@@ -394,10 +385,7 @@ function ScreenShareView({
         className="w-full h-full object-contain"
       />
       <div
-        className="absolute bottom-0 left-0 right-0 px-4 py-2"
-        style={{
-          background: "linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%)",
-        }}
+        className="absolute bottom-0 left-0 right-0 px-4 py-2 bg-black/60"
       >
         <div className="flex items-center gap-2">
           <HugeiconsIcon
@@ -419,22 +407,17 @@ function ScreenShareView({
 /* ── Setup Overlay ───────────────────────────────────────────── */
 function SetupOverlay({ message }: { message: string }) {
   return (
-    <div className="fixed inset-0 z-50 bg-zinc-950/90 flex flex-col items-center justify-center gap-5">
+    <div className="absolute inset-0 z-50 bg-background/95 flex flex-col items-center justify-center gap-5 rounded-inherit">
       <div
-        className="w-20 h-20 rounded-3xl flex items-center justify-center"
-        style={{
-          background: "rgba(255,255,255,0.06)",
-          backdropFilter: "blur(20px)",
-          border: "1px solid rgba(255,255,255,0.08)",
-        }}
+        className="w-16 h-16 rounded-2xl flex items-center justify-center bg-muted border border-border"
       >
         <HugeiconsIcon
           icon={Loading03Icon}
-          size={32}
-          className="text-white/70 animate-spin"
+          size={28}
+          className="text-muted-foreground animate-spin"
         />
       </div>
-      <p className="text-white/70 text-sm font-medium">{message}</p>
+      <p className="text-muted-foreground text-sm font-medium">{message}</p>
     </div>
   )
 }
@@ -448,29 +431,23 @@ function WaitingRoom({
   onCancel: () => void
 }) {
   return (
-    <div className="fixed inset-0 z-50 bg-zinc-950 flex flex-col items-center justify-center">
-      <div className="absolute inset-0 bg-linear-to-br from-zinc-900 via-zinc-950 to-black" />
+    <div className="absolute inset-0 z-50 bg-background flex flex-col items-center justify-center rounded-inherit">
       <div className="relative z-10 flex flex-col items-center gap-8">
         <div className="relative">
-          <div className="absolute inset-0 w-28 h-28 rounded-full bg-emerald-500/10 animate-ping" />
+          <div className="absolute inset-0 w-24 h-24 rounded-full bg-emerald-500/10 animate-ping" />
           <div
-            className="w-28 h-28 rounded-full flex items-center justify-center"
-            style={{
-              background: "rgba(255,255,255,0.06)",
-              backdropFilter: "blur(20px)",
-              border: "1px solid rgba(255,255,255,0.08)",
-            }}
+            className="w-24 h-24 rounded-full flex items-center justify-center bg-muted border border-border"
           >
             <HugeiconsIcon
               icon={Loading03Icon}
-              size={36}
-              className="text-white/50 animate-spin"
+              size={32}
+              className="text-muted-foreground animate-spin"
             />
           </div>
         </div>
         <div className="text-center space-y-2">
-          <h2 className="text-white text-xl font-semibold">{meetingTitle}</h2>
-          <p className="text-white/40 text-sm">
+          <h2 className="text-foreground text-lg font-semibold">{meetingTitle}</h2>
+          <p className="text-muted-foreground text-sm">
             Waiting for the host to let you in…
           </p>
         </div>
@@ -478,7 +455,7 @@ function WaitingRoom({
           variant="outline"
           size="sm"
           onClick={onCancel}
-          className="border-white/10 text-white/60 hover:text-white hover:border-white/20 bg-white/5"
+          className="border-border text-muted-foreground hover:text-foreground hover:border-border bg-muted"
         >
           Cancel
         </Button>
@@ -504,6 +481,8 @@ export default function MeetingsPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [newTitle, setNewTitle] = useState("")
   const [isCreating, setIsCreating] = useState(false)
+  const [meetingHistory, setMeetingHistory] = useState<MeetingHistoryEntry[]>([])
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true)
 
   /* ── Active meeting state ── */
   const [activeMeeting, setActiveMeeting] = useState<MeetingWithDetails | null>(
@@ -521,7 +500,7 @@ export default function MeetingsPage() {
     MeetingParticipantDetails[]
   >([])
   const [remoteParticipants, setRemoteParticipants] = useState<
-    Map<string, { name: string; audioEnabled: boolean; videoEnabled: boolean }>
+    Map<string, { name: string; audioEnabled: boolean; videoEnabled: boolean; userId?: string }>
   >(new Map())
   const [isJoined, setIsJoined] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
@@ -572,6 +551,11 @@ export default function MeetingsPage() {
       if (cancelled) return
       if (r.success && r.meetings) setMeetings(r.meetings)
       setIsLoadingMeetings(false)
+    })
+    getMeetingHistory().then((r) => {
+      if (cancelled) return
+      if (r.success && r.meetings) setMeetingHistory(r.meetings)
+      setIsLoadingHistory(false)
     })
     return () => {
       cancelled = true
@@ -658,6 +642,7 @@ export default function MeetingsPage() {
 
         case "meeting:hand-raised":
           setRaisedHands((prev) => new Set(prev).add(e.userId))
+          playHandRaise()
           break
 
         case "meeting:hand-lowered":
@@ -670,6 +655,7 @@ export default function MeetingsPage() {
 
         case "meeting:reaction":
           if (e.emoji && e.userId) {
+            playReaction()
             const uid = e.userId
             const prevTimer = tileReactionTimers.current.get(uid)
             if (prevTimer) clearTimeout(prevTimer)
@@ -709,6 +695,7 @@ export default function MeetingsPage() {
         audioEnabled: boolean
         videoEnabled: boolean
         screenShareEnabled?: boolean
+        customParticipantId?: string
       }> = []
       if (typeof joined.toArray === "function") {
         existing.push(...joined.toArray())
@@ -721,13 +708,14 @@ export default function MeetingsPage() {
       if (existing.length > 0) {
         const map = new Map<
           string,
-          { name: string; audioEnabled: boolean; videoEnabled: boolean }
+          { name: string; audioEnabled: boolean; videoEnabled: boolean; userId?: string }
         >()
         for (const p of existing) {
           map.set(p.id, {
             name: p.name,
             audioEnabled: p.audioEnabled,
             videoEnabled: p.videoEnabled,
+            userId: p.customParticipantId,
           })
           if (p.screenShareEnabled) {
             setScreenSharer({ id: p.id, name: p.name, isLocal: false })
@@ -748,6 +736,7 @@ export default function MeetingsPage() {
           name: p.name,
           audioEnabled: p.audioEnabled,
           videoEnabled: p.videoEnabled,
+          userId: p.customParticipantId,
         })
         return next
       })
@@ -774,6 +763,7 @@ export default function MeetingsPage() {
             name: p.name || "Participant",
             audioEnabled,
             videoEnabled: false,
+            userId: p.customParticipantId,
           })
         }
         const next = new Map(prev)
@@ -792,6 +782,7 @@ export default function MeetingsPage() {
             name: p.name || "Participant",
             audioEnabled: false,
             videoEnabled,
+            userId: p.customParticipantId,
           })
         }
         const next = new Map(prev)
@@ -804,6 +795,7 @@ export default function MeetingsPage() {
     const handleScreenShareUpdate = (p: any) => {
       if (p.screenShareEnabled) {
         setScreenSharer({ id: p.id, name: p.name, isLocal: false })
+        playScreenShare()
       } else {
         setScreenSharer((prev) => (prev?.id === p.id ? null : prev))
       }
@@ -818,6 +810,7 @@ export default function MeetingsPage() {
           name: `${user.firstName} ${user.lastName}`,
           isLocal: true,
         })
+        playScreenShare()
       } else {
         setIsScreenSharing(false)
         setScreenSharer((prev) => (prev?.isLocal ? null : prev))
@@ -874,6 +867,7 @@ export default function MeetingsPage() {
         await rtkClient.joinRoom()
         setIsJoined(true)
         setSetupMessage(null)
+        playMeetingJoined()
 
         if (!activeMeetingRef.current && meetingId) {
           const details = await getMeetingDetails(meetingId)
@@ -929,12 +923,17 @@ export default function MeetingsPage() {
     setIsCreating(true)
     setShowCreate(false)
     setSetupMessage("Setting up your meeting...")
+    playMeetingCreating()
 
     const result = await createMeeting(newTitle.trim())
     if (result.success && result.meeting && result.authToken) {
       setNewTitle("")
       setActiveMeeting(result.meeting)
-      setMeetingStartTime(new Date())
+      setMeetingStartTime(
+        result.meeting.startedAt
+          ? new Date(result.meeting.startedAt)
+          : new Date(),
+      )
       await joinRTKAndSetup(result.authToken)
     } else {
       setSetupMessage(null)
@@ -1018,6 +1017,9 @@ export default function MeetingsPage() {
     getMyMeetings().then((r) => {
       if (r.success && r.meetings) setMeetings(r.meetings)
     })
+    getMeetingHistory().then((r) => {
+      if (r.success && r.meetings) setMeetingHistory(r.meetings)
+    })
   }
 
   /* ── Media controls ── */
@@ -1093,12 +1095,14 @@ export default function MeetingsPage() {
     if (!activeMeeting) return
     const next = !myHandRaised
     setMyHandRaised(next)
+    if (next) playHandRaise()
     await toggleHandRaise(activeMeeting.id, next)
   }
 
   async function handleReaction(emoji: string) {
     if (!activeMeeting) return
     setShowReactionPicker(false)
+    playReaction()
     // Show on own tile
     const existingTimer = tileReactionTimers.current.get(user.id)
     if (existingTimer) clearTimeout(existingTimer)
@@ -1121,20 +1125,6 @@ export default function MeetingsPage() {
     navigator.clipboard.writeText(link)
     setCopiedLink(true)
     setTimeout(() => setCopiedLink(false), 2000)
-  }
-
-  /* ═══════════════════════════════════════════════════════════
-     RENDER: LOADING / WAITING
-     ═══════════════════════════════════════════════════════════ */
-
-  if (setupMessage) return <SetupOverlay message={setupMessage} />
-  if (waitingForApproval) {
-    return (
-      <WaitingRoom
-        meetingTitle={waitingForApproval}
-        onCancel={() => setWaitingForApproval(null)}
-      />
-    )
   }
 
   /* ═══════════════════════════════════════════════════════════
@@ -1170,10 +1160,9 @@ export default function MeetingsPage() {
     const activeSlide = slides[currentSlide]
 
     return (
-      <div className="flex flex-col h-dvh bg-zinc-950 relative overflow-hidden">
+      <div className="flex flex-col h-dvh bg-neutral-100 dark:bg-zinc-950 relative overflow-hidden">
         {/* Hide the platform bottom nav when in active meeting */}
         <style>{`nav.safe-area-bottom { display: none !important; }`}</style>
-        <div className="absolute inset-0 bg-linear-to-br from-zinc-900 via-zinc-950 to-black" />
 
         {/* ── Hidden audio players for every remote participant ── */}
         {Array.from(remoteParticipants.entries()).map(([id, p]) => (
@@ -1184,73 +1173,18 @@ export default function MeetingsPage() {
           />
         ))}
 
-        {/* ── Pending request banner (minimal, inline) ── */}
-        {isHost && pendingRequests.length > 0 && (
-          <div
-            className="relative z-20 mx-4 mt-1 flex items-center gap-3 px-4 py-2 rounded-xl"
-            style={{
-              background: "rgba(245,158,11,0.12)",
-              backdropFilter: "blur(16px)",
-              border: "1px solid rgba(245,158,11,0.2)",
-            }}
-          >
-            <span className="text-xs text-amber-300/80 font-medium shrink-0">
-              {pendingRequests.length} waiting
-            </span>
-            <div className="flex-1 flex items-center gap-2 overflow-x-auto">
-              {pendingRequests.map((req) => (
-                <div
-                  key={req.userId}
-                  className="flex items-center gap-2 shrink-0"
-                >
-                  <span className="text-xs text-white/70 truncate max-w-24">
-                    {req.name}
-                  </span>
-                  <button
-                    onClick={() => handleAdmit(req.userId)}
-                    className="w-6 h-6 rounded-full bg-emerald-500/20 hover:bg-emerald-500/40 flex items-center justify-center transition-colors"
-                    title="Admit"
-                  >
-                    <HugeiconsIcon
-                      icon={CheckmarkCircle01Icon}
-                      size={12}
-                      className="text-emerald-400"
-                    />
-                  </button>
-                  <button
-                    onClick={() => handleDecline(req.userId)}
-                    className="w-6 h-6 rounded-full bg-red-500/20 hover:bg-red-500/40 flex items-center justify-center transition-colors"
-                    title="Decline"
-                  >
-                    <HugeiconsIcon
-                      icon={Cancel01Icon}
-                      size={12}
-                      className="text-red-400"
-                    />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* ── Top bar ── */}
         <div
-          className="relative z-10 flex items-center justify-between px-4 md:px-6 py-3"
-          style={{
-            background: "rgba(0,0,0,0.3)",
-            backdropFilter: "blur(16px)",
-            WebkitBackdropFilter: "blur(16px)",
-          }}
+          className="relative z-10 flex items-center justify-between px-4 md:px-6 py-3 bg-white/80 dark:bg-black/30 backdrop-blur-xl border-b border-border/30 dark:border-white/5"
         >
           <div className="flex flex-col">
-            <h2 className="text-white font-semibold text-sm truncate max-w-50">
+            <h2 className="text-foreground font-semibold text-sm truncate max-w-50">
               {activeMeeting.title}
             </h2>
             <div className="flex items-center gap-2">
               <MeetingTimer startTime={meetingStartTime} />
-              <span className="text-white/40 text-xs">&middot;</span>
-              <span className="text-white/50 text-xs">
+              <span className="text-muted-foreground/50 text-xs">&middot;</span>
+              <span className="text-muted-foreground text-xs">
                 {totalParticipants} in meeting
               </span>
             </div>
@@ -1258,12 +1192,7 @@ export default function MeetingsPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={copyMeetingLink}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-white/70 hover:text-white transition-colors"
-              style={{
-                background: "rgba(255,255,255,0.08)",
-                backdropFilter: "blur(8px)",
-                border: "1px solid rgba(255,255,255,0.06)",
-              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-muted-foreground hover:text-foreground transition-colors bg-black/5 dark:bg-white/8 backdrop-blur-md border border-black/5 dark:border-white/6"
             >
               <HugeiconsIcon
                 icon={copiedLink ? CheckmarkCircle01Icon : Link01Icon}
@@ -1273,17 +1202,12 @@ export default function MeetingsPage() {
             </button>
             <button
               onClick={() => setShowPanel(!showPanel)}
-              className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-white/70 hover:text-white transition-colors"
-              style={{
-                background: "rgba(255,255,255,0.08)",
-                backdropFilter: "blur(8px)",
-                border: "1px solid rgba(255,255,255,0.06)",
-              }}
+              className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-muted-foreground hover:text-foreground transition-colors bg-black/5 dark:bg-white/8 backdrop-blur-md border border-black/5 dark:border-white/6"
             >
               <HugeiconsIcon icon={UserGroupIcon} size={14} />
-              {(pendingRequests.length > 0 || raisedHands.size > 0) && (
+              {pendingRequests.length > 0 && (
                 <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-[10px] flex items-center justify-center text-white font-bold">
-                  {pendingRequests.length + raisedHands.size}
+                  {pendingRequests.length}
                 </span>
               )}
             </button>
@@ -1293,62 +1217,22 @@ export default function MeetingsPage() {
         {/* ── People side-panel ── */}
         {showPanel && (
           <div
-            className="fixed md:absolute inset-0 md:inset-auto md:top-14 md:right-4 z-30 md:z-20 md:w-72 md:max-h-[calc(100dvh-120px)] md:rounded-2xl p-4 md:p-3 overflow-y-auto animate-in slide-in-from-right-4 fade-in duration-200"
-            style={{
-              background: "rgba(20,20,25,0.97)",
-              backdropFilter: "blur(24px)",
-              WebkitBackdropFilter: "blur(24px)",
-              border: "1px solid rgba(255,255,255,0.08)",
-            }}
+            className="fixed md:absolute inset-0 md:inset-auto md:top-14 md:right-4 z-30 md:z-20 md:w-72 md:max-h-[calc(100dvh-120px)] md:rounded-2xl p-4 md:p-3 overflow-y-auto animate-in slide-in-from-right-4 fade-in duration-200 bg-background/97 backdrop-blur-xl border border-border dark:border-white/8"
           >
             {/* Mobile: safe area top + bigger header */}
             <div className="flex items-center justify-between mb-3 pt-[env(safe-area-inset-top)] md:pt-0">
-              <h3 className="text-white text-base md:text-sm font-semibold">People</h3>
+              <h3 className="text-foreground text-base md:text-sm font-semibold">People</h3>
               <button
                 onClick={() => setShowPanel(false)}
-                className="w-8 h-8 md:w-auto md:h-auto rounded-full bg-white/10 md:bg-transparent flex items-center justify-center"
+                className="w-8 h-8 md:w-auto md:h-auto rounded-full bg-muted md:bg-transparent flex items-center justify-center"
               >
                 <HugeiconsIcon
                   icon={Cancel01Icon}
                   size={18}
-                  className="text-white/60 hover:text-white/90 transition-colors md:text-white/40 md:hover:text-white/70"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
                 />
               </button>
             </div>
-
-            {/* Raised Hands */}
-            {raisedHands.size > 0 && (
-              <div className="mb-3">
-                <p className="text-[10px] uppercase tracking-wider text-amber-400/80 font-semibold mb-1.5">
-                  ✋ Raised hands ({raisedHands.size})
-                </p>
-                <div className="space-y-1">
-                  {Array.from(raisedHands).map((uid) => {
-                    const rp = Array.from(remoteParticipants.entries()).find(
-                      ([id]) => id === uid,
-                    )
-                    const name =
-                      rp
-                        ? rp[1].name
-                        : admittedParticipants.find(
-                            (ap) => ap.userId === uid,
-                          )?.name || "Participant"
-                    return (
-                      <div
-                        key={uid}
-                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg"
-                        style={{ background: "rgba(245,158,11,0.1)" }}
-                      >
-                        <span className="text-sm">✋</span>
-                        <span className="text-xs text-white/80 flex-1 truncate">
-                          {name}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
 
             {/* Pending requests — host only */}
             {isHost && pendingRequests.length > 0 && (
@@ -1367,18 +1251,17 @@ export default function MeetingsPage() {
                     return (
                       <div
                         key={req.userId}
-                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg"
-                        style={{ background: "rgba(255,255,255,0.05)" }}
+                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-muted/50"
                       >
                         <Avatar className="w-6 h-6">
                           {req.avatar && (
                             <AvatarImage src={req.avatar} alt={req.name} />
                           )}
-                          <AvatarFallback className="text-[8px] bg-white/10 text-white/70">
+                          <AvatarFallback className="text-[8px] bg-muted text-muted-foreground">
                             {initials}
                           </AvatarFallback>
                         </Avatar>
-                        <span className="text-xs text-white/70 flex-1 truncate">
+                        <span className="text-xs text-muted-foreground flex-1 truncate">
                           {req.name}
                         </span>
                         <button
@@ -1409,30 +1292,30 @@ export default function MeetingsPage() {
             )}
 
             {/* All participants */}
-            <p className="text-[10px] uppercase tracking-wider text-white/40 font-semibold mb-1.5">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5">
               In meeting ({totalParticipants})
             </p>
             <div className="space-y-1">
               {/* Self */}
               <div
-                className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg"
-                style={{ background: "rgba(255,255,255,0.05)" }}
+                className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-muted/50"
               >
                 <Avatar className="w-6 h-6">
                   {user.avatarUrl && (
                     <AvatarImage src={user.avatarUrl} alt="You" />
                   )}
-                  <AvatarFallback className="text-[8px] bg-white/10 text-white/70">
+                  <AvatarFallback className="text-[8px] bg-muted text-muted-foreground">
                     {(user.firstName?.[0] || "") + (user.lastName?.[0] || "")}
                   </AvatarFallback>
                 </Avatar>
-                <span className="text-xs text-white/70 flex-1 truncate">
+                <span className="text-xs text-muted-foreground flex-1 truncate">
                   {user.firstName} {user.lastName} (You)
                 </span>
+                {myHandRaised && <span className="text-sm animate-bounce">✋</span>}
                 {isHost && (
                   <Badge
                     variant="outline"
-                    className="text-[8px] px-1.5 py-0 border-white/10 text-white/40"
+                    className="text-[8px] px-1.5 py-0 border-border text-muted-foreground"
                   >
                     Host
                   </Badge>
@@ -1442,11 +1325,10 @@ export default function MeetingsPage() {
               {Array.from(remoteParticipants.entries()).map(([id, p]) => (
                 <div
                   key={id}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg"
-                  style={{ background: "rgba(255,255,255,0.05)" }}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-muted/50"
                 >
                   <Avatar className="w-6 h-6">
-                    <AvatarFallback className="text-[8px] bg-white/10 text-white/70">
+                    <AvatarFallback className="text-[8px] bg-muted text-muted-foreground">
                       {p.name
                         .split(" ")
                         .map((n) => n[0])
@@ -1455,10 +1337,10 @@ export default function MeetingsPage() {
                         .slice(0, 2)}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="text-xs text-white/70 flex-1 truncate">
+                  <span className="text-xs text-muted-foreground flex-1 truncate">
                     {p.name}
                   </span>
-                  {raisedHands.has(id) && <span className="text-xs">✋</span>}
+                  {raisedHands.has(p.userId || id) && <span className="text-xs">✋</span>}
                 </div>
               ))}
               {/* Admitted but offline */}
@@ -1473,14 +1355,13 @@ export default function MeetingsPage() {
                 .map((p) => (
                   <div
                     key={p.userId}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg opacity-50"
-                    style={{ background: "rgba(255,255,255,0.03)" }}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg opacity-50 bg-muted/30"
                   >
                     <Avatar className="w-6 h-6">
                       {p.avatar && (
                         <AvatarImage src={p.avatar} alt={p.name} />
                       )}
-                      <AvatarFallback className="text-[8px] bg-white/10 text-white/70">
+                      <AvatarFallback className="text-[8px] bg-muted text-muted-foreground">
                         {p.name
                           .split(" ")
                           .map((n) => n[0])
@@ -1489,10 +1370,10 @@ export default function MeetingsPage() {
                           .slice(0, 2)}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="text-xs text-white/50 flex-1 truncate">
+                    <span className="text-xs text-muted-foreground flex-1 truncate">
                       {p.name}
                     </span>
-                    <span className="text-[10px] text-white/30">offline</span>
+                    <span className="text-[10px] text-muted-foreground/60">offline</span>
                   </div>
                 ))}
             </div>
@@ -1531,15 +1412,19 @@ export default function MeetingsPage() {
                       reactionEmoji={tileReactions.get(user.id) || null}
                       videoRef={localVideoRef}
                     />
-                  ) : (
-                    <RemoteParticipantTile
-                      key={entry.id}
-                      participantId={entry.id}
-                      participant={remoteParticipants.get(entry.id)!}
-                      handRaised={raisedHands.has(entry.id)}
-                      reactionEmoji={tileReactions.get(entry.id) || null}
-                    />
-                  ),
+                  ) : (() => {
+                    const participant = remoteParticipants.get(entry.id)!
+                    const uid = participant.userId || entry.id
+                    return (
+                      <RemoteParticipantTile
+                        key={entry.id}
+                        participantId={entry.id}
+                        participant={participant}
+                        handRaised={raisedHands.has(uid)}
+                        reactionEmoji={tileReactions.get(uid) || null}
+                      />
+                    )
+                  })(),
                 )}
               </div>
             ) : null}
@@ -1553,18 +1438,13 @@ export default function MeetingsPage() {
                       setGridPage((p) => Math.max(0, p - 1))
                     }
                     className={cn(
-                      "pointer-events-auto w-9 h-9 rounded-full flex items-center justify-center transition-all",
+                      "pointer-events-auto w-9 h-9 rounded-full flex items-center justify-center transition-all bg-background/80 dark:bg-black/50 backdrop-blur-md border border-border/50 dark:border-white/10",
                       currentSlide <= 0
                         ? "opacity-0 pointer-events-none"
                         : "opacity-80 hover:opacity-100 hover:scale-110",
                     )}
-                    style={{
-                      background: "rgba(0,0,0,0.5)",
-                      backdropFilter: "blur(8px)",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                    }}
                   >
-                    <span className="text-white text-lg font-bold leading-none">
+                    <span className="text-foreground text-lg font-bold leading-none">
                       ‹
                     </span>
                   </button>
@@ -1575,18 +1455,13 @@ export default function MeetingsPage() {
                       )
                     }
                     className={cn(
-                      "pointer-events-auto w-9 h-9 rounded-full flex items-center justify-center transition-all",
+                      "pointer-events-auto w-9 h-9 rounded-full flex items-center justify-center transition-all bg-background/80 dark:bg-black/50 backdrop-blur-md border border-border/50 dark:border-white/10",
                       currentSlide >= totalSlideCount - 1
                         ? "opacity-0 pointer-events-none"
                         : "opacity-80 hover:opacity-100 hover:scale-110",
                     )}
-                    style={{
-                      background: "rgba(0,0,0,0.5)",
-                      backdropFilter: "blur(8px)",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                    }}
                   >
-                    <span className="text-white text-lg font-bold leading-none">
+                    <span className="text-foreground text-lg font-bold leading-none">
                       ›
                     </span>
                   </button>
@@ -1603,8 +1478,8 @@ export default function MeetingsPage() {
                         i === currentSlide
                           ? slide.type === "screenshare"
                             ? "bg-emerald-400 w-4"
-                            : "bg-white w-4"
-                          : "bg-white/30 hover:bg-white/50 w-1.5",
+                            : "bg-foreground w-4"
+                          : "bg-foreground/30 hover:bg-foreground/50 w-1.5",
                       )}
                     />
                   ))}
@@ -1616,13 +1491,7 @@ export default function MeetingsPage() {
 
         {/* ── Bottom controls ── */}
         <div
-          className="relative z-10 flex items-center justify-center gap-2 md:gap-4 px-3 md:px-4 py-2 md:py-5 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:pb-5"
-          style={{
-            background: "rgba(0,0,0,0.4)",
-            backdropFilter: "blur(20px)",
-            WebkitBackdropFilter: "blur(20px)",
-            borderTop: "1px solid rgba(255,255,255,0.05)",
-          }}
+          className="relative z-10 flex items-center justify-center gap-2 md:gap-4 px-3 md:px-4 py-2 md:py-5 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:pb-5 bg-white/80 dark:bg-black/40 backdrop-blur-xl border-t border-border/30 dark:border-white/5"
         >
           {/* Mic */}
           <GlassButton
@@ -1633,7 +1502,7 @@ export default function MeetingsPage() {
             <HugeiconsIcon
               icon={isMuted ? MicOff01Icon : Mic01Icon}
               size={18}
-              className={isMuted ? "text-black" : "text-white"}
+              className={isMuted ? "text-background" : "text-foreground"}
             />
           </GlassButton>
 
@@ -1646,7 +1515,7 @@ export default function MeetingsPage() {
             <HugeiconsIcon
               icon={isVideoOff ? VideoOffIcon : Video01Icon}
               size={18}
-              className={isVideoOff ? "text-black" : "text-white"}
+              className={isVideoOff ? "text-background" : "text-foreground"}
             />
           </GlassButton>
 
@@ -1660,7 +1529,7 @@ export default function MeetingsPage() {
             <HugeiconsIcon
               icon={ComputerScreenShareIcon}
               size={18}
-              className={isScreenSharing ? "text-black" : "text-white"}
+              className={isScreenSharing ? "text-background" : "text-foreground"}
             />
           </GlassButton>
 
@@ -1687,18 +1556,13 @@ export default function MeetingsPage() {
             </GlassButton>
             {showReactionPicker && (
               <div
-                className="absolute bottom-14 md:bottom-16 left-1/2 -translate-x-1/2 flex gap-0.5 md:gap-1 px-1.5 md:px-2 py-1 md:py-1.5 rounded-full animate-in fade-in zoom-in-95 duration-150"
-                style={{
-                  background: "rgba(30,30,35,0.95)",
-                  backdropFilter: "blur(20px)",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                }}
+                className="absolute bottom-14 md:bottom-16 left-1/2 -translate-x-1/2 flex gap-0.5 md:gap-1 px-1.5 md:px-2 py-1 md:py-1.5 rounded-full animate-in fade-in zoom-in-95 duration-150 bg-background/95 backdrop-blur-xl border border-border dark:border-white/10"
               >
                 {REACTION_EMOJIS.map((emoji) => (
                   <button
                     key={emoji}
                     onClick={() => handleReaction(emoji)}
-                    className="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-base md:text-xl hover:bg-white/10 transition-colors hover:scale-110 active:scale-95"
+                    className="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-base md:text-xl hover:bg-muted transition-colors hover:scale-110 active:scale-95"
                   >
                     {emoji}
                   </button>
@@ -1716,11 +1580,11 @@ export default function MeetingsPage() {
             <HugeiconsIcon
               icon={UserGroupIcon}
               size={18}
-              className="text-white"
+              className="text-foreground"
             />
-            {(pendingRequests.length > 0 || raisedHands.size > 0) && (
+            {pendingRequests.length > 0 && (
               <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-amber-500 text-[10px] flex items-center justify-center text-white font-bold">
-                {pendingRequests.length + raisedHands.size}
+                {pendingRequests.length}
               </span>
             )}
           </GlassButton>
@@ -1743,147 +1607,240 @@ export default function MeetingsPage() {
   }
 
   /* ═══════════════════════════════════════════════════════════
-     RENDER: LOBBY (theme-aware, light + dark mode)
+     RENDER: LOBBY (3-panel layout, theme-aware)
      ═══════════════════════════════════════════════════════════ */
 
+  function formatDuration(seconds: number): string {
+    if (seconds < 60) return `${seconds}s`
+    const mins = Math.floor(seconds / 60)
+    const hrs = Math.floor(mins / 60)
+    if (hrs > 0) return `${hrs}h ${mins % 60}m`
+    return `${mins}m`
+  }
+
+  function formatTimeAgo(date: string): string {
+    const diff = Date.now() - new Date(date).getTime()
+    const mins = Math.floor(diff / 60000)
+    if (mins < 1) return "Just now"
+    if (mins < 60) return `${mins}m ago`
+    const hrs = Math.floor(mins / 60)
+    if (hrs < 24) return `${hrs}h ago`
+    const days = Math.floor(hrs / 24)
+    if (days < 7) return `${days}d ago`
+    return new Date(date).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+  }
+
   return (
-    <>
+    <div className="relative flex flex-col h-dvh min-h-0">
+      {/* ── Overlays (absolute within this container) ── */}
+      {setupMessage && <SetupOverlay message={setupMessage} />}
+      {waitingForApproval && (
+        <WaitingRoom
+          meetingTitle={waitingForApproval}
+          onCancel={() => setWaitingForApproval(null)}
+        />
+      )}
+
       <Topbar title="Meetings" />
 
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
-          {/* ── Hero ── */}
-          <div className="relative overflow-hidden rounded-2xl bg-linear-to-br from-primary/10 via-primary/5 to-transparent border p-6">
-            <div className="absolute -right-8 -top-8 w-40 h-40 bg-primary/5 rounded-full blur-2xl" />
-            <div className="absolute -left-4 bottom-0 w-24 h-24 bg-primary/3 rounded-full blur-xl" />
-            <div className="relative flex items-start justify-between">
-              <div>
-                <h1 className="text-xl font-bold">Meetings</h1>
-                <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-                  Host or join video meetings with screen sharing
-                </p>
-              </div>
-              <Button
-                onClick={() => setShowCreate(true)}
-                size="sm"
-                className="gap-1.5 shrink-0"
-              >
-                <HugeiconsIcon icon={Add01Icon} size={16} />
-                New Meeting
-              </Button>
-            </div>
-          </div>
-
-          {/* ── Meetings list ── */}
-          {isLoadingMeetings ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="h-20 rounded-xl bg-muted animate-pulse"
-                />
-              ))}
-            </div>
-          ) : meetings.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="relative w-48 h-48 mx-auto mb-4">
-                <Image
-                  src="/user/dashboard/no-meeting-yet.png"
-                  alt="No meetings yet"
-                  fill
-                  className="object-contain"
-                  priority
-                />
-              </div>
-              <h3 className="font-semibold text-lg mb-1">No meetings yet</h3>
-              <p className="text-sm text-muted-foreground mb-5 max-w-xs mx-auto leading-relaxed">
-                Create a meeting to start a video call with screen sharing and
-                invite others.
-              </p>
-              <Button
-                onClick={() => setShowCreate(true)}
-                size="sm"
-                className="gap-1.5"
-              >
-                <HugeiconsIcon icon={Add01Icon} size={16} />
-                Create Meeting
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {meetings.map((meeting) => (
-                <div
-                  key={meeting.id}
-                  className="flex items-center gap-4 p-4 rounded-xl border bg-card hover:bg-accent/50 transition-colors cursor-pointer group"
-                  onClick={() => handleRejoin(meeting)}
+        <div className="max-w-6xl mx-auto px-4 py-6">
+          {/* ── 3-panel grid ── */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            {/* ═══ Panel 1: Active Meetings ═══ */}
+            <div className="lg:col-span-2 space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                  Active Meetings
+                </h2>
+                <Button
+                  onClick={() => setShowCreate(true)}
+                  size="sm"
+                  className="gap-1.5"
                 >
-                  <div
-                    className={cn(
-                      "w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-colors",
-                      meeting.status === "active"
-                        ? "bg-emerald-500/12 group-hover:bg-emerald-500/20"
-                        : "bg-primary/8 group-hover:bg-primary/12",
-                    )}
-                  >
-                    <HugeiconsIcon
-                      icon={Video01Icon}
-                      size={20}
-                      className={
-                        meeting.status === "active"
-                          ? "text-emerald-500"
-                          : "text-primary/60"
-                      }
+                  <HugeiconsIcon icon={Add01Icon} size={14} />
+                  New
+                </Button>
+              </div>
+
+              {isLoadingMeetings ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <div
+                      key={i}
+                      className="h-20 rounded-xl bg-muted animate-pulse"
+                    />
+                  ))}
+                </div>
+              ) : meetings.length === 0 ? (
+                <div className="rounded-xl border border-dashed bg-muted/30 p-8 text-center">
+                  <div className="relative w-36 h-36 mx-auto mb-3">
+                    <Image
+                      src="/user/dashboard/no-meeting-yet.png"
+                      alt="No meetings yet"
+                      fill
+                      className="object-contain"
+                      priority
                     />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-sm truncate">
-                      {meeting.title}
-                    </h3>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs text-muted-foreground">
-                        {meeting.hostId === user.id
-                          ? "Hosted by you"
-                          : `Hosted by ${meeting.hostName}`}
-                      </span>
-                      <span className="text-muted-foreground/40 text-xs">
-                        &middot;
-                      </span>
-                      <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        <HugeiconsIcon icon={UserGroupIcon} size={11} />
-                        {meeting.participantCount}
+                  <h3 className="font-semibold text-sm mb-1">No active meetings</h3>
+                  <p className="text-xs text-muted-foreground mb-4 max-w-xs mx-auto leading-relaxed">
+                    Create a meeting to start a video call with screen sharing.
+                  </p>
+                  <Button
+                    onClick={() => setShowCreate(true)}
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5"
+                  >
+                    <HugeiconsIcon icon={Add01Icon} size={14} />
+                    Create Meeting
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {meetings.map((meeting) => (
+                    <div
+                      key={meeting.id}
+                      className="flex items-center gap-4 p-4 rounded-xl border bg-card hover:bg-accent/50 transition-colors cursor-pointer group"
+                      onClick={() => handleRejoin(meeting)}
+                    >
+                      <div
+                        className={cn(
+                          "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors",
+                          meeting.status === "active"
+                            ? "bg-emerald-500/12 group-hover:bg-emerald-500/20"
+                            : "bg-primary/8 group-hover:bg-primary/12",
+                        )}
+                      >
+                        <HugeiconsIcon
+                          icon={Video01Icon}
+                          size={18}
+                          className={
+                            meeting.status === "active"
+                              ? "text-emerald-500"
+                              : "text-primary/60"
+                          }
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-sm truncate">
+                          {meeting.title}
+                        </h3>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-xs text-muted-foreground">
+                            {meeting.hostId === user.id
+                              ? "Hosted by you"
+                              : `Hosted by ${meeting.hostName}`}
+                          </span>
+                          <span className="text-muted-foreground/40 text-xs">
+                            &middot;
+                          </span>
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <HugeiconsIcon icon={UserGroupIcon} size={11} />
+                            {meeting.participantCount}
+                          </span>
+                        </div>
+                      </div>
+                      <Badge
+                        variant={
+                          meeting.status === "active" ? "default" : "secondary"
+                        }
+                        className={cn(
+                          "text-[10px] px-2 gap-1",
+                          meeting.status === "active" &&
+                            "bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-400",
+                        )}
+                      >
+                        {meeting.status === "active" && (
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                          </span>
+                        )}
+                        {meeting.status === "active"
+                          ? "Live"
+                          : meeting.status === "waiting"
+                            ? "Waiting"
+                            : meeting.status}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* ── Join by link/ID ── */}
+              <JoinByIdSection onJoin={handleJoinByLink} />
+            </div>
+
+            {/* ═══ Panel 2: Meeting History ═══ */}
+            <div className="space-y-4">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <HugeiconsIcon icon={Clock01Icon} size={14} />
+                History
+              </h2>
+
+              {isLoadingHistory ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <div
+                      key={i}
+                      className="h-16 rounded-xl bg-muted animate-pulse"
+                    />
+                  ))}
+                </div>
+              ) : meetingHistory.length === 0 ? (
+                <div className="rounded-xl border border-dashed bg-muted/30 p-6 text-center">
+                  <HugeiconsIcon
+                    icon={Clock01Icon}
+                    size={24}
+                    className="text-muted-foreground/40 mx-auto mb-2"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Completed meetings will appear here
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-1.5 max-h-[calc(100dvh-14rem)] overflow-y-auto">
+                  {meetingHistory.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className="flex items-start gap-3 p-3 rounded-lg border bg-card/50 hover:bg-accent/30 transition-colors"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0 mt-0.5">
+                        <HugeiconsIcon
+                          icon={Video01Icon}
+                          size={14}
+                          className="text-muted-foreground"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate leading-tight">
+                          {entry.title}
+                        </p>
+                        <div className="flex items-center gap-1.5 mt-1 text-[11px] text-muted-foreground">
+                          <span className="flex items-center gap-0.5">
+                            <HugeiconsIcon icon={UserGroupIcon} size={10} />
+                            {entry.participantCount}
+                          </span>
+                          {entry.duration != null && entry.duration > 0 && (
+                            <>
+                              <span className="text-muted-foreground/30">&middot;</span>
+                              <span>{formatDuration(entry.duration)}</span>
+                            </>
+                          )}
+                          <span className="text-muted-foreground/30">&middot;</span>
+                          <span>{entry.wasHost ? "You hosted" : entry.hostName}</span>
+                        </div>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground/60 shrink-0 mt-0.5">
+                        {formatTimeAgo(entry.endedAt ?? entry.createdAt)}
                       </span>
                     </div>
-                  </div>
-                  <Badge
-                    variant={
-                      meeting.status === "active" ? "default" : "secondary"
-                    }
-                    className={cn(
-                      "text-[10px] px-2 gap-1",
-                      meeting.status === "active" &&
-                        "bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-400",
-                    )}
-                  >
-                    {meeting.status === "active" && (
-                      <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75" />
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                      </span>
-                    )}
-                    {meeting.status === "active"
-                      ? "Live"
-                      : meeting.status === "waiting"
-                        ? "Waiting"
-                        : meeting.status}
-                  </Badge>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-          )}
-
-          {/* ── Join by link/ID ── */}
-          <div className="pt-4 border-t">
-            <JoinByIdSection onJoin={handleJoinByLink} />
           </div>
         </div>
       </div>
@@ -1892,26 +1849,34 @@ export default function MeetingsPage() {
       <ResponsiveModal open={showCreate} onOpenChange={setShowCreate}>
         <ResponsiveModalContent className="sm:max-w-md">
           <ResponsiveModalHeader>
-            <ResponsiveModalTitle>New Meeting</ResponsiveModalTitle>
+            <ResponsiveModalTitle className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                <HugeiconsIcon icon={Video01Icon} size={16} className="text-primary" />
+              </div>
+              New Meeting
+            </ResponsiveModalTitle>
+            <p className="text-sm text-muted-foreground">
+              Create a meeting room and invite others with a link.
+            </p>
           </ResponsiveModalHeader>
-          <div className="space-y-4 pt-2">
-            <div>
-              <p className="text-sm text-muted-foreground mb-3">
-                Give your meeting a name and you&apos;ll get a shareable link
-                to invite others.
-              </p>
+          <div className="space-y-4 pt-1">
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground">
+                Meeting name
+              </label>
               <Input
                 placeholder="e.g. Weekly standup, Study group..."
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+                className="h-11"
                 autoFocus
               />
             </div>
             <Button
               onClick={handleCreate}
               disabled={!newTitle.trim() || isCreating}
-              className="w-full gap-1.5"
+              className="w-full gap-2 h-11"
             >
               {isCreating ? (
                 <>
@@ -1932,7 +1897,7 @@ export default function MeetingsPage() {
           </div>
         </ResponsiveModalContent>
       </ResponsiveModal>
-    </>
+    </div>
   )
 }
 
