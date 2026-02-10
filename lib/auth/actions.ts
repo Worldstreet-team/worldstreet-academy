@@ -251,7 +251,7 @@ export async function logoutAction() {
   }
   
   await clearTokens()
-  redirect("/unauthorized")
+  redirect("https://worldstreetgold.com/login")
 }
 
 /**
@@ -265,7 +265,7 @@ export async function logoutAllAction() {
   }
   
   await clearTokens()
-  redirect("/unauthorized")
+  redirect("https://worldstreetgold.com/login")
 }
 
 /**

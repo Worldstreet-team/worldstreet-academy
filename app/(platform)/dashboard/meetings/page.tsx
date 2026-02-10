@@ -19,15 +19,10 @@ import {
   Loading03Icon,
   Clock01Icon,
   ArrowRight01Icon,
-  WavingHand01Icon,
-  SmileIcon,
   BubbleChatIcon,
   ChartColumnIcon,
   VolumeHighIcon,
-  Clapping01Icon,
-  FavouriteIcon,
-  LaughingIcon,
-  ThumbsUpIcon,
+  ArrowShrink02Icon,
 } from "@hugeicons/core-free-icons"
 import { Topbar } from "@/components/platform/topbar"
 import { Button } from "@/components/ui/button"
@@ -43,6 +38,7 @@ import {
 import { cn } from "@/lib/utils"
 import { rtkClient } from "@/lib/rtk-client"
 import { useUser } from "@/components/providers/user-provider"
+import { useMeeting } from "@/components/providers/meeting-provider"
 import type { MeetingEventPayload } from "@/lib/call-events"
 import {
   createMeeting,
@@ -81,10 +77,11 @@ import {
    ═══════════════════════════════════════════════════════ */
 
 const REACTIONS = [
-  { id: "clap", icon: Clapping01Icon, label: "Clap" },
-  { id: "heart", icon: FavouriteIcon, label: "Love" },
-  { id: "laugh", icon: LaughingIcon, label: "Haha" },
-  { id: "thumbsup", icon: ThumbsUpIcon, label: "Like" },
+  { id: "👏", emoji: "👏", label: "Clap" },
+  { id: "❤️", emoji: "❤️", label: "Love" },
+  { id: "😂", emoji: "😂", label: "Haha" },
+  { id: "🎉", emoji: "🎉", label: "Celebrate" },
+  { id: "👍", emoji: "👍", label: "Like" },
 ] as const
 const TILES_PER_PAGE = 4
 
@@ -205,13 +202,13 @@ function ParticipantTile({
             const r = REACTIONS.find((rx) => rx.id === reactionId)
             return r ? (
               <div className="w-8 h-8 rounded-full bg-background/70 backdrop-blur-sm flex items-center justify-center animate-bounce">
-                <HugeiconsIcon icon={r.icon} size={18} className="text-foreground" />
+                <span className="text-base leading-none">{r.emoji}</span>
               </div>
             ) : null
           })()}
           {handRaised && (
             <div className="w-8 h-8 rounded-full bg-amber-500/20 backdrop-blur-sm flex items-center justify-center animate-bounce">
-              <HugeiconsIcon icon={WavingHand01Icon} size={18} className="text-amber-500" />
+              <span className="text-base leading-none">✋</span>
             </div>
           )}
         </div>
@@ -465,6 +462,7 @@ export default function MeetingsPage() {
   const user = useUser()
   const searchParams = useSearchParams()
   const router = useRouter()
+  const meetingCtx = useMeeting()
 
   const [meetings, setMeetings] = useState<MeetingWithDetails[]>([])
   const [isLoadingMeetings, setIsLoadingMeetings] = useState(true)
@@ -548,6 +546,43 @@ export default function MeetingsPage() {
     })
     return () => { cancelled = true }
   }, [])
+
+  /* ---- Real-time meeting list refresh via Ably ---- */
+  useEffect(() => {
+    // Only refresh the lobby list when NOT in an active meeting
+    if (activeMeeting) return
+
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null
+    function handleMeetingListEvent(evt: Event) {
+      const e = (evt as CustomEvent).detail as MeetingEventPayload & { type: string }
+      if (!e?.type?.startsWith("meeting:")) return
+
+      // These events indicate the meeting list should be refreshed
+      const refreshEvents = [
+        "meeting:ended",
+        "meeting:participant-joined",
+        "meeting:participant-left",
+        "meeting:admitted",
+      ]
+      if (refreshEvents.includes(e.type)) {
+        // Debounce to avoid multiple rapid re-fetches
+        if (debounceTimer) clearTimeout(debounceTimer)
+        debounceTimer = setTimeout(() => {
+          getMyMeetings().then((r) => {
+            if (r.success && r.meetings) setMeetings(r.meetings)
+          })
+          getMeetingHistory().then((r) => {
+            if (r.success && r.meetings) setMeetingHistory(r.meetings)
+          })
+        }, 500)
+      }
+    }
+    window.addEventListener("sse:event", handleMeetingListEvent)
+    return () => {
+      window.removeEventListener("sse:event", handleMeetingListEvent)
+      if (debounceTimer) clearTimeout(debounceTimer)
+    }
+  }, [activeMeeting])
 
   useEffect(() => {
     const joinId = searchParams.get("join")
@@ -791,31 +826,108 @@ export default function MeetingsPage() {
         setSetupMessage(null)
         playMeetingJoined()
 
-        if (!activeMeetingRef.current && meetingId) {
+        let meeting = activeMeetingRef.current
+        if (!meeting && meetingId) {
           const details = await getMeetingDetails(meetingId)
           if (details.success && details.meeting) {
-            setActiveMeeting(details.meeting)
+            meeting = details.meeting
+            setActiveMeeting(meeting)
             setMeetingStartTime(details.meeting.startedAt ? new Date(details.meeting.startedAt) : new Date())
             if (details.participants) setAdmittedParticipants(details.participants.filter((p) => p.status === "admitted"))
           } else {
-            setActiveMeeting({
+            meeting = {
               id: meetingId, title: meetingTitle || "Meeting", hostId: "", hostName: "", hostAvatar: null,
               status: "active", meetingId, participantCount: 1, maxParticipants: 50,
               settings: { allowScreenShare: true, muteOnEntry: true, requireApproval: true, maxParticipants: 50 },
               createdAt: new Date().toISOString(),
-            })
+            }
+            setActiveMeeting(meeting)
             setMeetingStartTime(new Date())
           }
+        }
+
+        // Register with the meeting provider for PIP bar / cross-screen persistence
+        if (meeting) {
+          meetingCtx.registerMeeting({
+            meetingId: meeting.id,
+            title: meeting.title,
+            isHost: meeting.hostId === user.id,
+            startTime: meeting.startedAt ? new Date(meeting.startedAt) : new Date(),
+            participantCount: meeting.participantCount,
+          })
         }
       } catch (err) {
         console.error("[Meeting] Failed to join RTK room:", err)
         setSetupMessage(null)
       }
     },
-    [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [meetingCtx.registerMeeting, user.id],
   )
 
   useEffect(() => { joinRTKRef.current = joinRTKAndSetup }, [joinRTKAndSetup])
+
+  /* ---- PIP bar callbacks & muted state sync ---- */
+  useEffect(() => {
+    if (!activeMeeting || !isJoined) return
+    meetingCtx.setMeetingCallbacks({
+      onToggleMute: () => {
+        const next = !isMuted
+        setIsMuted(next)
+        if (next) rtkClient.client?.self.disableAudio().catch(() => {})
+        else rtkClient.client?.self.enableAudio().catch(() => {})
+        meetingCtx.setMeetingMuted(next)
+      },
+      onEndMeeting: () => handleEndMeeting(),
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMeeting, isJoined, isMuted])
+
+  // Keep PIP bar muted indicator in sync
+  useEffect(() => {
+    meetingCtx.setMeetingMuted(isMuted)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMuted])
+
+  // Keep participant count in sync with provider
+  useEffect(() => {
+    if (!activeMeeting) return
+    meetingCtx.updateMeeting({ participantCount: remoteParticipants.size + 1 })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remoteParticipants.size, activeMeeting])
+
+  // When user navigates back to meetings page while RTK is still in room, restore the meeting
+  useEffect(() => {
+    if (activeMeeting || !meetingCtx.hasActiveMeeting) return
+    // RTK client is still connected (module-level singleton persists across navigation)
+    if (!rtkClient.isInRoom || !rtkClient.client) return
+
+    const info = meetingCtx.activeMeetingInfo
+    if (!info) return
+
+    // Un-minimize since user is back on the meetings page
+    meetingCtx.setMinimized(false)
+
+    // Restore meeting state from the provider + DB
+    setSetupMessage("Reconnecting...")
+    getMeetingDetails(info.meetingId).then((details) => {
+      if (details.success && details.meeting) {
+        setActiveMeeting(details.meeting)
+        setMeetingStartTime(info.startTime)
+        setIsJoined(true)
+        setSetupMessage(null)
+        if (details.participants) {
+          setAdmittedParticipants(details.participants.filter((p) => p.status === "admitted"))
+        }
+      } else {
+        // Meeting no longer exists — clean up
+        meetingCtx.unregisterMeeting()
+        rtkClient.leaveRoom().catch(() => {})
+        setSetupMessage(null)
+      }
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function handleCreate() {
     if (!newTitle.trim()) return
@@ -863,6 +975,7 @@ export default function MeetingsPage() {
 
   function resetMeetingState() {
     rtkClient.leaveRoom().catch(() => {})
+    meetingCtx.unregisterMeeting()
     setActiveMeeting(null)
     setIsJoined(false)
     setRemoteParticipants(new Map())
@@ -1080,7 +1193,7 @@ export default function MeetingsPage() {
 
   /* ---- RENDER: ACTIVE MEETING ---- */
 
-  if (activeMeeting && isJoined) {
+  if (activeMeeting && isJoined && !meetingCtx.isMinimized) {
     const totalParticipants = remoteParticipants.size + 1
     const hasScreenShare = !!screenSharer
 
@@ -1118,13 +1231,22 @@ export default function MeetingsPage() {
             <span className="text-muted-foreground/40">·</span>
             <span className="text-muted-foreground text-xs">{totalParticipants}</span>
           </div>
-          <button
-            onClick={copyMeetingLink}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-muted-foreground hover:text-foreground transition-colors border border-border/50"
-          >
-            <HugeiconsIcon icon={copiedLink ? CheckmarkCircle01Icon : Link01Icon} size={12} />
-            {copiedLink ? "Copied!" : "Invite"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={copyMeetingLink}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-muted-foreground hover:text-foreground transition-colors border border-border/50"
+            >
+              <HugeiconsIcon icon={copiedLink ? CheckmarkCircle01Icon : Link01Icon} size={12} />
+              {copiedLink ? "Copied!" : "Invite"}
+            </button>
+            <button
+              onClick={() => meetingCtx.setMinimized(true)}
+              className="flex items-center justify-center w-8 h-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-white/10 transition-colors"
+              title="Minimize meeting"
+            >
+              <HugeiconsIcon icon={ArrowShrink02Icon} size={14} />
+            </button>
+          </div>
         </div>
 
         {/* Pending admission requests */}
@@ -1196,16 +1318,6 @@ export default function MeetingsPage() {
 
             {totalSlideCount > 1 && (
               <>
-                <div className="absolute top-1/2 -translate-y-1/2 left-1 right-1 flex justify-between pointer-events-none z-10">
-                  <button onClick={() => setGridPage((p) => Math.max(0, p - 1))}
-                    className={cn("pointer-events-auto w-8 h-8 rounded-full flex items-center justify-center bg-background/60 backdrop-blur-md border border-border/40", currentSlide <= 0 ? "opacity-0 pointer-events-none" : "opacity-70 hover:opacity-100")}>
-                    <span className="text-foreground text-lg font-bold leading-none">‹</span>
-                  </button>
-                  <button onClick={() => setGridPage((p) => Math.min(totalSlideCount - 1, p + 1))}
-                    className={cn("pointer-events-auto w-8 h-8 rounded-full flex items-center justify-center bg-background/60 backdrop-blur-md border border-border/40", currentSlide >= totalSlideCount - 1 ? "opacity-0 pointer-events-none" : "opacity-70 hover:opacity-100")}>
-                    <span className="text-foreground text-lg font-bold leading-none">›</span>
-                  </button>
-                </div>
                 <div className="flex gap-1.5 justify-center py-1">
                   {slides.map((slide, i) => (
                     <button key={i} onClick={() => setGridPage(i)}
@@ -1252,7 +1364,7 @@ export default function MeetingsPage() {
                     <span className="text-sm text-foreground truncate block">{user.firstName} {user.lastName}</span>
                     <span className="text-[10px] text-muted-foreground">{isHost ? "Host · You" : "You"}</span>
                   </div>
-                  {myHandRaised && <HugeiconsIcon icon={WavingHand01Icon} size={16} className="text-amber-500 animate-bounce" />}
+                  {myHandRaised && <span className="text-sm leading-none animate-bounce">✋</span>}
                   {isMuted && <HugeiconsIcon icon={MicOff01Icon} size={14} className="text-red-400" />}
                 </div>
 
@@ -1270,7 +1382,7 @@ export default function MeetingsPage() {
                         <span className="text-sm text-foreground truncate block">{p.name}</span>
                         {isParticipantHost && <span className="text-[10px] text-muted-foreground">Host</span>}
                       </div>
-                      {raisedHands.has(uid) && <HugeiconsIcon icon={WavingHand01Icon} size={14} className="text-amber-500" />}
+                      {raisedHands.has(uid) && <span className="text-sm leading-none">✋</span>}
                       {!p.audioEnabled && <HugeiconsIcon icon={MicOff01Icon} size={14} className="text-red-400" />}
                       {isHost && !isParticipantHost && (
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1460,111 +1572,192 @@ export default function MeetingsPage() {
         )}
 
         {/* Bottom controls dock */}
-        <div className="absolute bottom-0 left-0 right-0 z-30 flex justify-center pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-4 px-3 pointer-events-none">
-          <div className="pointer-events-auto flex items-center gap-1 px-2.5 py-2 rounded-2xl bg-white/8 dark:bg-white/6 backdrop-blur-2xl border border-white/10 dark:border-white/8 shadow-2xl shadow-black/20">
-            <button onClick={toggleMute} className="flex flex-col items-center gap-0.5 px-1.5 md:px-2">
-              <div className={cn("w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
+        <div className="absolute bottom-0 left-0 right-0 z-30 flex flex-col items-center pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-4 px-2 md:px-3 pointer-events-none gap-2">
+
+          {/* Mobile reaction picker — stacked above controls */}
+          {isMobile && showReactionPicker && (
+            <div className="pointer-events-auto rounded-2xl animate-in fade-in zoom-in-95 duration-150 bg-white/8 dark:bg-white/6 backdrop-blur-2xl border border-white/10 dark:border-white/8 shadow-2xl shadow-black/20 p-2">
+              <div className="flex items-center gap-1.5">
+                {REACTIONS.map((r) => (
+                  <button key={r.id} onClick={() => handleReaction(r.id)}
+                    className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-white/10 active:bg-white/20 transition-colors active:scale-95"
+                    title={r.label}>
+                    <span className="text-xl leading-none">{r.emoji}</span>
+                  </button>
+                ))}
+                <button
+                  onClick={() => setShowReactionPicker(false)}
+                  className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-white/10 transition-colors ml-0.5"
+                  title="Close"
+                >
+                  <HugeiconsIcon icon={Cancel01Icon} size={14} className="text-foreground/70" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Mobile secondary controls row */}
+          <div className="pointer-events-auto md:hidden flex items-center gap-0.5 px-2 py-1.5 rounded-2xl bg-white/8 dark:bg-white/6 backdrop-blur-2xl border border-white/10 dark:border-white/8 shadow-2xl shadow-black/20">
+            <button onClick={handleToggleHand} className="flex flex-col items-center px-2.5">
+              <div className={cn("w-9 h-9 rounded-full flex items-center justify-center transition-all",
+                myHandRaised ? "bg-amber-500/20" : "bg-transparent")}>
+                <span className={cn("text-base leading-none transition-transform", myHandRaised && "animate-bounce")}>✋</span>
+              </div>
+            </button>
+
+            <button onClick={() => setShowReactionPicker(!showReactionPicker)} className="flex flex-col items-center px-2.5">
+              <div className={cn("w-9 h-9 rounded-full flex items-center justify-center transition-all",
+                showReactionPicker ? "bg-foreground/90" : "bg-transparent")}>
+                <span className="text-base leading-none">😊</span>
+              </div>
+            </button>
+
+            <button onClick={() => setActiveTab(activeTab === "people" ? null : "people")} className="flex flex-col items-center px-2.5 relative">
+              <div className={cn("w-9 h-9 rounded-full flex items-center justify-center transition-all",
+                activeTab === "people" ? "bg-foreground/90" : "bg-transparent")}>
+                <HugeiconsIcon icon={UserGroupIcon} size={16} className={activeTab === "people" ? "text-background" : "text-foreground"} />
+              </div>
+              {pendingRequests.length > 0 && (
+                <span className="absolute -top-0.5 right-0 w-4 h-4 rounded-full bg-amber-500 text-[9px] flex items-center justify-center text-white font-bold">{pendingRequests.length}</span>
+              )}
+            </button>
+
+            <button onClick={() => { setActiveTab(activeTab === "chat" ? null : "chat"); setUnreadChat(0) }} className="flex flex-col items-center px-2.5 relative">
+              <div className={cn("w-9 h-9 rounded-full flex items-center justify-center transition-all",
+                activeTab === "chat" ? "bg-foreground/90" : "bg-transparent")}>
+                <HugeiconsIcon icon={BubbleChatIcon} size={16} className={activeTab === "chat" ? "text-background" : "text-foreground"} />
+              </div>
+              {unreadChat > 0 && activeTab !== "chat" && (
+                <span className="absolute -top-0.5 right-0 w-4 h-4 rounded-full bg-primary text-[9px] flex items-center justify-center text-primary-foreground font-bold">{unreadChat > 9 ? "9+" : unreadChat}</span>
+              )}
+            </button>
+
+            <button onClick={() => setActiveTab(activeTab === "polls" ? null : "polls")} className="flex flex-col items-center px-2.5">
+              <div className={cn("w-9 h-9 rounded-full flex items-center justify-center transition-all",
+                activeTab === "polls" ? "bg-foreground/90" : "bg-transparent")}>
+                <HugeiconsIcon icon={ChartColumnIcon} size={16} className={activeTab === "polls" ? "text-background" : "text-foreground"} />
+              </div>
+            </button>
+          </div>
+
+          {/* Primary controls row */}
+          <div className="pointer-events-auto flex items-center gap-0.5 md:gap-1 px-1.5 md:px-2.5 py-1.5 md:py-2 rounded-2xl bg-white/8 dark:bg-white/6 backdrop-blur-2xl border border-white/10 dark:border-white/8 shadow-2xl shadow-black/20">
+            <button onClick={toggleMute} className="flex flex-col items-center gap-0.5 px-1 md:px-2 shrink-0">
+              <div className={cn("w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
                 isMuted ? "bg-foreground/90" : "bg-transparent")}>
-                <HugeiconsIcon icon={isMuted ? MicOff01Icon : Mic01Icon} size={18} className={isMuted ? "text-background" : "text-foreground"} />
+                <HugeiconsIcon icon={isMuted ? MicOff01Icon : Mic01Icon} size={16} className={cn("md:w-4.5! md:h-4.5!", isMuted ? "text-background" : "text-foreground")} />
               </div>
               <span className="text-[9px] text-muted-foreground font-medium hidden md:block">{isMuted ? "Unmute" : "Mute"}</span>
             </button>
 
-            <button onClick={toggleVideo} className="flex flex-col items-center gap-0.5 px-1.5 md:px-2">
-              <div className={cn("w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
+            <button onClick={toggleVideo} className="flex flex-col items-center gap-0.5 px-1 md:px-2 shrink-0">
+              <div className={cn("w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
                 isVideoOff ? "bg-foreground/90" : "bg-transparent")}>
-                <HugeiconsIcon icon={isVideoOff ? VideoOffIcon : Video01Icon} size={18} className={isVideoOff ? "text-background" : "text-foreground"} />
+                <HugeiconsIcon icon={isVideoOff ? VideoOffIcon : Video01Icon} size={16} className={cn("md:w-4.5! md:h-4.5!", isVideoOff ? "text-background" : "text-foreground")} />
               </div>
               <span className="text-[9px] text-muted-foreground font-medium hidden md:block">{isVideoOff ? "Start" : "Stop"}</span>
             </button>
 
             {!isMobile && (
               <button onClick={toggleScreenShare} disabled={!!screenSharer && !isScreenSharing}
-                className="flex flex-col items-center gap-0.5 px-1.5 md:px-2 disabled:opacity-30">
-                <div className={cn("w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
+                className="flex flex-col items-center gap-0.5 px-2 disabled:opacity-30 shrink-0">
+                <div className={cn("w-11 h-11 rounded-full flex items-center justify-center transition-all",
                   isScreenSharing ? "bg-foreground/90" : "bg-transparent")}>
                   <HugeiconsIcon icon={ComputerScreenShareIcon} size={18} className={isScreenSharing ? "text-background" : "text-foreground"} />
                 </div>
-                <span className="text-[9px] text-muted-foreground font-medium hidden md:block">Share</span>
+                <span className="text-[9px] text-muted-foreground font-medium">Share</span>
               </button>
             )}
 
             {isMobile && (
-              <button onClick={toggleLoudspeaker} className="flex flex-col items-center gap-0.5 px-1.5">
-                <div className={cn("w-10 h-10 rounded-full flex items-center justify-center transition-all",
+              <button onClick={toggleLoudspeaker} className="flex flex-col items-center gap-0.5 px-1 shrink-0">
+                <div className={cn("w-9 h-9 rounded-full flex items-center justify-center transition-all",
                   isLoudspeaker ? "bg-foreground/90" : "bg-transparent")}>
-                  <HugeiconsIcon icon={VolumeHighIcon} size={18} className={isLoudspeaker ? "text-background" : "text-foreground"} />
+                  <HugeiconsIcon icon={VolumeHighIcon} size={16} className={isLoudspeaker ? "text-background" : "text-foreground"} />
                 </div>
               </button>
             )}
 
-            <div className="w-px h-8 bg-white/10 dark:bg-white/6 mx-0.5" />
+            {isMobile && (
+              <button onClick={toggleScreenShare} disabled={!!screenSharer && !isScreenSharing}
+                className="flex flex-col items-center gap-0.5 px-1 disabled:opacity-30 shrink-0">
+                <div className={cn("w-9 h-9 rounded-full flex items-center justify-center transition-all",
+                  isScreenSharing ? "bg-foreground/90" : "bg-transparent")}>
+                  <HugeiconsIcon icon={ComputerScreenShareIcon} size={16} className={isScreenSharing ? "text-background" : "text-foreground"} />
+                </div>
+              </button>
+            )}
 
-            <button onClick={handleToggleHand} className="flex flex-col items-center gap-0.5 px-1.5 md:px-2">
-              <div className={cn("w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
+            <div className="w-px h-6 md:h-8 bg-white/10 dark:bg-white/6 mx-0.5 shrink-0 hidden md:block" />
+
+            {/* Desktop: secondary controls inline */}
+            <button onClick={handleToggleHand} className="hidden md:flex flex-col items-center gap-0.5 px-2 shrink-0">
+              <div className={cn("w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
                 myHandRaised ? "bg-amber-500/20" : "bg-transparent")}>
-                <HugeiconsIcon icon={WavingHand01Icon} size={18} className={cn("transition-colors", myHandRaised ? "text-amber-500" : "text-foreground", myHandRaised && "animate-bounce")} />
+                <span className={cn("text-base md:text-lg leading-none transition-transform", myHandRaised && "animate-bounce")}>✋</span>
               </div>
               <span className="text-[9px] text-muted-foreground font-medium hidden md:block">{myHandRaised ? "Lower" : "Raise"}</span>
             </button>
 
-            <div className="relative">
-              <button onClick={() => setShowReactionPicker(!showReactionPicker)} className="flex flex-col items-center gap-0.5 px-1.5 md:px-2">
-                <div className="w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center bg-transparent">
-                  <HugeiconsIcon icon={SmileIcon} size={18} className="text-foreground" />
+            <div className="relative shrink-0 hidden md:block">
+              <button onClick={() => setShowReactionPicker(!showReactionPicker)} className="flex flex-col items-center gap-0.5 px-2">
+                <div className="w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center bg-transparent">
+                  <span className="text-base md:text-lg leading-none">😊</span>
                 </div>
                 <span className="text-[9px] text-muted-foreground font-medium hidden md:block">React</span>
               </button>
               {showReactionPicker && (
-                <div className="absolute bottom-14 md:bottom-16 left-1/2 -translate-x-1/2 flex gap-1 px-2 py-1.5 rounded-2xl animate-in fade-in zoom-in-95 duration-150 bg-background/95 backdrop-blur-xl border border-border dark:border-white/10 shadow-lg">
-                  {REACTIONS.map((r) => (
-                    <button key={r.id} onClick={() => handleReaction(r.id)}
-                      className="w-9 h-9 md:w-10 md:h-10 rounded-xl flex items-center justify-center hover:bg-muted transition-colors hover:scale-110 active:scale-95"
-                      title={r.label}>
-                      <HugeiconsIcon icon={r.icon} size={20} className="text-foreground" />
-                    </button>
-                  ))}
+                <div className="absolute bottom-16 left-1/2 -translate-x-1/2 rounded-2xl animate-in fade-in zoom-in-95 duration-150 bg-background/95 backdrop-blur-xl border border-border dark:border-white/10 shadow-lg p-2">
+                  <div className="flex gap-1">
+                    {REACTIONS.map((r) => (
+                      <button key={r.id} onClick={() => handleReaction(r.id)}
+                        className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-muted transition-colors hover:scale-110 active:scale-95"
+                        title={r.label}>
+                        <span className="text-xl leading-none">{r.emoji}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
 
-            <div className="w-px h-8 bg-white/10 dark:bg-white/6 mx-0.5" />
+            <div className="w-px h-8 bg-white/10 dark:bg-white/6 mx-0.5 shrink-0 hidden md:block" />
 
-            <button onClick={() => setActiveTab(activeTab === "people" ? null : "people")} className="flex flex-col items-center gap-0.5 px-1.5 md:px-2 relative">
-              <div className={cn("w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
+            <button onClick={() => setActiveTab(activeTab === "people" ? null : "people")} className="hidden md:flex flex-col items-center gap-0.5 px-2 relative shrink-0">
+              <div className={cn("w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
                 activeTab === "people" ? "bg-foreground/90" : "bg-transparent")}>
-                <HugeiconsIcon icon={UserGroupIcon} size={18} className={activeTab === "people" ? "text-background" : "text-foreground"} />
+                <HugeiconsIcon icon={UserGroupIcon} size={16} className={cn("md:w-4.5! md:h-4.5!", activeTab === "people" ? "text-background" : "text-foreground")} />
               </div>
               {pendingRequests.length > 0 && (
-                <span className="absolute top-0 right-0.5 w-4 h-4 rounded-full bg-amber-500 text-[9px] flex items-center justify-center text-white font-bold">{pendingRequests.length}</span>
+                <span className="absolute -top-0.5 right-0 w-4 h-4 rounded-full bg-amber-500 text-[9px] flex items-center justify-center text-white font-bold">{pendingRequests.length}</span>
               )}
               <span className="text-[9px] text-muted-foreground font-medium hidden md:block">People</span>
             </button>
 
-            <button onClick={() => { setActiveTab(activeTab === "chat" ? null : "chat"); setUnreadChat(0) }} className="flex flex-col items-center gap-0.5 px-1.5 md:px-2 relative">
-              <div className={cn("w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
+            <button onClick={() => { setActiveTab(activeTab === "chat" ? null : "chat"); setUnreadChat(0) }} className="hidden md:flex flex-col items-center gap-0.5 px-2 relative shrink-0">
+              <div className={cn("w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
                 activeTab === "chat" ? "bg-foreground/90" : "bg-transparent")}>
-                <HugeiconsIcon icon={BubbleChatIcon} size={18} className={activeTab === "chat" ? "text-background" : "text-foreground"} />
+                <HugeiconsIcon icon={BubbleChatIcon} size={16} className={cn("md:w-4.5! md:h-4.5!", activeTab === "chat" ? "text-background" : "text-foreground")} />
               </div>
               {unreadChat > 0 && activeTab !== "chat" && (
-                <span className="absolute top-0 right-0.5 w-4 h-4 rounded-full bg-primary text-[9px] flex items-center justify-center text-primary-foreground font-bold">{unreadChat > 9 ? "9+" : unreadChat}</span>
+                <span className="absolute -top-0.5 right-0 w-4 h-4 rounded-full bg-primary text-[9px] flex items-center justify-center text-primary-foreground font-bold">{unreadChat > 9 ? "9+" : unreadChat}</span>
               )}
               <span className="text-[9px] text-muted-foreground font-medium hidden md:block">Chat</span>
             </button>
 
-            <button onClick={() => setActiveTab(activeTab === "polls" ? null : "polls")} className="flex flex-col items-center gap-0.5 px-1.5 md:px-2">
-              <div className={cn("w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
+            <button onClick={() => setActiveTab(activeTab === "polls" ? null : "polls")} className="hidden md:flex flex-col items-center gap-0.5 px-2 shrink-0">
+              <div className={cn("w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
                 activeTab === "polls" ? "bg-foreground/90" : "bg-transparent")}>
-                <HugeiconsIcon icon={ChartColumnIcon} size={18} className={activeTab === "polls" ? "text-background" : "text-foreground"} />
+                <HugeiconsIcon icon={ChartColumnIcon} size={16} className={cn("md:w-4.5! md:h-4.5!", activeTab === "polls" ? "text-background" : "text-foreground")} />
               </div>
               <span className="text-[9px] text-muted-foreground font-medium hidden md:block">Polls</span>
             </button>
 
-            <div className="w-px h-8 bg-white/10 dark:bg-white/6 mx-0.5" />
+            <div className="w-px h-6 md:h-8 bg-white/10 dark:bg-white/6 mx-0.5 shrink-0" />
 
-            <button onClick={handleEndMeeting} className="flex flex-col items-center gap-0.5 px-1.5 md:px-2">
-              <div className="w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center bg-red-500/85">
-                <HugeiconsIcon icon={CallEnd01Icon} size={20} className="text-white" />
+            <button onClick={handleEndMeeting} className="flex flex-col items-center gap-0.5 px-1 md:px-2 shrink-0">
+              <div className="w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center bg-red-500/85">
+                <HugeiconsIcon icon={CallEnd01Icon} size={18} className="text-white" />
               </div>
               <span className="text-[9px] text-muted-foreground font-medium hidden md:block">{isHost ? "End" : "Leave"}</span>
             </button>
@@ -1602,6 +1795,31 @@ export default function MeetingsPage() {
       {waitingForApproval && <WaitingRoom meetingTitle={waitingForApproval} onCancel={() => setWaitingForApproval(null)} />}
 
       <Topbar title="Meetings" />
+
+      {/* Return-to-meeting banner when minimized */}
+      {activeMeeting && isJoined && meetingCtx.isMinimized && (
+        <div className="px-4 pt-2">
+          <button
+            onClick={() => meetingCtx.setMinimized(false)}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/15 transition-colors"
+          >
+            <div className="w-9 h-9 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0">
+              <HugeiconsIcon icon={Video01Icon} size={16} className="text-emerald-500" />
+            </div>
+            <div className="flex-1 text-left min-w-0">
+              <span className="text-sm font-medium text-foreground truncate block">{activeMeeting.title}</span>
+              <span className="text-xs text-emerald-600 dark:text-emerald-400">Tap to return to meeting</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              <MeetingTimer startTime={meetingStartTime} />
+            </div>
+          </button>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-6xl mx-auto px-4 py-6">
