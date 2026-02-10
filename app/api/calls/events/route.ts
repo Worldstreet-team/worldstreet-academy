@@ -2,8 +2,14 @@ import { NextRequest } from "next/server"
 import { getCurrentUser } from "@/lib/auth"
 import { subscribeToEvents, type SSEEventPayload } from "@/lib/call-events"
 
+// IMPORTANT: Mongoose requires Node.js runtime (not Edge)
+// SSE on serverless has timeout limits:
+// - Vercel Hobby: 10s max
+// - Vercel Pro: up to 300s with maxDuration config
+// - Alternative: Use Pusher/Ably/WebSocket service for production
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
+export const maxDuration = 300 // 5 minutes (requires Vercel Pro or Enterprise)
 
 /**
  * Unified SSE endpoint for real-time events (calls + messages).
@@ -82,6 +88,10 @@ export async function GET(req: NextRequest) {
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
       "X-Accel-Buffering": "no", // Disable nginx buffering
+      // Prevent compression that might buffer the response
+      "Content-Encoding": "none",
+      // Help Vercel/serverless platforms understand this is long-running
+      "Transfer-Encoding": "chunked",
     },
   })
 }
