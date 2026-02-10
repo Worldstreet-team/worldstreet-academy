@@ -178,7 +178,7 @@ export async function joinMeeting(meetingId: string): Promise<{
       const participant = await addParticipant(meeting.meetingId, {
         name: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
         customParticipantId: currentUser.id,
-        presetName: "group_call_host",
+        presetName: "group_call_participant",
       })
 
       const host = await User.findById(meeting.hostId).select("firstName lastName avatarUrl").lean()
@@ -238,7 +238,7 @@ export async function joinMeeting(meetingId: string): Promise<{
     const participant = await addParticipant(meeting.meetingId, {
       name: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
       customParticipantId: currentUser.id,
-      presetName: "group_call_host",
+      presetName: "group_call_participant",
     })
 
     const host = await User.findById(meeting.hostId).select("firstName lastName avatarUrl").lean()
@@ -299,7 +299,7 @@ export async function admitParticipant(
     const rtkParticipant = await addParticipant(meeting.meetingId, {
       name: user ? `${user.firstName} ${user.lastName}`.trim() : "Participant",
       customParticipantId: userId,
-      presetName: "group_call_host",
+      presetName: "group_call_participant",
     })
 
     // Notify the participant that they've been admitted
@@ -539,7 +539,7 @@ export async function getMeetingDetails(meetingId: string): Promise<{
         const rtkP = await addParticipant(meeting.meetingId, {
           name: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
           customParticipantId: currentUser.id,
-          presetName: "group_call_host",
+          presetName: "group_call_participant",
         })
         authToken = rtkP.authToken
       }
@@ -652,5 +652,191 @@ export async function leaveMeeting(meetingId: string): Promise<{
   } catch (error) {
     console.error("Error leaving meeting:", error)
     return { success: false, error: "Failed to leave meeting" }
+  }
+}
+
+// ── Invite to stage (host only) ──
+
+export async function inviteToStage(
+  meetingId: string,
+  userId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await connectDB()
+    const currentUser = await getCurrentUser()
+    if (!currentUser) return { success: false, error: "Unauthorized" }
+
+    const meeting = await Meeting.findById(meetingId)
+    if (!meeting) return { success: false, error: "Meeting not found" }
+    if (meeting.hostId.toString() !== currentUser.id) {
+      return { success: false, error: "Only the host can invite to stage" }
+    }
+
+    const user = await User.findById(userId).select("firstName lastName avatarUrl").lean()
+    const eventPayload: MeetingEventPayload = {
+      type: "meeting:stage-invite",
+      meetingId: meeting._id.toString(),
+      meetingTitle: meeting.title,
+      userId: currentUser.id,
+      userName: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
+      userAvatar: currentUser.avatarUrl,
+    }
+    emitEvent(userId, eventPayload)
+
+    // Also notify all other admitted participants so they update their state
+    const otherParticipantIds = meeting.participants
+      .filter((p) => p.status === "admitted" && p.userId.toString() !== userId && p.userId.toString() !== currentUser.id)
+      .map((p) => p.userId.toString())
+
+    if (otherParticipantIds.length > 0) {
+      const broadcastPayload: MeetingEventPayload = {
+        type: "meeting:stage-invite",
+        meetingId: meeting._id.toString(),
+        meetingTitle: meeting.title,
+        userId,
+        userName: user ? `${user.firstName} ${user.lastName}`.trim() : "Participant",
+        userAvatar: user?.avatarUrl || null,
+      }
+      emitEventToMany(otherParticipantIds, broadcastPayload)
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error inviting to stage:", error)
+    return { success: false, error: "Failed to invite to stage" }
+  }
+}
+
+// ── Remove from stage (host only) ──
+
+export async function removeFromStage(
+  meetingId: string,
+  userId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await connectDB()
+    const currentUser = await getCurrentUser()
+    if (!currentUser) return { success: false, error: "Unauthorized" }
+
+    const meeting = await Meeting.findById(meetingId)
+    if (!meeting) return { success: false, error: "Meeting not found" }
+    if (meeting.hostId.toString() !== currentUser.id) {
+      return { success: false, error: "Only the host can remove from stage" }
+    }
+
+    const user = await User.findById(userId).select("firstName lastName avatarUrl").lean()
+    const eventPayload: MeetingEventPayload = {
+      type: "meeting:stage-removed",
+      meetingId: meeting._id.toString(),
+      meetingTitle: meeting.title,
+      userId: currentUser.id,
+      userName: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
+      userAvatar: currentUser.avatarUrl,
+    }
+    emitEvent(userId, eventPayload)
+
+    // Also notify others
+    const otherParticipantIds = meeting.participants
+      .filter((p) => p.status === "admitted" && p.userId.toString() !== userId && p.userId.toString() !== currentUser.id)
+      .map((p) => p.userId.toString())
+
+    if (otherParticipantIds.length > 0) {
+      const broadcastPayload: MeetingEventPayload = {
+        type: "meeting:stage-removed",
+        meetingId: meeting._id.toString(),
+        meetingTitle: meeting.title,
+        userId,
+        userName: user ? `${user.firstName} ${user.lastName}`.trim() : "Participant",
+        userAvatar: user?.avatarUrl || null,
+      }
+      emitEventToMany(otherParticipantIds, broadcastPayload)
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error removing from stage:", error)
+    return { success: false, error: "Failed to remove from stage" }
+  }
+}
+
+// ── Raise / lower hand ──
+
+export async function toggleHandRaise(
+  meetingId: string,
+  raised: boolean
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await connectDB()
+    const currentUser = await getCurrentUser()
+    if (!currentUser) return { success: false, error: "Unauthorized" }
+
+    const meeting = await Meeting.findById(meetingId)
+    if (!meeting) return { success: false, error: "Meeting not found" }
+
+    // Notify the host
+    const eventPayload: MeetingEventPayload = {
+      type: raised ? "meeting:hand-raised" : "meeting:hand-lowered",
+      meetingId: meeting._id.toString(),
+      meetingTitle: meeting.title,
+      userId: currentUser.id,
+      userName: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
+      userAvatar: currentUser.avatarUrl,
+    }
+
+    // Send to all admitted participants so everyone sees the hand
+    const participantIds = meeting.participants
+      .filter((p) => p.status === "admitted" && p.userId.toString() !== currentUser.id)
+      .map((p) => p.userId.toString())
+    // Include host
+    if (!participantIds.includes(meeting.hostId.toString())) {
+      participantIds.push(meeting.hostId.toString())
+    }
+    emitEventToMany(participantIds, eventPayload)
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error toggling hand raise:", error)
+    return { success: false, error: "Failed to toggle hand" }
+  }
+}
+
+// ── Send reaction ──
+
+export async function sendReaction(
+  meetingId: string,
+  emoji: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await connectDB()
+    const currentUser = await getCurrentUser()
+    if (!currentUser) return { success: false, error: "Unauthorized" }
+
+    const meeting = await Meeting.findById(meetingId)
+    if (!meeting) return { success: false, error: "Meeting not found" }
+
+    const eventPayload: MeetingEventPayload = {
+      type: "meeting:reaction",
+      meetingId: meeting._id.toString(),
+      meetingTitle: meeting.title,
+      userId: currentUser.id,
+      userName: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
+      userAvatar: currentUser.avatarUrl,
+      emoji,
+    }
+
+    // Send to all admitted participants
+    const participantIds = meeting.participants
+      .filter((p) => p.status === "admitted" && p.userId.toString() !== currentUser.id)
+      .map((p) => p.userId.toString())
+    // Include host
+    if (meeting.hostId.toString() !== currentUser.id && !participantIds.includes(meeting.hostId.toString())) {
+      participantIds.push(meeting.hostId.toString())
+    }
+    emitEventToMany(participantIds, eventPayload)
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error sending reaction:", error)
+    return { success: false, error: "Failed to send reaction" }
   }
 }

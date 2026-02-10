@@ -48,6 +48,11 @@ export type MeetingEventType =
   | "meeting:ended"
   | "meeting:participant-joined"
   | "meeting:participant-left"
+  | "meeting:stage-invite"
+  | "meeting:stage-removed"
+  | "meeting:hand-raised"
+  | "meeting:hand-lowered"
+  | "meeting:reaction"
 
 export type MeetingEventPayload = {
   type: MeetingEventType
@@ -58,6 +63,8 @@ export type MeetingEventPayload = {
   userAvatar: string | null
   /** RTK auth token — included in meeting:admitted so joiner can init immediately */
   authToken?: string
+  /** Emoji for reactions */
+  emoji?: string
 }
 
 export type MessageEventPayload = {

@@ -38,6 +38,7 @@ export type MessageType = {
   isDelivered?: boolean
   status?: "pending" | "sent" | "error"
   uploadProgress?: number
+  isNew?: boolean
 }
 
 type MessageBubbleProps = {

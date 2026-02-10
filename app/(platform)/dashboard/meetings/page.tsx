@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
+import Image from "next/image"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   Add01Icon,
@@ -41,11 +42,24 @@ import {
   leaveMeeting,
   admitParticipant,
   declineParticipant,
+  toggleHandRaise,
+  sendReaction,
   type MeetingWithDetails,
   type MeetingParticipantDetails,
 } from "@/lib/actions/meetings"
 
-/* ─── Glass Button ──────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   CONSTANTS
+   ═══════════════════════════════════════════════════════════════ */
+
+const REACTION_EMOJIS = ["👏", "❤️", "😂", "🎉", "👍"]
+const TILES_PER_PAGE = 4
+
+/* ═══════════════════════════════════════════════════════════════
+   SUB-COMPONENTS
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Glass Button (meeting controls) ─────────────────────────── */
 function GlassButton({
   onClick,
   children,
@@ -75,25 +89,26 @@ function GlassButton({
         disabled={disabled}
         className={cn(
           "w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200",
-          "active:scale-95 disabled:opacity-50",
+          "hover:scale-105 active:scale-95 disabled:opacity-40 disabled:pointer-events-none",
           className,
         )}
         style={{
           background: bg[variant],
           backdropFilter: "blur(16px)",
           WebkitBackdropFilter: "blur(16px)",
+          border: "1px solid rgba(255,255,255,0.1)",
         }}
       >
         {children}
       </button>
       {label && (
-        <span className="text-[10px] text-white/60 font-medium">{label}</span>
+        <span className="text-[10px] text-white/50 font-medium">{label}</span>
       )}
     </div>
   )
 }
 
-/* ─── Timer ─────────────────────────────────────────────────── */
+/* ── Meeting Timer ───────────────────────────────────────────── */
 function MeetingTimer({ startTime }: { startTime: Date | null }) {
   const [elapsed, setElapsed] = useState(0)
   useEffect(() => {
@@ -115,7 +130,7 @@ function MeetingTimer({ startTime }: { startTime: Date | null }) {
   )
 }
 
-/* ─── Participant Tile ──────────────────────────────────────── */
+/* ── Participant Tile (glassmorphic) ─────────────────────────── */
 function ParticipantTile({
   name,
   avatar,
@@ -124,6 +139,7 @@ function ParticipantTile({
   isLocal,
   isSpeaking,
   isScreenShare,
+  handRaised,
   videoRef,
   className: cls,
 }: {
@@ -134,6 +150,7 @@ function ParticipantTile({
   isLocal?: boolean
   isSpeaking?: boolean
   isScreenShare?: boolean
+  handRaised?: boolean
   videoRef?: React.RefObject<HTMLVideoElement | null>
   className?: string
 }) {
@@ -147,13 +164,15 @@ function ParticipantTile({
   return (
     <div
       className={cn(
-        "relative rounded-2xl overflow-hidden bg-zinc-900/80 flex items-center justify-center transition-all duration-200",
-        isSpeaking && "ring-2 ring-emerald-400/60",
+        "relative rounded-2xl overflow-hidden flex items-center justify-center transition-all duration-300",
+        isSpeaking && "ring-2 ring-emerald-400/60 ring-offset-1 ring-offset-transparent",
         cls,
       )}
       style={{
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
+        background: "rgba(30,30,35,0.7)",
+        backdropFilter: "blur(20px)",
+        WebkitBackdropFilter: "blur(20px)",
+        border: "1px solid rgba(255,255,255,0.08)",
       }}
     >
       {!isVideoOff && videoRef ? (
@@ -169,133 +188,92 @@ function ParticipantTile({
         />
       ) : (
         <div className="flex flex-col items-center gap-2">
-          <Avatar className="w-16 h-16">
+          <Avatar className="w-16 h-16 ring-2 ring-white/10">
             {avatar && <AvatarImage src={avatar} alt={name} />}
-            <AvatarFallback className="text-xl bg-zinc-700 text-white">
+            <AvatarFallback className="text-xl bg-white/10 text-white/80">
               {initials}
             </AvatarFallback>
           </Avatar>
         </div>
       )}
 
+      {handRaised && (
+        <div className="absolute top-2 right-2 text-lg animate-bounce">✋</div>
+      )}
+
       <div
         className="absolute bottom-0 left-0 right-0 px-3 py-2 flex items-center justify-between"
         style={{
-          background:
-            "linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 100%)",
+          background: "linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 100%)",
         }}
       >
         <span className="text-xs font-medium text-white truncate">
           {isLocal ? "You" : name}
         </span>
-        {isMuted && (
-          <div className="w-5 h-5 rounded-full bg-red-500/80 flex items-center justify-center">
-            <HugeiconsIcon icon={MicOff01Icon} size={10} className="text-white" />
-          </div>
-        )}
+        <div className="flex items-center gap-1">
+          {isMuted && (
+            <div className="w-5 h-5 rounded-full bg-red-500/80 flex items-center justify-center">
+              <HugeiconsIcon icon={MicOff01Icon} size={10} className="text-white" />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
 }
 
-/* ─── Pending Request Card ──────────────────────────────────── */
-function PendingRequestCard({
-  request,
-  onAdmit,
-  onDecline,
+/* ── Audio player for remote participants ─────────────────────
+   RTK/Dyte custom UI requires explicit audio element registration
+   to hear other participants. Without this, only video renders. */
+function RemoteAudioPlayer({
+  participantId,
+  audioEnabled,
 }: {
-  request: MeetingParticipantDetails
-  onAdmit: () => void
-  onDecline: () => void
+  participantId: string
+  audioEnabled: boolean
 }) {
-  const initials = request.name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2)
+  const audioRef = useRef<HTMLAudioElement>(null)
 
-  return (
-    <div
-      className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
-      style={{
-        background: "rgba(255,255,255,0.08)",
-        backdropFilter: "blur(12px)",
-      }}
-    >
-      <Avatar className="w-9 h-9">
-        {request.avatar && (
-          <AvatarImage src={request.avatar} alt={request.name} />
-        )}
-        <AvatarFallback className="text-xs bg-zinc-700 text-white">
-          {initials}
-        </AvatarFallback>
-      </Avatar>
-      <span className="flex-1 text-sm font-medium text-white truncate">
-        {request.name}
-      </span>
-      <button
-        onClick={onAdmit}
-        className="w-8 h-8 rounded-full bg-emerald-500/80 flex items-center justify-center hover:bg-emerald-500 transition-colors"
-      >
-        <HugeiconsIcon
-          icon={CheckmarkCircle01Icon}
-          size={16}
-          className="text-white"
-        />
-      </button>
-      <button
-        onClick={onDecline}
-        className="w-8 h-8 rounded-full bg-red-500/80 flex items-center justify-center hover:bg-red-500 transition-colors"
-      >
-        <HugeiconsIcon icon={Cancel01Icon} size={16} className="text-white" />
-      </button>
-    </div>
-  )
+  useEffect(() => {
+    const client = rtkClient.client
+    if (!client || !audioRef.current) return
+
+    const p = client.participants.joined.get(participantId)
+    if (!p) return
+
+    const el = audioRef.current
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const participant = p as any
+
+    // Prefer SDK built-in registration (handles track changes automatically)
+    if (typeof participant.registerAudioElement === "function") {
+      participant.registerAudioElement(el)
+      return
+    }
+
+    // Fallback: manually pipe the raw audio track into the element
+    if (audioEnabled && participant.audioTrack) {
+      el.srcObject = new MediaStream([participant.audioTrack])
+      el.play().catch(() => {})
+    } else {
+      el.srcObject = null
+    }
+  }, [participantId, audioEnabled])
+
+  return <audio ref={audioRef} autoPlay playsInline />
 }
 
-/* ─── Admitted Row ──────────────────────────────────────────── */
-function AdmittedRow({
-  name,
-  avatar,
-}: {
-  name: string
-  avatar?: string | null
-}) {
-  const initials = name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2)
-  return (
-    <div
-      className="flex items-center gap-2.5 px-3 py-2 rounded-lg"
-      style={{ background: "rgba(255,255,255,0.05)" }}
-    >
-      <Avatar className="w-7 h-7">
-        {avatar && <AvatarImage src={avatar} alt={name} />}
-        <AvatarFallback className="text-[10px] bg-zinc-700 text-white">
-          {initials}
-        </AvatarFallback>
-      </Avatar>
-      <span className="text-xs font-medium text-white/80 truncate">{name}</span>
-    </div>
-  )
-}
-
-/* ─── Remote Participant Tile ───────────────────────────────── */
+/* ── Remote Participant Tile ─────────────────────────────────── */
 function RemoteParticipantTile({
   participantId,
   participant,
+  handRaised,
   className,
 }: {
   participantId: string
-  participant: {
-    name: string
-    audioEnabled: boolean
-    videoEnabled: boolean
-  }
+  participant: { name: string; audioEnabled: boolean; videoEnabled: boolean }
+  handRaised?: boolean
   className?: string
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -303,8 +281,12 @@ function RemoteParticipantTile({
   useEffect(() => {
     const client = rtkClient.client
     if (!client || !videoRef.current) return
+    if (!participant.videoEnabled) return
+
     const p = client.participants.joined.get(participantId)
-    if (p) p.registerVideoElement(videoRef.current)
+    if (p && videoRef.current) {
+      p.registerVideoElement(videoRef.current)
+    }
   }, [participantId, participant.videoEnabled])
 
   return (
@@ -312,13 +294,14 @@ function RemoteParticipantTile({
       name={participant.name}
       isMuted={!participant.audioEnabled}
       isVideoOff={!participant.videoEnabled}
+      handRaised={handRaised}
       videoRef={videoRef}
       className={className}
     />
   )
 }
 
-/* ─── Screen Share View ─────────────────────────────────────── */
+/* ── Screen Share View ───────────────────────────────────────── */
 function ScreenShareView({
   participantId,
   participantName,
@@ -335,10 +318,8 @@ function ScreenShareView({
     if (!client || !videoRef.current) return
     const el = videoRef.current
 
-    // Attach the screen share track to the video element via srcObject
     function attachTrack() {
       if (!el || !client) return
-
       let tracks: { video?: MediaStreamTrack; audio?: MediaStreamTrack } | undefined
       if (isLocal) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -348,7 +329,6 @@ function ScreenShareView({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         tracks = (p as any)?.screenShareTracks
       }
-
       if (tracks?.video) {
         const stream = new MediaStream([tracks.video])
         el.srcObject = stream
@@ -356,24 +336,17 @@ function ScreenShareView({
       }
     }
 
-    // Try immediately (tracks should be ready since screenShareUpdate fired)
     attachTrack()
 
-    // Also listen for track changes in case they aren't ready yet
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handler = (payload: any) => {
-      if (payload.screenShareEnabled) {
-        requestAnimationFrame(attachTrack)
-      }
+      if (payload?.screenShareEnabled ?? payload) requestAnimationFrame(attachTrack)
     }
 
     if (isLocal) {
       client.self.on("screenShareUpdate" as never, handler as never)
       return () => {
-        client.self.removeListener(
-          "screenShareUpdate" as never,
-          handler as never,
-        )
+        client.self.removeListener("screenShareUpdate" as never, handler as never)
         if (el) el.srcObject = null
       }
     } else {
@@ -381,10 +354,7 @@ function ScreenShareView({
       if (p) {
         p.on("screenShareUpdate" as never, handler as never)
         return () => {
-          p.removeListener(
-            "screenShareUpdate" as never,
-            handler as never,
-          )
+          p.removeListener("screenShareUpdate" as never, handler as never)
           if (el) el.srcObject = null
         }
       }
@@ -395,7 +365,14 @@ function ScreenShareView({
   }, [participantId, isLocal])
 
   return (
-    <div className="relative flex-1 rounded-2xl overflow-hidden bg-black flex items-center justify-center min-h-0">
+    <div
+      className="relative flex-1 rounded-2xl overflow-hidden flex items-center justify-center min-h-0"
+      style={{
+        background: "rgba(0,0,0,0.6)",
+        backdropFilter: "blur(20px)",
+        border: "1px solid rgba(255,255,255,0.08)",
+      }}
+    >
       <video
         ref={videoRef}
         autoPlay
@@ -406,8 +383,7 @@ function ScreenShareView({
       <div
         className="absolute bottom-0 left-0 right-0 px-4 py-2"
         style={{
-          background:
-            "linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%)",
+          background: "linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%)",
         }}
       >
         <div className="flex items-center gap-2">
@@ -427,7 +403,27 @@ function ScreenShareView({
   )
 }
 
-/* ─── Setup Overlay ─────────────────────────────────────────── */
+/* ── Floating Reaction ───────────────────────────────────────── */
+function FloatingReaction({
+  emoji,
+  onDone,
+}: {
+  emoji: string
+  onDone: () => void
+}) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 2500)
+    return () => clearTimeout(t)
+  }, [onDone])
+
+  return (
+    <div className="animate-float-up text-3xl pointer-events-none select-none">
+      {emoji}
+    </div>
+  )
+}
+
+/* ── Setup Overlay ───────────────────────────────────────────── */
 function SetupOverlay({ message }: { message: string }) {
   return (
     <div className="fixed inset-0 z-50 bg-zinc-950/90 flex flex-col items-center justify-center gap-5">
@@ -450,7 +446,7 @@ function SetupOverlay({ message }: { message: string }) {
   )
 }
 
-/* ─── Waiting Room ──────────────────────────────────────────── */
+/* ── Waiting Room ────────────────────────────────────────────── */
 function WaitingRoom({
   meetingTitle,
   onCancel,
@@ -461,9 +457,7 @@ function WaitingRoom({
   return (
     <div className="fixed inset-0 z-50 bg-zinc-950 flex flex-col items-center justify-center">
       <div className="absolute inset-0 bg-linear-to-br from-zinc-900 via-zinc-950 to-black" />
-
       <div className="relative z-10 flex flex-col items-center gap-8">
-        {/* Pulsing ring animation */}
         <div className="relative">
           <div className="absolute inset-0 w-28 h-28 rounded-full bg-emerald-500/10 animate-ping" />
           <div
@@ -481,14 +475,12 @@ function WaitingRoom({
             />
           </div>
         </div>
-
         <div className="text-center space-y-2">
           <h2 className="text-white text-xl font-semibold">{meetingTitle}</h2>
           <p className="text-white/40 text-sm">
             Waiting for the host to let you in…
           </p>
         </div>
-
         <Button
           variant="outline"
           size="sm"
@@ -502,11 +494,12 @@ function WaitingRoom({
   )
 }
 
-/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-/*                         Main Page                            */
-/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* ═══════════════════════════════════════════════════════════════
+   MAIN PAGE COMPONENT
+   ═══════════════════════════════════════════════════════════════ */
 
 type ScreenSharer = { id: string; name: string; isLocal: boolean }
+type ReactionItem = { id: string; emoji: string; left: number }
 
 export default function MeetingsPage() {
   const user = useUser()
@@ -524,7 +517,7 @@ export default function MeetingsPage() {
   const [activeMeeting, setActiveMeeting] = useState<MeetingWithDetails | null>(
     null,
   )
-  const [isMuted, setIsMuted] = useState(true)
+  const [isMuted, setIsMuted] = useState(false) // audio ON by default
   const [isVideoOff, setIsVideoOff] = useState(true)
   const [isScreenSharing, setIsScreenSharing] = useState(false)
   const [meetingStartTime, setMeetingStartTime] = useState<Date | null>(null)
@@ -536,14 +529,20 @@ export default function MeetingsPage() {
     MeetingParticipantDetails[]
   >([])
   const [remoteParticipants, setRemoteParticipants] = useState<
-    Map<
-      string,
-      { name: string; audioEnabled: boolean; videoEnabled: boolean }
-    >
+    Map<string, { name: string; audioEnabled: boolean; videoEnabled: boolean }>
   >(new Map())
   const [isJoined, setIsJoined] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
   const [screenSharer, setScreenSharer] = useState<ScreenSharer | null>(null)
+
+  /* ── Hand-raise & reactions ── */
+  const [raisedHands, setRaisedHands] = useState<Set<string>>(new Set())
+  const [myHandRaised, setMyHandRaised] = useState(false)
+  const [reactions, setReactions] = useState<ReactionItem[]>([])
+  const [showReactionPicker, setShowReactionPicker] = useState(false)
+
+  /* ── Grid carousel ── */
+  const [gridPage, setGridPage] = useState(0)
 
   /* ── Setup / waiting state ── */
   const [setupMessage, setSetupMessage] = useState<string | null>(null)
@@ -553,13 +552,23 @@ export default function MeetingsPage() {
 
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const isHost = activeMeeting?.hostId === user.id
+
+  // Refs for stable callback access
   const waitingRef = useRef(waitingForApproval)
   waitingRef.current = waitingForApproval
   const activeMeetingRef = useRef(activeMeeting)
   activeMeetingRef.current = activeMeeting
   const joinRTKRef = useRef<
-    (authToken: string, meetingId?: string, meetingTitle?: string) => Promise<void>
+    (
+      authToken: string,
+      meetingId?: string,
+      meetingTitle?: string,
+    ) => Promise<void>
   >(async () => {})
+
+  /* ═══════════════════════════════════════════════════════════
+     EFFECTS
+     ═══════════════════════════════════════════════════════════ */
 
   /* ── Load meetings on mount ── */
   useEffect(() => {
@@ -583,7 +592,28 @@ export default function MeetingsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
-  /* ── SSE listener for meeting events (via window CustomEvent from CallProvider) ── */
+  /* ── Register local video element when meeting view mounts ── */
+  useEffect(() => {
+    if (!isJoined) return
+    const client = rtkClient.client
+    if (!client) return
+
+    const raf = requestAnimationFrame(() => {
+      if (localVideoRef.current) {
+        client.self.registerVideoElement(localVideoRef.current, true)
+      }
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [isJoined, isVideoOff])
+
+  /* ── Auto-reset grid page when participant count changes ── */
+  useEffect(() => {
+    const total = remoteParticipants.size + 1
+    const maxPage = Math.max(0, Math.ceil(total / TILES_PER_PAGE) - 1)
+    setGridPage((prev) => Math.min(prev, maxPage))
+  }, [remoteParticipants.size])
+
+  /* ── SSE listener for meeting events ── */
   useEffect(() => {
     function handleSSE(evt: Event) {
       const e = (evt as CustomEvent).detail as MeetingEventPayload & {
@@ -623,12 +653,33 @@ export default function MeetingsPage() {
         case "meeting:ended":
           if (activeMeetingRef.current) handleForceLeave()
           break
+
+        case "meeting:hand-raised":
+          setRaisedHands((prev) => new Set(prev).add(e.userId))
+          break
+
+        case "meeting:hand-lowered":
+          setRaisedHands((prev) => {
+            const next = new Set(prev)
+            next.delete(e.userId)
+            return next
+          })
+          break
+
+        case "meeting:reaction":
+          if (e.emoji) {
+            const id = `${Date.now()}-${Math.random()}`
+            const left = 10 + Math.random() * 80
+            setReactions((prev) => [...prev, { id, emoji: e.emoji!, left }])
+          }
+          break
       }
     }
 
     window.addEventListener("sse:event", handleSSE)
     return () => window.removeEventListener("sse:event", handleSSE)
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user.id])
 
   /* ── RTK event listeners ── */
   useEffect(() => {
@@ -636,6 +687,47 @@ export default function MeetingsPage() {
     const client = rtkClient.client
     if (!client) return
 
+    // ────── Populate existing participants on join ──────
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const joined = client.participants.joined as any
+      const existing: Array<{
+        id: string
+        name: string
+        audioEnabled: boolean
+        videoEnabled: boolean
+        screenShareEnabled?: boolean
+      }> = []
+      if (typeof joined.toArray === "function") {
+        existing.push(...joined.toArray())
+      } else if (typeof joined.forEach === "function") {
+        joined.forEach((p: (typeof existing)[0]) => existing.push(p))
+      } else if (typeof joined[Symbol.iterator] === "function") {
+        for (const p of joined) existing.push(p)
+      }
+
+      if (existing.length > 0) {
+        const map = new Map<
+          string,
+          { name: string; audioEnabled: boolean; videoEnabled: boolean }
+        >()
+        for (const p of existing) {
+          map.set(p.id, {
+            name: p.name,
+            audioEnabled: p.audioEnabled,
+            videoEnabled: p.videoEnabled,
+          })
+          if (p.screenShareEnabled) {
+            setScreenSharer({ id: p.id, name: p.name, isLocal: false })
+          }
+        }
+        setRemoteParticipants(map)
+      }
+    } catch (err) {
+      console.warn("[Meeting] Error populating existing participants:", err)
+    }
+
+    // ────── Event handlers ──────
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handleParticipantJoined = (p: any) => {
       setRemoteParticipants((prev) => {
@@ -659,35 +751,43 @@ export default function MeetingsPage() {
       setScreenSharer((prev) => (prev?.id === p.id ? null : prev))
     }
 
+    // Audio / video update: read directly from participant object
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const handleAudioUpdate = (p: any, data: any) => {
+    const handleAudioUpdate = (p: any) => {
+      const audioEnabled = p.audioEnabled ?? true
       setRemoteParticipants((prev) => {
-        const ex = prev.get(p.id)
-        if (!ex) return prev
+        const existing = prev.get(p.id)
+        if (!existing) {
+          return new Map(prev).set(p.id, {
+            name: p.name || "Participant",
+            audioEnabled,
+            videoEnabled: false,
+          })
+        }
         const next = new Map(prev)
-        next.set(p.id, {
-          ...ex,
-          audioEnabled: data?.audioEnabled ?? ex.audioEnabled,
-        })
+        next.set(p.id, { ...existing, audioEnabled })
         return next
       })
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const handleVideoUpdate = (p: any, data: any) => {
+    const handleVideoUpdate = (p: any) => {
+      const videoEnabled = p.videoEnabled ?? true
       setRemoteParticipants((prev) => {
-        const ex = prev.get(p.id)
-        if (!ex) return prev
+        const existing = prev.get(p.id)
+        if (!existing) {
+          return new Map(prev).set(p.id, {
+            name: p.name || "Participant",
+            audioEnabled: false,
+            videoEnabled,
+          })
+        }
         const next = new Map(prev)
-        next.set(p.id, {
-          ...ex,
-          videoEnabled: data?.videoEnabled ?? ex.videoEnabled,
-        })
+        next.set(p.id, { ...existing, videoEnabled })
         return next
       })
     }
 
-    // Screen share events from remote participants (note: camelCase "screenShareUpdate")
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handleScreenShareUpdate = (p: any) => {
       if (p.screenShareEnabled) {
@@ -697,7 +797,6 @@ export default function MeetingsPage() {
       }
     }
 
-    // Self screen share — track local screen share state via SDK events
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handleSelfScreenShareUpdate = (payload: any) => {
       if (payload.screenShareEnabled) {
@@ -713,14 +812,12 @@ export default function MeetingsPage() {
       }
     }
 
-    // Map-level events
     rtkClient.on(
       "participantJoined",
       "participants",
       handleParticipantJoined,
     )
     rtkClient.on("participantLeft", "participants", handleParticipantLeft)
-    // Per-participant events forwarded through participant map
     rtkClient.on("audioUpdate", "participants", handleAudioUpdate)
     rtkClient.on("videoUpdate", "participants", handleVideoUpdate)
     rtkClient.on(
@@ -728,7 +825,6 @@ export default function MeetingsPage() {
       "participants",
       handleScreenShareUpdate,
     )
-    // Self screen share events
     rtkClient.on("screenShareUpdate", "self", handleSelfScreenShareUpdate)
 
     return () => {
@@ -745,16 +841,15 @@ export default function MeetingsPage() {
         "participants",
         handleScreenShareUpdate,
       )
-      rtkClient.off(
-        "screenShareUpdate",
-        "self",
-        handleSelfScreenShareUpdate,
-      )
+      rtkClient.off("screenShareUpdate", "self", handleSelfScreenShareUpdate)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isJoined])
 
-  /* ── Join RTK room and set up ── */
+  /* ═══════════════════════════════════════════════════════════
+     HANDLERS
+     ═══════════════════════════════════════════════════════════ */
+
   const joinRTKAndSetup = useCallback(
     async (
       authToken: string,
@@ -762,19 +857,12 @@ export default function MeetingsPage() {
       meetingTitle?: string,
     ) => {
       try {
-        await rtkClient.init(authToken, { audio: false, video: false })
+        // Enable audio by default so WebRTC audio pipeline is fully established
+        await rtkClient.init(authToken, { audio: true, video: false })
         await rtkClient.joinRoom()
         setIsJoined(true)
         setSetupMessage(null)
 
-        if (localVideoRef.current) {
-          rtkClient.client?.self.registerVideoElement(
-            localVideoRef.current,
-            true,
-          )
-        }
-
-        // If we don't have meeting details yet, fetch them
         if (!activeMeetingRef.current && meetingId) {
           const details = await getMeetingDetails(meetingId)
           if (details.success && details.meeting) {
@@ -784,10 +872,11 @@ export default function MeetingsPage() {
                 ? new Date(details.meeting.startedAt)
                 : new Date(),
             )
-            if (details.participants)
+            if (details.participants) {
               setAdmittedParticipants(
                 details.participants.filter((p) => p.status === "admitted"),
               )
+            }
           } else {
             setActiveMeeting({
               id: meetingId,
@@ -815,15 +904,14 @@ export default function MeetingsPage() {
         setSetupMessage(null)
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   )
 
-  // Keep joinRTKRef in sync for SSE handler
   useEffect(() => {
     joinRTKRef.current = joinRTKAndSetup
   }, [joinRTKAndSetup])
 
-  /* ── Create meeting ── */
   async function handleCreate() {
     if (!newTitle.trim()) return
     setIsCreating(true)
@@ -842,7 +930,6 @@ export default function MeetingsPage() {
     setIsCreating(false)
   }
 
-  /* ── Join via link / ID ── */
   async function handleJoinByLink(meetingId: string) {
     setSetupMessage("Joining meeting...")
     const result = await joinMeeting(meetingId)
@@ -867,7 +954,6 @@ export default function MeetingsPage() {
     }
   }
 
-  /* ── Rejoin from lobby list ── */
   async function handleRejoin(meeting: MeetingWithDetails) {
     setSetupMessage("Connecting...")
     const result = await joinMeeting(meeting.id)
@@ -898,19 +984,22 @@ export default function MeetingsPage() {
     }
   }
 
-  /* ── Force leave (host ended meeting via SSE) ── */
   function handleForceLeave() {
     rtkClient.leaveRoom().catch(() => {})
     setActiveMeeting(null)
     setIsJoined(false)
     setRemoteParticipants(new Map())
-    setIsMuted(true)
+    setIsMuted(false)
     setIsVideoOff(true)
     setIsScreenSharing(false)
     setScreenSharer(null)
     setPendingRequests([])
     setAdmittedParticipants([])
     setSetupMessage(null)
+    setRaisedHands(new Set())
+    setMyHandRaised(false)
+    setReactions([])
+    setGridPage(0)
     getMyMeetings().then((r) => {
       if (r.success && r.meetings) setMeetings(r.meetings)
     })
@@ -932,14 +1021,18 @@ export default function MeetingsPage() {
     const next = !isVideoOff
     setIsVideoOff(next)
     try {
-      if (next) await rtkClient.client?.self.disableVideo()
-      else {
+      if (next) {
+        await rtkClient.client?.self.disableVideo()
+      } else {
         await rtkClient.client?.self.enableVideo()
-        if (localVideoRef.current)
-          rtkClient.client?.self.registerVideoElement(
-            localVideoRef.current,
-            true,
-          )
+        requestAnimationFrame(() => {
+          if (localVideoRef.current) {
+            rtkClient.client?.self.registerVideoElement(
+              localVideoRef.current,
+              true,
+            )
+          }
+        })
       }
     } catch (e) {
       console.error("Toggle video:", e)
@@ -950,13 +1043,10 @@ export default function MeetingsPage() {
     try {
       if (isScreenSharing) {
         await rtkClient.client?.self.disableScreenShare()
-        // State updates handled by self screenShareUpdate listener
       } else {
         await rtkClient.client?.self.enableScreenShare()
-        // State updates handled by self screenShareUpdate listener
       }
     } catch (e) {
-      // User likely cancelled the screen picker dialog
       console.error("Screen share:", e)
     }
   }
@@ -984,6 +1074,26 @@ export default function MeetingsPage() {
     setPendingRequests((prev) => prev.filter((r) => r.userId !== userId))
   }
 
+  async function handleToggleHand() {
+    if (!activeMeeting) return
+    const next = !myHandRaised
+    setMyHandRaised(next)
+    await toggleHandRaise(activeMeeting.id, next)
+  }
+
+  async function handleReaction(emoji: string) {
+    if (!activeMeeting) return
+    setShowReactionPicker(false)
+    const id = `${Date.now()}-${Math.random()}`
+    const left = 10 + Math.random() * 80
+    setReactions((prev) => [...prev, { id, emoji, left }])
+    await sendReaction(activeMeeting.id, emoji)
+  }
+
+  function removeReaction(id: string) {
+    setReactions((prev) => prev.filter((r) => r.id !== id))
+  }
+
   function copyMeetingLink() {
     if (!activeMeeting) return
     const link = `${window.location.origin}/dashboard/meetings?join=${activeMeeting.id}`
@@ -992,10 +1102,11 @@ export default function MeetingsPage() {
     setTimeout(() => setCopiedLink(false), 2000)
   }
 
-  /* ── Loading overlay ── */
-  if (setupMessage) return <SetupOverlay message={setupMessage} />
+  /* ═══════════════════════════════════════════════════════════
+     RENDER: LOADING / WAITING
+     ═══════════════════════════════════════════════════════════ */
 
-  /* ── Waiting for host approval ── */
+  if (setupMessage) return <SetupOverlay message={setupMessage} />
   if (waitingForApproval) {
     return (
       <WaitingRoom
@@ -1005,25 +1116,115 @@ export default function MeetingsPage() {
     )
   }
 
-  /* ━━━━━━━━━━━━━━━━━━━ ACTIVE MEETING VIEW ━━━━━━━━━━━━━━━━━━ */
+  /* ═══════════════════════════════════════════════════════════
+     RENDER: ACTIVE MEETING
+     ═══════════════════════════════════════════════════════════ */
 
   if (activeMeeting && isJoined) {
     const totalParticipants = remoteParticipants.size + 1
     const hasScreenShare = !!screenSharer
 
+    // Build all grid entries: self + all remote participants
+    const allGridEntries: Array<{ id: string; isLocal: boolean }> = [
+      { id: "local", isLocal: true },
+      ...Array.from(remoteParticipants.keys()).map((id) => ({
+        id,
+        isLocal: false,
+      })),
+    ]
+
+    // Carousel pagination
+    const totalPages = Math.ceil(allGridEntries.length / TILES_PER_PAGE)
+    const currentPage = Math.min(gridPage, Math.max(0, totalPages - 1))
+    const pageEntries = allGridEntries.slice(
+      currentPage * TILES_PER_PAGE,
+      (currentPage + 1) * TILES_PER_PAGE,
+    )
+
     const gridCols = hasScreenShare
       ? ""
-      : totalParticipants <= 1
+      : pageEntries.length <= 1
         ? "grid-cols-1"
-        : totalParticipants <= 4
-          ? "grid-cols-2"
-          : totalParticipants <= 9
-            ? "grid-cols-3"
-            : "grid-cols-4"
+        : "grid-cols-2"
 
     return (
       <div className="flex flex-col h-dvh bg-zinc-950 relative overflow-hidden">
         <div className="absolute inset-0 bg-linear-to-br from-zinc-900 via-zinc-950 to-black" />
+
+        {/* ── Hidden audio players for every remote participant ── */}
+        {Array.from(remoteParticipants.entries()).map(([id, p]) => (
+          <RemoteAudioPlayer
+            key={`audio-${id}`}
+            participantId={id}
+            audioEnabled={p.audioEnabled}
+          />
+        ))}
+
+        {/* ── Floating reactions ── */}
+        <div className="fixed bottom-28 left-0 right-0 z-30 pointer-events-none flex flex-col items-center">
+          {reactions.map((r) => (
+            <div
+              key={r.id}
+              className="absolute"
+              style={{ left: `${r.left}%`, bottom: 0 }}
+            >
+              <FloatingReaction
+                emoji={r.emoji}
+                onDone={() => removeReaction(r.id)}
+              />
+            </div>
+          ))}
+        </div>
+
+        {/* ── Pending request banner (minimal, inline) ── */}
+        {isHost && pendingRequests.length > 0 && (
+          <div
+            className="relative z-20 mx-4 mt-1 flex items-center gap-3 px-4 py-2 rounded-xl"
+            style={{
+              background: "rgba(245,158,11,0.12)",
+              backdropFilter: "blur(16px)",
+              border: "1px solid rgba(245,158,11,0.2)",
+            }}
+          >
+            <span className="text-xs text-amber-300/80 font-medium shrink-0">
+              {pendingRequests.length} waiting
+            </span>
+            <div className="flex-1 flex items-center gap-2 overflow-x-auto">
+              {pendingRequests.map((req) => (
+                <div
+                  key={req.userId}
+                  className="flex items-center gap-2 shrink-0"
+                >
+                  <span className="text-xs text-white/70 truncate max-w-24">
+                    {req.name}
+                  </span>
+                  <button
+                    onClick={() => handleAdmit(req.userId)}
+                    className="w-6 h-6 rounded-full bg-emerald-500/20 hover:bg-emerald-500/40 flex items-center justify-center transition-colors"
+                    title="Admit"
+                  >
+                    <HugeiconsIcon
+                      icon={CheckmarkCircle01Icon}
+                      size={12}
+                      className="text-emerald-400"
+                    />
+                  </button>
+                  <button
+                    onClick={() => handleDecline(req.userId)}
+                    className="w-6 h-6 rounded-full bg-red-500/20 hover:bg-red-500/40 flex items-center justify-center transition-colors"
+                    title="Decline"
+                  >
+                    <HugeiconsIcon
+                      icon={Cancel01Icon}
+                      size={12}
+                      className="text-red-400"
+                    />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* ── Top bar ── */}
         <div
@@ -1046,37 +1247,35 @@ export default function MeetingsPage() {
               </span>
             </div>
           </div>
-
           <div className="flex items-center gap-2">
-            {/* Invite link — visible to all */}
             <button
               onClick={copyMeetingLink}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-white/70 hover:text-white transition-colors"
               style={{
                 background: "rgba(255,255,255,0.08)",
                 backdropFilter: "blur(8px)",
+                border: "1px solid rgba(255,255,255,0.06)",
               }}
             >
               <HugeiconsIcon
                 icon={copiedLink ? CheckmarkCircle01Icon : Link01Icon}
                 size={12}
               />
-              {copiedLink ? "Copied!" : "Invite Link"}
+              {copiedLink ? "Copied!" : "Invite"}
             </button>
-
-            {/* People button — visible to all */}
             <button
               onClick={() => setShowPanel(!showPanel)}
               className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-white/70 hover:text-white transition-colors"
               style={{
                 background: "rgba(255,255,255,0.08)",
                 backdropFilter: "blur(8px)",
+                border: "1px solid rgba(255,255,255,0.06)",
               }}
             >
               <HugeiconsIcon icon={UserGroupIcon} size={14} />
-              {pendingRequests.length > 0 && (
+              {(pendingRequests.length > 0 || raisedHands.size > 0) && (
                 <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-[10px] flex items-center justify-center text-white font-bold">
-                  {pendingRequests.length}
+                  {pendingRequests.length + raisedHands.size}
                 </span>
               )}
             </button>
@@ -1088,10 +1287,10 @@ export default function MeetingsPage() {
           <div
             className="absolute top-14 right-4 z-20 w-72 max-h-[calc(100dvh-120px)] rounded-2xl p-3 overflow-y-auto animate-in slide-in-from-right-4 fade-in duration-200"
             style={{
-              background: "rgba(30,30,30,0.85)",
+              background: "rgba(20,20,25,0.9)",
               backdropFilter: "blur(24px)",
               WebkitBackdropFilter: "blur(24px)",
-              border: "1px solid rgba(255,255,255,0.1)",
+              border: "1px solid rgba(255,255,255,0.08)",
             }}
           >
             <div className="flex items-center justify-between mb-3">
@@ -1100,42 +1299,157 @@ export default function MeetingsPage() {
                 <HugeiconsIcon
                   icon={Cancel01Icon}
                   size={16}
-                  className="text-white/50"
+                  className="text-white/40 hover:text-white/70 transition-colors"
                 />
               </button>
             </div>
 
-            {/* Pending requests — host only */}
-            {isHost && pendingRequests.length > 0 && (
-              <div className="mb-4">
-                <p className="text-[10px] uppercase tracking-wider text-amber-400/80 font-semibold mb-2">
-                  Waiting ({pendingRequests.length})
+            {/* Raised Hands */}
+            {raisedHands.size > 0 && (
+              <div className="mb-3">
+                <p className="text-[10px] uppercase tracking-wider text-amber-400/80 font-semibold mb-1.5">
+                  ✋ Raised hands ({raisedHands.size})
                 </p>
-                <div className="space-y-2">
-                  {pendingRequests.map((req) => (
-                    <PendingRequestCard
-                      key={req.userId}
-                      request={req}
-                      onAdmit={() => handleAdmit(req.userId)}
-                      onDecline={() => handleDecline(req.userId)}
-                    />
-                  ))}
+                <div className="space-y-1">
+                  {Array.from(raisedHands).map((uid) => {
+                    const rp = Array.from(remoteParticipants.entries()).find(
+                      ([id]) => id === uid,
+                    )
+                    const name =
+                      rp
+                        ? rp[1].name
+                        : admittedParticipants.find(
+                            (ap) => ap.userId === uid,
+                          )?.name || "Participant"
+                    return (
+                      <div
+                        key={uid}
+                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg"
+                        style={{ background: "rgba(245,158,11,0.1)" }}
+                      >
+                        <span className="text-sm">✋</span>
+                        <span className="text-xs text-white/80 flex-1 truncate">
+                          {name}
+                        </span>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )}
 
-            {/* In meeting */}
-            <p className="text-[10px] uppercase tracking-wider text-white/40 font-semibold mb-2">
+            {/* Pending requests — host only */}
+            {isHost && pendingRequests.length > 0 && (
+              <div className="mb-3">
+                <p className="text-[10px] uppercase tracking-wider text-amber-400/80 font-semibold mb-1.5">
+                  Waiting ({pendingRequests.length})
+                </p>
+                <div className="space-y-1.5">
+                  {pendingRequests.map((req) => {
+                    const initials = req.name
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")
+                      .toUpperCase()
+                      .slice(0, 2)
+                    return (
+                      <div
+                        key={req.userId}
+                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg"
+                        style={{ background: "rgba(255,255,255,0.05)" }}
+                      >
+                        <Avatar className="w-6 h-6">
+                          {req.avatar && (
+                            <AvatarImage src={req.avatar} alt={req.name} />
+                          )}
+                          <AvatarFallback className="text-[8px] bg-white/10 text-white/70">
+                            {initials}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-xs text-white/70 flex-1 truncate">
+                          {req.name}
+                        </span>
+                        <button
+                          onClick={() => handleAdmit(req.userId)}
+                          className="w-6 h-6 rounded-full bg-emerald-500/20 hover:bg-emerald-500/40 flex items-center justify-center transition-colors"
+                        >
+                          <HugeiconsIcon
+                            icon={CheckmarkCircle01Icon}
+                            size={12}
+                            className="text-emerald-400"
+                          />
+                        </button>
+                        <button
+                          onClick={() => handleDecline(req.userId)}
+                          className="w-6 h-6 rounded-full bg-red-500/20 hover:bg-red-500/40 flex items-center justify-center transition-colors"
+                        >
+                          <HugeiconsIcon
+                            icon={Cancel01Icon}
+                            size={12}
+                            className="text-red-400"
+                          />
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* All participants */}
+            <p className="text-[10px] uppercase tracking-wider text-white/40 font-semibold mb-1.5">
               In meeting ({totalParticipants})
             </p>
-            <div className="space-y-1.5">
-              <AdmittedRow
-                name={`${user.firstName} ${user.lastName} (You)`}
-                avatar={user.avatarUrl}
-              />
-              {Array.from(remoteParticipants.values()).map((p, i) => (
-                <AdmittedRow key={i} name={p.name} />
+            <div className="space-y-1">
+              {/* Self */}
+              <div
+                className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg"
+                style={{ background: "rgba(255,255,255,0.05)" }}
+              >
+                <Avatar className="w-6 h-6">
+                  {user.avatarUrl && (
+                    <AvatarImage src={user.avatarUrl} alt="You" />
+                  )}
+                  <AvatarFallback className="text-[8px] bg-white/10 text-white/70">
+                    {(user.firstName?.[0] || "") + (user.lastName?.[0] || "")}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="text-xs text-white/70 flex-1 truncate">
+                  {user.firstName} {user.lastName} (You)
+                </span>
+                {isHost && (
+                  <Badge
+                    variant="outline"
+                    className="text-[8px] px-1.5 py-0 border-white/10 text-white/40"
+                  >
+                    Host
+                  </Badge>
+                )}
+              </div>
+              {/* Remote participants */}
+              {Array.from(remoteParticipants.entries()).map(([id, p]) => (
+                <div
+                  key={id}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg"
+                  style={{ background: "rgba(255,255,255,0.05)" }}
+                >
+                  <Avatar className="w-6 h-6">
+                    <AvatarFallback className="text-[8px] bg-white/10 text-white/70">
+                      {p.name
+                        .split(" ")
+                        .map((n) => n[0])
+                        .join("")
+                        .toUpperCase()
+                        .slice(0, 2)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="text-xs text-white/70 flex-1 truncate">
+                    {p.name}
+                  </span>
+                  {raisedHands.has(id) && <span className="text-xs">✋</span>}
+                </div>
               ))}
+              {/* Admitted but offline */}
               {admittedParticipants
                 .filter(
                   (p) =>
@@ -1145,11 +1459,29 @@ export default function MeetingsPage() {
                     ),
                 )
                 .map((p) => (
-                  <AdmittedRow
+                  <div
                     key={p.userId}
-                    name={p.name}
-                    avatar={p.avatar}
-                  />
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg opacity-50"
+                    style={{ background: "rgba(255,255,255,0.03)" }}
+                  >
+                    <Avatar className="w-6 h-6">
+                      {p.avatar && (
+                        <AvatarImage src={p.avatar} alt={p.name} />
+                      )}
+                      <AvatarFallback className="text-[8px] bg-white/10 text-white/70">
+                        {p.name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")
+                          .toUpperCase()
+                          .slice(0, 2)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-xs text-white/50 flex-1 truncate">
+                      {p.name}
+                    </span>
+                    <span className="text-[10px] text-white/30">offline</span>
+                  </div>
                 ))}
             </div>
           </div>
@@ -1158,15 +1490,13 @@ export default function MeetingsPage() {
         {/* ── Video area ── */}
         <div className="relative z-10 flex-1 p-3 md:p-4 overflow-hidden flex flex-col gap-2">
           {hasScreenShare ? (
-            /* Spotlight layout: screen share primary, participants as thumbnails */
+            /* ── Screen-share layout: large share + thumbnail strip ── */
             <>
               <ScreenShareView
                 participantId={screenSharer.id}
                 participantName={screenSharer.name}
                 isLocal={screenSharer.isLocal}
               />
-
-              {/* Participant thumbnail strip */}
               <div className="flex gap-2 overflow-x-auto pb-1 shrink-0">
                 <div className="w-32 h-24 shrink-0">
                   <ParticipantTile
@@ -1175,6 +1505,7 @@ export default function MeetingsPage() {
                     isMuted={isMuted}
                     isVideoOff={isVideoOff}
                     isLocal
+                    handRaised={myHandRaised}
                     videoRef={localVideoRef}
                     className="w-full h-full"
                   />
@@ -1184,6 +1515,7 @@ export default function MeetingsPage() {
                     <RemoteParticipantTile
                       participantId={id}
                       participant={p}
+                      handRaised={raisedHands.has(id)}
                       className="w-full h-full"
                     />
                   </div>
@@ -1191,28 +1523,103 @@ export default function MeetingsPage() {
               </div>
             </>
           ) : (
-            /* Grid layout: all participants in a grid */
-            <div
-              className={cn(
-                "grid gap-2 md:gap-3 h-full auto-rows-fr",
-                gridCols,
+            /* ── Normal grid layout with carousel pagination ── */
+            <div className="relative flex-1 flex flex-col gap-2">
+              <div
+                className={cn(
+                  "grid gap-2 md:gap-3 flex-1 auto-rows-fr",
+                  gridCols,
+                )}
+              >
+                {pageEntries.map((entry) =>
+                  entry.isLocal ? (
+                    <ParticipantTile
+                      key="local"
+                      name={`${user.firstName} ${user.lastName}`}
+                      avatar={user.avatarUrl}
+                      isMuted={isMuted}
+                      isVideoOff={isVideoOff}
+                      isLocal
+                      handRaised={myHandRaised}
+                      videoRef={localVideoRef}
+                    />
+                  ) : (
+                    <RemoteParticipantTile
+                      key={entry.id}
+                      participantId={entry.id}
+                      participant={remoteParticipants.get(entry.id)!}
+                      handRaised={raisedHands.has(entry.id)}
+                    />
+                  ),
+                )}
+              </div>
+
+              {/* Carousel navigation (appears when > 4 participants) */}
+              {totalPages > 1 && (
+                <>
+                  {/* Prev / Next arrows */}
+                  <div className="absolute top-1/2 -translate-y-1/2 left-1 right-1 flex justify-between pointer-events-none z-10">
+                    <button
+                      onClick={() =>
+                        setGridPage((p) => Math.max(0, p - 1))
+                      }
+                      className={cn(
+                        "pointer-events-auto w-9 h-9 rounded-full flex items-center justify-center transition-all",
+                        currentPage <= 0
+                          ? "opacity-0 pointer-events-none"
+                          : "opacity-80 hover:opacity-100 hover:scale-110",
+                      )}
+                      style={{
+                        background: "rgba(0,0,0,0.5)",
+                        backdropFilter: "blur(8px)",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                      }}
+                    >
+                      <span className="text-white text-lg font-bold leading-none">
+                        ‹
+                      </span>
+                    </button>
+                    <button
+                      onClick={() =>
+                        setGridPage((p) =>
+                          Math.min(totalPages - 1, p + 1),
+                        )
+                      }
+                      className={cn(
+                        "pointer-events-auto w-9 h-9 rounded-full flex items-center justify-center transition-all",
+                        currentPage >= totalPages - 1
+                          ? "opacity-0 pointer-events-none"
+                          : "opacity-80 hover:opacity-100 hover:scale-110",
+                      )}
+                      style={{
+                        background: "rgba(0,0,0,0.5)",
+                        backdropFilter: "blur(8px)",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                      }}
+                    >
+                      <span className="text-white text-lg font-bold leading-none">
+                        ›
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Dot indicators */}
+                  <div className="flex gap-1.5 justify-center py-1">
+                    {Array.from({ length: totalPages }).map((_, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setGridPage(i)}
+                        className={cn(
+                          "h-1.5 rounded-full transition-all duration-200",
+                          i === currentPage
+                            ? "bg-white w-4"
+                            : "bg-white/30 hover:bg-white/50 w-1.5",
+                        )}
+                      />
+                    ))}
+                  </div>
+                </>
               )}
-            >
-              <ParticipantTile
-                name={`${user.firstName} ${user.lastName}`}
-                avatar={user.avatarUrl}
-                isMuted={isMuted}
-                isVideoOff={isVideoOff}
-                isLocal
-                videoRef={localVideoRef}
-              />
-              {Array.from(remoteParticipants.entries()).map(([id, p]) => (
-                <RemoteParticipantTile
-                  key={id}
-                  participantId={id}
-                  participant={p}
-                />
-              ))}
             </div>
           )}
         </div>
@@ -1224,8 +1631,10 @@ export default function MeetingsPage() {
             background: "rgba(0,0,0,0.4)",
             backdropFilter: "blur(20px)",
             WebkitBackdropFilter: "blur(20px)",
+            borderTop: "1px solid rgba(255,255,255,0.05)",
           }}
         >
+          {/* Mic */}
           <GlassButton
             onClick={toggleMute}
             active={isMuted}
@@ -1238,6 +1647,7 @@ export default function MeetingsPage() {
             />
           </GlassButton>
 
+          {/* Video */}
           <GlassButton
             onClick={toggleVideo}
             active={isVideoOff}
@@ -1250,7 +1660,7 @@ export default function MeetingsPage() {
             />
           </GlassButton>
 
-          {/* Screen share — visible to everyone */}
+          {/* Screen share — available for everyone */}
           <GlassButton
             onClick={toggleScreenShare}
             active={isScreenSharing}
@@ -1263,7 +1673,50 @@ export default function MeetingsPage() {
             />
           </GlassButton>
 
-          {/* People — visible to everyone */}
+          {/* Raise hand */}
+          <GlassButton
+            onClick={handleToggleHand}
+            active={myHandRaised}
+            label={myHandRaised ? "Lower" : "Raise"}
+          >
+            <span
+              className={cn("text-lg", myHandRaised && "animate-bounce")}
+            >
+              ✋
+            </span>
+          </GlassButton>
+
+          {/* Reactions */}
+          <div className="relative">
+            <GlassButton
+              onClick={() => setShowReactionPicker(!showReactionPicker)}
+              label="React"
+            >
+              <span className="text-lg">😊</span>
+            </GlassButton>
+            {showReactionPicker && (
+              <div
+                className="absolute bottom-16 left-1/2 -translate-x-1/2 flex gap-1 px-2 py-1.5 rounded-full animate-in fade-in zoom-in-95 duration-150"
+                style={{
+                  background: "rgba(30,30,35,0.95)",
+                  backdropFilter: "blur(20px)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                }}
+              >
+                {REACTION_EMOJIS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    onClick={() => handleReaction(emoji)}
+                    className="w-10 h-10 rounded-full flex items-center justify-center text-xl hover:bg-white/10 transition-colors hover:scale-110 active:scale-95"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* People */}
           <GlassButton
             onClick={() => setShowPanel(!showPanel)}
             label="People"
@@ -1274,13 +1727,14 @@ export default function MeetingsPage() {
               size={18}
               className="text-white"
             />
-            {pendingRequests.length > 0 && (
+            {(pendingRequests.length > 0 || raisedHands.size > 0) && (
               <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-amber-500 text-[10px] flex items-center justify-center text-white font-bold">
-                {pendingRequests.length}
+                {pendingRequests.length + raisedHands.size}
               </span>
             )}
           </GlassButton>
 
+          {/* End / Leave */}
           <GlassButton
             variant="danger"
             onClick={handleEndMeeting}
@@ -1297,7 +1751,9 @@ export default function MeetingsPage() {
     )
   }
 
-  /* ━━━━━━━━━━━━━━━━━━━━━━━━ LOBBY VIEW ━━━━━━━━━━━━━━━━━━━━━━ */
+  /* ═══════════════════════════════════════════════════════════
+     RENDER: LOBBY (theme-aware, light + dark mode)
+     ═══════════════════════════════════════════════════════════ */
 
   return (
     <>
@@ -1305,7 +1761,7 @@ export default function MeetingsPage() {
 
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
-          {/* Hero */}
+          {/* ── Hero ── */}
           <div className="relative overflow-hidden rounded-2xl bg-linear-to-br from-primary/10 via-primary/5 to-transparent border p-6">
             <div className="absolute -right-8 -top-8 w-40 h-40 bg-primary/5 rounded-full blur-2xl" />
             <div className="absolute -left-4 bottom-0 w-24 h-24 bg-primary/3 rounded-full blur-xl" />
@@ -1327,24 +1783,26 @@ export default function MeetingsPage() {
             </div>
           </div>
 
-          {/* Meetings list */}
+          {/* ── Meetings list ── */}
           {isLoadingMeetings ? (
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="h-20 rounded-xl bg-muted animate-pulse" />
+                <div
+                  key={i}
+                  className="h-20 rounded-xl bg-muted animate-pulse"
+                />
               ))}
             </div>
           ) : meetings.length === 0 ? (
-            <div className="text-center py-16">
-              <div className="relative w-20 h-20 mx-auto mb-5">
-                <div className="absolute inset-0 rounded-2xl bg-primary/10 animate-pulse" />
-                <div className="relative w-full h-full rounded-2xl bg-linear-to-br from-primary/15 to-primary/5 flex items-center justify-center border border-primary/10">
-                  <HugeiconsIcon
-                    icon={Video01Icon}
-                    size={32}
-                    className="text-primary/70"
-                  />
-                </div>
+            <div className="text-center py-12">
+              <div className="relative w-48 h-48 mx-auto mb-4">
+                <Image
+                  src="/user/dashboard/no-meeting-yet.png"
+                  alt="No meetings yet"
+                  fill
+                  className="object-contain"
+                  priority
+                />
               </div>
               <h3 className="font-semibold text-lg mb-1">No meetings yet</h3>
               <p className="text-sm text-muted-foreground mb-5 max-w-xs mx-auto leading-relaxed">
@@ -1361,24 +1819,24 @@ export default function MeetingsPage() {
               </Button>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {meetings.map((meeting) => (
                 <div
                   key={meeting.id}
-                  className="flex items-center gap-4 p-4 rounded-xl border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
+                  className="flex items-center gap-4 p-4 rounded-xl border bg-card hover:bg-accent/50 transition-colors cursor-pointer group"
                   onClick={() => handleRejoin(meeting)}
                 >
                   <div
                     className={cn(
-                      "w-12 h-12 rounded-xl flex items-center justify-center shrink-0",
+                      "w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-colors",
                       meeting.status === "active"
-                        ? "bg-emerald-500/12"
-                        : "bg-primary/8",
+                        ? "bg-emerald-500/12 group-hover:bg-emerald-500/20"
+                        : "bg-primary/8 group-hover:bg-primary/12",
                     )}
                   >
                     <HugeiconsIcon
                       icon={Video01Icon}
-                      size={22}
+                      size={20}
                       className={
                         meeting.status === "active"
                           ? "text-emerald-500"
@@ -1386,17 +1844,17 @@ export default function MeetingsPage() {
                       }
                     />
                   </div>
-
                   <div className="flex-1 min-w-0">
                     <h3 className="font-medium text-sm truncate">
                       {meeting.title}
                     </h3>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-xs text-muted-foreground">
-                        Hosted by{" "}
-                        {meeting.hostId === user.id ? "you" : meeting.hostName}
+                        {meeting.hostId === user.id
+                          ? "Hosted by you"
+                          : `Hosted by ${meeting.hostName}`}
                       </span>
-                      <span className="text-muted-foreground/60 text-xs">
+                      <span className="text-muted-foreground/40 text-xs">
                         &middot;
                       </span>
                       <span className="text-xs text-muted-foreground flex items-center gap-1">
@@ -1405,7 +1863,6 @@ export default function MeetingsPage() {
                       </span>
                     </div>
                   </div>
-
                   <Badge
                     variant={
                       meeting.status === "active" ? "default" : "secondary"
@@ -1413,7 +1870,7 @@ export default function MeetingsPage() {
                     className={cn(
                       "text-[10px] px-2 gap-1",
                       meeting.status === "active" &&
-                        "bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/20",
+                        "bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-400",
                     )}
                   >
                     {meeting.status === "active" && (
@@ -1433,14 +1890,14 @@ export default function MeetingsPage() {
             </div>
           )}
 
-          {/* Join by ID / link */}
+          {/* ── Join by link/ID ── */}
           <div className="pt-4 border-t">
             <JoinByIdSection onJoin={handleJoinByLink} />
           </div>
         </div>
       </div>
 
-      {/* Create modal */}
+      {/* ── Create modal ── */}
       <ResponsiveModal open={showCreate} onOpenChange={setShowCreate}>
         <ResponsiveModalContent className="sm:max-w-md">
           <ResponsiveModalHeader>
@@ -1449,8 +1906,8 @@ export default function MeetingsPage() {
           <div className="space-y-4 pt-2">
             <div>
               <p className="text-sm text-muted-foreground mb-3">
-                Give your meeting a name and you&apos;ll get a shareable link to
-                invite others.
+                Give your meeting a name and you&apos;ll get a shareable link
+                to invite others.
               </p>
               <Input
                 placeholder="e.g. Weekly standup, Study group..."
@@ -1488,12 +1945,11 @@ export default function MeetingsPage() {
   )
 }
 
-/* ─── Join by Meeting ID section ────────────────────────────── */
-function JoinByIdSection({
-  onJoin,
-}: {
-  onJoin: (meetingId: string) => void
-}) {
+/* ═══════════════════════════════════════════════════════════════
+   JOIN BY MEETING ID SECTION
+   ═══════════════════════════════════════════════════════════════ */
+
+function JoinByIdSection({ onJoin }: { onJoin: (meetingId: string) => void }) {
   const [meetingId, setMeetingId] = useState("")
   const [isJoining, setIsJoining] = useState(false)
 
@@ -1509,7 +1965,11 @@ function JoinByIdSection({
     <div className="rounded-xl border border-dashed bg-muted/30 p-4">
       <div className="flex items-center gap-2 mb-3">
         <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
-          <HugeiconsIcon icon={Link01Icon} size={14} className="text-primary/70" />
+          <HugeiconsIcon
+            icon={Link01Icon}
+            size={14}
+            className="text-primary/70"
+          />
         </div>
         <h3 className="text-sm font-semibold">Join a meeting</h3>
       </div>
