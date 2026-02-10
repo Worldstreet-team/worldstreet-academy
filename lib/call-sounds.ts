@@ -138,6 +138,14 @@ class CallSoundManager {
     this.playTone(480, 0.35, 0.2, 0.12)
   }
 
+  /** User is on another call: three short busy tones. */
+  playBusy() {
+    this.stopRing()
+    this.playTone(480, 0, 0.25, 0.15)
+    this.playTone(480, 0.35, 0.25, 0.15)
+    this.playTone(480, 0.70, 0.25, 0.15)
+  }
+
   /** Stop ongoing ring pattern (outgoing or incoming). */
   stopRing() {
     if (this.ringInterval) {

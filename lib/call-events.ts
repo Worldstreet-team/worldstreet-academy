@@ -19,6 +19,7 @@ export type CallEventType =
   | "call:ended"
   | "call:declined"
   | "call:cancelled"
+  | "call:busy"
 
 export type CallEventPayload = {
   type: CallEventType
@@ -55,6 +56,12 @@ export type MeetingEventType =
   | "meeting:hand-raised"
   | "meeting:hand-lowered"
   | "meeting:reaction"
+  | "meeting:kicked"
+  | "meeting:chat"
+  | "meeting:poll"
+  | "meeting:poll-vote"
+  | "meeting:mute-participant"
+  | "meeting:screen-share-permission"
 
 export type MeetingEventPayload = {
   type: MeetingEventType
@@ -67,6 +74,19 @@ export type MeetingEventPayload = {
   authToken?: string
   /** Emoji for reactions */
   emoji?: string
+  /** Chat message content */
+  chatMessage?: string
+  chatImageUrl?: string
+  chatVideoUrl?: string
+  chatMessageId?: string
+  /** Poll data */
+  pollId?: string
+  pollQuestion?: string
+  pollOptions?: string[]
+  pollVotes?: Record<string, number>
+  pollVoters?: Record<string, string>
+  /** Permission flag */
+  canScreenShare?: boolean
 }
 
 export type MessageEventPayload = {

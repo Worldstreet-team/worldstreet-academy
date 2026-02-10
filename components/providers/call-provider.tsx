@@ -10,14 +10,15 @@ import {
   ReactNode,
 } from "react"
 import { VideoCall } from "@/components/messages/video-call"
-import { endCall as endCallAction, pollIncomingCall } from "@/lib/actions/calls"
+import { endCall as endCallAction, pollIncomingCall, cleanupOrphanedCalls } from "@/lib/actions/calls"
 import { useSSEEvents } from "@/lib/hooks/use-call-events"
 import { useUser } from "@/components/providers/user-provider"
 import { callSounds } from "@/lib/call-sounds"
+import { rtkClient } from "@/lib/rtk-client"
 import type { CallEventPayload, SSEEventPayload } from "@/lib/call-events"
 
 type CallType = "video" | "audio"
-type CallState = "idle" | "ringing" | "connecting" | "connected" | "ended"
+type CallState = "idle" | "ringing" | "connecting" | "connected" | "ended" | "busy"
 
 type CallInfo = {
   callId: string | null
@@ -75,6 +76,57 @@ export function CallProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     callSounds.preload()
   }, [])
+
+  // On mount: clean up any orphaned calls from previous sessions
+  // (page refresh, HMR, crash, navigation, etc.)
+  useEffect(() => {
+    cleanupOrphanedCalls()
+      .then(({ cleaned }) => {
+        if (cleaned > 0) {
+          console.log(`[CallProvider] Cleaned ${cleaned} orphaned calls on mount`)
+        }
+      })
+      .catch(() => {})
+
+    // Also destroy any leftover RTK client from a previous session
+    if (rtkClient.isInRoom || rtkClient.client) {
+      console.log("[CallProvider] Destroying leftover RTK client from previous session")
+      rtkClient.destroy().catch(() => {})
+    }
+  }, [])
+
+  // On page unload: try to end the active call so it doesn't stay stuck in DB
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const current = activeCallRef.current
+      const state = callStateRef.current
+      if (!current?.callId) return
+      if (state !== "connecting" && state !== "connected" && state !== "ringing") return
+
+      // Use sendBeacon for reliable delivery during page unload
+      // We can't use server actions here because they're async and won't complete during unload
+      // Instead, send a beacon to a lightweight API route
+      try {
+        const payload = JSON.stringify({ callId: current.callId })
+        navigator.sendBeacon("/api/calls/end", payload)
+        console.log("[CallProvider] Sent beacon to end call", current.callId)
+      } catch {
+        // Last resort: fire-and-forget server action (may not complete)
+        endCallAction(current.callId).catch(() => {})
+      }
+
+      // Clean up RTK client synchronously
+      try {
+        rtkClient.destroy().catch(() => {})
+      } catch {
+        // ignore
+      }
+    }
+
+    window.addEventListener("beforeunload", handleBeforeUnload)
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload)
+  }, [])
+
   // Ref to access latest state in the SSE callback without re-subscribing
   const activeCallRef = useRef<CallInfo | null>(null)
   const callStateRef = useRef<CallState>("idle")
@@ -83,6 +135,19 @@ export function CallProvider({ children }: { children: ReactNode }) {
     callState === "connecting" ||
     callState === "connected" ||
     callState === "ringing"
+
+  // When a user is busy, auto-close after showing the busy state briefly
+  useEffect(() => {
+    if (callState !== "busy") return
+    callSounds.playDeclined()
+    const timer = setTimeout(() => {
+      setActiveCall(null)
+      setCallState("idle")
+      setShowCallUI(false)
+      setIsMinimized(false)
+    }, 3000)
+    return () => clearTimeout(timer)
+  }, [callState])
 
   // Keep refs in sync (must be in useEffect for React 19)
   useEffect(() => {
@@ -97,12 +162,22 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
       switch (event.type) {
         case "call:incoming": {
-          // Only show if we don't already have an active call and haven't dismissed this one
-          if (
-            callStateRef.current !== "idle" &&
-            callStateRef.current !== "ended"
-          ) {
-            console.log("[CallProvider] Already in a call, ignoring incoming")
+          // Check LIVE connection state — if RTK is in a room, we're in an active call
+          const isInActiveCall =
+            rtkClient.isInRoom ||
+            (callStateRef.current !== "idle" && callStateRef.current !== "ended")
+
+          if (isInActiveCall) {
+            console.log("[CallProvider] Already in a call (RTK.isInRoom:", rtkClient.isInRoom, "), auto-declining incoming")
+            // Auto-decline the incoming call and notify the caller they're busy
+            ;(async () => {
+              try {
+                const { declineCall } = await import("@/lib/actions/calls")
+                await declineCall(event.callId)
+              } catch (err) {
+                console.error("[CallProvider] Auto-decline failed:", err)
+              }
+            })()
             return
           }
           if (dismissedCallsRef.current.has(event.callId)) {
@@ -121,7 +196,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
           })
           setCallState("ringing")
           setShowCallUI(true)
-          setIsMinimized(false)
+          // Incoming calls start minimized — user can tap to expand or answer from there
+          setIsMinimized(true)
           break
         }
 
@@ -163,6 +239,13 @@ export function CallProvider({ children }: { children: ReactNode }) {
           }
           break
         }
+
+        case "call:busy": {
+          // Receiver is on another call
+          console.log("[CallProvider] Receiver is busy/on another call")
+          setCallState("busy")
+          break
+        }
       }
     },
     [] // No deps — uses refs for latest state
@@ -191,6 +274,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
   // Polling fallback for incoming calls (safety net if SSE misses an event)
   useEffect(() => {
     const poll = async () => {
+      // Check LIVE connection state — don't poll if already in a call
+      if (rtkClient.isInRoom) return
       // Only poll when idle — SSE handles events during active calls
       if (callStateRef.current !== "idle" && callStateRef.current !== "ended") return
       try {
@@ -211,7 +296,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
           })
           setCallState("ringing")
           setShowCallUI(true)
-          setIsMinimized(false)
+          // Incoming calls start minimized
+          setIsMinimized(true)
         }
       } catch {
         // Ignore poll errors
@@ -229,6 +315,21 @@ export function CallProvider({ children }: { children: ReactNode }) {
       participantAvatar?: string
       callType: CallType
     }) => {
+      // Check LIVE connection state — if RTK is in a room, we're actually in a call
+      if (rtkClient.isInRoom) {
+        console.log("[CallProvider] RTK is in a room, cannot start new call")
+        return
+      }
+      // Also check our state (for UI consistency)
+      if (
+        callStateRef.current === "connecting" ||
+        callStateRef.current === "connected" ||
+        callStateRef.current === "ringing"
+      ) {
+        console.log("[CallProvider] Already in a call state, ignoring startCall")
+        return
+      }
+      // Instant UI update — show the call modal immediately before any network requests
       setActiveCall({
         callId: null,
         callType: params.callType,
@@ -240,6 +341,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
       setCallState("connecting")
       setShowCallUI(true)
       setIsMinimized(false)
+      // Resume audio context on user gesture so sounds play instantly
+      callSounds.resume()
     },
     []
   )

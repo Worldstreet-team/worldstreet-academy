@@ -133,3 +133,31 @@ export function playReaction() {
     // Silently fail
   }
 }
+
+/** Descending tone — meeting ended */
+export function playMeetingEnded() {
+  try {
+    const ctx = getAudioContext()
+    const now = ctx.currentTime
+    const notes = [554, 440, 330]
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = "sine"
+      osc.frequency.setValueAtTime(freq, now + i * 0.15)
+      gain.gain.setValueAtTime(0.25, now + i * 0.15)
+      gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.15 + 0.2)
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.start(now + i * 0.15)
+      osc.stop(now + i * 0.15 + 0.2)
+    })
+  } catch {
+    // Silently fail
+  }
+}
+
+/** Short pop for chat message */
+export function playChatMessage() {
+  playTone(880, 0.08, "sine", 0.12)
+}

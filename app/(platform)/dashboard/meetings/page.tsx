@@ -19,6 +19,11 @@ import {
   Loading03Icon,
   Clock01Icon,
   ArrowRight01Icon,
+  BubbleChatIcon,
+  ChartColumnIcon,
+  VolumeHighIcon,
+  MinimizeScreenIcon,
+  More02Icon,
 } from "@hugeicons/core-free-icons"
 import { Topbar } from "@/components/platform/topbar"
 import { Button } from "@/components/ui/button"
@@ -34,6 +39,7 @@ import {
 import { cn } from "@/lib/utils"
 import { rtkClient } from "@/lib/rtk-client"
 import { useUser } from "@/components/providers/user-provider"
+import { useMeeting } from "@/components/providers/meeting-provider"
 import type { MeetingEventPayload } from "@/lib/call-events"
 import {
   createMeeting,
@@ -47,6 +53,12 @@ import {
   declineParticipant,
   toggleHandRaise,
   sendReaction,
+  kickParticipant,
+  sendMeetingChat,
+  createMeetingPoll,
+  voteMeetingPoll,
+  muteParticipant,
+  toggleScreenSharePermission,
   type MeetingWithDetails,
   type MeetingParticipantDetails,
   type MeetingHistoryEntry,
@@ -57,62 +69,50 @@ import {
   playScreenShare,
   playHandRaise,
   playReaction,
+  playMeetingEnded,
+  playChatMessage,
 } from "@/lib/sounds"
 
-/* ═══════════════════════════════════════════════════════════════
-   CONSTANTS
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════
+   CONSTANTS & TYPES
+   ═══════════════════════════════════════════════════════ */
 
-const REACTION_EMOJIS = ["👏", "❤️", "😂", "🎉", "👍"]
+const REACTIONS = [
+  { id: "👏", emoji: "👏", label: "Clap" },
+  { id: "❤️", emoji: "❤️", label: "Love" },
+  { id: "😂", emoji: "😂", label: "Haha" },
+  { id: "🎉", emoji: "🎉", label: "Party" },
+  { id: "👍", emoji: "👍", label: "Like" },
+] as const
 const TILES_PER_PAGE = 4
 
-/* ═══════════════════════════════════════════════════════════════
-   SUB-COMPONENTS
-   ═══════════════════════════════════════════════════════════════ */
-
-/* ── Glass Button (meeting controls) ─────────────────────────── */
-function GlassButton({
-  onClick,
-  children,
-  variant = "default",
-  active = false,
-  label,
-  disabled,
-  className,
-}: {
-  onClick?: () => void
-  children: React.ReactNode
-  variant?: "default" | "danger" | "success"
-  active?: boolean
-  label?: string
-  disabled?: boolean
-  className?: string
-}) {
-  return (
-    <div className="flex flex-col items-center gap-1">
-      <button
-        onClick={onClick}
-        disabled={disabled}
-        className={cn(
-          "w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center transition-all duration-200 backdrop-blur-xl border",
-          "hover:scale-105 active:scale-95 disabled:opacity-40 disabled:pointer-events-none",
-          variant === "danger" && "bg-red-500/85 border-red-500/20",
-          variant === "success" && "bg-emerald-500/85 border-emerald-500/20",
-          variant === "default" && active && "bg-foreground/90 border-foreground/20",
-          variant === "default" && !active && "bg-black/8 dark:bg-white/12 border-black/5 dark:border-white/10",
-          className,
-        )}
-      >
-        {children}
-      </button>
-      {label && (
-        <span className="text-[10px] text-muted-foreground font-medium hidden md:block">{label}</span>
-      )}
-    </div>
-  )
+type ChatMessage = {
+  id: string
+  userId: string
+  userName: string
+  userAvatar: string | null
+  message: string
+  imageUrl?: string
+  videoUrl?: string
+  timestamp: number
 }
 
-/* ── Meeting Timer ───────────────────────────────────────────── */
+type Poll = {
+  id: string
+  question: string
+  options: string[]
+  votes: Record<string, number>
+  voters: Set<string>
+  createdBy: string
+  createdByName: string
+}
+
+type ActiveTab = "people" | "chat" | "polls"
+
+/* ----------------------------------------------------------------
+   SUB-COMPONENTS
+   ---------------------------------------------------------------- */
+
 function MeetingTimer({ startTime }: { startTime: Date | null }) {
   const [elapsed, setElapsed] = useState(0)
   useEffect(() => {
@@ -134,7 +134,6 @@ function MeetingTimer({ startTime }: { startTime: Date | null }) {
   )
 }
 
-/* ── Participant Tile (glassmorphic) ─────────────────────────── */
 function ParticipantTile({
   name,
   avatar,
@@ -144,7 +143,7 @@ function ParticipantTile({
   isSpeaking,
   isScreenShare,
   handRaised,
-  reactionEmoji,
+  reactionId,
   videoRef,
   className: cls,
 }: {
@@ -156,7 +155,7 @@ function ParticipantTile({
   isSpeaking?: boolean
   isScreenShare?: boolean
   handRaised?: boolean
-  reactionEmoji?: string | null
+  reactionId?: string | null
   videoRef?: React.RefObject<HTMLVideoElement | null>
   className?: string
 }) {
@@ -170,8 +169,8 @@ function ParticipantTile({
   return (
     <div
       className={cn(
-        "relative rounded-2xl overflow-hidden flex items-center justify-center transition-all duration-300 backdrop-blur-xl border",
-        "bg-white/80 dark:bg-zinc-900/70 border-black/5 dark:border-white/8",
+        "relative rounded-2xl overflow-hidden flex items-center justify-center transition-all duration-300",
+        "bg-neutral-200/60 dark:bg-zinc-900/70",
         isSpeaking && "ring-2 ring-emerald-400/60 ring-offset-1 ring-offset-transparent",
         cls,
       )}
@@ -198,39 +197,35 @@ function ParticipantTile({
         </div>
       )}
 
-      {/* Hand raise / reaction overlay */}
-      {(handRaised || reactionEmoji) && (
+      {(handRaised || reactionId) && (
         <div className="absolute top-2 right-2 flex items-center gap-1.5 z-10">
-          {reactionEmoji && (
-            <span className="text-2xl drop-shadow-lg animate-bounce">{reactionEmoji}</span>
+          {reactionId && (
+            <div className="w-8 h-8 rounded-full bg-background/70 backdrop-blur-sm flex items-center justify-center animate-bounce">
+              <span className="text-lg leading-none">{reactionId}</span>
+            </div>
           )}
           {handRaised && (
-            <span className="text-lg animate-bounce">✋</span>
+            <div className="w-8 h-8 rounded-full bg-amber-500/20 backdrop-blur-sm flex items-center justify-center animate-bounce">
+              <span className="text-lg leading-none">✋</span>
+            </div>
           )}
         </div>
       )}
 
-      <div
-        className="absolute bottom-0 left-0 right-0 px-3 py-2 flex items-center justify-between bg-black/40 dark:bg-black/50"
-      >
-        <span className="text-xs font-medium text-white truncate">
+      <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between pointer-events-none">
+        <span className="px-2.5 py-0.5 rounded-full border border-white/30 dark:border-white/20 text-[11px] font-medium text-white truncate max-w-[70%] backdrop-blur-sm">
           {isLocal ? "You" : name}
         </span>
-        <div className="flex items-center gap-1">
-          {isMuted && (
-            <div className="w-5 h-5 rounded-full bg-red-500/80 flex items-center justify-center">
-              <HugeiconsIcon icon={MicOff01Icon} size={10} className="text-white" />
-            </div>
-          )}
-        </div>
+        {isMuted && (
+          <div className="w-6 h-6 rounded-full border border-red-400/50 flex items-center justify-center backdrop-blur-sm">
+            <HugeiconsIcon icon={MicOff01Icon} size={11} className="text-red-400" />
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
-/* ── Audio player for remote participants ─────────────────────
-   RTK/Dyte custom UI requires explicit audio element registration
-   to hear other participants. Without this, only video renders. */
 function RemoteAudioPlayer({
   participantId,
   audioEnabled,
@@ -248,17 +243,14 @@ function RemoteAudioPlayer({
     if (!p) return
 
     const el = audioRef.current
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const participant = p as any
 
-    // Prefer SDK built-in registration (handles track changes automatically)
     if (typeof participant.registerAudioElement === "function") {
       participant.registerAudioElement(el)
       return
     }
 
-    // Fallback: manually pipe the raw audio track into the element
     if (audioEnabled && participant.audioTrack) {
       el.srcObject = new MediaStream([participant.audioTrack])
       el.play().catch(() => {})
@@ -270,18 +262,17 @@ function RemoteAudioPlayer({
   return <audio ref={audioRef} autoPlay playsInline />
 }
 
-/* ── Remote Participant Tile ─────────────────────────────────── */
 function RemoteParticipantTile({
   participantId,
   participant,
   handRaised,
-  reactionEmoji,
+  reactionId,
   className,
 }: {
   participantId: string
   participant: { name: string; audioEnabled: boolean; videoEnabled: boolean }
   handRaised?: boolean
-  reactionEmoji?: string | null
+  reactionId?: string | null
   className?: string
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -303,14 +294,13 @@ function RemoteParticipantTile({
       isMuted={!participant.audioEnabled}
       isVideoOff={!participant.videoEnabled}
       handRaised={handRaised}
-      reactionEmoji={reactionEmoji}
+      reactionId={reactionId}
       videoRef={videoRef}
       className={className}
     />
   )
 }
 
-/* ── Screen Share View ───────────────────────────────────────── */
 function ScreenShareView({
   participantId,
   participantName,
@@ -374,9 +364,7 @@ function ScreenShareView({
   }, [participantId, isLocal])
 
   return (
-    <div
-      className="relative flex-1 rounded-2xl overflow-hidden flex items-center justify-center min-h-0 bg-black/80 dark:bg-black/60 backdrop-blur-xl border border-black/10 dark:border-white/8"
-    >
+    <div className="relative flex-1 rounded-2xl overflow-hidden flex items-center justify-center min-h-0 bg-black/90">
       <video
         ref={videoRef}
         autoPlay
@@ -384,45 +372,27 @@ function ScreenShareView({
         muted
         className="w-full h-full object-contain"
       />
-      <div
-        className="absolute bottom-0 left-0 right-0 px-4 py-2 bg-black/60"
-      >
-        <div className="flex items-center gap-2">
-          <HugeiconsIcon
-            icon={ComputerScreenShareIcon}
-            size={14}
-            className="text-emerald-400"
-          />
-          <span className="text-xs font-medium text-white">
-            {isLocal
-              ? "You are sharing your screen"
-              : `${participantName}'s screen`}
-          </span>
-        </div>
+      <div className="absolute bottom-2 left-2 flex items-center gap-2 px-3 py-1 rounded-full border border-white/20 backdrop-blur-sm">
+        <HugeiconsIcon icon={ComputerScreenShareIcon} size={12} className="text-emerald-400" />
+        <span className="text-[11px] font-medium text-white">
+          {isLocal ? "You are sharing" : `${participantName}'s screen`}
+        </span>
       </div>
     </div>
   )
 }
 
-/* ── Setup Overlay ───────────────────────────────────────────── */
 function SetupOverlay({ message }: { message: string }) {
   return (
     <div className="absolute inset-0 z-50 bg-background/95 flex flex-col items-center justify-center gap-5 rounded-inherit">
-      <div
-        className="w-16 h-16 rounded-2xl flex items-center justify-center bg-muted border border-border"
-      >
-        <HugeiconsIcon
-          icon={Loading03Icon}
-          size={28}
-          className="text-muted-foreground animate-spin"
-        />
+      <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-muted border border-border">
+        <HugeiconsIcon icon={Loading03Icon} size={28} className="text-muted-foreground animate-spin" />
       </div>
       <p className="text-muted-foreground text-sm font-medium">{message}</p>
     </div>
   )
 }
 
-/* ── Waiting Room ────────────────────────────────────────────── */
 function WaitingRoom({
   meetingTitle,
   onCancel,
@@ -435,28 +405,15 @@ function WaitingRoom({
       <div className="relative z-10 flex flex-col items-center gap-8">
         <div className="relative">
           <div className="absolute inset-0 w-24 h-24 rounded-full bg-emerald-500/10 animate-ping" />
-          <div
-            className="w-24 h-24 rounded-full flex items-center justify-center bg-muted border border-border"
-          >
-            <HugeiconsIcon
-              icon={Loading03Icon}
-              size={32}
-              className="text-muted-foreground animate-spin"
-            />
+          <div className="w-24 h-24 rounded-full flex items-center justify-center bg-muted border border-border">
+            <HugeiconsIcon icon={Loading03Icon} size={32} className="text-muted-foreground animate-spin" />
           </div>
         </div>
         <div className="text-center space-y-2">
           <h2 className="text-foreground text-lg font-semibold">{meetingTitle}</h2>
-          <p className="text-muted-foreground text-sm">
-            Waiting for the host to let you in…
-          </p>
+          <p className="text-muted-foreground text-sm">Waiting for the host to let you in…</p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onCancel}
-          className="border-border text-muted-foreground hover:text-foreground hover:border-border bg-muted"
-        >
+        <Button variant="outline" size="sm" onClick={onCancel} className="border-border text-muted-foreground hover:text-foreground hover:border-border bg-muted">
           Cancel
         </Button>
       </div>
@@ -464,9 +421,38 @@ function WaitingRoom({
   )
 }
 
-/* ═══════════════════════════════════════════════════════════════
+function MeetingEndedScreen({
+  meetingTitle,
+  duration,
+  onReturn,
+}: {
+  meetingTitle: string
+  duration: string
+  onReturn: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-60 bg-background flex flex-col items-center justify-center gap-6">
+      <div className="w-20 h-20 rounded-full border-2 border-red-400/30 flex items-center justify-center">
+        <HugeiconsIcon icon={CallEnd01Icon} size={32} className="text-red-400" />
+      </div>
+      <div className="text-center space-y-1.5">
+        <h2 className="text-xl font-semibold text-foreground">Meeting Ended</h2>
+        <p className="text-sm text-muted-foreground">{meetingTitle}</p>
+        {duration && (
+          <p className="text-xs text-muted-foreground/60">Duration: {duration}</p>
+        )}
+      </div>
+      <Button onClick={onReturn} size="sm" className="gap-2 mt-2">
+        <HugeiconsIcon icon={ArrowRight01Icon} size={14} />
+        Back to Meetings
+      </Button>
+    </div>
+  )
+}
+
+/* ----------------------------------------------------------------
    MAIN PAGE COMPONENT
-   ═══════════════════════════════════════════════════════════════ */
+   ---------------------------------------------------------------- */
 
 type ScreenSharer = { id: string; name: string; isLocal: boolean }
 
@@ -474,8 +460,8 @@ export default function MeetingsPage() {
   const user = useUser()
   const searchParams = useSearchParams()
   const router = useRouter()
+  const meeting = useMeeting()
 
-  /* ── Lobby state ── */
   const [meetings, setMeetings] = useState<MeetingWithDetails[]>([])
   const [isLoadingMeetings, setIsLoadingMeetings] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
@@ -484,21 +470,13 @@ export default function MeetingsPage() {
   const [meetingHistory, setMeetingHistory] = useState<MeetingHistoryEntry[]>([])
   const [isLoadingHistory, setIsLoadingHistory] = useState(true)
 
-  /* ── Active meeting state ── */
-  const [activeMeeting, setActiveMeeting] = useState<MeetingWithDetails | null>(
-    null,
-  )
-  const [isMuted, setIsMuted] = useState(false) // audio ON by default
+  const [activeMeeting, setActiveMeeting] = useState<MeetingWithDetails | null>(null)
+  const [isMuted, setIsMuted] = useState(false)
   const [isVideoOff, setIsVideoOff] = useState(true)
   const [isScreenSharing, setIsScreenSharing] = useState(false)
   const [meetingStartTime, setMeetingStartTime] = useState<Date | null>(null)
-  const [showPanel, setShowPanel] = useState(false)
-  const [admittedParticipants, setAdmittedParticipants] = useState<
-    MeetingParticipantDetails[]
-  >([])
-  const [pendingRequests, setPendingRequests] = useState<
-    MeetingParticipantDetails[]
-  >([])
+  const [admittedParticipants, setAdmittedParticipants] = useState<MeetingParticipantDetails[]>([])
+  const [pendingRequests, setPendingRequests] = useState<MeetingParticipantDetails[]>([])
   const [remoteParticipants, setRemoteParticipants] = useState<
     Map<string, { name: string; audioEnabled: boolean; videoEnabled: boolean; userId?: string }>
   >(new Map())
@@ -506,45 +484,53 @@ export default function MeetingsPage() {
   const [copiedLink, setCopiedLink] = useState(false)
   const [screenSharer, setScreenSharer] = useState<ScreenSharer | null>(null)
 
-  /* ── Hand-raise & reactions ── */
   const [raisedHands, setRaisedHands] = useState<Set<string>>(new Set())
   const [myHandRaised, setMyHandRaised] = useState(false)
   const [showReactionPicker, setShowReactionPicker] = useState(false)
-
-  /* ── Per-tile reaction display (auto-clears after 3s) ── */
+  const [showMobileMore, setShowMobileMore] = useState(false)
   const [tileReactions, setTileReactions] = useState<Map<string, string>>(new Map())
   const tileReactionTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
-  /* ── Grid carousel ── */
   const [gridPage, setGridPage] = useState(0)
-
-  /* ── Setup / waiting state ── */
   const [setupMessage, setSetupMessage] = useState<string | null>(null)
-  const [waitingForApproval, setWaitingForApproval] = useState<string | null>(
-    null,
-  )
+  const [waitingForApproval, setWaitingForApproval] = useState<string | null>(null)
+
+  const [activeTab, setActiveTab] = useState<ActiveTab | null>(null)
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [chatInput, setChatInput] = useState("")
+  const [unreadChat, setUnreadChat] = useState(0)
+  const chatEndRef = useRef<HTMLDivElement>(null)
+
+  const [polls, setPolls] = useState<Poll[]>([])
+  const [showCreatePoll, setShowCreatePoll] = useState(false)
+  const [pollQuestion, setPollQuestion] = useState("")
+  const [pollOptions, setPollOptions] = useState(["", ""])
+  const [myVotes, setMyVotes] = useState<Set<string>>(new Set())
+
+  const [isLoudspeaker, setIsLoudspeaker] = useState(true)
+  const [screenSharePermissions, setScreenSharePermissions] = useState<Map<string, boolean>>(new Map())
+  const [showMeetingEnded, setShowMeetingEnded] = useState<{ title: string; duration: string } | null>(null)
+
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    setIsMobile(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent))
+  }, [])
 
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const isHost = activeMeeting?.hostId === user.id
 
-  // Refs for stable callback access
   const waitingRef = useRef(waitingForApproval)
   waitingRef.current = waitingForApproval
   const activeMeetingRef = useRef(activeMeeting)
   activeMeetingRef.current = activeMeeting
-  const joinRTKRef = useRef<
-    (
-      authToken: string,
-      meetingId?: string,
-      meetingTitle?: string,
-    ) => Promise<void>
-  >(async () => {})
+  const activeTabRef = useRef(activeTab)
+  activeTabRef.current = activeTab
+  const meetingStartTimeRef = useRef(meetingStartTime)
+  meetingStartTimeRef.current = meetingStartTime
+  const joinRTKRef = useRef<(authToken: string, meetingId?: string, meetingTitle?: string) => Promise<void>>(async () => {})
 
-  /* ═══════════════════════════════════════════════════════════
-     EFFECTS
-     ═══════════════════════════════════════════════════════════ */
+  /* ---- EFFECTS ---- */
 
-  /* ── Load meetings on mount ── */
   useEffect(() => {
     let cancelled = false
     getMyMeetings().then((r) => {
@@ -557,12 +543,9 @@ export default function MeetingsPage() {
       if (r.success && r.meetings) setMeetingHistory(r.meetings)
       setIsLoadingHistory(false)
     })
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [])
 
-  /* ── Handle ?join=<id> URL param ── */
   useEffect(() => {
     const joinId = searchParams.get("join")
     if (!joinId) return
@@ -571,27 +554,19 @@ export default function MeetingsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
-  /* ── Register local video element when meeting view mounts ── */
   useEffect(() => {
     if (!isJoined) return
     const client = rtkClient.client
     if (!client) return
-
     const raf = requestAnimationFrame(() => {
-      if (localVideoRef.current) {
-        client.self.registerVideoElement(localVideoRef.current, true)
-      }
+      if (localVideoRef.current) client.self.registerVideoElement(localVideoRef.current, true)
     })
     return () => cancelAnimationFrame(raf)
   }, [isJoined, isVideoOff])
 
-  /* ── Reset grid page on screen share change ── */
   const isScreenShareActive = !!screenSharer
-  useEffect(() => {
-    setGridPage(0)
-  }, [isScreenShareActive])
+  useEffect(() => { setGridPage(0) }, [isScreenShareActive])
 
-  /* ── Auto-clamp grid page when participant count changes ── */
   useEffect(() => {
     const participantPages = Math.ceil((remoteParticipants.size + 1) / TILES_PER_PAGE)
     const totalSlides = (screenSharer ? 1 : 0) + participantPages
@@ -599,31 +574,26 @@ export default function MeetingsPage() {
     setGridPage((prev) => Math.min(prev, maxPage))
   }, [remoteParticipants.size, screenSharer])
 
-  /* ── SSE listener for meeting events ── */
+  useEffect(() => {
+    if (activeTab === "chat") {
+      setUnreadChat(0)
+      chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    }
+  }, [chatMessages.length, activeTab])
+
+  /* ---- SSE listener ---- */
   useEffect(() => {
     function handleSSE(evt: Event) {
-      const e = (evt as CustomEvent).detail as MeetingEventPayload & {
-        type: string
-      }
+      const e = (evt as CustomEvent).detail as MeetingEventPayload & { type: string }
       if (!e?.type?.startsWith("meeting:")) return
 
       switch (e.type) {
         case "meeting:join-request":
           setPendingRequests((prev) => {
             if (prev.some((r) => r.userId === e.userId)) return prev
-            return [
-              ...prev,
-              {
-                userId: e.userId,
-                name: e.userName,
-                avatar: e.userAvatar,
-                role: "participant" as const,
-                status: "pending" as const,
-              },
-            ]
+            return [...prev, { userId: e.userId, name: e.userName, avatar: e.userAvatar, role: "participant" as const, status: "pending" as const }]
           })
           break
-
         case "meeting:admitted":
           if (e.authToken && waitingRef.current) {
             setWaitingForApproval(null)
@@ -631,28 +601,22 @@ export default function MeetingsPage() {
             joinRTKRef.current(e.authToken, e.meetingId, e.meetingTitle)
           }
           break
-
         case "meeting:declined":
           setWaitingForApproval(null)
           break
-
         case "meeting:ended":
-          if (activeMeetingRef.current) handleForceLeave()
+          if (activeMeetingRef.current) handleMeetingEnd()
           break
-
+        case "meeting:kicked":
+          if (activeMeetingRef.current) handleMeetingEnd()
+          break
         case "meeting:hand-raised":
           setRaisedHands((prev) => new Set(prev).add(e.userId))
           playHandRaise()
           break
-
         case "meeting:hand-lowered":
-          setRaisedHands((prev) => {
-            const next = new Set(prev)
-            next.delete(e.userId)
-            return next
-          })
+          setRaisedHands((prev) => { const n = new Set(prev); n.delete(e.userId); return n })
           break
-
         case "meeting:reaction":
           if (e.emoji && e.userId) {
             playReaction()
@@ -661,155 +625,142 @@ export default function MeetingsPage() {
             if (prevTimer) clearTimeout(prevTimer)
             setTileReactions((prev) => new Map(prev).set(uid, e.emoji!))
             const t = setTimeout(() => {
-              setTileReactions((prev) => {
-                const next = new Map(prev)
-                next.delete(uid)
-                return next
-              })
+              setTileReactions((prev) => { const n = new Map(prev); n.delete(uid); return n })
               tileReactionTimers.current.delete(uid)
             }, 3000)
             tileReactionTimers.current.set(uid, t)
           }
           break
+        case "meeting:chat":
+          if (e.chatMessage || e.chatImageUrl || e.chatVideoUrl) {
+            playChatMessage()
+            setChatMessages((prev) => [...prev, {
+              id: e.chatMessageId || `${Date.now()}-${e.userId}`,
+              userId: e.userId,
+              userName: e.userName,
+              userAvatar: e.userAvatar,
+              message: e.chatMessage || "",
+              imageUrl: e.chatImageUrl,
+              videoUrl: e.chatVideoUrl,
+              timestamp: Date.now(),
+            }])
+            if (activeTabRef.current !== "chat") setUnreadChat((c) => c + 1)
+          }
+          break
+        case "meeting:poll":
+          if (e.pollId && e.pollQuestion && e.pollOptions) {
+            setPolls((prev) => [...prev, {
+              id: e.pollId!,
+              question: e.pollQuestion!,
+              options: e.pollOptions!,
+              votes: Object.fromEntries(e.pollOptions!.map((_, i) => [String(i), 0])),
+              voters: new Set<string>(),
+              createdBy: e.userId,
+              createdByName: e.userName,
+            }])
+          }
+          break
+        case "meeting:poll-vote":
+          if (e.pollId && e.pollVotes) {
+            setPolls((prev) => prev.map((p) => {
+              if (p.id !== e.pollId) return p
+              const newVotes = { ...p.votes }
+              for (const [key, val] of Object.entries(e.pollVotes!)) {
+                newVotes[key] = (newVotes[key] || 0) + val
+              }
+              const newVoters = new Set(p.voters)
+              newVoters.add(e.userId)
+              return { ...p, votes: newVotes, voters: newVoters }
+            }))
+          }
+          break
+        case "meeting:mute-participant":
+          rtkClient.client?.self.disableAudio().then(() => {
+            setIsMuted(true)
+          }).catch(() => {
+            // Fallback: directly disable the audio track
+            try {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const audioTrack = (rtkClient.client?.self as any)?.audioTrack
+              if (audioTrack) audioTrack.enabled = false
+            } catch { /* ignore */ }
+            setIsMuted(true)
+          })
+          break
+        case "meeting:screen-share-permission":
+          break
       }
     }
-
     window.addEventListener("sse:event", handleSSE)
     return () => window.removeEventListener("sse:event", handleSSE)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.id])
 
-  /* ── RTK event listeners ── */
+  /* ---- RTK event listeners ---- */
   useEffect(() => {
     if (!isJoined) return
     const client = rtkClient.client
     if (!client) return
 
-    // ────── Populate existing participants on join ──────
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const joined = client.participants.joined as any
-      const existing: Array<{
-        id: string
-        name: string
-        audioEnabled: boolean
-        videoEnabled: boolean
-        screenShareEnabled?: boolean
-        customParticipantId?: string
-      }> = []
-      if (typeof joined.toArray === "function") {
-        existing.push(...joined.toArray())
-      } else if (typeof joined.forEach === "function") {
-        joined.forEach((p: (typeof existing)[0]) => existing.push(p))
-      } else if (typeof joined[Symbol.iterator] === "function") {
-        for (const p of joined) existing.push(p)
-      }
+      const existing: Array<{ id: string; name: string; audioEnabled: boolean; videoEnabled: boolean; screenShareEnabled?: boolean; customParticipantId?: string }> = []
+      if (typeof joined.toArray === "function") existing.push(...joined.toArray())
+      else if (typeof joined.forEach === "function") joined.forEach((p: (typeof existing)[0]) => existing.push(p))
+      else if (typeof joined[Symbol.iterator] === "function") { for (const p of joined) existing.push(p) }
 
       if (existing.length > 0) {
-        const map = new Map<
-          string,
-          { name: string; audioEnabled: boolean; videoEnabled: boolean; userId?: string }
-        >()
+        const map = new Map<string, { name: string; audioEnabled: boolean; videoEnabled: boolean; userId?: string }>()
         for (const p of existing) {
-          map.set(p.id, {
-            name: p.name,
-            audioEnabled: p.audioEnabled,
-            videoEnabled: p.videoEnabled,
-            userId: p.customParticipantId,
-          })
-          if (p.screenShareEnabled) {
-            setScreenSharer({ id: p.id, name: p.name, isLocal: false })
-          }
+          map.set(p.id, { name: p.name, audioEnabled: p.audioEnabled, videoEnabled: p.videoEnabled, userId: p.customParticipantId })
+          if (p.screenShareEnabled) setScreenSharer({ id: p.id, name: p.name, isLocal: false })
         }
         setRemoteParticipants(map)
       }
-    } catch (err) {
-      console.warn("[Meeting] Error populating existing participants:", err)
-    }
+    } catch (err) { console.warn("[Meeting] Error populating existing participants:", err) }
 
-    // ────── Event handlers ──────
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handleParticipantJoined = (p: any) => {
       setRemoteParticipants((prev) => {
         const next = new Map(prev)
-        next.set(p.id, {
-          name: p.name,
-          audioEnabled: p.audioEnabled,
-          videoEnabled: p.videoEnabled,
-          userId: p.customParticipantId,
-        })
+        next.set(p.id, { name: p.name, audioEnabled: p.audioEnabled, videoEnabled: p.videoEnabled, userId: p.customParticipantId })
         return next
       })
     }
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handleParticipantLeft = (p: any) => {
-      setRemoteParticipants((prev) => {
-        const next = new Map(prev)
-        next.delete(p.id)
-        return next
-      })
+      setRemoteParticipants((prev) => { const n = new Map(prev); n.delete(p.id); return n })
       setScreenSharer((prev) => (prev?.id === p.id ? null : prev))
     }
-
-    // Audio / video update: read directly from participant object
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handleAudioUpdate = (p: any) => {
       const audioEnabled = p.audioEnabled ?? true
       setRemoteParticipants((prev) => {
-        const existing = prev.get(p.id)
-        if (!existing) {
-          return new Map(prev).set(p.id, {
-            name: p.name || "Participant",
-            audioEnabled,
-            videoEnabled: false,
-            userId: p.customParticipantId,
-          })
-        }
-        const next = new Map(prev)
-        next.set(p.id, { ...existing, audioEnabled })
-        return next
+        const ex = prev.get(p.id)
+        if (!ex) return new Map(prev).set(p.id, { name: p.name || "Participant", audioEnabled, videoEnabled: false, userId: p.customParticipantId })
+        const n = new Map(prev); n.set(p.id, { ...ex, audioEnabled }); return n
       })
     }
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handleVideoUpdate = (p: any) => {
       const videoEnabled = p.videoEnabled ?? true
       setRemoteParticipants((prev) => {
-        const existing = prev.get(p.id)
-        if (!existing) {
-          return new Map(prev).set(p.id, {
-            name: p.name || "Participant",
-            audioEnabled: false,
-            videoEnabled,
-            userId: p.customParticipantId,
-          })
-        }
-        const next = new Map(prev)
-        next.set(p.id, { ...existing, videoEnabled })
-        return next
+        const ex = prev.get(p.id)
+        if (!ex) return new Map(prev).set(p.id, { name: p.name || "Participant", audioEnabled: false, videoEnabled, userId: p.customParticipantId })
+        const n = new Map(prev); n.set(p.id, { ...ex, videoEnabled }); return n
       })
     }
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handleScreenShareUpdate = (p: any) => {
-      if (p.screenShareEnabled) {
-        setScreenSharer({ id: p.id, name: p.name, isLocal: false })
-        playScreenShare()
-      } else {
-        setScreenSharer((prev) => (prev?.id === p.id ? null : prev))
-      }
+      if (p.screenShareEnabled) { setScreenSharer({ id: p.id, name: p.name, isLocal: false }); playScreenShare() }
+      else setScreenSharer((prev) => (prev?.id === p.id ? null : prev))
     }
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handleSelfScreenShareUpdate = (payload: any) => {
       if (payload.screenShareEnabled) {
         setIsScreenSharing(true)
-        setScreenSharer({
-          id: client.self.id,
-          name: `${user.firstName} ${user.lastName}`,
-          isLocal: true,
-        })
+        setScreenSharer({ id: client.self.id, name: `${user.firstName} ${user.lastName}`, isLocal: true })
         playScreenShare()
       } else {
         setIsScreenSharing(false)
@@ -817,52 +768,68 @@ export default function MeetingsPage() {
       }
     }
 
-    rtkClient.on(
-      "participantJoined",
-      "participants",
-      handleParticipantJoined,
-    )
+    rtkClient.on("participantJoined", "participants", handleParticipantJoined)
     rtkClient.on("participantLeft", "participants", handleParticipantLeft)
     rtkClient.on("audioUpdate", "participants", handleAudioUpdate)
     rtkClient.on("videoUpdate", "participants", handleVideoUpdate)
-    rtkClient.on(
-      "screenShareUpdate",
-      "participants",
-      handleScreenShareUpdate,
-    )
+    rtkClient.on("screenShareUpdate", "participants", handleScreenShareUpdate)
     rtkClient.on("screenShareUpdate", "self", handleSelfScreenShareUpdate)
 
     return () => {
-      rtkClient.off(
-        "participantJoined",
-        "participants",
-        handleParticipantJoined,
-      )
+      rtkClient.off("participantJoined", "participants", handleParticipantJoined)
       rtkClient.off("participantLeft", "participants", handleParticipantLeft)
       rtkClient.off("audioUpdate", "participants", handleAudioUpdate)
       rtkClient.off("videoUpdate", "participants", handleVideoUpdate)
-      rtkClient.off(
-        "screenShareUpdate",
-        "participants",
-        handleScreenShareUpdate,
-      )
+      rtkClient.off("screenShareUpdate", "participants", handleScreenShareUpdate)
       rtkClient.off("screenShareUpdate", "self", handleSelfScreenShareUpdate)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isJoined])
 
-  /* ═══════════════════════════════════════════════════════════
-     HANDLERS
-     ═══════════════════════════════════════════════════════════ */
+  // Register/unregister meeting with global provider for minimize support
+  useEffect(() => {
+    if (activeMeeting && isJoined) {
+      meeting.registerMeeting({
+        meetingId: activeMeeting.id,
+        title: activeMeeting.title,
+        isHost: activeMeeting.hostId === user.id,
+        startTime: meetingStartTime,
+        participantCount: remoteParticipants.size + 1,
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMeeting?.id, isJoined])
+
+  // Keep participant count in sync
+  useEffect(() => {
+    if (activeMeeting && isJoined) {
+      meeting.updateMeeting({ participantCount: remoteParticipants.size + 1 })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remoteParticipants.size])
+
+  // Set callbacks so PIP bar can control mute/end
+  useEffect(() => {
+    if (activeMeeting && isJoined) {
+      meeting.setMeetingCallbacks({
+        onToggleMute: () => {
+          const next = !isMuted
+          setIsMuted(next)
+          if (next) rtkClient.client?.self.disableAudio().catch(() => {})
+          else rtkClient.client?.self.enableAudio().catch(() => {})
+        },
+        onEndMeeting: () => handleEndMeeting(),
+      })
+      meeting.setMeetingMuted(isMuted)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMeeting?.id, isJoined, isMuted])
+
+  /* ---- HANDLERS ---- */
 
   const joinRTKAndSetup = useCallback(
-    async (
-      authToken: string,
-      meetingId?: string,
-      meetingTitle?: string,
-    ) => {
+    async (authToken: string, meetingId?: string, meetingTitle?: string) => {
       try {
-        // Enable audio by default so WebRTC audio pipeline is fully established
         await rtkClient.init(authToken, { audio: true, video: false })
         await rtkClient.joinRoom()
         setIsJoined(true)
@@ -873,33 +840,13 @@ export default function MeetingsPage() {
           const details = await getMeetingDetails(meetingId)
           if (details.success && details.meeting) {
             setActiveMeeting(details.meeting)
-            setMeetingStartTime(
-              details.meeting.startedAt
-                ? new Date(details.meeting.startedAt)
-                : new Date(),
-            )
-            if (details.participants) {
-              setAdmittedParticipants(
-                details.participants.filter((p) => p.status === "admitted"),
-              )
-            }
+            setMeetingStartTime(details.meeting.startedAt ? new Date(details.meeting.startedAt) : new Date())
+            if (details.participants) setAdmittedParticipants(details.participants.filter((p) => p.status === "admitted"))
           } else {
             setActiveMeeting({
-              id: meetingId,
-              title: meetingTitle || "Meeting",
-              hostId: "",
-              hostName: "",
-              hostAvatar: null,
-              status: "active",
-              meetingId,
-              participantCount: 1,
-              maxParticipants: 50,
-              settings: {
-                allowScreenShare: true,
-                muteOnEntry: true,
-                requireApproval: true,
-                maxParticipants: 50,
-              },
+              id: meetingId, title: meetingTitle || "Meeting", hostId: "", hostName: "", hostAvatar: null,
+              status: "active", meetingId, participantCount: 1, maxParticipants: 50,
+              settings: { allowScreenShare: true, muteOnEntry: true, requireApproval: true, maxParticipants: 50 },
               createdAt: new Date().toISOString(),
             })
             setMeetingStartTime(new Date())
@@ -910,13 +857,10 @@ export default function MeetingsPage() {
         setSetupMessage(null)
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   )
 
-  useEffect(() => {
-    joinRTKRef.current = joinRTKAndSetup
-  }, [joinRTKAndSetup])
+  useEffect(() => { joinRTKRef.current = joinRTKAndSetup }, [joinRTKAndSetup])
 
   async function handleCreate() {
     if (!newTitle.trim()) return
@@ -924,20 +868,13 @@ export default function MeetingsPage() {
     setShowCreate(false)
     setSetupMessage("Setting up your meeting...")
     playMeetingCreating()
-
     const result = await createMeeting(newTitle.trim())
     if (result.success && result.meeting && result.authToken) {
       setNewTitle("")
       setActiveMeeting(result.meeting)
-      setMeetingStartTime(
-        result.meeting.startedAt
-          ? new Date(result.meeting.startedAt)
-          : new Date(),
-      )
+      setMeetingStartTime(result.meeting.startedAt ? new Date(result.meeting.startedAt) : new Date())
       await joinRTKAndSetup(result.authToken)
-    } else {
-      setSetupMessage(null)
-    }
+    } else setSetupMessage(null)
     setIsCreating(false)
   }
 
@@ -945,58 +882,33 @@ export default function MeetingsPage() {
     setSetupMessage("Joining meeting...")
     const result = await joinMeeting(meetingId)
     if (result.success) {
-      if (result.requiresApproval) {
-        setSetupMessage(null)
-        setWaitingForApproval(result.meeting?.title || "Meeting")
-        return
-      }
+      if (result.requiresApproval) { setSetupMessage(null); setWaitingForApproval(result.meeting?.title || "Meeting"); return }
       if (result.authToken && result.meeting) {
         setActiveMeeting(result.meeting)
-        setMeetingStartTime(
-          result.meeting.startedAt
-            ? new Date(result.meeting.startedAt)
-            : new Date(),
-        )
+        setMeetingStartTime(result.meeting.startedAt ? new Date(result.meeting.startedAt) : new Date())
         await joinRTKAndSetup(result.authToken)
       }
-    } else {
-      setSetupMessage(null)
-      console.error("[Meeting] Join failed:", result.error)
-    }
+    } else { setSetupMessage(null); console.error("[Meeting] Join failed:", result.error) }
   }
 
   async function handleRejoin(meeting: MeetingWithDetails) {
     setSetupMessage("Connecting...")
     const result = await joinMeeting(meeting.id)
     if (result.success) {
-      if (result.requiresApproval) {
-        setSetupMessage(null)
-        setWaitingForApproval(result.meeting?.title || meeting.title)
-        return
-      }
+      if (result.requiresApproval) { setSetupMessage(null); setWaitingForApproval(result.meeting?.title || meeting.title); return }
       if (result.authToken && result.meeting) {
         setActiveMeeting(result.meeting)
-        setMeetingStartTime(
-          result.meeting.startedAt
-            ? new Date(result.meeting.startedAt)
-            : new Date(),
-        )
+        setMeetingStartTime(result.meeting.startedAt ? new Date(result.meeting.startedAt) : new Date())
         await joinRTKAndSetup(result.authToken)
         const details = await getMeetingDetails(meeting.id)
-        if (details.success && details.participants) {
-          setAdmittedParticipants(
-            details.participants.filter((p) => p.status === "admitted"),
-          )
-        }
+        if (details.success && details.participants) setAdmittedParticipants(details.participants.filter((p) => p.status === "admitted"))
       }
-    } else {
-      setSetupMessage(null)
-      console.error("[Meeting] Rejoin failed:", result.error)
-    }
+    } else { setSetupMessage(null); console.error("[Meeting] Rejoin failed:", result.error) }
   }
 
-  function handleForceLeave() {
+  function resetMeetingState() {
     rtkClient.leaveRoom().catch(() => {})
+    meeting.unregisterMeeting()
     setActiveMeeting(null)
     setIsJoined(false)
     setRemoteParticipants(new Map())
@@ -1010,28 +922,52 @@ export default function MeetingsPage() {
     setRaisedHands(new Set())
     setMyHandRaised(false)
     setTileReactions(new Map())
-    // Clear tile reaction timers
     tileReactionTimers.current.forEach((t) => clearTimeout(t))
     tileReactionTimers.current.clear()
     setGridPage(0)
-    getMyMeetings().then((r) => {
-      if (r.success && r.meetings) setMeetings(r.meetings)
-    })
-    getMeetingHistory().then((r) => {
-      if (r.success && r.meetings) setMeetingHistory(r.meetings)
-    })
+    setActiveTab(null)
+    setChatMessages([])
+    setChatInput("")
+    setUnreadChat(0)
+    setPolls([])
+    setShowCreatePoll(false)
+    setMyVotes(new Set())
+    setScreenSharePermissions(new Map())
+    getMyMeetings().then((r) => { if (r.success && r.meetings) setMeetings(r.meetings) })
+    getMeetingHistory().then((r) => { if (r.success && r.meetings) setMeetingHistory(r.meetings) })
   }
 
-  /* ── Media controls ── */
+  function handleMeetingEnd() {
+    const title = activeMeetingRef.current?.title || "Meeting"
+    const start = meetingStartTimeRef.current
+    let duration = ""
+    if (start) {
+      const secs = Math.floor((Date.now() - start.getTime()) / 1000)
+      const mm = Math.floor(secs / 60)
+      const ss = secs % 60
+      duration = mm > 0 ? `${mm}m ${ss}s` : `${ss}s`
+    }
+    playMeetingEnded()
+    resetMeetingState()
+    setShowMeetingEnded({ title, duration })
+  }
+
+  async function handleEndMeeting() {
+    if (!activeMeeting) return
+    try {
+      if (isHost) await endMeetingAction(activeMeeting.id)
+      else await leaveMeeting(activeMeeting.id)
+    } catch { /* noop */ }
+    handleMeetingEnd()
+  }
+
   async function toggleMute() {
     const next = !isMuted
     setIsMuted(next)
     try {
       if (next) await rtkClient.client?.self.disableAudio()
       else await rtkClient.client?.self.enableAudio()
-    } catch (e) {
-      console.error("Toggle mute:", e)
-    }
+    } catch (e) { console.error("Toggle mute:", e) }
   }
 
   async function toggleVideo() {
@@ -1043,40 +979,31 @@ export default function MeetingsPage() {
       } else {
         await rtkClient.client?.self.enableVideo()
         requestAnimationFrame(() => {
-          if (localVideoRef.current) {
-            rtkClient.client?.self.registerVideoElement(
-              localVideoRef.current,
-              true,
-            )
-          }
+          if (localVideoRef.current) rtkClient.client?.self.registerVideoElement(localVideoRef.current, true)
         })
       }
-    } catch (e) {
-      console.error("Toggle video:", e)
-    }
+    } catch (e) { console.error("Toggle video:", e) }
   }
 
   async function toggleScreenShare() {
     try {
-      if (isScreenSharing) {
-        await rtkClient.client?.self.disableScreenShare()
-      } else {
-        await rtkClient.client?.self.enableScreenShare()
-      }
-    } catch (e) {
-      console.error("Screen share:", e)
-    }
+      if (isScreenSharing) await rtkClient.client?.self.disableScreenShare()
+      else await rtkClient.client?.self.enableScreenShare()
+    } catch (e) { console.error("Screen share:", e) }
   }
 
-  async function handleEndMeeting() {
-    if (!activeMeeting) return
-    try {
-      if (isHost) await endMeetingAction(activeMeeting.id)
-      else await leaveMeeting(activeMeeting.id)
-    } catch {
-      /* noop */
-    }
-    handleForceLeave()
+  function toggleLoudspeaker() {
+    setIsLoudspeaker((prev) => {
+      const next = !prev
+      document.querySelectorAll("audio").forEach((el) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const audioEl = el as any
+        if (typeof audioEl.setSinkId === "function") {
+          audioEl.setSinkId(next ? "default" : "communications").catch(() => {})
+        }
+      })
+      return next
+    })
   }
 
   async function handleAdmit(userId: string) {
@@ -1099,24 +1026,19 @@ export default function MeetingsPage() {
     await toggleHandRaise(activeMeeting.id, next)
   }
 
-  async function handleReaction(emoji: string) {
+  async function handleReaction(reactionId: string) {
     if (!activeMeeting) return
     setShowReactionPicker(false)
     playReaction()
-    // Show on own tile
     const existingTimer = tileReactionTimers.current.get(user.id)
     if (existingTimer) clearTimeout(existingTimer)
-    setTileReactions((prev) => new Map(prev).set(user.id, emoji))
+    setTileReactions((prev) => new Map(prev).set(user.id, reactionId))
     const timer = setTimeout(() => {
-      setTileReactions((prev) => {
-        const next = new Map(prev)
-        next.delete(user.id)
-        return next
-      })
+      setTileReactions((prev) => { const n = new Map(prev); n.delete(user.id); return n })
       tileReactionTimers.current.delete(user.id)
     }, 3000)
     tileReactionTimers.current.set(user.id, timer)
-    await sendReaction(activeMeeting.id, emoji)
+    await sendReaction(activeMeeting.id, reactionId)
   }
 
   function copyMeetingLink() {
@@ -1127,278 +1049,199 @@ export default function MeetingsPage() {
     setTimeout(() => setCopiedLink(false), 2000)
   }
 
-  /* ═══════════════════════════════════════════════════════════
-     RENDER: ACTIVE MEETING
-     ═══════════════════════════════════════════════════════════ */
+  async function handleKick(userId: string) {
+    if (!activeMeeting) return
+    await kickParticipant(activeMeeting.id, userId)
+  }
+
+  async function handleMuteParticipant(userId: string) {
+    if (!activeMeeting) return
+    await muteParticipant(activeMeeting.id, userId)
+  }
+
+  async function handleToggleScreenSharePerm(userId: string) {
+    if (!activeMeeting) return
+    const current = screenSharePermissions.get(userId) ?? true
+    const next = !current
+    setScreenSharePermissions((prev) => new Map(prev).set(userId, next))
+    await toggleScreenSharePermission(activeMeeting.id, userId, next)
+  }
+
+  async function handleSendChat() {
+    if (!activeMeeting || !chatInput.trim()) return
+    const msg = chatInput.trim()
+    setChatInput("")
+    setChatMessages((prev) => [...prev, {
+      id: `${Date.now()}-${user.id}`,
+      userId: user.id,
+      userName: `${user.firstName} ${user.lastName}`,
+      userAvatar: user.avatarUrl,
+      message: msg,
+      timestamp: Date.now(),
+    }])
+    await sendMeetingChat(activeMeeting.id, msg)
+  }
+
+  async function handleCreatePoll() {
+    if (!activeMeeting || !pollQuestion.trim() || pollOptions.filter((o) => o.trim()).length < 2) return
+    const opts = pollOptions.filter((o) => o.trim())
+    setPolls((prev) => [...prev, {
+      id: `poll-${Date.now()}-local`, question: pollQuestion, options: opts,
+      votes: Object.fromEntries(opts.map((_, i) => [String(i), 0])),
+      voters: new Set<string>(), createdBy: user.id,
+      createdByName: `${user.firstName} ${user.lastName}`,
+    }])
+    setShowCreatePoll(false)
+    const q = pollQuestion
+    setPollQuestion("")
+    setPollOptions(["", ""])
+    await createMeetingPoll(activeMeeting.id, q, opts)
+  }
+
+  async function handleVotePoll(pollId: string, optionIndex: number) {
+    if (!activeMeeting || myVotes.has(pollId)) return
+    setMyVotes((prev) => new Set(prev).add(pollId))
+    setPolls((prev) => prev.map((p) => {
+      if (p.id !== pollId) return p
+      const newVotes = { ...p.votes }
+      newVotes[String(optionIndex)] = (newVotes[String(optionIndex)] || 0) + 1
+      const newVoters = new Set(p.voters)
+      newVoters.add(user.id)
+      return { ...p, votes: newVotes, voters: newVoters }
+    }))
+    await voteMeetingPoll(activeMeeting.id, pollId, optionIndex)
+  }
+
+  /* ---- RENDER: MEETING ENDED ---- */
+
+  if (showMeetingEnded) {
+    return (
+      <MeetingEndedScreen
+        meetingTitle={showMeetingEnded.title}
+        duration={showMeetingEnded.duration}
+        onReturn={() => setShowMeetingEnded(null)}
+      />
+    )
+  }
+
+  /* ---- RENDER: ACTIVE MEETING ---- */
 
   if (activeMeeting && isJoined) {
     const totalParticipants = remoteParticipants.size + 1
     const hasScreenShare = !!screenSharer
 
-    // Build all participant entries
     const allGridEntries: Array<{ id: string; isLocal: boolean }> = [
       { id: "local", isLocal: true },
-      ...Array.from(remoteParticipants.keys()).map((id) => ({
-        id,
-        isLocal: false,
-      })),
+      ...Array.from(remoteParticipants.keys()).map((id) => ({ id, isLocal: false })),
     ]
 
-    // Unified slides: screen share as page 0 (when active) + participant grid pages (4 per page)
-    type Slide =
-      | { type: "screenshare" }
-      | { type: "participants"; entries: typeof allGridEntries }
-
+    type Slide = { type: "screenshare" } | { type: "participants"; entries: typeof allGridEntries }
     const slides: Slide[] = []
     if (hasScreenShare) slides.push({ type: "screenshare" })
     for (let i = 0; i < allGridEntries.length; i += TILES_PER_PAGE) {
       slides.push({ type: "participants", entries: allGridEntries.slice(i, i + TILES_PER_PAGE) })
     }
-
     const totalSlideCount = slides.length
     const currentSlide = Math.min(gridPage, Math.max(0, totalSlideCount - 1))
     const activeSlide = slides[currentSlide]
 
-    return (
-      <div className="flex flex-col h-dvh bg-neutral-100 dark:bg-zinc-950 relative overflow-hidden">
-        {/* Hide the platform bottom nav when in active meeting */}
-        <style>{`nav.safe-area-bottom { display: none !important; }`}</style>
+    const panelOpen = activeTab !== null
 
-        {/* ── Hidden audio players for every remote participant ── */}
+    // When minimized, don't render the full meeting UI — PIP bar handles it
+    if (meeting.isMinimized) {
+      return (
+        <div className="relative flex flex-col h-dvh min-h-0">
+          <Topbar title="Meetings" />
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center space-y-3">
+              <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto">
+                <HugeiconsIcon icon={Video01Icon} size={28} className="text-emerald-500" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-sm">{activeMeeting.title}</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Meeting is minimized</p>
+              </div>
+              <Button onClick={() => meeting.setMinimized(false)} size="sm" variant="outline" className="gap-1.5">
+                Return to meeting
+              </Button>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col bg-neutral-100 dark:bg-zinc-950 overflow-hidden">
+        <style>{"nav.safe-area-bottom { display: none !important; }"}</style>
+
         {Array.from(remoteParticipants.entries()).map(([id, p]) => (
-          <RemoteAudioPlayer
-            key={`audio-${id}`}
-            participantId={id}
-            audioEnabled={p.audioEnabled}
-          />
+          <RemoteAudioPlayer key={`audio-${id}`} participantId={id} audioEnabled={p.audioEnabled} />
         ))}
 
-        {/* ── Top bar ── */}
-        <div
-          className="relative z-10 flex items-center justify-between px-4 md:px-6 py-3 bg-white/80 dark:bg-black/30 backdrop-blur-xl border-b border-border/30 dark:border-white/5"
-        >
-          <div className="flex flex-col">
-            <h2 className="text-foreground font-semibold text-sm truncate max-w-50">
-              {activeMeeting.title}
-            </h2>
-            <div className="flex items-center gap-2">
-              <MeetingTimer startTime={meetingStartTime} />
-              <span className="text-muted-foreground/50 text-xs">&middot;</span>
-              <span className="text-muted-foreground text-xs">
-                {totalParticipants} in meeting
-              </span>
-            </div>
+        {/* Top bar */}
+        <div className="relative z-10 flex items-center justify-between px-4 py-2 bg-transparent">
+          <div className="flex items-center gap-2.5">
+            <span className="text-foreground font-semibold text-sm truncate max-w-40">{activeMeeting.title}</span>
+            <span className="text-muted-foreground/40">·</span>
+            <MeetingTimer startTime={meetingStartTime} />
+            <span className="text-muted-foreground/40">·</span>
+            <span className="text-muted-foreground text-xs">{totalParticipants}</span>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={copyMeetingLink}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-muted-foreground hover:text-foreground transition-colors bg-black/5 dark:bg-white/8 backdrop-blur-md border border-black/5 dark:border-white/6"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-muted-foreground hover:text-foreground transition-colors border border-border/50"
             >
-              <HugeiconsIcon
-                icon={copiedLink ? CheckmarkCircle01Icon : Link01Icon}
-                size={12}
-              />
+              <HugeiconsIcon icon={copiedLink ? CheckmarkCircle01Icon : Link01Icon} size={12} />
               {copiedLink ? "Copied!" : "Invite"}
             </button>
             <button
-              onClick={() => setShowPanel(!showPanel)}
-              className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-muted-foreground hover:text-foreground transition-colors bg-black/5 dark:bg-white/8 backdrop-blur-md border border-black/5 dark:border-white/6"
+              onClick={() => meeting.setMinimized(true)}
+              className="flex items-center justify-center w-8 h-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+              title="Minimize meeting"
             >
-              <HugeiconsIcon icon={UserGroupIcon} size={14} />
-              {pendingRequests.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-[10px] flex items-center justify-center text-white font-bold">
-                  {pendingRequests.length}
-                </span>
-              )}
+              <HugeiconsIcon icon={MinimizeScreenIcon} size={16} />
             </button>
           </div>
         </div>
 
-        {/* ── People side-panel ── */}
-        {showPanel && (
-          <div
-            className="fixed md:absolute inset-0 md:inset-auto md:top-14 md:right-4 z-30 md:z-20 md:w-72 md:max-h-[calc(100dvh-120px)] md:rounded-2xl p-4 md:p-3 overflow-y-auto animate-in slide-in-from-right-4 fade-in duration-200 bg-background/97 backdrop-blur-xl border border-border dark:border-white/8"
-          >
-            {/* Mobile: safe area top + bigger header */}
-            <div className="flex items-center justify-between mb-3 pt-[env(safe-area-inset-top)] md:pt-0">
-              <h3 className="text-foreground text-base md:text-sm font-semibold">People</h3>
-              <button
-                onClick={() => setShowPanel(false)}
-                className="w-8 h-8 md:w-auto md:h-auto rounded-full bg-muted md:bg-transparent flex items-center justify-center"
-              >
-                <HugeiconsIcon
-                  icon={Cancel01Icon}
-                  size={18}
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                />
-              </button>
-            </div>
-
-            {/* Pending requests — host only */}
-            {isHost && pendingRequests.length > 0 && (
-              <div className="mb-3">
-                <p className="text-[10px] uppercase tracking-wider text-amber-400/80 font-semibold mb-1.5">
-                  Waiting ({pendingRequests.length})
-                </p>
-                <div className="space-y-1.5">
-                  {pendingRequests.map((req) => {
-                    const initials = req.name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")
-                      .toUpperCase()
-                      .slice(0, 2)
-                    return (
-                      <div
-                        key={req.userId}
-                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-muted/50"
-                      >
-                        <Avatar className="w-6 h-6">
-                          {req.avatar && (
-                            <AvatarImage src={req.avatar} alt={req.name} />
-                          )}
-                          <AvatarFallback className="text-[8px] bg-muted text-muted-foreground">
-                            {initials}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="text-xs text-muted-foreground flex-1 truncate">
-                          {req.name}
-                        </span>
-                        <button
-                          onClick={() => handleAdmit(req.userId)}
-                          className="w-6 h-6 rounded-full bg-emerald-500/20 hover:bg-emerald-500/40 flex items-center justify-center transition-colors"
-                        >
-                          <HugeiconsIcon
-                            icon={CheckmarkCircle01Icon}
-                            size={12}
-                            className="text-emerald-400"
-                          />
-                        </button>
-                        <button
-                          onClick={() => handleDecline(req.userId)}
-                          className="w-6 h-6 rounded-full bg-red-500/20 hover:bg-red-500/40 flex items-center justify-center transition-colors"
-                        >
-                          <HugeiconsIcon
-                            icon={Cancel01Icon}
-                            size={12}
-                            className="text-red-400"
-                          />
-                        </button>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* All participants */}
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5">
-              In meeting ({totalParticipants})
-            </p>
-            <div className="space-y-1">
-              {/* Self */}
-              <div
-                className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-muted/50"
-              >
-                <Avatar className="w-6 h-6">
-                  {user.avatarUrl && (
-                    <AvatarImage src={user.avatarUrl} alt="You" />
-                  )}
-                  <AvatarFallback className="text-[8px] bg-muted text-muted-foreground">
-                    {(user.firstName?.[0] || "") + (user.lastName?.[0] || "")}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="text-xs text-muted-foreground flex-1 truncate">
-                  {user.firstName} {user.lastName} (You)
-                </span>
-                {myHandRaised && <span className="text-sm animate-bounce">✋</span>}
-                {isHost && (
-                  <Badge
-                    variant="outline"
-                    className="text-[8px] px-1.5 py-0 border-border text-muted-foreground"
-                  >
-                    Host
-                  </Badge>
-                )}
-              </div>
-              {/* Remote participants */}
-              {Array.from(remoteParticipants.entries()).map(([id, p]) => (
-                <div
-                  key={id}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-muted/50"
-                >
-                  <Avatar className="w-6 h-6">
-                    <AvatarFallback className="text-[8px] bg-muted text-muted-foreground">
-                      {p.name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")
-                        .toUpperCase()
-                        .slice(0, 2)}
+        {/* Pending admission requests */}
+        {isHost && pendingRequests.length > 0 && (
+          <div className="relative z-10 px-3 pb-1">
+            <div className="flex flex-col gap-1">
+              {pendingRequests.map((req) => (
+                <div key={req.userId} className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-amber-500/6 border border-amber-500/10 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <Avatar className="w-6 h-6 shrink-0">
+                    {req.avatar && <AvatarImage src={req.avatar} alt={req.name} />}
+                    <AvatarFallback className="text-[8px] bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                      {req.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="text-xs text-muted-foreground flex-1 truncate">
-                    {p.name}
-                  </span>
-                  {raisedHands.has(p.userId || id) && <span className="text-xs">✋</span>}
+                  <span className="text-xs text-foreground font-medium flex-1 truncate">{req.name} <span className="text-muted-foreground/60 font-normal">wants to join</span></span>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => handleAdmit(req.userId)} className="h-6 px-2.5 rounded-md text-[10px] font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors">
+                      Admit
+                    </button>
+                    <button onClick={() => handleDecline(req.userId)} className="h-6 px-2 rounded-md text-[10px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                      Decline
+                    </button>
+                  </div>
                 </div>
               ))}
-              {/* Admitted but offline */}
-              {admittedParticipants
-                .filter(
-                  (p) =>
-                    p.userId !== user.id &&
-                    !Array.from(remoteParticipants.values()).some(
-                      (rp) => rp.name === p.name,
-                    ),
-                )
-                .map((p) => (
-                  <div
-                    key={p.userId}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg opacity-50 bg-muted/30"
-                  >
-                    <Avatar className="w-6 h-6">
-                      {p.avatar && (
-                        <AvatarImage src={p.avatar} alt={p.name} />
-                      )}
-                      <AvatarFallback className="text-[8px] bg-muted text-muted-foreground">
-                        {p.name
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")
-                          .toUpperCase()
-                          .slice(0, 2)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-xs text-muted-foreground flex-1 truncate">
-                      {p.name}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground/60">offline</span>
-                  </div>
-                ))}
             </div>
           </div>
         )}
 
-        {/* ── Video area (unified carousel) ── */}
-        <div className="relative z-10 flex-1 p-2 md:p-4 overflow-hidden flex flex-col gap-1.5 md:gap-2">
+        {/* Video area */}
+        <div className="relative flex-1 p-2 md:p-3 overflow-hidden flex flex-col gap-1.5">
           <div className="relative flex-1 flex flex-col gap-2">
-            {/* Current slide */}
             {activeSlide?.type === "screenshare" ? (
-              <ScreenShareView
-                participantId={screenSharer!.id}
-                participantName={screenSharer!.name}
-                isLocal={screenSharer!.isLocal}
-              />
+              <ScreenShareView participantId={screenSharer!.id} participantName={screenSharer!.name} isLocal={screenSharer!.isLocal} />
             ) : activeSlide?.type === "participants" ? (
-              <div
-                className={cn(
-                  "grid gap-2 md:gap-3 flex-1 auto-rows-fr",
-                  activeSlide.entries.length <= 1
-                    ? "grid-cols-1"
-                    : "grid-cols-1 md:grid-cols-2",
-                )}
-              >
+              <div className={cn(
+                "grid gap-2 md:gap-3 flex-1 auto-rows-fr",
+                activeSlide.entries.length <= 1 ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2",
+              )}>
                 {activeSlide.entries.map((entry) =>
                   entry.isLocal ? (
                     <ParticipantTile
@@ -1409,7 +1252,7 @@ export default function MeetingsPage() {
                       isVideoOff={isVideoOff}
                       isLocal
                       handRaised={myHandRaised}
-                      reactionEmoji={tileReactions.get(user.id) || null}
+                      reactionId={tileReactions.get(user.id) || null}
                       videoRef={localVideoRef}
                     />
                   ) : (() => {
@@ -1421,7 +1264,7 @@ export default function MeetingsPage() {
                         participantId={entry.id}
                         participant={participant}
                         handRaised={raisedHands.has(uid)}
-                        reactionEmoji={tileReactions.get(uid) || null}
+                        reactionId={tileReactions.get(uid) || null}
                       />
                     )
                   })(),
@@ -1429,186 +1272,519 @@ export default function MeetingsPage() {
               </div>
             ) : null}
 
-            {/* Carousel navigation */}
             {totalSlideCount > 1 && (
               <>
                 <div className="absolute top-1/2 -translate-y-1/2 left-1 right-1 flex justify-between pointer-events-none z-10">
-                  <button
-                    onClick={() =>
-                      setGridPage((p) => Math.max(0, p - 1))
-                    }
-                    className={cn(
-                      "pointer-events-auto w-9 h-9 rounded-full flex items-center justify-center transition-all bg-background/80 dark:bg-black/50 backdrop-blur-md border border-border/50 dark:border-white/10",
-                      currentSlide <= 0
-                        ? "opacity-0 pointer-events-none"
-                        : "opacity-80 hover:opacity-100 hover:scale-110",
-                    )}
-                  >
-                    <span className="text-foreground text-lg font-bold leading-none">
-                      ‹
-                    </span>
+                  <button onClick={() => setGridPage((p) => Math.max(0, p - 1))}
+                    className={cn("pointer-events-auto w-8 h-8 rounded-full flex items-center justify-center bg-background/60 backdrop-blur-md border border-border/40", currentSlide <= 0 ? "opacity-0 pointer-events-none" : "opacity-70 hover:opacity-100")}>
+                    <span className="text-foreground text-lg font-bold leading-none">‹</span>
                   </button>
-                  <button
-                    onClick={() =>
-                      setGridPage((p) =>
-                        Math.min(totalSlideCount - 1, p + 1),
-                      )
-                    }
-                    className={cn(
-                      "pointer-events-auto w-9 h-9 rounded-full flex items-center justify-center transition-all bg-background/80 dark:bg-black/50 backdrop-blur-md border border-border/50 dark:border-white/10",
-                      currentSlide >= totalSlideCount - 1
-                        ? "opacity-0 pointer-events-none"
-                        : "opacity-80 hover:opacity-100 hover:scale-110",
-                    )}
-                  >
-                    <span className="text-foreground text-lg font-bold leading-none">
-                      ›
-                    </span>
+                  <button onClick={() => setGridPage((p) => Math.min(totalSlideCount - 1, p + 1))}
+                    className={cn("pointer-events-auto w-8 h-8 rounded-full flex items-center justify-center bg-background/60 backdrop-blur-md border border-border/40", currentSlide >= totalSlideCount - 1 ? "opacity-0 pointer-events-none" : "opacity-70 hover:opacity-100")}>
+                    <span className="text-foreground text-lg font-bold leading-none">›</span>
                   </button>
                 </div>
-
-                {/* Dot indicators — green dot for screen share slide */}
                 <div className="flex gap-1.5 justify-center py-1">
                   {slides.map((slide, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setGridPage(i)}
-                      className={cn(
-                        "h-1.5 rounded-full transition-all duration-200",
-                        i === currentSlide
-                          ? slide.type === "screenshare"
-                            ? "bg-emerald-400 w-4"
-                            : "bg-foreground w-4"
-                          : "bg-foreground/30 hover:bg-foreground/50 w-1.5",
-                      )}
-                    />
+                    <button key={i} onClick={() => setGridPage(i)}
+                      className={cn("h-1.5 rounded-full transition-all duration-200",
+                        i === currentSlide ? slide.type === "screenshare" ? "bg-emerald-400 w-4" : "bg-foreground w-4" : "bg-foreground/30 hover:bg-foreground/50 w-1.5")} />
                   ))}
                 </div>
               </>
             )}
           </div>
+
+
         </div>
 
-        {/* ── Bottom controls ── */}
-        <div
-          className="relative z-10 flex items-center justify-center gap-2 md:gap-4 px-3 md:px-4 py-2 md:py-5 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:pb-5 bg-white/80 dark:bg-black/40 backdrop-blur-xl border-t border-border/30 dark:border-white/5"
-        >
-          {/* Mic */}
-          <GlassButton
-            onClick={toggleMute}
-            active={isMuted}
-            label={isMuted ? "Unmute" : "Mute"}
-          >
-            <HugeiconsIcon
-              icon={isMuted ? MicOff01Icon : Mic01Icon}
-              size={18}
-              className={isMuted ? "text-background" : "text-foreground"}
-            />
-          </GlassButton>
+        {/* Side panel */}
+        {panelOpen && (
+          <div className="fixed md:absolute inset-0 md:inset-auto md:top-12 md:right-3 md:bottom-24 z-40 md:w-80 md:rounded-2xl flex flex-col overflow-hidden animate-in slide-in-from-right-4 fade-in duration-200 bg-background dark:bg-neutral-950 border border-border/30 dark:border-white/8 shadow-xl">
+            {/* Tab header */}
+            <div className="flex items-center gap-1 px-2 pt-[max(0.5rem,env(safe-area-inset-top))] md:pt-2 pb-0">
+              {(["people", "chat", "polls"] as ActiveTab[]).map((tab) => (
+                <button key={tab} onClick={() => setActiveTab(tab)}
+                  className={cn("flex-1 py-2 text-xs font-medium capitalize transition-all relative rounded-lg",
+                    activeTab === tab ? "text-foreground bg-muted/60" : "text-muted-foreground hover:text-foreground/80 hover:bg-muted/30")}>
+                  {tab}
+                  {tab === "chat" && unreadChat > 0 && activeTab !== "chat" && (
+                    <span className="absolute top-1 right-1/4 w-4 h-4 rounded-full bg-primary text-[9px] flex items-center justify-center text-primary-foreground font-bold">{unreadChat > 9 ? "9+" : unreadChat}</span>
+                  )}
+                </button>
+              ))}
+              <button onClick={() => setActiveTab(null)} className="w-8 h-8 rounded-lg flex items-center justify-center ml-0.5 hover:bg-muted/50 transition-colors shrink-0">
+                <HugeiconsIcon icon={Cancel01Icon} size={14} className="text-muted-foreground" />
+              </button>
+            </div>
 
-          {/* Video */}
-          <GlassButton
-            onClick={toggleVideo}
-            active={isVideoOff}
-            label={isVideoOff ? "Start Video" : "Stop Video"}
-          >
-            <HugeiconsIcon
-              icon={isVideoOff ? VideoOffIcon : Video01Icon}
-              size={18}
-              className={isVideoOff ? "text-background" : "text-foreground"}
-            />
-          </GlassButton>
+            <div className="h-px bg-border/30 dark:bg-white/6 mx-3 mt-2" />
 
-          {/* Screen share — disabled when someone else is sharing */}
-          <GlassButton
-            onClick={toggleScreenShare}
-            active={isScreenSharing}
-            label="Share"
-            disabled={!!screenSharer && !isScreenSharing}
-          >
-            <HugeiconsIcon
-              icon={ComputerScreenShareIcon}
-              size={18}
-              className={isScreenSharing ? "text-background" : "text-foreground"}
-            />
-          </GlassButton>
+            {activeTab === "people" && (
+              <div className="flex-1 overflow-y-auto p-3 space-y-1">
+                {/* Pending requests */}
+                {isHost && pendingRequests.length > 0 && (
+                  <div className="mb-3 space-y-1.5">
+                    <p className="text-[10px] uppercase tracking-wider text-amber-500 font-semibold px-1 mb-1">Waiting ({pendingRequests.length})</p>
+                    {pendingRequests.map((req) => (
+                      <div key={req.userId} className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-amber-500/5 border border-amber-500/10">
+                        <Avatar className="w-7 h-7 shrink-0">
+                          {req.avatar && <AvatarImage src={req.avatar} alt={req.name} />}
+                          <AvatarFallback className="text-[9px] bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                            {req.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-xs text-foreground font-medium flex-1 truncate">{req.name}</span>
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => handleAdmit(req.userId)} className="h-6 px-2.5 rounded-md text-[10px] font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors">
+                            Admit
+                          </button>
+                          <button onClick={() => handleDecline(req.userId)} className="h-6 px-2 rounded-md text-[10px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                            Decline
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="h-px bg-border/30 dark:bg-white/6 my-2" />
+                  </div>
+                )}
 
-          {/* Raise hand */}
-          <GlassButton
-            onClick={handleToggleHand}
-            active={myHandRaised}
-            label={myHandRaised ? "Lower" : "Raise"}
-          >
-            <span
-              className={cn("text-lg", myHandRaised && "animate-bounce")}
-            >
-              ✋
-            </span>
-          </GlassButton>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-semibold px-1 mb-1.5">Participants ({totalParticipants})</p>
 
-          {/* Reactions */}
-          <div className="relative">
-            <GlassButton
-              onClick={() => setShowReactionPicker(!showReactionPicker)}
-              label="React"
-            >
-              <span className="text-lg">😊</span>
-            </GlassButton>
-            {showReactionPicker && (
-              <div
-                className="absolute bottom-14 md:bottom-16 left-1/2 -translate-x-1/2 flex gap-0.5 md:gap-1 px-1.5 md:px-2 py-1 md:py-1.5 rounded-full animate-in fade-in zoom-in-95 duration-150 bg-background/95 backdrop-blur-xl border border-border dark:border-white/10"
-              >
-                {REACTION_EMOJIS.map((emoji) => (
-                  <button
-                    key={emoji}
-                    onClick={() => handleReaction(emoji)}
-                    className="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-base md:text-xl hover:bg-muted transition-colors hover:scale-110 active:scale-95"
-                  >
-                    {emoji}
-                  </button>
-                ))}
+                {/* Self */}
+                <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-muted/40 transition-colors">
+                  <Avatar className="w-7 h-7 shrink-0">
+                    {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt="You" />}
+                    <AvatarFallback className="text-[9px] bg-primary/10 text-primary">{(user.firstName?.[0] || "") + (user.lastName?.[0] || "")}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs font-medium text-foreground truncate block">{user.firstName} {user.lastName}</span>
+                    <span className="text-[10px] text-muted-foreground/60">{isHost ? "Host · You" : "You"}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {myHandRaised && <span className="text-sm animate-bounce">✋</span>}
+                    <div className={cn("w-6 h-6 rounded-md flex items-center justify-center", isMuted ? "bg-red-500/10" : "bg-emerald-500/10")}>
+                      <HugeiconsIcon icon={isMuted ? MicOff01Icon : Mic01Icon} size={12} className={isMuted ? "text-red-400" : "text-emerald-500"} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Remote participants */}
+                {Array.from(remoteParticipants.entries()).map(([id, p]) => {
+                  const uid = p.userId || id
+                  const isParticipantHost = uid === activeMeeting.hostId
+                  return (
+                    <div key={id} className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-muted/40 transition-colors group">
+                      <Avatar className="w-7 h-7 shrink-0">
+                        <AvatarFallback className="text-[9px] bg-muted text-muted-foreground">
+                          {p.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-xs font-medium text-foreground truncate block">{p.name}</span>
+                        {isParticipantHost && <span className="text-[10px] text-muted-foreground/60">Host</span>}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {raisedHands.has(uid) && <span className="text-sm">✋</span>}
+                        {isHost && !isParticipantHost ? (
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => handleMuteParticipant(uid)}
+                              title={p.audioEnabled ? "Mute" : "Already muted"}
+                              className={cn("w-6 h-6 rounded-md flex items-center justify-center transition-colors",
+                                p.audioEnabled ? "bg-muted hover:bg-red-500/10 hover:text-red-400" : "bg-red-500/10")}
+                            >
+                              <HugeiconsIcon icon={p.audioEnabled ? Mic01Icon : MicOff01Icon} size={12} className={p.audioEnabled ? "text-muted-foreground" : "text-red-400"} />
+                            </button>
+                            <button onClick={() => handleToggleScreenSharePerm(uid)} title={screenSharePermissions.get(uid) === false ? "Allow share" : "Revoke share"}
+                              className={cn("w-6 h-6 rounded-md flex items-center justify-center transition-colors",
+                                screenSharePermissions.get(uid) === false ? "bg-red-500/10" : "bg-muted hover:bg-muted/80")}>
+                              <HugeiconsIcon icon={ComputerScreenShareIcon} size={12} className={screenSharePermissions.get(uid) === false ? "text-red-400" : "text-muted-foreground"} />
+                            </button>
+                            <button onClick={() => handleKick(uid)} title="Remove"
+                              className="w-6 h-6 rounded-md flex items-center justify-center bg-muted hover:bg-red-500/10 transition-colors">
+                              <HugeiconsIcon icon={Cancel01Icon} size={12} className="text-muted-foreground hover:text-red-400" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className={cn("w-6 h-6 rounded-md flex items-center justify-center", !p.audioEnabled ? "bg-red-500/10" : "bg-emerald-500/10")}>
+                            <HugeiconsIcon icon={p.audioEnabled ? Mic01Icon : MicOff01Icon} size={12} className={p.audioEnabled ? "text-emerald-500" : "text-red-400"} />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+
+                {/* Offline admitted */}
+                {admittedParticipants
+                  .filter((p) => p.userId !== user.id && !Array.from(remoteParticipants.values()).some((rp) => rp.name === p.name))
+                  .map((p) => (
+                    <div key={p.userId} className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl opacity-30">
+                      <Avatar className="w-7 h-7 shrink-0">
+                        {p.avatar && <AvatarImage src={p.avatar} alt={p.name} />}
+                        <AvatarFallback className="text-[9px] bg-muted text-muted-foreground">{p.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}</AvatarFallback>
+                      </Avatar>
+                      <span className="text-xs text-muted-foreground flex-1 truncate">{p.name}</span>
+                      <span className="text-[9px] text-muted-foreground/40 bg-muted/50 px-1.5 py-0.5 rounded">offline</span>
+                    </div>
+                  ))}
+              </div>
+            )}
+
+            {activeTab === "chat" && (
+              <div className="flex-1 flex flex-col min-h-0">
+                <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5">
+                  {chatMessages.length === 0 && (
+                    <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground/30">
+                      <HugeiconsIcon icon={BubbleChatIcon} size={28} />
+                      <p className="text-[11px]">No messages yet</p>
+                    </div>
+                  )}
+                  {chatMessages.map((msg) => {
+                    const isMe = msg.userId === user.id
+                    return (
+                      <div key={msg.id} className={cn("flex gap-2", isMe && "flex-row-reverse")}>
+                        <Avatar className="w-6 h-6 shrink-0 mt-0.5">
+                          {msg.userAvatar && <AvatarImage src={msg.userAvatar} alt={msg.userName} />}
+                          <AvatarFallback className="text-[8px] bg-muted text-muted-foreground">
+                            {msg.userName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className={cn("max-w-[75%]", isMe && "text-right")}>
+                          <p className="text-[10px] text-muted-foreground/60 mb-0.5">{isMe ? "You" : msg.userName}</p>
+                          {msg.message && (
+                            <div className={cn("px-3 py-1.5 rounded-2xl text-[13px] leading-relaxed",
+                              isMe ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-muted/60 text-foreground rounded-tl-sm")}>
+                              {msg.message}
+                            </div>
+                          )}
+                          {msg.imageUrl && (
+                            <Image src={msg.imageUrl} alt="" width={240} height={180} className="mt-1.5 rounded-xl max-w-full object-cover" />
+                          )}
+                          {msg.videoUrl && <video src={msg.videoUrl} controls className="mt-1.5 rounded-xl max-w-full max-h-48" />}
+                        </div>
+                      </div>
+                    )
+                  })}
+                  <div ref={chatEndRef} />
+                </div>
+                <div className="px-3 py-2.5 border-t border-border/30 dark:border-white/6 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendChat()}
+                      placeholder="Type a message..."
+                      className="flex-1 h-8 text-xs border-border/30 bg-muted/30 focus-visible:ring-1 focus-visible:ring-primary/30"
+                    />
+                    <button onClick={handleSendChat} disabled={!chatInput.trim()}
+                      className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground disabled:opacity-30 hover:bg-primary/90 transition-colors shrink-0">
+                      <HugeiconsIcon icon={ArrowRight01Icon} size={14} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "polls" && (
+              <div className="flex-1 flex flex-col min-h-0">
+                <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
+                  {polls.length === 0 && !showCreatePoll && (
+                    <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground/30">
+                      <HugeiconsIcon icon={ChartColumnIcon} size={28} />
+                      <p className="text-[11px]">No polls yet</p>
+                    </div>
+                  )}
+                  {polls.map((poll) => {
+                    const totalVotes = Object.values(poll.votes).reduce((a, b) => a + b, 0)
+                    const hasVoted = myVotes.has(poll.id)
+                    const maxVotes = Math.max(...Object.values(poll.votes), 1)
+                    return (
+                      <div key={poll.id} className="rounded-xl bg-muted/30 p-3 space-y-2.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-xs font-semibold text-foreground leading-snug">{poll.question}</p>
+                          <span className="text-[10px] text-muted-foreground/60 whitespace-nowrap shrink-0">{totalVotes} vote{totalVotes !== 1 ? "s" : ""}</span>
+                        </div>
+                        <div className="space-y-1.5">
+                          {poll.options.map((opt, i) => {
+                            const count = poll.votes[String(i)] || 0
+                            const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0
+                            const isWinning = hasVoted && count === maxVotes && count > 0
+                            return (
+                              <button
+                                key={i}
+                                disabled={hasVoted}
+                                onClick={() => handleVotePoll(poll.id, i)}
+                                className={cn(
+                                  "relative w-full text-left px-3 py-2 rounded-lg transition-all overflow-hidden",
+                                  hasVoted ? "cursor-default bg-background/50" : "bg-background/80 hover:bg-background cursor-pointer active:scale-[0.98]",
+                                )}
+                              >
+                                {hasVoted && (
+                                  <div className={cn("absolute inset-y-0 left-0 transition-all duration-500 rounded-lg",
+                                    isWinning ? "bg-primary/15" : "bg-muted/60")}
+                                    style={{ width: `${pct}%` }} />
+                                )}
+                                <div className="relative flex items-center justify-between gap-2">
+                                  <span className={cn("text-xs", hasVoted && isWinning ? "font-medium text-foreground" : "text-foreground/80")}>{opt}</span>
+                                  {hasVoted && <span className={cn("text-[10px] font-semibold tabular-nums", isWinning ? "text-primary" : "text-muted-foreground")}>{pct}%</span>}
+                                </div>
+                              </button>
+                            )
+                          })}
+                        </div>
+                        <p className="text-[10px] text-muted-foreground/40">by {poll.createdByName}</p>
+                      </div>
+                    )
+                  })}
+                  {showCreatePoll && (
+                    <div className="rounded-xl bg-muted/30 p-3 space-y-2.5">
+                      <Input value={pollQuestion} onChange={(e) => setPollQuestion(e.target.value)} placeholder="Ask a question..." className="h-8 text-xs border-border/30 bg-background/80" autoFocus />
+                      {pollOptions.map((opt, i) => (
+                        <div key={i} className="flex gap-1.5">
+                          <Input
+                            value={opt}
+                            onChange={(e) => {
+                              const next = [...pollOptions]
+                              next[i] = e.target.value
+                              setPollOptions(next)
+                            }}
+                            placeholder={`Option ${i + 1}`}
+                            className="h-7 text-[11px] flex-1 border-border/30 bg-background/80"
+                          />
+                          {pollOptions.length > 2 && (
+                            <button onClick={() => setPollOptions(pollOptions.filter((_, j) => j !== i))} className="w-7 h-7 rounded-md flex items-center justify-center hover:bg-muted transition-colors shrink-0">
+                              <HugeiconsIcon icon={Cancel01Icon} size={10} className="text-muted-foreground" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      {pollOptions.length < 6 && (
+                        <button onClick={() => setPollOptions([...pollOptions, ""])} className="text-[11px] text-primary/80 hover:text-primary transition-colors">
+                          + Add option
+                        </button>
+                      )}
+                      <div className="flex gap-1.5 pt-0.5">
+                        <button onClick={handleCreatePoll} disabled={!pollQuestion.trim() || pollOptions.filter((o) => o.trim()).length < 2}
+                          className="flex-1 h-7 rounded-lg text-[11px] font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-30 transition-colors">
+                          Create
+                        </button>
+                        <button onClick={() => setShowCreatePoll(false)}
+                          className="h-7 px-3 rounded-lg text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {!showCreatePoll && isHost && (
+                  <div className="px-3 py-2.5 border-t border-border/30 dark:border-white/6 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-2.5">
+                    <button onClick={() => setShowCreatePoll(true)}
+                      className="w-full h-8 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground bg-muted/40 hover:bg-muted/60 flex items-center justify-center gap-1.5 transition-colors">
+                      <HugeiconsIcon icon={Add01Icon} size={12} />
+                      Create Poll
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
+        )}
 
-          {/* People */}
-          <GlassButton
-            onClick={() => setShowPanel(!showPanel)}
-            label="People"
-            className="relative"
-          >
-            <HugeiconsIcon
-              icon={UserGroupIcon}
-              size={18}
-              className="text-foreground"
-            />
-            {pendingRequests.length > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-amber-500 text-[10px] flex items-center justify-center text-white font-bold">
-                {pendingRequests.length}
-              </span>
+        {/* Bottom controls dock */}
+        <div className="absolute bottom-0 left-0 right-0 z-30 flex justify-center pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-4 px-2 md:px-3 pointer-events-none">
+          <div className="pointer-events-auto flex items-center gap-0.5 md:gap-1 px-1.5 md:px-2.5 py-1.5 md:py-2 rounded-2xl bg-white/8 dark:bg-white/6 backdrop-blur-2xl border border-white/10 dark:border-white/8 shadow-2xl shadow-black/20">
+            <button onClick={toggleMute} className="flex flex-col items-center gap-0.5 px-1 md:px-2 shrink-0">
+              <div className={cn("w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
+                isMuted ? "bg-foreground/90" : "bg-transparent")}>
+                <HugeiconsIcon icon={isMuted ? MicOff01Icon : Mic01Icon} size={16} className={cn("md:w-4.5! md:h-4.5!", isMuted ? "text-background" : "text-foreground")} />
+              </div>
+              <span className="text-[9px] text-muted-foreground font-medium hidden md:block">{isMuted ? "Unmute" : "Mute"}</span>
+            </button>
+
+            <button onClick={toggleVideo} className="flex flex-col items-center gap-0.5 px-1 md:px-2 shrink-0">
+              <div className={cn("w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
+                isVideoOff ? "bg-foreground/90" : "bg-transparent")}>
+                <HugeiconsIcon icon={isVideoOff ? VideoOffIcon : Video01Icon} size={16} className={cn("md:w-4.5! md:h-4.5!", isVideoOff ? "text-background" : "text-foreground")} />
+              </div>
+              <span className="text-[9px] text-muted-foreground font-medium hidden md:block">{isVideoOff ? "Start" : "Stop"}</span>
+            </button>
+
+            {!isMobile && (
+              <button onClick={toggleScreenShare} disabled={!!screenSharer && !isScreenSharing}
+                className="flex flex-col items-center gap-0.5 px-2 disabled:opacity-30 shrink-0">
+                <div className={cn("w-11 h-11 rounded-full flex items-center justify-center transition-all",
+                  isScreenSharing ? "bg-foreground/90" : "bg-transparent")}>
+                  <HugeiconsIcon icon={ComputerScreenShareIcon} size={18} className={isScreenSharing ? "text-background" : "text-foreground"} />
+                </div>
+                <span className="text-[9px] text-muted-foreground font-medium">Share</span>
+              </button>
             )}
-          </GlassButton>
 
-          {/* End / Leave */}
-          <GlassButton
-            variant="danger"
-            onClick={handleEndMeeting}
-            label={isHost ? "End" : "Leave"}
-          >
-            <HugeiconsIcon
-              icon={CallEnd01Icon}
-              size={20}
-              className="text-white"
-            />
-          </GlassButton>
+            {isMobile && (
+              <button onClick={toggleLoudspeaker} className="flex flex-col items-center gap-0.5 px-1 shrink-0">
+                <div className={cn("w-9 h-9 rounded-full flex items-center justify-center transition-all",
+                  isLoudspeaker ? "bg-foreground/90" : "bg-transparent")}>
+                  <HugeiconsIcon icon={VolumeHighIcon} size={16} className={isLoudspeaker ? "text-background" : "text-foreground"} />
+                </div>
+              </button>
+            )}
+
+            <div className="w-px h-6 md:h-8 bg-white/10 dark:bg-white/6 mx-0.5 shrink-0 md:hidden" />
+
+            {/* Mobile More Menu */}
+            {isMobile && (
+              <div className="relative shrink-0">
+                <button onClick={() => setShowMobileMore(!showMobileMore)} className="flex flex-col items-center gap-0.5 px-1">
+                  <div className={cn("w-9 h-9 rounded-full flex items-center justify-center transition-all",
+                    showMobileMore ? "bg-foreground/90" : "bg-transparent")}>
+                    <HugeiconsIcon icon={More02Icon} size={16} className={showMobileMore ? "text-background" : "text-foreground"} />
+                  </div>
+                </button>
+                {showMobileMore && (
+                  <div className="absolute bottom-12 right-0 rounded-2xl animate-in fade-in zoom-in-95 duration-150 bg-white/8 dark:bg-white/6 backdrop-blur-2xl border border-white/10 dark:border-white/8 shadow-2xl shadow-black/20 p-1.5">
+                    {/* Triangular arrow */}
+                    <div className="absolute -bottom-2 right-4 w-4 h-4 bg-white/8 dark:bg-white/6 backdrop-blur-2xl border-r border-b border-white/10 dark:border-white/8 rotate-45" />
+                    
+                    <div className="relative flex items-center gap-0.5">
+                      <button
+                        onClick={() => { handleToggleHand(); setShowMobileMore(false) }}
+                        className="flex flex-col items-center gap-0.5 px-1 shrink-0"
+                      >
+                        <div className={cn("w-9 h-9 rounded-full flex items-center justify-center transition-all",
+                          myHandRaised ? "bg-amber-500/20" : "bg-transparent")}>
+                          <span className={cn("text-base leading-none transition-transform", myHandRaised && "animate-bounce")}>✋</span>
+                        </div>
+                      </button>
+
+                      <button
+                        onClick={() => { setShowReactionPicker(true); setShowMobileMore(false) }}
+                        className="flex flex-col items-center gap-0.5 px-1 shrink-0"
+                      >
+                        <div className="w-9 h-9 rounded-full flex items-center justify-center bg-transparent">
+                          <span className="text-base leading-none">😊</span>
+                        </div>
+                      </button>
+
+                      <button
+                        onClick={() => { setActiveTab(activeTab === "people" ? null : "people"); setShowMobileMore(false) }}
+                        className="flex flex-col items-center gap-0.5 px-1 relative shrink-0"
+                      >
+                        <div className={cn("w-9 h-9 rounded-full flex items-center justify-center transition-all",
+                          activeTab === "people" ? "bg-foreground/90" : "bg-transparent")}>
+                          <HugeiconsIcon icon={UserGroupIcon} size={16} className={activeTab === "people" ? "text-background" : "text-foreground"} />
+                        </div>
+                        {pendingRequests.length > 0 && (
+                          <span className="absolute -top-0.5 right-0 w-4 h-4 rounded-full bg-amber-500 text-[9px] flex items-center justify-center text-white font-bold">{pendingRequests.length}</span>
+                        )}
+                      </button>
+
+                      <button
+                        onClick={() => { setActiveTab(activeTab === "chat" ? null : "chat"); setUnreadChat(0); setShowMobileMore(false) }}
+                        className="flex flex-col items-center gap-0.5 px-1 relative shrink-0"
+                      >
+                        <div className={cn("w-9 h-9 rounded-full flex items-center justify-center transition-all",
+                          activeTab === "chat" ? "bg-foreground/90" : "bg-transparent")}>
+                          <HugeiconsIcon icon={BubbleChatIcon} size={16} className={activeTab === "chat" ? "text-background" : "text-foreground"} />
+                        </div>
+                        {unreadChat > 0 && activeTab !== "chat" && (
+                          <span className="absolute -top-0.5 right-0 w-4 h-4 rounded-full bg-primary text-[9px] flex items-center justify-center text-primary-foreground font-bold">{unreadChat > 9 ? "9+" : unreadChat}</span>
+                        )}
+                      </button>
+
+                      <button
+                        onClick={() => { setActiveTab(activeTab === "polls" ? null : "polls"); setShowMobileMore(false) }}
+                        className="flex flex-col items-center gap-0.5 px-1 shrink-0"
+                      >
+                        <div className={cn("w-9 h-9 rounded-full flex items-center justify-center transition-all",
+                          activeTab === "polls" ? "bg-foreground/90" : "bg-transparent")}>
+                          <HugeiconsIcon icon={ChartColumnIcon} size={16} className={activeTab === "polls" ? "text-background" : "text-foreground"} />
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="w-px h-6 md:h-8 bg-white/10 dark:bg-white/6 mx-0.5 shrink-0 hidden md:block" />
+
+            <button onClick={handleToggleHand} className="hidden md:flex flex-col items-center gap-0.5 px-2 shrink-0">
+              <div className={cn("w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
+                myHandRaised ? "bg-amber-500/20" : "bg-transparent")}>
+                <span className={cn("text-base md:text-lg leading-none transition-transform", myHandRaised && "animate-bounce")}>✋</span>
+              </div>
+              <span className="text-[9px] text-muted-foreground font-medium hidden md:block">{myHandRaised ? "Lower" : "Raise"}</span>
+            </button>
+
+            <div className="relative shrink-0 hidden md:block">
+              <button onClick={() => setShowReactionPicker(!showReactionPicker)} className="flex flex-col items-center gap-0.5 px-2">
+                <div className="w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center bg-transparent">
+                  <span className="text-base md:text-lg leading-none">😊</span>
+                </div>
+                <span className="text-[9px] text-muted-foreground font-medium hidden md:block">React</span>
+              </button>
+              {showReactionPicker && (
+                <div className="absolute bottom-12 md:bottom-16 left-1/2 -translate-x-1/2 flex gap-1 px-2 py-1.5 rounded-2xl animate-in fade-in zoom-in-95 duration-150 bg-background/95 backdrop-blur-xl border border-border dark:border-white/10 shadow-lg">
+                  {REACTIONS.map((r) => (
+                    <button key={r.id} onClick={() => handleReaction(r.id)}
+                      className="w-9 h-9 md:w-10 md:h-10 rounded-xl flex items-center justify-center hover:bg-muted transition-colors hover:scale-110 active:scale-95"
+                      title={r.label}>
+                      <span className="text-xl leading-none">{r.emoji}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="w-px h-8 bg-white/10 dark:bg-white/6 mx-0.5 shrink-0 hidden md:block" />
+
+            <button onClick={() => setActiveTab(activeTab === "people" ? null : "people")} className="hidden md:flex flex-col items-center gap-0.5 px-2 relative shrink-0">
+              <div className={cn("w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
+                activeTab === "people" ? "bg-foreground/90" : "bg-transparent")}>
+                <HugeiconsIcon icon={UserGroupIcon} size={16} className={cn("md:w-4.5! md:h-4.5!", activeTab === "people" ? "text-background" : "text-foreground")} />
+              </div>
+              {pendingRequests.length > 0 && (
+                <span className="absolute -top-0.5 right-0 w-4 h-4 rounded-full bg-amber-500 text-[9px] flex items-center justify-center text-white font-bold">{pendingRequests.length}</span>
+              )}
+              <span className="text-[9px] text-muted-foreground font-medium hidden md:block">People</span>
+            </button>
+
+            <button onClick={() => { setActiveTab(activeTab === "chat" ? null : "chat"); setUnreadChat(0) }} className="hidden md:flex flex-col items-center gap-0.5 px-2 relative shrink-0">
+              <div className={cn("w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
+                activeTab === "chat" ? "bg-foreground/90" : "bg-transparent")}>
+                <HugeiconsIcon icon={BubbleChatIcon} size={16} className={cn("md:w-4.5! md:h-4.5!", activeTab === "chat" ? "text-background" : "text-foreground")} />
+              </div>
+              {unreadChat > 0 && activeTab !== "chat" && (
+                <span className="absolute -top-0.5 right-0 w-4 h-4 rounded-full bg-primary text-[9px] flex items-center justify-center text-primary-foreground font-bold">{unreadChat > 9 ? "9+" : unreadChat}</span>
+              )}
+              <span className="text-[9px] text-muted-foreground font-medium hidden md:block">Chat</span>
+            </button>
+
+            <button onClick={() => setActiveTab(activeTab === "polls" ? null : "polls")} className="hidden md:flex flex-col items-center gap-0.5 px-2 shrink-0">
+              <div className={cn("w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all",
+                activeTab === "polls" ? "bg-foreground/90" : "bg-transparent")}>
+                <HugeiconsIcon icon={ChartColumnIcon} size={16} className={cn("md:w-4.5! md:h-4.5!", activeTab === "polls" ? "text-background" : "text-foreground")} />
+              </div>
+              <span className="text-[9px] text-muted-foreground font-medium hidden md:block">Polls</span>
+            </button>
+
+            <div className="w-px h-6 md:h-8 bg-white/10 dark:bg-white/6 mx-0.5 shrink-0" />
+
+            <button onClick={handleEndMeeting} className="flex flex-col items-center gap-0.5 px-1 md:px-2 shrink-0">
+              <div className="w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center bg-red-500/85">
+                <HugeiconsIcon icon={CallEnd01Icon} size={18} className="text-white" />
+              </div>
+              <span className="text-[9px] text-muted-foreground font-medium hidden md:block">{isHost ? "End" : "Leave"}</span>
+            </button>
+          </div>
         </div>
       </div>
     )
   }
 
-  /* ═══════════════════════════════════════════════════════════
-     RENDER: LOBBY (3-panel layout, theme-aware)
-     ═══════════════════════════════════════════════════════════ */
+  /* ---- RENDER: LOBBY ---- */
 
   function formatDuration(seconds: number): string {
     if (seconds < 60) return `${seconds}s`
@@ -1632,67 +1808,33 @@ export default function MeetingsPage() {
 
   return (
     <div className="relative flex flex-col h-dvh min-h-0">
-      {/* ── Overlays (absolute within this container) ── */}
       {setupMessage && <SetupOverlay message={setupMessage} />}
-      {waitingForApproval && (
-        <WaitingRoom
-          meetingTitle={waitingForApproval}
-          onCancel={() => setWaitingForApproval(null)}
-        />
-      )}
+      {waitingForApproval && <WaitingRoom meetingTitle={waitingForApproval} onCancel={() => setWaitingForApproval(null)} />}
 
       <Topbar title="Meetings" />
 
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-6xl mx-auto px-4 py-6">
-          {/* ── 3-panel grid ── */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-            {/* ═══ Panel 1: Active Meetings ═══ */}
             <div className="lg:col-span-2 space-y-4">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                  Active Meetings
-                </h2>
-                <Button
-                  onClick={() => setShowCreate(true)}
-                  size="sm"
-                  className="gap-1.5"
-                >
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Active Meetings</h2>
+                <Button onClick={() => setShowCreate(true)} size="sm" className="gap-1.5">
                   <HugeiconsIcon icon={Add01Icon} size={14} />
                   New
                 </Button>
               </div>
 
               {isLoadingMeetings ? (
-                <div className="space-y-3">
-                  {[1, 2, 3].map((i) => (
-                    <div
-                      key={i}
-                      className="h-20 rounded-xl bg-muted animate-pulse"
-                    />
-                  ))}
-                </div>
+                <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="h-20 rounded-xl bg-muted animate-pulse" />)}</div>
               ) : meetings.length === 0 ? (
                 <div className="rounded-xl border border-dashed bg-muted/30 p-8 text-center">
                   <div className="relative w-36 h-36 mx-auto mb-3">
-                    <Image
-                      src="/user/dashboard/no-meeting-yet.png"
-                      alt="No meetings yet"
-                      fill
-                      className="object-contain"
-                      priority
-                    />
+                    <Image src="/user/dashboard/no-meeting-yet.png" alt="No meetings yet" fill className="object-contain" priority />
                   </div>
                   <h3 className="font-semibold text-sm mb-1">No active meetings</h3>
-                  <p className="text-xs text-muted-foreground mb-4 max-w-xs mx-auto leading-relaxed">
-                    Create a meeting to start a video call with screen sharing.
-                  </p>
-                  <Button
-                    onClick={() => setShowCreate(true)}
-                    size="sm"
-                    variant="outline"
-                    className="gap-1.5"
-                  >
+                  <p className="text-xs text-muted-foreground mb-4 max-w-xs mx-auto leading-relaxed">Create a meeting to start a video call with screen sharing.</p>
+                  <Button onClick={() => setShowCreate(true)} size="sm" variant="outline" className="gap-1.5">
                     <HugeiconsIcon icon={Add01Icon} size={14} />
                     Create Meeting
                   </Button>
@@ -1700,80 +1842,36 @@ export default function MeetingsPage() {
               ) : (
                 <div className="space-y-2">
                   {meetings.map((meeting) => (
-                    <div
-                      key={meeting.id}
-                      className="flex items-center gap-4 p-4 rounded-xl border bg-card hover:bg-accent/50 transition-colors cursor-pointer group"
-                      onClick={() => handleRejoin(meeting)}
-                    >
-                      <div
-                        className={cn(
-                          "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors",
-                          meeting.status === "active"
-                            ? "bg-emerald-500/12 group-hover:bg-emerald-500/20"
-                            : "bg-primary/8 group-hover:bg-primary/12",
-                        )}
-                      >
-                        <HugeiconsIcon
-                          icon={Video01Icon}
-                          size={18}
-                          className={
-                            meeting.status === "active"
-                              ? "text-emerald-500"
-                              : "text-primary/60"
-                          }
-                        />
+                    <div key={meeting.id} className="flex items-center gap-4 p-4 rounded-xl border bg-card hover:bg-accent/50 transition-colors cursor-pointer group" onClick={() => handleRejoin(meeting)}>
+                      <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors",
+                        meeting.status === "active" ? "bg-emerald-500/12 group-hover:bg-emerald-500/20" : "bg-primary/8 group-hover:bg-primary/12")}>
+                        <HugeiconsIcon icon={Video01Icon} size={18} className={meeting.status === "active" ? "text-emerald-500" : "text-primary/60"} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-sm truncate">
-                          {meeting.title}
-                        </h3>
+                        <h3 className="font-medium text-sm truncate">{meeting.title}</h3>
                         <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-xs text-muted-foreground">
-                            {meeting.hostId === user.id
-                              ? "Hosted by you"
-                              : `Hosted by ${meeting.hostName}`}
-                          </span>
-                          <span className="text-muted-foreground/40 text-xs">
-                            &middot;
-                          </span>
-                          <span className="text-xs text-muted-foreground flex items-center gap-1">
-                            <HugeiconsIcon icon={UserGroupIcon} size={11} />
-                            {meeting.participantCount}
-                          </span>
+                          <span className="text-xs text-muted-foreground">{meeting.hostId === user.id ? "Hosted by you" : `Hosted by ${meeting.hostName}`}</span>
+                          <span className="text-muted-foreground/40 text-xs">&middot;</span>
+                          <span className="text-xs text-muted-foreground flex items-center gap-1"><HugeiconsIcon icon={UserGroupIcon} size={11} />{meeting.participantCount}</span>
                         </div>
                       </div>
-                      <Badge
-                        variant={
-                          meeting.status === "active" ? "default" : "secondary"
-                        }
-                        className={cn(
-                          "text-[10px] px-2 gap-1",
-                          meeting.status === "active" &&
-                            "bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-400",
-                        )}
-                      >
+                      <Badge variant={meeting.status === "active" ? "default" : "secondary"} className={cn("text-[10px] px-2 gap-1", meeting.status === "active" && "bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-400")}>
                         {meeting.status === "active" && (
                           <span className="relative flex h-2 w-2">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75" />
                             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
                           </span>
                         )}
-                        {meeting.status === "active"
-                          ? "Live"
-                          : meeting.status === "waiting"
-                            ? "Waiting"
-                            : meeting.status}
+                        {meeting.status === "active" ? "Live" : meeting.status === "waiting" ? "Waiting" : meeting.status}
                       </Badge>
                     </div>
                   ))}
                 </div>
               )}
 
-              {/* ── Join by link/ID ── */}
               <JoinByIdSection onJoin={handleJoinByLink} />
             </div>
 
-            {/* ═══ Panel 2: Meeting History ═══ */}
             <div className="space-y-4">
               <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                 <HugeiconsIcon icon={Clock01Icon} size={14} />
@@ -1781,61 +1879,29 @@ export default function MeetingsPage() {
               </h2>
 
               {isLoadingHistory ? (
-                <div className="space-y-2">
-                  {[1, 2, 3].map((i) => (
-                    <div
-                      key={i}
-                      className="h-16 rounded-xl bg-muted animate-pulse"
-                    />
-                  ))}
-                </div>
+                <div className="space-y-2">{[1, 2, 3].map((i) => <div key={i} className="h-16 rounded-xl bg-muted animate-pulse" />)}</div>
               ) : meetingHistory.length === 0 ? (
                 <div className="rounded-xl border border-dashed bg-muted/30 p-6 text-center">
-                  <HugeiconsIcon
-                    icon={Clock01Icon}
-                    size={24}
-                    className="text-muted-foreground/40 mx-auto mb-2"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Completed meetings will appear here
-                  </p>
+                  <HugeiconsIcon icon={Clock01Icon} size={24} className="text-muted-foreground/40 mx-auto mb-2" />
+                  <p className="text-xs text-muted-foreground">Completed meetings will appear here</p>
                 </div>
               ) : (
                 <div className="space-y-1.5 max-h-[calc(100dvh-14rem)] overflow-y-auto">
                   {meetingHistory.map((entry) => (
-                    <div
-                      key={entry.id}
-                      className="flex items-start gap-3 p-3 rounded-lg border bg-card/50 hover:bg-accent/30 transition-colors"
-                    >
+                    <div key={entry.id} className="flex items-start gap-3 p-3 rounded-lg border bg-card/50 hover:bg-accent/30 transition-colors">
                       <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0 mt-0.5">
-                        <HugeiconsIcon
-                          icon={Video01Icon}
-                          size={14}
-                          className="text-muted-foreground"
-                        />
+                        <HugeiconsIcon icon={Video01Icon} size={14} className="text-muted-foreground" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate leading-tight">
-                          {entry.title}
-                        </p>
+                        <p className="text-sm font-medium truncate leading-tight">{entry.title}</p>
                         <div className="flex items-center gap-1.5 mt-1 text-[11px] text-muted-foreground">
-                          <span className="flex items-center gap-0.5">
-                            <HugeiconsIcon icon={UserGroupIcon} size={10} />
-                            {entry.participantCount}
-                          </span>
-                          {entry.duration != null && entry.duration > 0 && (
-                            <>
-                              <span className="text-muted-foreground/30">&middot;</span>
-                              <span>{formatDuration(entry.duration)}</span>
-                            </>
-                          )}
+                          <span className="flex items-center gap-0.5"><HugeiconsIcon icon={UserGroupIcon} size={10} />{entry.participantCount}</span>
+                          {entry.duration != null && entry.duration > 0 && (<><span className="text-muted-foreground/30">&middot;</span><span>{formatDuration(entry.duration)}</span></>)}
                           <span className="text-muted-foreground/30">&middot;</span>
                           <span>{entry.wasHost ? "You hosted" : entry.hostName}</span>
                         </div>
                       </div>
-                      <span className="text-[10px] text-muted-foreground/60 shrink-0 mt-0.5">
-                        {formatTimeAgo(entry.endedAt ?? entry.createdAt)}
-                      </span>
+                      <span className="text-[10px] text-muted-foreground/60 shrink-0 mt-0.5">{formatTimeAgo(entry.endedAt ?? entry.createdAt)}</span>
                     </div>
                   ))}
                 </div>
@@ -1845,7 +1911,6 @@ export default function MeetingsPage() {
         </div>
       </div>
 
-      {/* ── Create modal ── */}
       <ResponsiveModal open={showCreate} onOpenChange={setShowCreate}>
         <ResponsiveModalContent className="sm:max-w-md">
           <ResponsiveModalHeader>
@@ -1855,44 +1920,15 @@ export default function MeetingsPage() {
               </div>
               New Meeting
             </ResponsiveModalTitle>
-            <p className="text-sm text-muted-foreground">
-              Create a meeting room and invite others with a link.
-            </p>
+            <p className="text-sm text-muted-foreground">Create a meeting room and invite others with a link.</p>
           </ResponsiveModalHeader>
           <div className="space-y-4 pt-1">
             <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground">
-                Meeting name
-              </label>
-              <Input
-                placeholder="e.g. Weekly standup, Study group..."
-                value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-                className="h-11"
-                autoFocus
-              />
+              <label className="text-xs font-medium text-muted-foreground">Meeting name</label>
+              <Input placeholder="e.g. Weekly standup, Study group..." value={newTitle} onChange={(e) => setNewTitle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleCreate()} className="h-11" autoFocus />
             </div>
-            <Button
-              onClick={handleCreate}
-              disabled={!newTitle.trim() || isCreating}
-              className="w-full gap-2 h-11"
-            >
-              {isCreating ? (
-                <>
-                  <HugeiconsIcon
-                    icon={Loading03Icon}
-                    size={16}
-                    className="animate-spin"
-                  />
-                  Creating...
-                </>
-              ) : (
-                <>
-                  <HugeiconsIcon icon={Video01Icon} size={16} />
-                  Create &amp; Join
-                </>
-              )}
+            <Button onClick={handleCreate} disabled={!newTitle.trim() || isCreating} className="w-full gap-2 h-11">
+              {isCreating ? (<><HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" />Creating...</>) : (<><HugeiconsIcon icon={Video01Icon} size={16} />Create &amp; Join</>)}
             </Button>
           </div>
         </ResponsiveModalContent>
@@ -1900,10 +1936,6 @@ export default function MeetingsPage() {
     </div>
   )
 }
-
-/* ═══════════════════════════════════════════════════════════════
-   JOIN BY MEETING ID SECTION
-   ═══════════════════════════════════════════════════════════════ */
 
 function JoinByIdSection({ onJoin }: { onJoin: (meetingId: string) => void }) {
   const [meetingId, setMeetingId] = useState("")
@@ -1921,11 +1953,7 @@ function JoinByIdSection({ onJoin }: { onJoin: (meetingId: string) => void }) {
     <div className="rounded-xl border border-dashed bg-muted/30 p-4">
       <div className="flex items-center gap-2 mb-3">
         <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
-          <HugeiconsIcon
-            icon={Link01Icon}
-            size={14}
-            className="text-primary/70"
-          />
+          <HugeiconsIcon icon={Link01Icon} size={14} className="text-primary/70" />
         </div>
         <h3 className="text-sm font-semibold">Join a meeting</h3>
       </div>
@@ -1942,11 +1970,7 @@ function JoinByIdSection({ onJoin }: { onJoin: (meetingId: string) => void }) {
           onKeyDown={(e) => e.key === "Enter" && handleJoin()}
           className="flex-1"
         />
-        <Button
-          onClick={handleJoin}
-          disabled={!meetingId.trim() || isJoining}
-          size="sm"
-        >
+        <Button onClick={handleJoin} disabled={!meetingId.trim() || isJoining} size="sm">
           {isJoining ? "Joining..." : "Join"}
         </Button>
       </div>

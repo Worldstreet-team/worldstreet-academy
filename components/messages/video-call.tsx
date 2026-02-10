@@ -28,7 +28,7 @@ import { useUser } from "@/components/providers/user-provider"
 import type { CallEventPayload } from "@/lib/call-events"
 
 type CallType = "video" | "audio"
-type CallState = "ringing" | "connecting" | "connected" | "ended"
+type CallState = "ringing" | "connecting" | "connected" | "ended" | "busy"
 
 type VideoCallProps = {
   open: boolean
@@ -140,6 +140,8 @@ export function VideoCall({
   const [callId, setCallId] = useState<string | null>(incomingCallId || null)
   const [internalMinimized, setInternalMinimized] = useState(false)
   const [isRemoteMuted, setIsRemoteMuted] = useState(false)
+  const [isAnswering, setIsAnswering] = useState(false)
+  const [isEnding, setIsEnding] = useState(false)
 
   const isMinimized =
     externalMinimized !== undefined ? externalMinimized : internalMinimized
@@ -161,16 +163,27 @@ export function VideoCall({
   // ── Handle SSE call events (answer/decline/cancel/end) ──
   const handleCallSSE = useCallback(
     (event: CallEventPayload) => {
-      // Only handle events for our current call
+      // Only handle events for our current call (except busy which has no callId)
       const currentCallId = callIdRef.current
-      if (!currentCallId || event.callId !== currentCallId) return
+      if (event.type !== "call:busy" && (!currentCallId || event.callId !== currentCallId)) return
 
       console.log("[VideoCall] SSE event:", event.type, event.callId)
 
       switch (event.type) {
+        case "call:busy": {
+          // Receiver is on another call
+          setCallState("busy")
+          callSounds.stopRing()
+          callSounds.playBusy()
+          rtkClient.leaveRoom().catch(() => {})
+          break
+        }
+
         case "call:answered": {
           // Receiver answered — caller should join room (RTK may already be pre-initialized)
           if (!isIncoming && !hasJoinedRoomRef.current) {
+            // Immediately update UI to show we're connecting (not stuck on ringing)
+            setCallState("connecting")
             const token = authTokenRef.current
             if (token) {
               ;(async () => {
@@ -222,13 +235,44 @@ export function VideoCall({
   const callIdRef = useRef<string | null>(callId)
   callIdRef.current = callId
 
+  // ── Helper: setup remote audio with loudspeaker support ──
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const setupRemoteAudio = useCallback((participant: any) => {
+    if (!participant?.audioTrack) return
+    try {
+      const stream = new MediaStream([participant.audioTrack])
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = stream
+        remoteAudioRef.current.volume = 1.0 // Always start at full volume (loudspeaker)
+        remoteAudioRef.current.play().catch((e: unknown) => {
+          console.warn("[RTK] Remote audio autoplay blocked:", e)
+        })
+      }
+    } catch (e) {
+      console.warn("[RTK] Failed to setup remote audio:", e)
+    }
+  }, [])
+
   // ── RTK event listeners (registered via singleton, survive re-renders) ──
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handleRoomJoined = () => {
       console.log("[RTK] Room joined")
+      // Register local video
       if (localVideoRef.current && callType === "video") {
-        rtkClient.client?.self.registerVideoElement(localVideoRef.current, true)
+        try {
+          rtkClient.client?.self.registerVideoElement(localVideoRef.current, true)
+        } catch {
+          // Fallback: Use self video track directly
+          const selfVideoTrack = rtkClient.client?.self?.videoTrack
+          if (selfVideoTrack && localVideoRef.current) {
+            try {
+              const stream = new MediaStream([selfVideoTrack])
+              localVideoRef.current.srcObject = stream
+              localVideoRef.current.play().catch(() => {})
+            } catch { /* ignore */ }
+          }
+        }
       }
       // Explicitly enable audio after joining to ensure mic is publishing
       rtkClient.client?.self.enableAudio().catch(() => {})
@@ -243,7 +287,7 @@ export function VideoCall({
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handleParticipantJoined = (participant: any) => {
-      console.log("[RTK] Participant joined:", participant.name, "audioEnabled:", participant.audioEnabled)
+      console.log("[RTK] Participant joined:", participant.name, "audioEnabled:", participant.audioEnabled, "videoEnabled:", participant.videoEnabled)
       // Cancel any pending "participant left" timer — they reconnected
       if (participantLeftTimerRef.current) {
         clearTimeout(participantLeftTimerRef.current)
@@ -256,20 +300,51 @@ export function VideoCall({
       setCallState("connected")
       setCallStartTime((prev) => prev ?? new Date())
       setIsRemoteMuted(!participant.audioEnabled)
-      if (remoteVideoRef.current && callType === "video") {
-        participant.registerVideoElement(remoteVideoRef.current)
-      }
-      // Explicitly play remote audio via hidden <audio> element
-      if (participant.audioTrack) {
+      // Register video element for remote participant
+      if (remoteVideoRef.current && callType === "video" && participant.videoEnabled) {
         try {
-          const stream = new MediaStream([participant.audioTrack])
-          if (remoteAudioRef.current) {
-            remoteAudioRef.current.srcObject = stream
-            remoteAudioRef.current.play().catch((e: unknown) => console.warn("[RTK] Remote audio autoplay blocked:", e))
+          participant.registerVideoElement(remoteVideoRef.current)
+        } catch (e) {
+          console.warn("[RTK] Failed to register remote video:", e)
+        }
+      }
+      // Fallback: if registerVideoElement doesn't work, use MediaStream directly
+      if (callType === "video" && participant.videoTrack && remoteVideoRef.current) {
+        try {
+          const stream = new MediaStream([participant.videoTrack])
+          if (!remoteVideoRef.current.srcObject) {
+            remoteVideoRef.current.srcObject = stream
+            remoteVideoRef.current.play().catch(() => {})
           }
         } catch (e) {
-          console.warn("[RTK] Failed to setup remote audio:", e)
+          console.warn("[RTK] Failed to set remote video srcObject:", e)
         }
+      }
+      // Setup remote audio — use a proper audio element
+      setupRemoteAudio(participant)
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handleVideoUpdate = (...args: any[]) => {
+      const participant = args[0]
+      const data = args[1] as { videoEnabled?: boolean; videoTrack?: MediaStreamTrack } | undefined
+      if (!data) return
+      console.log("[RTK] Remote video update:", participant?.name, "enabled:", data.videoEnabled)
+      if (data.videoEnabled && data.videoTrack && remoteVideoRef.current) {
+        try {
+          // Try registerVideoElement first 
+          if (participant?.registerVideoElement) {
+            participant.registerVideoElement(remoteVideoRef.current)
+          }
+          // Also set srcObject as backup
+          const stream = new MediaStream([data.videoTrack])
+          remoteVideoRef.current.srcObject = stream
+          remoteVideoRef.current.play().catch(() => {})
+        } catch (e) {
+          console.warn("[RTK] Failed to update remote video:", e)
+        }
+      } else if (!data.videoEnabled && remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = null
       }
     }
 
@@ -280,15 +355,9 @@ export function VideoCall({
       if (!data) return
       console.log("[RTK] Remote audio update:", participant?.name, "enabled:", data.audioEnabled)
       setIsRemoteMuted(!data.audioEnabled)
-      // Re-attach audio track when it changes
-      if (data.audioEnabled && data.audioTrack && remoteAudioRef.current) {
-        try {
-          const stream = new MediaStream([data.audioTrack])
-          remoteAudioRef.current.srcObject = stream
-          remoteAudioRef.current.play().catch(() => {})
-        } catch (e) {
-          console.warn("[RTK] Failed to update remote audio:", e)
-        }
+      // Re-attach audio track when it changes — always force re-setup
+      if (data.audioEnabled && data.audioTrack) {
+        setupRemoteAudio({ audioTrack: data.audioTrack })
       }
     }
 
@@ -327,6 +396,7 @@ export function VideoCall({
     rtkClient.on("participantJoined", "participants", handleParticipantJoined)
     rtkClient.on("participantLeft", "participants", handleParticipantLeft)
     rtkClient.on("audioUpdate", "participants", handleAudioUpdate)
+    rtkClient.on("videoUpdate", "participants", handleVideoUpdate)
 
     return () => {
       rtkClient.off("roomJoined", "self", handleRoomJoined)
@@ -334,6 +404,7 @@ export function VideoCall({
       rtkClient.off("participantJoined", "participants", handleParticipantJoined)
       rtkClient.off("participantLeft", "participants", handleParticipantLeft)
       rtkClient.off("audioUpdate", "participants", handleAudioUpdate)
+      rtkClient.off("videoUpdate", "participants", handleVideoUpdate)
       if (participantLeftTimerRef.current) {
         clearTimeout(participantLeftTimerRef.current)
         participantLeftTimerRef.current = null
@@ -345,36 +416,52 @@ export function VideoCall({
   // Re-register video/audio elements when minimized state changes
   useEffect(() => {
     if (!rtkClient.client || !rtkClient.isInRoom) return
-    // Re-register video
+    // Re-register video with fallback to srcObject
     if (callType === "video") {
       if (localVideoRef.current) {
-        rtkClient.client.self.registerVideoElement(localVideoRef.current, true)
+        try {
+          rtkClient.client.self.registerVideoElement(localVideoRef.current, true)
+        } catch { /* ignore */ }
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const remote = remoteParticipantRef.current as any
       if (remoteVideoRef.current && remote) {
-        remote.registerVideoElement(remoteVideoRef.current)
+        try {
+          remote.registerVideoElement(remoteVideoRef.current)
+        } catch { /* ignore */ }
+        // Fallback: set srcObject directly
+        if (remote.videoTrack && !remoteVideoRef.current.srcObject) {
+          try {
+            const stream = new MediaStream([remote.videoTrack])
+            remoteVideoRef.current.srcObject = stream
+            remoteVideoRef.current.play().catch(() => {})
+          } catch { /* ignore */ }
+        }
       }
     }
-    // Re-setup remote audio
+    // Re-setup remote audio via helper
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const remoteP = remoteParticipantRef.current as any
-    if (remoteP?.audioTrack && remoteAudioRef.current) {
-      try {
-        const stream = new MediaStream([remoteP.audioTrack])
-        remoteAudioRef.current.srcObject = stream
-        remoteAudioRef.current.play().catch(() => {})
-      } catch {
-        // Audio re-setup failed
-      }
+    if (remoteP) {
+      setupRemoteAudio(remoteP)
     }
-  }, [callType, isMinimized, callState])
+  }, [callType, isMinimized, callState, setupRemoteAudio])
 
-  // ── Loudspeaker toggle: control remote audio volume ──
+  // ── Loudspeaker toggle: force audio through loudspeaker ──
   useEffect(() => {
     if (!remoteAudioRef.current) return
-    // Speaker ON = full volume (loudspeaker), OFF = low volume (earpiece simulation)
-    remoteAudioRef.current.volume = isSpeakerOn ? 1.0 : 0.15
+    const audioEl = remoteAudioRef.current
+    // Speaker ON = full volume (loudspeaker), OFF = lower volume (earpiece-style)
+    audioEl.volume = isSpeakerOn ? 1.0 : 0.15
+    // On supported devices, try to switch audio output
+    // setSinkId('default') = loudspeaker, '' = default/earpiece
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const el = audioEl as any
+    if (typeof el.setSinkId === "function") {
+      el.setSinkId(isSpeakerOn ? "default" : "").catch(() => {
+        // setSinkId not supported or failed — volume change still applies
+      })
+    }
   }, [isSpeakerOn])
 
   // ── Initiate outgoing call ──
@@ -407,7 +494,12 @@ export function VideoCall({
         })
       } else {
         console.log("[Caller] Failed to initiate call:", result.error)
-        setCallState("ended")
+        // If the error is "busy" — show busy state instead of ended
+        if (result.error === "User is on another call") {
+          setCallState("busy")
+        } else {
+          setCallState("ended")
+        }
       }
     }
 
@@ -481,6 +573,8 @@ export function VideoCall({
       setCallStartTime(null)
       setShowControls(true)
       setIsRemoteMuted(false)
+      setIsAnswering(false)
+      setIsEnding(false)
       isEndingRef.current = false
       hasJoinedRoomRef.current = false
       isConnectedRef.current = false
@@ -492,6 +586,33 @@ export function VideoCall({
       }
     }
   }, [open, isIncoming, callType, externalMinimized])
+
+  // ── Start local camera preview immediately for video calls ──
+  // Shows the user's own camera while connecting/ringing (before RTK init)
+  useEffect(() => {
+    if (!open || callType !== "video" || isVideoOff) return
+    if (localVideoRef.current && !localVideoRef.current.srcObject) {
+      let stream: MediaStream | null = null
+      navigator.mediaDevices.getUserMedia({ video: true, audio: false }).then((s) => {
+        stream = s
+        if (localVideoRef.current && !rtkClient.client) {
+          // Only use local preview if RTK hasn't taken over yet
+          localVideoRef.current.srcObject = stream
+          localVideoRef.current.play().catch(() => {})
+        } else {
+          // RTK is already managing the video — stop our preview
+          stream.getTracks().forEach(t => t.stop())
+        }
+      }).catch(() => {
+        // Camera permission denied or unavailable — that's ok
+      })
+      return () => {
+        if (stream) {
+          stream.getTracks().forEach(t => t.stop())
+        }
+      }
+    }
+  }, [open, callType, isVideoOff])
 
   // ── Call sounds ──
   useEffect(() => {
@@ -509,6 +630,9 @@ export function VideoCall({
       if (isConnectedRef.current || isEndingRef.current) {
         callSounds.playEnded()
       }
+    } else if (callState === "busy") {
+      callSounds.stopRing()
+      callSounds.playBusy()
     } else {
       callSounds.stopRing()
     }
@@ -534,24 +658,29 @@ export function VideoCall({
   // Auto-close after ended state shows for 2s
   // Only auto-close if we were actually connected or explicitly ending
   useEffect(() => {
-    if (callState !== "ended") return
-    // If we never connected and aren't explicitly ending, skip straight to close
-    // (this handles the phantom "ended" flash during connection setup)
-    if (!isConnectedRef.current && !isEndingRef.current) {
+    if (callState !== "ended" && callState !== "busy") return
+    // If ended: only show ended screen if we were actually connected or explicitly ending
+    if (callState === "ended" && !isConnectedRef.current && !isEndingRef.current) {
       return // Don't show ended screen — just wait for actual connection
     }
     const timer = setTimeout(() => {
       onCallEnded?.()
       onClose()
-    }, 2000)
+    }, callState === "busy" ? 3000 : 2000)
     return () => clearTimeout(timer)
   }, [callState, onCallEnded, onClose])
 
   // ── Answer incoming call (optimized: RTK init in parallel with server action) ──
   const handleAnswer = async () => {
-    if (!incomingCallId) return
+    if (!incomingCallId || isAnswering) return
+    setIsAnswering(true)
     console.log("[Receiver] Answering call ID:", incomingCallId)
     setCallState("connecting")
+
+    // Expand to full screen when answering
+    if (isMinimized) {
+      handleRestore()
+    }
 
     // Resume audio context during user gesture to satisfy autoplay policy
     callSounds.resume()
@@ -588,6 +717,7 @@ export function VideoCall({
 
       if (!answerResult.success) {
         console.error("[Receiver] Answer failed:", answerResult.error)
+        setIsAnswering(false)
         onCallEnded?.()
         onClose()
         return
@@ -609,11 +739,13 @@ export function VideoCall({
           }
         } catch (err) {
           console.error("[Receiver] Fallback RTK init/join failed:", err)
+          setIsAnswering(false)
           setCallState("ended")
           return
         }
       }
 
+      setIsAnswering(false)
       onCallStarted?.(incomingCallId)
     } else {
       // SLOW PATH: No pre-fetched token, must wait for answerCall
@@ -634,13 +766,16 @@ export function VideoCall({
           if (callType === "video") {
             try { await rtkClient.client?.self.enableVideo() } catch {}
           }
+          setIsAnswering(false)
           onCallStarted?.(incomingCallId)
         } catch (err) {
           console.error("[Receiver] RTK init/join failed:", err)
+          setIsAnswering(false)
           setCallState("ended")
         }
       } else {
         console.error("[Receiver] Answer failed:", result.error)
+        setIsAnswering(false)
         onCallEnded?.()
         onClose()
       }
@@ -657,8 +792,9 @@ export function VideoCall({
   }
 
   const handleEndCall = async () => {
-    if (isEndingRef.current) return
+    if (isEndingRef.current || isEnding) return
     isEndingRef.current = true
+    setIsEnding(true)
     // Cancel any pending participantLeft timer
     if (participantLeftTimerRef.current) {
       clearTimeout(participantLeftTimerRef.current)
@@ -670,6 +806,7 @@ export function VideoCall({
     }
     // Leave RTK room
     try { await rtkClient.leaveRoom() } catch (e) { console.error("Leave room error:", e) }
+    setIsEnding(false)
     setCallState("ended")
   }
 
@@ -742,8 +879,15 @@ export function VideoCall({
   if (!shouldRender) return null
 
   // Hidden audio element for remote participant's audio stream
+  // Note: using position/opacity instead of display:none — some mobile browsers
+  // stop playing audio from hidden elements
   const remoteAudioElement = (
-    <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: "none" }} />
+    <audio
+      ref={remoteAudioRef}
+      autoPlay
+      playsInline
+      className="absolute w-0 h-0 opacity-0 pointer-events-none"
+    />
   )
 
   // ── Minimized floating pip ──
@@ -799,32 +943,72 @@ export function VideoCall({
             )}
           </div>
           <div className="flex items-center gap-2 ml-2">
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                toggleMute()
-              }}
-              className={cn(
-                "w-8 h-8 rounded-full flex items-center justify-center transition-colors",
-                isMuted
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted hover:bg-muted/80"
-              )}
-            >
-              <HugeiconsIcon
-                icon={isMuted ? MicOff01Icon : Mic01Icon}
-                size={14}
-              />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                handleEndCall()
-              }}
-              className="w-8 h-8 rounded-full flex items-center justify-center bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
-            >
-              <HugeiconsIcon icon={CallEnd01Icon} size={14} />
-            </button>
+            {/* Incoming ringing: show answer + decline */}
+            {callState === "ringing" && isIncoming ? (
+              <>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDecline()
+                  }}
+                  disabled={isAnswering}
+                  className="w-9 h-9 rounded-full flex items-center justify-center bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50"
+                >
+                  <HugeiconsIcon icon={CallEnd01Icon} size={16} />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleAnswer()
+                  }}
+                  disabled={isAnswering}
+                  className="w-9 h-9 rounded-full flex items-center justify-center bg-green-500 text-white hover:bg-green-600 transition-colors disabled:opacity-50"
+                >
+                  {isAnswering ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <HugeiconsIcon
+                      icon={callType === "video" ? Video01Icon : Call02Icon}
+                      size={16}
+                    />
+                  )}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleMute()
+                  }}
+                  className={cn(
+                    "w-8 h-8 rounded-full flex items-center justify-center transition-colors",
+                    isMuted
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted hover:bg-muted/80"
+                  )}
+                >
+                  <HugeiconsIcon
+                    icon={isMuted ? MicOff01Icon : Mic01Icon}
+                    size={14}
+                  />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleEndCall()
+                  }}
+                  disabled={isEnding}
+                  className="w-8 h-8 rounded-full flex items-center justify-center bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50"
+                >
+                  {isEnding ? (
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <HugeiconsIcon icon={CallEnd01Icon} size={14} />
+                  )}
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -833,16 +1017,16 @@ export function VideoCall({
 
   // ── Modal call UI ──
   return (
-    <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[9998] flex items-center justify-center">
       {remoteAudioElement}
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
-        onClick={callState === "ended" ? handleDismiss : undefined}
+        className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+        onClick={callState === "ended" || callState === "busy" ? handleDismiss : undefined}
       />
 
       <div
-        className="relative w-full max-w-sm md:max-w-lg aspect-[2/3] md:aspect-[3/4] rounded-3xl overflow-hidden shadow-2xl bg-black animate-in fade-in zoom-in-95 duration-200"
+        className="relative w-[95vw] h-[93vh] md:w-[90vw] md:h-[90vh] rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl bg-black animate-in fade-in zoom-in-95 duration-200"
         onClick={() =>
           callState === "connected" && setShowControls(!showControls)
         }
@@ -940,7 +1124,7 @@ export function VideoCall({
         {/* Local PIP (video calls when connected) */}
         {callState === "connected" && callType === "video" && !isVideoOff && (
           <div
-            className="absolute top-4 right-4 w-24 md:w-36 aspect-[3/4] rounded-2xl overflow-hidden shadow-lg"
+            className="absolute top-6 right-6 w-32 md:w-44 aspect-[3/4] rounded-2xl overflow-hidden shadow-lg border border-white/10"
             style={{
               background: "rgba(0,0,0,0.3)",
               backdropFilter: "blur(4px)",
@@ -1003,6 +1187,7 @@ export function VideoCall({
                   variant="danger"
                   size="large"
                   onClick={handleDecline}
+                  disabled={isAnswering}
                 >
                   <HugeiconsIcon
                     icon={CallEnd01Icon}
@@ -1017,14 +1202,21 @@ export function VideoCall({
                   variant="success"
                   size="large"
                   onClick={handleAnswer}
+                  disabled={isAnswering}
                 >
-                  <HugeiconsIcon
-                    icon={callType === "video" ? Video01Icon : Call02Icon}
-                    size={28}
-                    className="text-white"
-                  />
+                  {isAnswering ? (
+                    <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <HugeiconsIcon
+                      icon={callType === "video" ? Video01Icon : Call02Icon}
+                      size={28}
+                      className="text-white"
+                    />
+                  )}
                 </GlassButton>
-                <span className="text-white/60 text-xs">Answer</span>
+                <span className="text-white/60 text-xs">
+                  {isAnswering ? "Connecting..." : "Answer"}
+                </span>
               </div>
             </div>
           </div>
@@ -1104,13 +1296,47 @@ export function VideoCall({
                 variant="danger"
                 size="large"
                 onClick={handleEndCall}
+                disabled={isEnding}
               >
-                <HugeiconsIcon
-                  icon={CallEnd01Icon}
-                  size={26}
-                  className="text-white"
-                />
+                {isEnding ? (
+                  <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <HugeiconsIcon
+                    icon={CallEnd01Icon}
+                    size={26}
+                    className="text-white"
+                  />
+                )}
               </GlassButton>
+            </div>
+          </div>
+        )}
+
+        {/* Busy state — receiver is on another call */}
+        {callState === "busy" && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-zinc-900 via-zinc-950 to-black">
+            <div className="flex flex-col items-center gap-3">
+              <Avatar className="w-24 h-24 mb-3">
+                <AvatarImage src={callerAvatar} alt={callerName} />
+                <AvatarFallback className="text-2xl bg-zinc-800 text-white">
+                  {getInitials(callerName)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="w-14 h-14 rounded-full flex items-center justify-center bg-orange-500/20 mb-1">
+                <HugeiconsIcon
+                  icon={Call02Icon}
+                  size={24}
+                  className="text-orange-400"
+                />
+              </div>
+              <h3 className="text-white font-semibold text-lg">{callerName}</h3>
+              <p className="text-white/50 text-sm">On another call</p>
+              <button
+                onClick={handleDismiss}
+                className="mt-3 px-8 py-2.5 rounded-full text-sm font-medium bg-white/10 hover:bg-white/20 text-white transition-colors"
+              >
+                Close
+              </button>
             </div>
           </div>
         )}

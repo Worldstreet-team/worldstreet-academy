@@ -7,6 +7,19 @@ import { getCurrentUser } from "@/lib/auth"
 import { createMeeting, addParticipant } from "@/lib/realtime"
 import { emitCallEvent, type CallEventPayload } from "@/lib/call-events"
 
+// ── Helpers ──
+
+/** Parallelize DB connection + auth — saves ~30-80ms per action */
+async function initAction() {
+  const [, currentUser] = await Promise.all([connectDB(), getCurrentUser()])
+  return currentUser
+}
+
+/** Fire-and-forget: schedule DB write without blocking the response */
+function backgroundWrite(promise: Promise<unknown>) {
+  promise.catch((err) => console.error("[Call] Background write failed:", err))
+}
+
 // ──────────────────────────────────────────────
 // Types
 // ──────────────────────────────────────────────
@@ -50,36 +63,43 @@ export async function initiateCall(
   error?: string
 }> {
   try {
-    await connectDB()
-    const currentUser = await getCurrentUser()
+    const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
 
     const callerId = new Types.ObjectId(currentUser.id)
     const recipientId = new Types.ObjectId(receiverId)
 
-    // Ensure a conversation exists
-    let conversation = await Conversation.findOne({
-      participants: { $all: [callerId, recipientId] },
-    })
-    if (!conversation) {
-      conversation = await Conversation.create({
-        participants: [callerId, recipientId],
-        lastMessageAt: new Date(),
-      })
-    }
-
-    // Expire ALL previous ringing calls between these two users (either direction)
-    // This prevents the receiver from picking up a stale call from any prior attempt
-    const expireResult = await Call.updateMany(
-      {
-        status: "ringing",
-        $or: [
-          { callerId, receiverId: recipientId },
-          { callerId: recipientId, receiverId: callerId },
-        ],
-      },
-      { status: "missed", endedAt: new Date() }
-    )
+    // Parallelize conversation lookup + stale call expiry (independent operations)
+    const [conversation, expireResult] = await Promise.all([
+      Conversation.findOne({
+        participants: { $all: [callerId, recipientId] },
+      }).then(async (conv) => {
+        if (conv) return conv
+        return Conversation.create({
+          participants: [callerId, recipientId],
+          lastMessageAt: new Date(),
+        })
+      }),
+      // Expire stale ringing calls between this pair
+      Call.updateMany(
+        {
+          status: "ringing",
+          $or: [
+            { callerId, receiverId: recipientId },
+            { callerId: recipientId, receiverId: callerId },
+          ],
+        },
+        { status: "missed", endedAt: new Date() }
+      ),
+      // Also expire any globally stale ringing calls (>60s old)
+      Call.updateMany(
+        {
+          status: "ringing",
+          createdAt: { $lt: new Date(Date.now() - 60_000) },
+        },
+        { status: "missed", endedAt: new Date() }
+      ),
+    ])
     if (expireResult.modifiedCount > 0) {
       console.log(`[InitiateCall] Expired ${expireResult.modifiedCount} previous ringing calls between pair`)
     }
@@ -89,6 +109,10 @@ export async function initiateCall(
       User.findById(recipientId).lean(),
     ])
     if (!caller || !receiver) return { success: false, error: "User not found" }
+
+    // NOTE: We don't check DB status for "busy" detection — DB records can be stale.
+    // Instead, the receiver's CallProvider checks if they have a live RTK connection
+    // and auto-declines incoming calls if already in a call.
 
     const callerName = `${caller.firstName} ${caller.lastName}`.trim()
     const receiverName = `${receiver.firstName} ${receiver.lastName}`.trim()
@@ -164,8 +188,7 @@ export async function answerCall(callId: string): Promise<{
   error?: string
 }> {
   try {
-    await connectDB()
-    const currentUser = await getCurrentUser()
+    const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
 
     const call = await Call.findById(callId)
@@ -179,22 +202,24 @@ export async function answerCall(callId: string): Promise<{
 
     call.status = "ongoing"
     call.answeredAt = new Date()
-    await call.save()
-    
+
     console.log(`[AnswerCall] Call ${callId} status updated to: ongoing`)
 
-    // Emit SSE event to the caller so they know to join the room
+    // Save and notify caller in parallel — instant "answered" event
     const eventPayload: CallEventPayload = {
       type: "call:answered",
       callId,
       callType: call.type,
       callerId: call.callerId.toString(),
-      callerName: "", // Caller already knows their own name
+      callerName: "",
       callerAvatar: null,
       receiverId: currentUser.id,
       conversationId: call.conversationId.toString(),
     }
-    await emitCallEvent(call.callerId.toString(), eventPayload)
+    await Promise.all([
+      call.save(),
+      emitCallEvent(call.callerId.toString(), eventPayload),
+    ])
 
     return {
       success: true,
@@ -215,8 +240,7 @@ export async function declineCall(callId: string): Promise<{
   error?: string
 }> {
   try {
-    await connectDB()
-    const currentUser = await getCurrentUser()
+    const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
 
     const call = await Call.findById(callId)
@@ -230,12 +254,8 @@ export async function declineCall(callId: string): Promise<{
 
     call.status = "declined"
     call.endedAt = new Date()
-    await call.save()
 
-    // Insert a system message into the conversation
-    await insertCallSystemMessage(call)
-
-    // Emit SSE event to the caller
+    // Save, emit, and insert system message in parallel
     const eventPayload: CallEventPayload = {
       type: "call:declined",
       callId,
@@ -247,7 +267,12 @@ export async function declineCall(callId: string): Promise<{
       conversationId: call.conversationId.toString(),
       status: "declined",
     }
-    await emitCallEvent(call.callerId.toString(), eventPayload)
+    await Promise.all([
+      call.save(),
+      emitCallEvent(call.callerId.toString(), eventPayload),
+    ])
+    // System message is non-critical — fire in background
+    backgroundWrite(insertCallSystemMessage(call))
 
     return { success: true }
   } catch (error) {
@@ -265,8 +290,7 @@ export async function endCall(callId: string): Promise<{
   error?: string
 }> {
   try {
-    await connectDB()
-    const currentUser = await getCurrentUser()
+    const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
 
     const call = await Call.findById(callId)
@@ -300,7 +324,6 @@ export async function endCall(callId: string): Promise<{
       : "completed"
 
     // Atomic update: only if call is still in a non-terminal state
-    // This prevents race conditions where both participants call endCall simultaneously
     const updated = await Call.findOneAndUpdate(
       {
         _id: callId,
@@ -314,18 +337,15 @@ export async function endCall(callId: string): Promise<{
       { new: true }
     )
 
-    // Only insert system message if WE were the one who actually updated (won the race)
+    // Only emit + insert system message if WE won the race
     if (updated) {
-      await insertCallSystemMessage(updated)
       console.log(`[EndCall] Call ${callId} ended with status: ${newStatus}`)
 
-      // Determine who to notify (the other participant)
       const otherUserId =
         call.callerId.toString() === currentUser.id
           ? call.receiverId.toString()
           : call.callerId.toString()
 
-      // Use the appropriate event type
       const eventType = wasRinging ? "call:cancelled" as const : "call:ended" as const
 
       const eventPayload: CallEventPayload = {
@@ -339,7 +359,9 @@ export async function endCall(callId: string): Promise<{
         conversationId: call.conversationId.toString(),
         status: newStatus,
       }
+      // Emit instantly, system message in background
       await emitCallEvent(otherUserId, eventPayload)
+      backgroundWrite(insertCallSystemMessage(updated))
     } else {
       console.log(`[EndCall] Call ${callId} was already ended by the other participant`)
     }
@@ -361,8 +383,7 @@ export async function getCallHistory(conversationId: string): Promise<{
   error?: string
 }> {
   try {
-    await connectDB()
-    const currentUser = await getCurrentUser()
+    const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
 
     const calls = await Call.find({
@@ -462,8 +483,7 @@ export async function getCallStatus(callId: string): Promise<{
   error?: string
 }> {
   try {
-    await connectDB()
-    const currentUser = await getCurrentUser()
+    const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
 
     // Force fresh read - findOne creates a new query each time
@@ -534,29 +554,29 @@ export async function pollIncomingCall(): Promise<{
   } | null
 }> {
   try {
-    await connectDB()
-    const currentUser = await getCurrentUser()
+    const currentUser = await initAction()
     if (!currentUser) return { incoming: null }
 
     const userId = new Types.ObjectId(currentUser.id)
 
-    // Expire stale ringing calls (>30 seconds old)
+    // Parallelize stale call expiry + incoming call query
     const staleThreshold = new Date(Date.now() - 30_000)
-    const expireResult = await Call.updateMany(
-      { status: "ringing", createdAt: { $lt: staleThreshold } },
-      { status: "missed", endedAt: new Date() }
-    )
+    const [expireResult, incomingCall] = await Promise.all([
+      Call.updateMany(
+        { status: "ringing", createdAt: { $lt: staleThreshold } },
+        { status: "missed", endedAt: new Date() }
+      ),
+      Call.findOne({
+        receiverId: userId,
+        status: "ringing",
+        createdAt: { $gte: staleThreshold },
+      })
+        .sort({ createdAt: -1 })
+        .lean(),
+    ])
     if (expireResult.modifiedCount > 0) {
       console.log(`[PollIncoming] Expired ${expireResult.modifiedCount} stale calls`)
     }
-
-    // Find the NEWEST ringing call where this user is the receiver
-    const incomingCall = await Call.findOne({
-      receiverId: userId,
-      status: "ringing",
-    })
-      .sort({ createdAt: -1 })
-      .lean()
 
     if (!incomingCall) {
       return { incoming: null }
@@ -587,5 +607,143 @@ export async function pollIncomingCall(): Promise<{
   } catch (error) {
     console.error("Error polling incoming calls:", error)
     return { incoming: null }
+  }
+}
+
+// ──────────────────────────────────────────────
+// Cleanup orphaned calls for the current user
+// Called on page load to recover from crashes, HMR, navigation, etc.
+// ──────────────────────────────────────────────
+
+export async function cleanupOrphanedCalls(): Promise<{
+  cleaned: number
+}> {
+  try {
+    const currentUser = await initAction()
+    if (!currentUser) return { cleaned: 0 }
+
+    const userId = new Types.ObjectId(currentUser.id)
+    const now = new Date()
+
+    // Find ALL non-terminal calls this user is part of.
+    // If the user is loading the page, they cannot have an active call — any
+    // "ringing" or "ongoing" record is orphaned by definition.
+    const orphanedCalls = await Call.find({
+      $or: [{ callerId: userId }, { receiverId: userId }],
+      status: { $in: ["ringing", "ongoing"] },
+    }).lean()
+
+    let cleaned = 0
+
+    for (const call of orphanedCalls) {
+      const isRinging = call.status === "ringing"
+      const newStatus = isRinging ? "missed" : "completed"
+      let duration = 0
+      if (call.answeredAt) {
+        duration = Math.floor((now.getTime() - call.answeredAt.getTime()) / 1000)
+      }
+
+      const updated = await Call.findOneAndUpdate(
+        {
+          _id: call._id,
+          status: { $nin: ["completed", "missed", "declined", "failed"] },
+        },
+        { status: newStatus, endedAt: now, duration },
+        { new: true }
+      )
+
+      if (updated) {
+        cleaned++
+        const age = now.getTime() - call.createdAt.getTime()
+        console.log(`[CleanupOrphaned] Cleaned call ${call._id} (was ${call.status} → ${newStatus}, age: ${Math.round(age / 1000)}s)`)
+
+        // Notify the other participant so their UI updates too
+        const otherUserId =
+          call.callerId.toString() === currentUser.id
+            ? call.receiverId.toString()
+            : call.callerId.toString()
+
+        const eventPayload: CallEventPayload = {
+          type: "call:ended",
+          callId: call._id.toString(),
+          callType: call.type,
+          callerId: call.callerId.toString(),
+          callerName: "",
+          callerAvatar: null,
+          receiverId: call.receiverId.toString(),
+          conversationId: call.conversationId.toString(),
+          status: newStatus,
+        }
+        emitCallEvent(otherUserId, eventPayload).catch(() => {})
+        backgroundWrite(insertCallSystemMessage(updated))
+      }
+    }
+
+    if (cleaned > 0) {
+      console.log(`[CleanupOrphaned] Cleaned ${cleaned} orphaned calls for user ${currentUser.id}`)
+    }
+
+    return { cleaned }
+  } catch (error) {
+    console.error("Error cleaning up orphaned calls:", error)
+    return { cleaned: 0 }
+  }
+}
+
+// ──────────────────────────────────────────────
+// End call by beacon (fire-and-forget on page unload)
+// Uses a simple callId approach for Navigator.sendBeacon
+// ──────────────────────────────────────────────
+
+export async function endCallByCallId(callId: string): Promise<void> {
+  try {
+    const currentUser = await initAction()
+    if (!currentUser) return
+
+    const now = new Date()
+    const call = await Call.findById(callId).lean()
+    if (!call) return
+
+    if (["completed", "missed", "declined", "failed"].includes(call.status)) return
+
+    const isParticipant =
+      call.callerId.toString() === currentUser.id ||
+      call.receiverId.toString() === currentUser.id
+    if (!isParticipant) return
+
+    let duration = 0
+    if (call.answeredAt) {
+      duration = Math.floor((now.getTime() - call.answeredAt.getTime()) / 1000)
+    }
+
+    const newStatus = call.status === "ringing" ? "missed" : "completed"
+
+    const updated = await Call.findOneAndUpdate(
+      { _id: callId, status: { $nin: ["completed", "missed", "declined", "failed"] } },
+      { status: newStatus, endedAt: now, duration },
+      { new: true }
+    )
+
+    if (updated) {
+      const otherUserId =
+        call.callerId.toString() === currentUser.id
+          ? call.receiverId.toString()
+          : call.callerId.toString()
+
+      const eventPayload: CallEventPayload = {
+        type: call.status === "ringing" ? "call:cancelled" : "call:ended",
+        callId,
+        callType: call.type,
+        callerId: call.callerId.toString(),
+        callerName: "",
+        callerAvatar: null,
+        receiverId: call.receiverId.toString(),
+        conversationId: call.conversationId.toString(),
+        status: newStatus,
+      }
+      await emitCallEvent(otherUserId, eventPayload)
+    }
+  } catch (error) {
+    console.error("[EndCallByCallId] Error:", error)
   }
 }
