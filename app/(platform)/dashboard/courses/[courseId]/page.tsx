@@ -221,6 +221,7 @@ export default async function CourseDetailPage({
             instructorHeadline={course.instructorHeadline}
             otherCourses={otherInstructorCourses}
             enrolledCourses={enrolledFromInstructor}
+            totalStudents={course.instructorTotalStudents}
           />
 
           {/* CTA */}

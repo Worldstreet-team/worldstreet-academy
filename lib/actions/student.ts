@@ -164,6 +164,7 @@ export type PublicCourse = {
   instructorAvatarUrl: string | null
   instructorBio: string | null
   instructorHeadline: string | null
+  instructorTotalStudents: number
   level: "beginner" | "intermediate" | "advanced"
   pricing: "free" | "paid"
   price: number | null
@@ -198,6 +199,7 @@ export async function fetchPublicCourse(courseId: string): Promise<PublicCourse 
       bio: string | null
       instructorProfile?: {
         headline: string | null
+        totalStudents: number
       }
     } | null
     
@@ -220,6 +222,7 @@ export async function fetchPublicCourse(courseId: string): Promise<PublicCourse 
       instructorAvatarUrl: instructor.avatarUrl,
       instructorBio: instructor.bio,
       instructorHeadline: instructor.instructorProfile?.headline || null,
+      instructorTotalStudents: instructor.instructorProfile?.totalStudents || 0,
       level: course.level as "beginner" | "intermediate" | "advanced",
       pricing: course.pricing as "free" | "paid",
       price: course.price,
