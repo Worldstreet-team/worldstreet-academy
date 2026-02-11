@@ -66,7 +66,7 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { PlusSignIcon, BluetoothIcon, MoreVerticalCircle01Icon, FileIcon, FolderIcon, FolderOpenIcon, CodeIcon, MoreHorizontalCircle01Icon, SearchIcon, FloppyDiskIcon, DownloadIcon, EyeIcon, LayoutIcon, PaintBoardIcon, SunIcon, MoonIcon, ComputerIcon, UserIcon, CreditCardIcon, SettingsIcon, KeyboardIcon, LanguageCircleIcon, NotificationIcon, MailIcon, ShieldIcon, HelpCircleIcon, File01Icon, LogoutIcon } from "@hugeicons/core-free-icons"
+import { PlusSignIcon, BluetoothIcon, MoreVerticalCircle01Icon, File01Icon, Folder01Icon, FolderOpenIcon, CodeIcon, MoreHorizontalCircle01Icon, Search01Icon, FloppyDiskIcon, Download01Icon, EyeIcon, Layout01Icon, PaintBoardIcon, Sun01Icon, MoonIcon, ComputerIcon, UserIcon, CreditCardIcon, Settings01Icon, KeyboardIcon, LanguageCircleIcon, Notification01Icon, Mail01Icon, Shield01Icon, HelpCircleIcon, Logout01Icon } from "@hugeicons/core-free-icons"
 
 export function ComponentExample() {
   return (
@@ -169,12 +169,12 @@ function FormExample() {
                 <DropdownMenuGroup>
                   <DropdownMenuLabel>File</DropdownMenuLabel>
                   <DropdownMenuItem>
-                    <HugeiconsIcon icon={FileIcon} strokeWidth={2} />
+                    <HugeiconsIcon icon={File01Icon} strokeWidth={2} />
                     New File
                     <DropdownMenuShortcut>⌘N</DropdownMenuShortcut>
                   </DropdownMenuItem>
                   <DropdownMenuItem>
-                    <HugeiconsIcon icon={FolderIcon} strokeWidth={2} />
+                    <HugeiconsIcon icon={Folder01Icon} strokeWidth={2} />
                     New Folder
                     <DropdownMenuShortcut>⇧⌘N</DropdownMenuShortcut>
                   </DropdownMenuItem>
@@ -217,7 +217,7 @@ function FormExample() {
                         <DropdownMenuSeparator />
                         <DropdownMenuGroup>
                           <DropdownMenuItem>
-                            <HugeiconsIcon icon={SearchIcon} strokeWidth={2} />
+                            <HugeiconsIcon icon={Search01Icon} strokeWidth={2} />
                             Browse...
                           </DropdownMenuItem>
                         </DropdownMenuGroup>
@@ -231,7 +231,7 @@ function FormExample() {
                     <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
                   </DropdownMenuItem>
                   <DropdownMenuItem>
-                    <HugeiconsIcon icon={DownloadIcon} strokeWidth={2} />
+                    <HugeiconsIcon icon={Download01Icon} strokeWidth={2} />
                     Export
                     <DropdownMenuShortcut>⇧⌘E</DropdownMenuShortcut>
                   </DropdownMenuItem>
@@ -260,7 +260,7 @@ function FormExample() {
                       })
                     }
                   >
-                    <HugeiconsIcon icon={LayoutIcon} strokeWidth={2} />
+                    <HugeiconsIcon icon={Layout01Icon} strokeWidth={2} />
                     Show Status Bar
                   </DropdownMenuCheckboxItem>
                   <DropdownMenuSub>
@@ -277,7 +277,7 @@ function FormExample() {
                             onValueChange={setTheme}
                           >
                             <DropdownMenuRadioItem value="light">
-                              <HugeiconsIcon icon={SunIcon} strokeWidth={2} />
+                              <HugeiconsIcon icon={Sun01Icon} strokeWidth={2} />
                               Light
                             </DropdownMenuRadioItem>
                             <DropdownMenuRadioItem value="dark">
@@ -308,7 +308,7 @@ function FormExample() {
                   </DropdownMenuItem>
                   <DropdownMenuSub>
                     <DropdownMenuSubTrigger>
-                      <HugeiconsIcon icon={SettingsIcon} strokeWidth={2} />
+                      <HugeiconsIcon icon={Settings01Icon} strokeWidth={2} />
                       Settings
                     </DropdownMenuSubTrigger>
                     <DropdownMenuPortal>
@@ -325,7 +325,7 @@ function FormExample() {
                           </DropdownMenuItem>
                           <DropdownMenuSub>
                             <DropdownMenuSubTrigger>
-                              <HugeiconsIcon icon={NotificationIcon} strokeWidth={2} />
+                              <HugeiconsIcon icon={Notification01Icon} strokeWidth={2} />
                               Notifications
                             </DropdownMenuSubTrigger>
                             <DropdownMenuPortal>
@@ -343,7 +343,7 @@ function FormExample() {
                                       })
                                     }
                                   >
-                                    <HugeiconsIcon icon={NotificationIcon} strokeWidth={2} />
+                                    <HugeiconsIcon icon={Notification01Icon} strokeWidth={2} />
                                     Push Notifications
                                   </DropdownMenuCheckboxItem>
                                   <DropdownMenuCheckboxItem
@@ -355,7 +355,7 @@ function FormExample() {
                                       })
                                     }
                                   >
-                                    <HugeiconsIcon icon={MailIcon} strokeWidth={2} />
+                                    <HugeiconsIcon icon={Mail01Icon} strokeWidth={2} />
                                     Email Notifications
                                   </DropdownMenuCheckboxItem>
                                 </DropdownMenuGroup>
@@ -366,7 +366,7 @@ function FormExample() {
                         <DropdownMenuSeparator />
                         <DropdownMenuGroup>
                           <DropdownMenuItem>
-                            <HugeiconsIcon icon={ShieldIcon} strokeWidth={2} />
+                            <HugeiconsIcon icon={Shield01Icon} strokeWidth={2} />
                             Privacy & Security
                           </DropdownMenuItem>
                         </DropdownMenuGroup>
@@ -388,7 +388,7 @@ function FormExample() {
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
                   <DropdownMenuItem variant="destructive">
-                    <HugeiconsIcon icon={LogoutIcon} strokeWidth={2} />
+                    <HugeiconsIcon icon={Logout01Icon} strokeWidth={2} />
                     Sign Out
                     <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut>
                   </DropdownMenuItem>

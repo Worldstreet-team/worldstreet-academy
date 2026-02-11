@@ -9,7 +9,7 @@ import {
   PlayIcon,
   PauseIcon,
   VolumeHighIcon,
-  VolumeMuteIcon,
+  VolumeMute01Icon,
   FullScreenIcon,
   MinimizeScreenIcon,
   Forward01Icon,
@@ -320,7 +320,7 @@ export function PreviewVideoPlayer({
                 className="p-1.5 text-white hover:text-primary transition-colors"
               >
                 <HugeiconsIcon
-                  icon={isMuted || volume === 0 ? VolumeMuteIcon : VolumeHighIcon}
+                  icon={isMuted || volume === 0 ? VolumeMute01Icon : VolumeHighIcon}
                   size={16}
                 />
               </button>

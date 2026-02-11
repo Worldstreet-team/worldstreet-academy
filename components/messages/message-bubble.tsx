@@ -3,7 +3,7 @@
 import Image from "next/image"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
-  FileIcon,
+  File01Icon,
   PlayIcon,
   PauseIcon,
   Tick02Icon,
@@ -234,7 +234,7 @@ export function MessageBubble({ message, showAvatar = true, showTimestamp = true
         return (
           <div className="flex items-center gap-3 min-w-48">
             <div className="h-10 w-10 rounded-lg bg-muted/50 flex items-center justify-center shrink-0">
-              <HugeiconsIcon icon={FileIcon} size={18} />
+              <HugeiconsIcon icon={File01Icon} size={18} />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{message.fileName || "File"}</p>

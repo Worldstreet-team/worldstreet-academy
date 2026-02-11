@@ -34,7 +34,7 @@ import {
   Add01Icon,
   Delete01Icon,
   Video01Icon,
-  WifiIcon,
+  Wifi01Icon,
   ViewIcon,
   Tick02Icon,
   Edit01Icon,
@@ -111,7 +111,7 @@ type EditorLesson = {
 
 const typeIcons = {
   video: Video01Icon,
-  live: WifiIcon,
+  live: Wifi01Icon,
   text: File01Icon,
 }
 

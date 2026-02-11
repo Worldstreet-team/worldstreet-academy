@@ -6,7 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { AnimatePresence, motion } from "motion/react"
 import { cn } from "@/lib/utils"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { Tick02Icon, Video01Icon, WifiIcon, File01Icon } from "@hugeicons/core-free-icons"
+import { Tick02Icon, Video01Icon, Wifi01Icon, File01Icon } from "@hugeicons/core-free-icons"
 import type { LearnLesson } from "@/lib/actions/student"
 
 type LessonSidebarProps = {
@@ -19,7 +19,7 @@ type LessonSidebarProps = {
 
 const typeIcons = {
   video: Video01Icon,
-  live: WifiIcon,
+  live: Wifi01Icon,
   text: File01Icon,
 }
 

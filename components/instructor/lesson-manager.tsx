@@ -30,7 +30,7 @@ import {
   Delete01Icon,
   Video01Icon,
   TextIcon,
-  WifiIcon,
+  Wifi01Icon,
   DragDropIcon,
 } from "@hugeicons/core-free-icons"
 import type { Lesson } from "@/lib/types"
@@ -49,7 +49,7 @@ const initialState: CourseFormState = {
 const typeIcons = {
   video: Video01Icon,
   text: TextIcon,
-  live: WifiIcon,
+  live: Wifi01Icon,
 }
 
 export function LessonManager({
