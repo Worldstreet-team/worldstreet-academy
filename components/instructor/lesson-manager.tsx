@@ -30,7 +30,6 @@ import {
   Delete01Icon,
   Video01Icon,
   TextIcon,
-  Wifi01Icon,
   DragDropIcon,
 } from "@hugeicons/core-free-icons"
 import type { Lesson } from "@/lib/types"
@@ -46,10 +45,9 @@ const initialState: CourseFormState = {
   fieldErrors: {},
 }
 
-const typeIcons = {
+const typeIcons: Record<string, typeof Video01Icon> = {
   video: Video01Icon,
   text: TextIcon,
-  live: Wifi01Icon,
 }
 
 export function LessonManager({
@@ -194,7 +192,7 @@ export function LessonManager({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="video">Video</SelectItem>
-                    <SelectItem value="live">Live</SelectItem>
+                    <SelectItem value="text">Text</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

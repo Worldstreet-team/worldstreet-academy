@@ -91,6 +91,16 @@ export function useOngoingCall() {
   return context?.hasOngoingCall ?? false
 }
 
+/** Returns the active call participant info for display (e.g. merged avatar in sidebar) */
+export function useActiveCallInfo() {
+  const context = useContext(CallContext)
+  if (!context?.hasOngoingCall || !context.activeCall) return null
+  return {
+    participantName: context.activeCall.participantName,
+    participantAvatar: context.activeCall.participantAvatar,
+  }
+}
+
 export function CallProvider({ children }: { children: ReactNode }) {
   const user = useUser()
   const [activeCall, setActiveCall] = useState<CallInfo | null>(null)

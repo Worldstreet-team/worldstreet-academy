@@ -113,6 +113,7 @@ export default function MeetingsPage() {
   const tileReactionTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
   const [gridPage, setGridPage] = useState(0)
+  const swipeTouchRef = useRef<{ x: number; y: number; time: number } | null>(null)
   const [setupMessage, setSetupMessage] = useState<string | null>(null)
   const [waitingForApproval, setWaitingForApproval] = useState<string | null>(null)
 
@@ -1456,7 +1457,26 @@ export default function MeetingsPage() {
         )}
 
         {/* Video area */}
-        <div className="relative flex-1 p-2 md:p-3 overflow-hidden flex flex-col gap-1.5">
+        <div
+          className="relative flex-1 p-2 md:p-3 overflow-hidden flex flex-col gap-1.5"
+          onTouchStart={(e) => {
+            const touch = e.touches[0]
+            swipeTouchRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() }
+          }}
+          onTouchEnd={(e) => {
+            if (!swipeTouchRef.current || totalSlideCount <= 1) return
+            const touch = e.changedTouches[0]
+            const dx = touch.clientX - swipeTouchRef.current.x
+            const dy = touch.clientY - swipeTouchRef.current.y
+            const dt = Date.now() - swipeTouchRef.current.time
+            swipeTouchRef.current = null
+            // Must be horizontal swipe (more X than Y), min 50px, within 500ms
+            if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50 && dt < 500) {
+              if (dx < 0 && currentSlide < totalSlideCount - 1) setGridPage(currentSlide + 1)
+              else if (dx > 0 && currentSlide > 0) setGridPage(currentSlide - 1)
+            }
+          }}
+        >
           <div className="relative flex-1 flex flex-col gap-2">
             {activeSlide?.type === "screenshare" ? (
               <ScreenShareView
@@ -1467,10 +1487,11 @@ export default function MeetingsPage() {
             ) : activeSlide?.type === "participants" ? (
               <div
                 className={cn(
-                  "grid gap-2 md:gap-3 flex-1 auto-rows-fr",
-                  activeSlide.entries.length <= 1
-                    ? "grid-cols-1"
-                    : "grid-cols-1 md:grid-cols-2"
+                  "grid gap-2 md:gap-3 flex-1",
+                  activeSlide.entries.length === 1 && "grid-cols-1 grid-rows-1",
+                  activeSlide.entries.length === 2 && "grid-cols-1 grid-rows-2 md:grid-cols-2 md:grid-rows-1",
+                  activeSlide.entries.length === 3 && "grid-cols-2 grid-rows-2 [&>*:last-child]:col-span-2 md:[&>*:last-child]:col-span-1 md:grid-cols-3 md:grid-rows-1",
+                  activeSlide.entries.length >= 4 && "grid-cols-2 grid-rows-2"
                 )}
               >
                 {activeSlide.entries.map((entry) =>
@@ -1507,55 +1528,78 @@ export default function MeetingsPage() {
               </div>
             ) : null}
 
-            {/* Slide dots */}
+            {/* Slide dots + navigation arrows */}
             {totalSlideCount > 1 && (
-              <div className="flex gap-1.5 justify-center py-1">
-                {slides.map((slide, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setGridPage(i)}
-                    className={cn(
-                      "h-1.5 rounded-full transition-all duration-200",
-                      i === currentSlide
-                        ? slide.type === "screenshare"
-                          ? "bg-emerald-400 w-4"
-                          : "bg-foreground w-4"
-                        : "bg-foreground/30 hover:bg-foreground/50 w-1.5"
-                    )}
-                  />
-                ))}
+              <div className="flex items-center gap-3 justify-center py-1">
+                <button
+                  onClick={() => setGridPage(Math.max(0, currentSlide - 1))}
+                  disabled={currentSlide === 0}
+                  className="hidden md:flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                </button>
+                <div className="flex gap-1.5">
+                  {slides.map((slide, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setGridPage(i)}
+                      className={cn(
+                        "h-1.5 rounded-full transition-all duration-200",
+                        i === currentSlide
+                          ? slide.type === "screenshare"
+                            ? "bg-emerald-400 w-4"
+                            : "bg-foreground w-4"
+                          : "bg-foreground/30 hover:bg-foreground/50 w-1.5"
+                      )}
+                    />
+                  ))}
+                </div>
+                <button
+                  onClick={() => setGridPage(Math.min(totalSlideCount - 1, currentSlide + 1))}
+                  disabled={currentSlide === totalSlideCount - 1}
+                  className="hidden md:flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                </button>
               </div>
             )}
 
             {/* Audience strip - shows guests watching */}
             {(audienceRemoteIds.length > 0 || !localIsOnStage) && (
-              <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl bg-muted/30 border border-border/30">
-                <span className="text-[10px] text-muted-foreground font-medium shrink-0">
-                  {audienceRemoteIds.length + (localIsOnStage ? 0 : 1)} watching
-                </span>
-                <div className="flex -space-x-1.5 overflow-hidden">
+              <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-muted/30 border border-border/30">
+                <div className="flex -space-x-2 overflow-hidden">
                   {!localIsOnStage && (
-                    <Avatar className="w-5 h-5 border border-background shrink-0">
+                    <Avatar className="w-6 h-6 border-2 border-background shrink-0 ring-1 ring-background">
                       {user.avatarUrl && <AvatarImage src={user.avatarUrl} />}
-                      <AvatarFallback className="text-[7px] bg-primary/10 text-primary">
+                      <AvatarFallback className="text-[8px] bg-primary/10 text-primary">
                         {user.firstName?.[0]}{user.lastName?.[0]}
                       </AvatarFallback>
                     </Avatar>
                   )}
-                  {audienceRemoteIds.slice(0, 10).map((rtkId) => {
+                  {audienceRemoteIds.slice(0, 6).map((rtkId) => {
                     const p = remoteParticipants.get(rtkId)
+                    const admitted = admittedParticipants.find((ap) => {
+                      const rp = remoteParticipants.get(rtkId)
+                      return rp?.userId && ap.userId === rp.userId
+                    })
                     return (
-                      <Avatar key={rtkId} className="w-5 h-5 border border-background shrink-0">
-                        <AvatarFallback className="text-[7px] bg-muted-foreground/10 text-muted-foreground">
+                      <Avatar key={rtkId} className="w-6 h-6 border-2 border-background shrink-0 ring-1 ring-background">
+                        {admitted?.avatar && <AvatarImage src={admitted.avatar} />}
+                        <AvatarFallback className="text-[8px] bg-muted-foreground/10 text-muted-foreground">
                           {p?.name?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "?"}
                         </AvatarFallback>
                       </Avatar>
                     )
                   })}
-                  {audienceRemoteIds.length > 10 && (
-                    <span className="text-[9px] text-muted-foreground ml-1.5">+{audienceRemoteIds.length - 10}</span>
+                  {audienceRemoteIds.length + (localIsOnStage ? 0 : 1) > 6 && (
+                    <div className="flex items-center justify-center w-6 h-6 rounded-full border-2 border-background bg-muted text-[8px] font-semibold text-muted-foreground shrink-0">
+                      +{audienceRemoteIds.length + (localIsOnStage ? 0 : 1) - 6}
+                    </div>
                   )}
                 </div>
+                <span className="text-[11px] text-muted-foreground font-medium">
+                  {audienceRemoteIds.length + (localIsOnStage ? 0 : 1)} watching
+                </span>
               </div>
             )}
           </div>

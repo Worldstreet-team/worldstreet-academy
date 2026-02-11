@@ -1805,6 +1805,7 @@ export async function inviteByEmail(
       courseName: undefined,
       courseThumbnailUrl: meeting.courseThumbnailUrl || undefined,
       inviteeName: invitee.firstName,
+      inviteeAvatarUrl: invitee.avatarUrl || undefined,
     })
 
     if (!result.success) {

@@ -29,6 +29,7 @@ export default function CheckoutPage() {
   const [course, setCourse] = useState<PublicCourse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [isSuccess, setIsSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -47,20 +48,27 @@ export default function CheckoutPage() {
     setIsProcessing(true)
     setError(null)
 
-    // Check if already enrolled
-    const check = await checkEnrollment(user.id, course.id)
-    if (check.isEnrolled) {
-      router.push(`/dashboard/checkout/success?courseId=${course.id}`)
-      return
-    }
+    try {
+      // Check if already enrolled
+      const check = await checkEnrollment(user.id, course.id)
+      if (check.isEnrolled) {
+        setIsSuccess(true)
+        router.push(`/dashboard/checkout/success?courseId=${course.id}`)
+        return
+      }
 
-    const price = course.pricing === "free" ? 0 : (course.price ?? 0)
-    const result = await enrollInCourse(user.id, course.id, price)
+      const price = course.pricing === "free" ? 0 : (course.price ?? 0)
+      const result = await enrollInCourse(user.id, course.id, price)
 
-    if (result.success) {
-      router.push(`/dashboard/checkout/success?courseId=${course.id}`)
-    } else {
-      setError(result.error || "Something went wrong")
+      if (result.success) {
+        setIsSuccess(true)
+        router.push(`/dashboard/checkout/success?courseId=${course.id}`)
+      } else {
+        setError(result.error || "Something went wrong")
+        setIsProcessing(false)
+      }
+    } catch {
+      setError("Something went wrong. Please try again.")
       setIsProcessing(false)
     }
   }
@@ -190,11 +198,16 @@ export default function CheckoutPage() {
           {/* CTA */}
           <Button
             onClick={handlePurchase}
-            disabled={isProcessing}
+            disabled={isProcessing || isSuccess}
             className="w-full h-12 text-sm font-semibold gap-2"
             size="lg"
           >
-            {isProcessing ? (
+            {isSuccess ? (
+              <>
+                <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} />
+                Enrolled! Redirecting...
+              </>
+            ) : isProcessing ? (
               <>
                 <HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" />
                 Processing...

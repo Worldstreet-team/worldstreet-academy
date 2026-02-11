@@ -27,6 +27,14 @@ function generateUsername(email: string): string {
   return `${base}${random}`.toLowerCase()
 }
 
+/**
+ * Generate a default avatar URL using DiceBear API
+ */
+function generateDefaultAvatarUrl(seed: string): string {
+  const encoded = encodeURIComponent(seed)
+  return `https://api.dicebear.com/9.x/notionists/svg?seed=${encoded}&backgroundColor=c0aede,d1d4f9,b6e3f4,ffd5dc,ffdfbf&backgroundType=gradientLinear`
+}
+
 export type LocalUser = {
   id: string
   authUserId: string
@@ -72,18 +80,26 @@ export async function syncUserToLocal(authUser: AuthUser, updateNames = true): P
       }
       user.verified = authUser.isVerified
       user.role = mapRole(authUser.role)
+      // Backfill avatar for existing users without one
+      if (!user.avatarUrl) {
+        user.avatarUrl = generateDefaultAvatarUrl(`${user.firstName} ${user.lastName}`.trim())
+      }
       await user.save()
     } else {
       // Create new user
       const emailPrefix = authUser.email.split("@")[0]
       const username = generateUsername(authUser.email)
+      const firstName = authUser.firstName || emailPrefix || "User"
+      const lastName = authUser.lastName || ""
+      const avatarUrl = generateDefaultAvatarUrl(`${firstName} ${lastName}`.trim())
       
       user = await User.create({
         authUserId: authUser.userId,
         email: authUser.email.toLowerCase(),
         username,
-        firstName: authUser.firstName || emailPrefix || "User",
-        lastName: authUser.lastName || "",
+        firstName,
+        lastName,
+        avatarUrl,
         role: mapRole(authUser.role),
         verified: authUser.isVerified,
       })
@@ -101,6 +117,12 @@ export async function syncUserToLocal(authUser: AuthUser, updateNames = true): P
     if (updateNames && authUser.lastName && authUser.lastName.length > 0) {
       user.lastName = authUser.lastName
     }
+
+    // Backfill avatar for existing users without one
+    if (!user.avatarUrl) {
+      user.avatarUrl = generateDefaultAvatarUrl(`${user.firstName} ${user.lastName}`.trim())
+    }
+
     await user.save()
   }
 

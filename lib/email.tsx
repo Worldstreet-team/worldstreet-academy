@@ -152,10 +152,12 @@ function AvatarStack({
   hostAvatar,
   hostName,
   inviteeName,
+  inviteeAvatar,
 }: {
   hostAvatar?: string
   hostName?: string
   inviteeName?: string
+  inviteeAvatar?: string
 }) {
   const hostInitial = hostName?.[0]?.toUpperCase() || "H"
   const inviteeInitial = inviteeName?.[0]?.toUpperCase() || "Y"
@@ -169,7 +171,7 @@ function AvatarStack({
               <AvatarCircle src={hostAvatar} initial={hostInitial} />
             </td>
             <td>
-              <AvatarCircle initial={inviteeInitial} offset />
+              <AvatarCircle src={inviteeAvatar} initial={inviteeInitial} offset />
             </td>
           </tr>
         </table>
@@ -253,7 +255,7 @@ function MeetingNotificationEmail({ data }: { data: MeetingEmailData }) {
 function MeetingInviteEmail({
   data,
 }: {
-  data: MeetingEmailData & { inviteeName?: string }
+  data: MeetingEmailData & { inviteeName?: string; inviteeAvatarUrl?: string }
 }) {
   return (
     <Html style={base}>
@@ -266,6 +268,7 @@ function MeetingInviteEmail({
               hostAvatar={data.hostAvatarUrl}
               hostName={data.hostName}
               inviteeName={data.inviteeName}
+              inviteeAvatar={data.inviteeAvatarUrl}
             />
 
             <Text style={heading}>{data.meetingTitle}</Text>
@@ -335,7 +338,7 @@ export async function sendMeetingNotificationEmail(
  */
 export async function sendMeetingInviteEmail(
   to: string,
-  data: MeetingEmailData & { inviteeName?: string }
+  data: MeetingEmailData & { inviteeName?: string; inviteeAvatarUrl?: string }
 ) {
   const subject = `${data.hostName} invited you to ${data.meetingTitle}`
 

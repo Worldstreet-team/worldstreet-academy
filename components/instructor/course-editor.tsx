@@ -34,7 +34,6 @@ import {
   Add01Icon,
   Delete01Icon,
   Video01Icon,
-  Wifi01Icon,
   ViewIcon,
   Tick02Icon,
   Edit01Icon,
@@ -100,7 +99,7 @@ type EditorLesson = {
   tempId: string
   title: string
   description: string
-  type: "video" | "live" | "text"
+  type: "video" | "text"
   thumbnailUrl: string
   videoUrl: string
   content: string
@@ -111,7 +110,6 @@ type EditorLesson = {
 
 const typeIcons = {
   video: Video01Icon,
-  live: Wifi01Icon,
   text: File01Icon,
 }
 
@@ -188,7 +186,7 @@ export function CourseEditor({
       tempId: l.id,
       title: l.title,
       description: l.description ?? "",
-      type: l.type,
+      type: l.type === "live" ? "video" : l.type,
       thumbnailUrl: l.thumbnailUrl ?? "",
       videoUrl: l.videoUrl ?? "",
       content: l.content ?? "",
@@ -560,7 +558,6 @@ export function CourseEditor({
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="video">Video</SelectItem>
-                                  <SelectItem value="live">Live</SelectItem>
                                   <SelectItem value="text">Text</SelectItem>
                                 </SelectContent>
                               </Select>

@@ -53,10 +53,12 @@ export function useSidebarActivity() {
 
       // Refresh on meeting lifecycle events
       const refreshTypes = [
+        "meeting:created",
         "meeting:ended",
         "meeting:participant-joined",
         "meeting:participant-left",
         "meeting:admitted",
+        "meeting:invite",
         "call:incoming",
         "call:ended",
         "call:answered",
@@ -76,6 +78,19 @@ export function useSidebarActivity() {
   )
 
   useSSEEvents(user?.id ?? null, handleEvent)
+
+  // Polling fallback every 30s for catch-up
+  useEffect(() => {
+    const interval = setInterval(() => {
+      getMyMeetings().then((r) => {
+        if (r.success && r.meetings) setActiveMeetings(r.meetings)
+      })
+      getMyMeetingInvites().then((r) => {
+        if (r.success && r.invites) setInvites(r.invites)
+      })
+    }, 30_000)
+    return () => clearInterval(interval)
+  }, [])
 
   const hasActivity = activeMeetings.length > 0 || invites.length > 0
 

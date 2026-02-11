@@ -429,38 +429,79 @@ export function VideoCall({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [callType, callId])
 
+  // Register local video when call becomes connected (catches invitee case where
+  // handleRoomJoined fires before the PIP <video> element is in the DOM)
+  useEffect(() => {
+    if (callState !== "connected" || callType !== "video" || isVideoOff) return
+    if (!rtkClient.client || !rtkClient.isInRoom) return
+    // Short delay to let React render the PIP video element first
+    const timer = setTimeout(() => {
+      if (!localVideoRef.current || !rtkClient.client) return
+      try {
+        rtkClient.client.self.registerVideoElement(localVideoRef.current, true)
+      } catch { /* ignore */ }
+      // Always force-attach self videoTrack as fallback
+      const selfTrack = rtkClient.client.self?.videoTrack
+      if (selfTrack && localVideoRef.current) {
+        try {
+          localVideoRef.current.srcObject = new MediaStream([selfTrack])
+          localVideoRef.current.play().catch(() => {})
+        } catch { /* ignore */ }
+      }
+    }, 150)
+    return () => clearTimeout(timer)
+  }, [callState, callType, isVideoOff])
+
   // Re-register video/audio elements when minimized state changes
   useEffect(() => {
     if (!rtkClient.client || !rtkClient.isInRoom) return
-    // Re-register video with fallback to srcObject
-    if (callType === "video") {
-      if (localVideoRef.current) {
-        try {
-          rtkClient.client.self.registerVideoElement(localVideoRef.current, true)
-        } catch { /* ignore */ }
-      }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const remote = remoteParticipantRef.current as any
-      if (remoteVideoRef.current && remote) {
-        try {
-          remote.registerVideoElement(remoteVideoRef.current)
-        } catch { /* ignore */ }
-        // Fallback: set srcObject directly
-        if (remote.videoTrack && !remoteVideoRef.current.srcObject) {
+    // Use a microtask delay to ensure new video elements are mounted after restore
+    const timer = setTimeout(() => {
+      if (!rtkClient.client || !rtkClient.isInRoom) return
+      // Re-register local video — always force clear & re-attach to handle stale srcObject
+      if (callType === "video") {
+        if (localVideoRef.current) {
+          // Clear any stale srcObject from before minimize
+          localVideoRef.current.srcObject = null
           try {
-            const stream = new MediaStream([remote.videoTrack])
-            remoteVideoRef.current.srcObject = stream
-            remoteVideoRef.current.play().catch(() => {})
+            rtkClient.client.self.registerVideoElement(localVideoRef.current, true)
           } catch { /* ignore */ }
+          // Always force-attach self videoTrack directly
+          const selfTrack = rtkClient.client.self?.videoTrack
+          if (selfTrack && localVideoRef.current) {
+            try {
+              const stream = new MediaStream([selfTrack])
+              localVideoRef.current.srcObject = stream
+              localVideoRef.current.play().catch(() => {})
+            } catch { /* ignore */ }
+          }
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const remote = remoteParticipantRef.current as any
+        if (remoteVideoRef.current && remote) {
+          // Clear stale remote srcObject too
+          remoteVideoRef.current.srcObject = null
+          try {
+            remote.registerVideoElement(remoteVideoRef.current)
+          } catch { /* ignore */ }
+          // Always force-attach remote videoTrack
+          if (remote.videoTrack) {
+            try {
+              const stream = new MediaStream([remote.videoTrack])
+              remoteVideoRef.current.srcObject = stream
+              remoteVideoRef.current.play().catch(() => {})
+            } catch { /* ignore */ }
+          }
         }
       }
-    }
-    // Re-setup remote audio via helper
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const remoteP = remoteParticipantRef.current as any
-    if (remoteP) {
-      setupRemoteAudio(remoteP)
-    }
+      // Re-setup remote audio via helper
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const remoteP = remoteParticipantRef.current as any
+      if (remoteP) {
+        setupRemoteAudio(remoteP)
+      }
+    }, 150) // Delay ensures DOM elements are mounted after restore
+    return () => clearTimeout(timer)
   }, [callType, isMinimized, callState, setupRemoteAudio])
 
   // ── Loudspeaker toggle: force audio through loudspeaker ──

@@ -41,7 +41,7 @@ import {
 import { useUser } from "@/components/providers/user-provider"
 import { logoutAction } from "@/lib/auth/actions"
 import { useUnreadCount } from "@/lib/hooks/use-unread-count"
-import { useOngoingCall } from "@/components/providers/call-provider"
+import { useOngoingCall, useActiveCallInfo } from "@/components/providers/call-provider"
 import { useSidebarActivity } from "@/lib/hooks/use-sidebar-activity"
 
 type NavItem = {
@@ -136,6 +136,7 @@ export function InstructorSidebar() {
   const [isPending, startTransition] = useTransition()
   const unreadCount = useUnreadCount()
   const hasOngoingCall = useOngoingCall()
+  const callInfo = useActiveCallInfo()
   const { activeMeetings, invites, hasActivity } = useSidebarActivity()
 
   const userInitials = `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`.toUpperCase() || "U"
@@ -230,7 +231,23 @@ export function InstructorSidebar() {
                   >
                     <HugeiconsIcon icon={item.icon} size={18} />
                     <span>{item.title}</span>
-                    {item.title === "Messages" && hasOngoingCall && (
+                    {item.title === "Messages" && hasOngoingCall && callInfo && (
+                      <span className="ml-auto flex items-center -space-x-1.5 shrink-0">
+                        <Avatar className="w-5 h-5 border-2 border-sidebar-accent ring-1 ring-sidebar-accent">
+                          {user.avatarUrl && <AvatarImage src={user.avatarUrl} />}
+                          <AvatarFallback className="text-[7px] bg-primary/10 text-primary">
+                            {user.firstName?.[0]}{user.lastName?.[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        <Avatar className="w-5 h-5 border-2 border-sidebar-accent ring-1 ring-sidebar-accent">
+                          {callInfo.participantAvatar && <AvatarImage src={callInfo.participantAvatar} />}
+                          <AvatarFallback className="text-[7px] bg-emerald-500/15 text-emerald-600">
+                            {callInfo.participantName?.[0]?.toUpperCase() || "?"}
+                          </AvatarFallback>
+                        </Avatar>
+                      </span>
+                    )}
+                    {item.title === "Messages" && hasOngoingCall && !callInfo && (
                       <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-500/15 px-1.5">
                         <HugeiconsIcon icon={Call02Icon} size={12} className="text-emerald-500" />
                       </span>
