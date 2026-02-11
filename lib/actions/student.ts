@@ -196,13 +196,16 @@ export async function fetchPublicCourse(courseId: string): Promise<PublicCourse 
     const instructor = course.instructor as unknown as {
       _id: string
       firstName: string
-      lastName: string
+      lastName?: string
       avatarUrl: string | null
       bio: string | null
       instructorProfile?: {
         headline: string | null
       }
-    }
+    } | null
+    
+    // Guard against missing instructor (deleted user, etc.)
+    if (!instructor) return null
     
     // Fetch lessons for this course with all needed fields
     const lessons = await Lesson.find({ course: courseId })
@@ -216,7 +219,7 @@ export async function fetchPublicCourse(courseId: string): Promise<PublicCourse 
       description: course.description,
       thumbnailUrl: course.thumbnailUrl,
       instructorId: instructor._id.toString(),
-      instructorName: `${instructor.firstName} ${instructor.lastName}`,
+      instructorName: `${instructor.firstName} ${instructor.lastName || ""}`.trim(),
       instructorAvatarUrl: instructor.avatarUrl,
       instructorBio: instructor.bio,
       instructorHeadline: instructor.instructorProfile?.headline || null,
@@ -700,9 +703,15 @@ export async function fetchInstructorProfile(instructorId: string): Promise<Inst
       .select("firstName lastName avatarUrl bio role instructorProfile createdAt")
       .lean()
     
-    if (!instructor || (instructor.role !== "INSTRUCTOR" && instructor.role !== "ADMIN")) {
-      return null
-    }
+    if (!instructor) return null
+    
+    // Compute real counts from DB
+    const [courseCount, studentCount] = await Promise.all([
+      Course.countDocuments({ instructor: instructor._id, status: "published" }),
+      Enrollment.distinct("user", {
+        course: { $in: await Course.find({ instructor: instructor._id }).distinct("_id") },
+      }).then((ids) => ids.length),
+    ])
     
     return {
       id: instructor._id.toString(),
@@ -714,8 +723,8 @@ export async function fetchInstructorProfile(instructorId: string): Promise<Inst
       headline: instructor.instructorProfile?.headline || null,
       expertise: instructor.instructorProfile?.expertise || [],
       socialLinks: instructor.instructorProfile?.socialLinks || {},
-      totalStudents: instructor.instructorProfile?.totalStudents || 0,
-      totalCourses: instructor.instructorProfile?.totalCourses || 0,
+      totalStudents: studentCount,
+      totalCourses: courseCount,
       createdAt: instructor.createdAt.toISOString(),
     }
   } catch (error) {

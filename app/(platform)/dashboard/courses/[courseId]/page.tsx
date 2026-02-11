@@ -18,11 +18,11 @@ import {
   BookOpen01Icon,
   Clock01Icon,
   UserMultipleIcon,
-  Bookmark01Icon,
   ArrowLeft01Icon,
 } from "@hugeicons/core-free-icons"
 import { LessonPreviewAccordion } from "@/components/courses/lesson-preview-accordion"
 import { AboutInstructor } from "@/components/courses/about-instructor"
+import { BookmarkButton } from "@/components/courses/bookmark-button"
 
 export default async function CourseDetailPage({
   params,
@@ -133,12 +133,7 @@ export default async function CourseDetailPage({
           </Button>
 
           {/* Bookmark */}
-          <button
-            type="button"
-            className="absolute top-3 right-3 flex h-8 w-8 items-center justify-center rounded-full border border-white/30 bg-black/30 backdrop-blur-sm text-white hover:bg-black/50 transition-all"
-          >
-            <HugeiconsIcon icon={Bookmark01Icon} size={16} />
-          </button>
+          <BookmarkButton courseId={course.id} />
         </div>
 
         {/* Content */}

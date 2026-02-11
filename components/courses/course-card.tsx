@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { StarIcon, Bookmark01Icon, PlayCircle02Icon } from "@hugeicons/core-free-icons"
-import { useFavorites } from "@/lib/hooks/use-favorites"
+import { useBookmarkContext } from "@/components/providers/bookmark-provider"
 import type { Course } from "@/lib/types"
 import type { BrowseCourse } from "@/lib/actions/student"
 
@@ -24,8 +24,8 @@ function formatDuration(totalMinutes: number): string {
 }
 
 export function CourseCard({ course }: { course: CourseData }) {
-  const { toggleFavorite, isFavorite } = useFavorites()
-  const favorited = isFavorite(course.id)
+  const { isBookmarked, toggle } = useBookmarkContext()
+  const favorited = isBookmarked(course.id)
 
   return (
     <Link href={`/dashboard/courses/${course.id}`}>
@@ -57,7 +57,7 @@ export function CourseCard({ course }: { course: CourseData }) {
             onClick={(e) => {
               e.preventDefault()
               e.stopPropagation()
-              toggleFavorite(course.id)
+              toggle(course.id)
             }}
             className={`absolute top-2.5 right-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/30 backdrop-blur-md shadow-lg transition-all hover:bg-white/40 dark:border-white/20 ${
               favorited
