@@ -2,7 +2,7 @@
 
 import mongoose from "mongoose"
 import connectDB from "@/lib/db"
-import { Course, Enrollment, Bookmark, User } from "@/lib/db/models"
+import { Course, Enrollment, Bookmark, User, Lesson } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth"
 
 // ============================================================================
@@ -180,9 +180,6 @@ export type PublicCourse = {
 export async function fetchPublicCourse(courseId: string): Promise<PublicCourse | null> {
   try {
     await connectDB()
-    
-    // Import Lesson model
-    const { Lesson } = await import("@/lib/db/models")
     
     const course = await Course.findOne({
       _id: courseId,
