@@ -48,14 +48,15 @@ const labelMap: Record<string, string> = {
   live: "Live Session",
 }
 
-function buildCrumbs(pathname: string) {
+function buildCrumbs(pathname: string, overrides?: Record<string, string>) {
   const segments = pathname.split("/").filter(Boolean)
   const crumbs: { label: string; href: string }[] = []
 
   let href = ""
   for (const seg of segments) {
     href += `/${seg}`
-    const label = labelMap[seg] ?? seg.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+    // Check overrides first, then labelMap, then format the segment
+    const label = overrides?.[seg] ?? labelMap[seg] ?? seg.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
     crumbs.push({ label, href })
   }
   return crumbs
@@ -65,11 +66,13 @@ type TopbarProps = {
   title?: string
   /** "platform" = student portal, "instructor" = instructor portal */
   variant?: "platform" | "instructor"
+  /** Override breadcrumb labels for specific path segments (e.g., { "courseId": "Course Title" }) */
+  breadcrumbOverrides?: Record<string, string>
 }
 
-export function Topbar({ title, variant = "platform" }: TopbarProps) {
+export function Topbar({ title, variant = "platform", breadcrumbOverrides }: TopbarProps) {
   const pathname = usePathname()
-  const crumbs = buildCrumbs(pathname)
+  const crumbs = buildCrumbs(pathname, breadcrumbOverrides)
   const user = useUser()
   const [isPending, startTransition] = useTransition()
 

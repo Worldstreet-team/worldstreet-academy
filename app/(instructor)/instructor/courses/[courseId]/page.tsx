@@ -45,7 +45,11 @@ export default async function InstructorCourseInfoPage({
 
   return (
     <>
-      <Topbar title="Course Info" variant="instructor" />
+      <Topbar 
+        title="Course Info" 
+        variant="instructor"
+        breadcrumbOverrides={{ [courseId]: course.title }}
+      />
       <div className="p-6 space-y-6">
         {/* Back + Actions Bar */}
         <div className="flex items-center justify-between">

@@ -53,7 +53,13 @@ export default async function InstructorProfilePage({
 
   return (
     <>
-      <Topbar title="Instructor Profile" />
+      <Topbar 
+        title="Instructor Profile"
+        breadcrumbOverrides={{ 
+          [instructorId]: instructor.fullName,
+          instructor: "Instructors"
+        }}
+      />
       <div className="flex-1 pb-24 md:pb-8">
         {/* Header */}
         <div className="relative bg-gradient-to-b from-primary/10 to-background pt-4 pb-8 px-4 md:px-6 lg:px-8">

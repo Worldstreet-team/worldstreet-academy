@@ -54,7 +54,10 @@ export default async function CourseDetailPage({
 
   return (
     <>
-      <Topbar title={course.title} />
+      <Topbar 
+        title={course.title} 
+        breadcrumbOverrides={{ [courseId]: course.title }}
+      />
       <div className="flex-1 pb-24 md:pb-8">
         {/* Hero thumbnail — edge-to-edge on mobile */}
         <div className="relative aspect-video md:aspect-[21/9] w-full bg-muted overflow-hidden">
