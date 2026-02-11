@@ -48,6 +48,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
+import { useUser } from "@/components/providers/user-provider"
 import type { Lesson, CourseLevel, CoursePricing, CourseStatus, CourseCategory } from "@/lib/types"
 
 // Minimal course data for editing
@@ -142,6 +143,7 @@ export function CourseEditor({
   course?: EditableCourse
   existingLessons?: Lesson[]
 }) {
+  const user = useUser()
   const isEdit = !!course
   const action = isEdit ? updateCourse : createCourse
   const [state, formAction, isPending] = useActionState(action, initialFormState)
@@ -786,13 +788,15 @@ export function CourseEditor({
               <div className="flex items-center justify-between pt-2 border-t text-xs text-muted-foreground">
                 <div className="flex items-center gap-2">
                   <Avatar size="sm">
-                    <AvatarImage
-                      src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=96&h=96&fit=crop&crop=face"
-                      alt="Sarah Chen"
-                    />
-                    <AvatarFallback>SC</AvatarFallback>
+                    {user.avatarUrl && (
+                      <AvatarImage
+                        src={user.avatarUrl}
+                        alt={`${user.firstName} ${user.lastName}`}
+                      />
+                    )}
+                    <AvatarFallback>{user.firstName[0]}{user.lastName[0]}</AvatarFallback>
                   </Avatar>
-                  <span>Sarah Chen</span>
+                  <span>{user.firstName} {user.lastName}</span>
                 </div>
                 <span>{lessons.length} lessons</span>
               </div>

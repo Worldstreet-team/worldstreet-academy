@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth"
 export async function Navbar() {
   // Check if user is authenticated
   const user = await getCurrentUser()
+  const isInstructor = user && (user.role === "INSTRUCTOR" || user.role === "ADMIN")
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -33,6 +34,14 @@ export async function Navbar() {
             >
               My Learning
             </Link>
+            {isInstructor && (
+              <Link
+                href="/instructor"
+                className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Instructor Dashboard
+              </Link>
+            )}
           </nav>
         </div>
         <div className="flex items-center gap-3">

@@ -1393,6 +1393,45 @@ export default function MeetingsPage() {
             <MeetingTimer startTime={meetingStartTime} />
             <span className="text-muted-foreground/40">·</span>
             <span className="text-muted-foreground text-xs">{totalParticipants}</span>
+            
+            {/* Desktop carousel controls */}
+            {totalSlideCount > 1 && (
+              <>
+                <span className="text-muted-foreground/40 hidden md:block">·</span>
+                <div className="hidden md:flex items-center gap-2">
+                  <button
+                    onClick={() => setGridPage(Math.max(0, currentSlide - 1))}
+                    disabled={currentSlide === 0}
+                    className="flex h-6 w-6 items-center justify-center rounded-md hover:bg-muted transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                  </button>
+                  <div className="flex gap-1.5">
+                    {slides.map((slide, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setGridPage(i)}
+                        className={cn(
+                          "h-1.5 rounded-full transition-all duration-200",
+                          i === currentSlide
+                            ? slide.type === "screenshare"
+                              ? "bg-emerald-400 w-4"
+                              : "bg-foreground w-4"
+                            : "bg-foreground/30 hover:bg-foreground/50 w-1.5"
+                        )}
+                      />
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setGridPage(Math.min(totalSlideCount - 1, currentSlide + 1))}
+                    disabled={currentSlide === totalSlideCount - 1}
+                    className="flex h-6 w-6 items-center justify-center rounded-md hover:bg-muted transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                  </button>
+                </div>
+              </>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -1478,20 +1517,20 @@ export default function MeetingsPage() {
           }}
         >
           <div className="relative flex-1 flex flex-col gap-2">
-            {/* Desktop prev/next arrows overlaid on sides */}
+            {/* Mobile prev/next arrows overlaid on sides */}
             {totalSlideCount > 1 && (
               <>
                 <button
                   onClick={() => setGridPage(Math.max(0, currentSlide - 1))}
                   disabled={currentSlide === 0}
-                  className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 z-20 h-8 w-8 items-center justify-center rounded-full bg-background/60 backdrop-blur-sm border border-border/30 text-muted-foreground hover:text-foreground hover:bg-background/80 transition-colors disabled:opacity-0 disabled:pointer-events-none"
+                  className="md:hidden flex absolute left-0 top-1/2 -translate-y-1/2 z-20 h-8 w-8 items-center justify-center rounded-full bg-background/60 backdrop-blur-sm border border-border/30 text-muted-foreground hover:text-foreground hover:bg-background/80 transition-colors disabled:opacity-0 disabled:pointer-events-none"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
                 </button>
                 <button
                   onClick={() => setGridPage(Math.min(totalSlideCount - 1, currentSlide + 1))}
                   disabled={currentSlide === totalSlideCount - 1}
-                  className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 z-20 h-8 w-8 items-center justify-center rounded-full bg-background/60 backdrop-blur-sm border border-border/30 text-muted-foreground hover:text-foreground hover:bg-background/80 transition-colors disabled:opacity-0 disabled:pointer-events-none"
+                  className="md:hidden flex absolute right-0 top-1/2 -translate-y-1/2 z-20 h-8 w-8 items-center justify-center rounded-full bg-background/60 backdrop-blur-sm border border-border/30 text-muted-foreground hover:text-foreground hover:bg-background/80 transition-colors disabled:opacity-0 disabled:pointer-events-none"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
                 </button>
@@ -1548,9 +1587,9 @@ export default function MeetingsPage() {
               </div>
             ) : null}
 
-            {/* Slide dots */}
+            {/* Slide dots (mobile only) */}
             {totalSlideCount > 1 && (
-              <div className="flex gap-1.5 justify-center py-1">
+              <div className="md:hidden flex gap-1.5 justify-center py-1">
                 {slides.map((slide, i) => (
                   <button
                     key={i}

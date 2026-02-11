@@ -110,6 +110,15 @@ const accountItems: NavItem[] = [
   },
 ]
 
+const instructorItems: NavItem[] = [
+  {
+    title: "Instructor Dashboard",
+    href: "/instructor",
+    icon: TeachingIcon,
+    match: (p) => p.startsWith("/instructor"),
+  },
+]
+
 type ExternalNavItem = {
   title: string
   href: string
@@ -298,6 +307,31 @@ export function AppSidebar() {
 
         <SidebarSeparator />
 
+        {isInstructor && (
+          <>
+            <SidebarGroup>
+              <SidebarGroupLabel>Teach</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {instructorItems.map((item) => (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton
+                        render={<Link href={item.href} />}
+                        isActive={isActive(item, pathname)}
+                      >
+                        <HugeiconsIcon icon={item.icon} size={18} />
+                        <span>{item.title}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            <SidebarSeparator />
+          </>
+        )}
+
         <SidebarGroup>
           <SidebarGroupLabel>Account</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -344,14 +378,6 @@ export function AppSidebar() {
       <SidebarFooter>
         <SidebarSeparator />
         <SidebarMenu>
-          {isInstructor && (
-            <SidebarMenuItem>
-              <SidebarMenuButton render={<Link href="/instructor" />}>
-                <HugeiconsIcon icon={TeachingIcon} size={18} />
-                <span>Instructor Portal</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          )}
           <SidebarMenuItem>
             <div className="flex items-center justify-between px-2 py-1.5">
               <div className="flex items-center gap-2 min-w-0">
