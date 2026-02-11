@@ -1,8 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { useTransition } from "react"
+import { usePathname, useRouter } from "next/navigation"
+import { useTransition, useEffect } from "react"
 import {
   Sidebar,
   SidebarContent,
@@ -78,6 +78,12 @@ const mainItems: NavItem[] = [
     icon: Bookmark01Icon,
     match: (p) => p === "/dashboard/bookmarks",
   },
+  {
+    title: "Instructor Dashboard",
+    href: "/instructor",
+    icon: TeachingIcon,
+    match: (p) => p.startsWith("/instructor"),
+  },
 ]
 
 const connectItems: NavItem[] = [
@@ -107,15 +113,6 @@ const accountItems: NavItem[] = [
     href: "/dashboard/help",
     icon: HelpCircleIcon,
     match: (p) => p === "/dashboard/help",
-  },
-]
-
-const instructorItems: NavItem[] = [
-  {
-    title: "Instructor Dashboard",
-    href: "/instructor",
-    icon: TeachingIcon,
-    match: (p) => p.startsWith("/instructor"),
   },
 ]
 
@@ -155,6 +152,7 @@ function isActive(item: NavItem, pathname: string) {
 
 export function AppSidebar() {
   const pathname = usePathname()
+  const router = useRouter()
   const user = useUser()
   const [isPending, startTransition] = useTransition()
   const unreadCount = useUnreadCount()
@@ -163,7 +161,18 @@ export function AppSidebar() {
   const { activeMeetings, invites, hasActivity } = useSidebarActivity()
 
   const userInitials = `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`.toUpperCase() || "U"
-  const isInstructor = user.role === "INSTRUCTOR" || user.role === "ADMIN"
+
+  // Prefetch all navigation routes on mount for faster transitions
+  useEffect(() => {
+    const allRoutes = [
+      ...mainItems.map((item) => item.href),
+      ...connectItems.map((item) => item.href),
+      ...accountItems.map((item) => item.href),
+    ]
+    allRoutes.forEach((route) => {
+      router.prefetch(route)
+    })
+  }, [router])
 
   function handleLogout() {
     startTransition(async () => {
@@ -306,31 +315,6 @@ export function AppSidebar() {
         </SidebarGroup>
 
         <SidebarSeparator />
-
-        {isInstructor && (
-          <>
-            <SidebarGroup>
-              <SidebarGroupLabel>Teach</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {instructorItems.map((item) => (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton
-                        render={<Link href={item.href} />}
-                        isActive={isActive(item, pathname)}
-                      >
-                        <HugeiconsIcon icon={item.icon} size={18} />
-                        <span>{item.title}</span>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-
-            <SidebarSeparator />
-          </>
-        )}
 
         <SidebarGroup>
           <SidebarGroupLabel>Account</SidebarGroupLabel>

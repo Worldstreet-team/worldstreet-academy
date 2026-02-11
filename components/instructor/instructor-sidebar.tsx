@@ -1,8 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { useTransition } from "react"
+import { usePathname, useRouter } from "next/navigation"
+import { useTransition, useEffect } from "react"
 import {
   Sidebar,
   SidebarContent,
@@ -132,6 +132,7 @@ function isActive(item: NavItem, pathname: string) {
 
 export function InstructorSidebar() {
   const pathname = usePathname()
+  const router = useRouter()
   const user = useUser()
   const [isPending, startTransition] = useTransition()
   const unreadCount = useUnreadCount()
@@ -140,6 +141,17 @@ export function InstructorSidebar() {
   const { activeMeetings, invites, hasActivity } = useSidebarActivity()
 
   const userInitials = `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`.toUpperCase() || "U"
+
+  // Prefetch all navigation routes on mount for faster transitions
+  useEffect(() => {
+    const allRoutes = [
+      ...teachItems.map((item) => item.href),
+      ...connectItems.map((item) => item.href),
+    ]
+    allRoutes.forEach((route) => {
+      router.prefetch(route)
+    })
+  }, [router])
 
   function handleLogout() {
     startTransition(async () => {

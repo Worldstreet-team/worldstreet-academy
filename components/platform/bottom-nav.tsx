@@ -33,7 +33,6 @@ const navItems: BottomNavItem[] = [
     icon: BookOpen01Icon,
     match: (p: string) => p === "/dashboard/my-courses",
   },
-  // CTA placeholder — rendered separately
   {
     title: "Bookmarks",
     href: "/dashboard/bookmarks",
