@@ -54,6 +54,10 @@ export type MeetingEventType =
   | "meeting:participant-left"
   | "meeting:stage-invite"
   | "meeting:stage-removed"
+  | "meeting:stage-request"
+  | "meeting:stage-request-declined"
+  | "meeting:stage-request-accepted"
+  | "meeting:role-changed"
   | "meeting:hand-raised"
   | "meeting:hand-lowered"
   | "meeting:reaction"
@@ -63,6 +67,8 @@ export type MeetingEventType =
   | "meeting:poll-vote"
   | "meeting:mute-participant"
   | "meeting:screen-share-permission"
+  | "meeting:lobby-update"
+  | "meeting:speaking"
 
 export type MeetingEventPayload = {
   type: MeetingEventType
@@ -86,8 +92,23 @@ export type MeetingEventPayload = {
   pollOptions?: string[]
   pollVotes?: Record<string, number>
   pollVoters?: Record<string, string>
+  optionIndex?: number
   /** Permission flag */
   canScreenShare?: boolean
+  /** Participant role */
+  role?: "host" | "co-host" | "participant" | "guest"
+  /** Stage request status - for tracking guest requests to speak */
+  stageRequestStatus?: "requested" | "accepted" | "declined"
+  /** Host info - who processed the request */
+  hostId?: string
+  hostName?: string
+  /** Lobby update data - for real-time meeting list updates */
+  participantCount?: number
+  meetingStatus?: "scheduled" | "waiting" | "active" | "ended"
+  /** Speaking indicator - audio level 0-1 */
+  speakingLevel?: number
+  /** Mute type for meeting:mute-participant */
+  muteType?: "audio" | "video" | "screenshare"
 }
 
 export type MessageEventPayload = {

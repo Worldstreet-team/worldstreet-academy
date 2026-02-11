@@ -235,11 +235,11 @@ export default async function CourseDetailPage({
               size="lg"
               render={
                 <Link
-                  href={`/dashboard/courses/${course.id}/learn/${firstLessonId}`}
+                  href={`/dashboard/checkout?courseId=${course.id}`}
                 />
               }
             >
-              {course.pricing === "free" ? "Start Learning" : "Enroll Now"}
+              Enroll Now
               {course.pricing !== "free" && (
                 <span className="ml-1 font-normal opacity-80">
                   · ${course.price}

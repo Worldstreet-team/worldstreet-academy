@@ -17,10 +17,10 @@ const protectedRoutes = ["/dashboard", "/instructor"]
  * Build the redirect URL to the central auth login page with a return URL
  * so the user comes back after logging in.
  */
-function buildAuthRedirect(request: NextRequest, response?: NextResponse): NextResponse {
+function buildAuthRedirect(request: NextRequest): NextResponse {
   const returnUrl = `${request.nextUrl.origin}${request.nextUrl.pathname}${request.nextUrl.search}`
   const authUrl = new URL(AUTH_LOGIN_URL)
-  authUrl.searchParams.set("returnUrl", returnUrl)
+  authUrl.searchParams.set("redirect", returnUrl)
   const res = NextResponse.redirect(authUrl)
 
   // Clear stale cookies on redirect
@@ -59,12 +59,18 @@ async function refreshAccessToken(
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
+  // Add pathname header so server components can read the current path
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set("x-next-pathname", pathname)
+
   const isProtectedRoute = protectedRoutes.some((route) =>
     pathname.startsWith(route)
   )
 
   if (!isProtectedRoute) {
-    return NextResponse.next()
+    return NextResponse.next({
+      request: { headers: requestHeaders },
+    })
   }
 
   const accessToken = request.cookies.get(ACCESS_TOKEN_COOKIE)?.value
@@ -79,7 +85,9 @@ export async function middleware(request: NextRequest) {
   if (accessToken) {
     try {
       await jwtVerify(accessToken, JWT_ACCESS_SECRET)
-      return NextResponse.next()
+      return NextResponse.next({
+        request: { headers: requestHeaders },
+      })
     } catch {
       // Access token invalid/expired — fall through to refresh
     }
@@ -91,7 +99,9 @@ export async function middleware(request: NextRequest) {
 
     if (newTokens) {
       // Set the fresh tokens on the response and let the request through
-      const response = NextResponse.next()
+      const response = NextResponse.next({
+        request: { headers: requestHeaders },
+      })
 
       response.cookies.set(ACCESS_TOKEN_COOKIE, newTokens.accessToken, {
         httpOnly: true,

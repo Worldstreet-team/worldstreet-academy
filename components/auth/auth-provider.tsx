@@ -135,16 +135,18 @@ export function useAuth() {
   return context
 }
 
-// Hook for requiring authentication
-export function useRequireAuth(redirectTo = "/unauthorized") {
+// Hook for requiring authentication — redirects to external login
+export function useRequireAuth() {
   const { user, isLoading, isAuthenticated } = useAuth()
-  const router = useRouter()
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.push(redirectTo)
+      const currentUrl = `${window.location.origin}${window.location.pathname}${window.location.search}`
+      const loginUrl = new URL("https://worldstreetgold.com/login")
+      loginUrl.searchParams.set("redirect", currentUrl)
+      window.location.href = loginUrl.toString()
     }
-  }, [isLoading, isAuthenticated, router, redirectTo])
+  }, [isLoading, isAuthenticated])
 
   return { user, isLoading, isAuthenticated }
 }

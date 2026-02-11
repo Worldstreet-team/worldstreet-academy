@@ -204,8 +204,8 @@ export default async function CourseDetailPage({
 
               <Separator />
 
-              <Button className="w-full" size="lg" render={<Link href={`/dashboard/courses/${course.id}/learn/${firstLessonId}`} />}>
-                {course.pricing === "free" ? "Start Learning" : "Enroll Now"}
+              <Button className="w-full" size="lg" render={<Link href={`/dashboard/checkout?courseId=${course.id}`} />}>
+                Enroll Now
               </Button>
             </CardContent>
           </Card>

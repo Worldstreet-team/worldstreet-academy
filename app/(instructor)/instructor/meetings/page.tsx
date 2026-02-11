@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
-  CheckmarkCircle01Icon,
   Link01Icon,
   ArrowShrink02Icon,
 } from "@hugeicons/core-free-icons"
@@ -40,6 +39,8 @@ import {
   requestStage,
   declineStageRequest,
   acceptStageRequest,
+  createCourseMeeting,
+  getInstructorCoursesForMeeting,
   type MeetingWithDetails,
   type MeetingParticipantDetails,
   type MeetingHistoryEntry,
@@ -72,13 +73,27 @@ import {
   ReturnToMeetingBanner,
 } from "@/components/meetings"
 import type { ActiveTab, ChatMessage, Poll, PollVoter } from "@/components/meetings"
-import { MeetingInvitesList } from "@/components/meetings/meeting-invites"
+import {
+  InstructorInviteDialog,
+  CourseMeetingCards,
+  CreateCourseMeetingModal,
+  type CourseSummary,
+} from "@/components/meetings/instructor-meeting-extras"
+
+/**
+ * Instructor Meetings Page
+ *
+ * Same meeting functionality as the student/platform page but lives under
+ * the /instructor route group. The meeting join link uses the instructor
+ * path so PiP navigation returns to this page instead of /dashboard/meetings.
+ */
 
 const TILES_PER_PAGE = 4
+const MEETINGS_PATH = "/instructor/meetings"
 
 type ScreenSharer = { id: string; name: string; isLocal: boolean }
 
-export default function MeetingsPage() {
+export default function InstructorMeetingsPage() {
   const user = useUser()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -103,7 +118,6 @@ export default function MeetingsPage() {
     Map<string, { name: string; audioEnabled: boolean; videoEnabled: boolean; userId?: string }>
   >(new Map())
   const [isJoined, setIsJoined] = useState(false)
-  const [copiedLink, setCopiedLink] = useState(false)
   const [screenSharer, setScreenSharer] = useState<ScreenSharer | null>(null)
 
   const [raisedHands, setRaisedHands] = useState<Set<string>>(new Set())
@@ -149,6 +163,13 @@ export default function MeetingsPage() {
   const tabIdRef = useRef<string>(Math.random().toString(36).slice(2))
 
   const [isMobile, setIsMobile] = useState(false)
+
+  // Course-linked meetings
+  const [instructorCourses, setInstructorCourses] = useState<CourseSummary[]>([])
+  const [isLoadingCourses, setIsLoadingCourses] = useState(true)
+  const [showCourseMeetingModal, setShowCourseMeetingModal] = useState(false)
+  const [selectedCourse, setSelectedCourse] = useState<CourseSummary | null>(null)
+  const [showInviteDialog, setShowInviteDialog] = useState(false)
   useEffect(() => {
     setIsMobile(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent))
   }, [])
@@ -219,6 +240,11 @@ export default function MeetingsPage() {
       if (r.success && r.meetings) setMeetingHistory(r.meetings)
       setIsLoadingHistory(false)
     })
+    getInstructorCoursesForMeeting().then((r) => {
+      if (cancelled) return
+      if (r.success && r.courses) setInstructorCourses(r.courses)
+      setIsLoadingCourses(false)
+    })
     return () => {
       cancelled = true
     }
@@ -258,7 +284,7 @@ export default function MeetingsPage() {
   useEffect(() => {
     const joinId = searchParams.get("join")
     if (!joinId) return
-    router.replace("/dashboard/meetings", { scroll: false })
+    router.replace(MEETINGS_PATH, { scroll: false })
     handleJoinByLink(joinId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
@@ -443,7 +469,6 @@ export default function MeetingsPage() {
         case "meeting:screen-share-permission": {
           const allowed = (e as MeetingEventPayload & { canScreenShare?: boolean }).canScreenShare
           if (allowed === false) {
-            // Disable screenshare and stop if active
             rtkClient.client?.self.disableScreenShare().catch(() => {})
             setIsScreenSharing(false)
             setScreenSharer((prev) => (prev?.isLocal ? null : prev))
@@ -460,7 +485,6 @@ export default function MeetingsPage() {
           // Guest receives notification that their request was declined
           if (e.userId === user.id) {
             setHasRequestedStage(false)
-            // Optionally show a toast or notification here
           }
           break
         case "meeting:stage-request-accepted":
@@ -472,12 +496,10 @@ export default function MeetingsPage() {
         case "meeting:role-changed": {
           const newRole = (e as MeetingEventPayload & { role?: string }).role
           if (!newRole) break
-          // If this is about the local user
           if (e.userId === user.id) {
             setMyRole(newRole as MeetingRole)
             setHasRequestedStage(false)
             if (newRole === "guest") {
-              // Force disable audio/video/screenshare when moved to audience
               rtkClient.client?.self.disableAudio().catch(() => {})
               rtkClient.client?.self.disableVideo().catch(() => {})
               rtkClient.client?.self.disableScreenShare().catch(() => {})
@@ -487,13 +509,11 @@ export default function MeetingsPage() {
               setScreenSharer((prev) => (prev?.isLocal ? null : prev))
             }
           }
-          // Update participant roles map
           setParticipantRoles((prev) => {
             const next = new Map(prev)
             next.set(e.userId, newRole)
             return next
           })
-          // Remove from stage requests if they were promoted
           if (newRole === "participant") {
             setStageRequests((prev) => prev.filter((r) => r.userId !== e.userId))
           }
@@ -514,8 +534,7 @@ export default function MeetingsPage() {
           const level = (e as MeetingEventPayload & { speakingLevel?: number }).speakingLevel ?? 0
           setSpeakingLevels((prev) => {
             const next = new Map(prev)
-            if (level > 0.05) next.set(e.userId, level)
-            else next.delete(e.userId)
+            next.set(e.userId, level)
             return next
           })
           break
@@ -737,7 +756,6 @@ export default function MeetingsPage() {
             if (details.participants) {
               const admitted = details.participants.filter((p) => p.status === "admitted")
               setAdmittedParticipants(admitted)
-              // Build participant roles map
               const roles = new Map<string, string>()
               for (const p of admitted) roles.set(p.userId, p.role)
               setParticipantRoles(roles)
@@ -888,6 +906,29 @@ export default function MeetingsPage() {
     }
   }
 
+  async function handleCreateCourseMeeting(courseId: string, title: string) {
+    setShowCourseMeetingModal(false)
+    setSelectedCourse(null)
+    setSetupMessage("Setting up your live session...")
+    playMeetingCreating()
+    const result = await createCourseMeeting(courseId, title)
+    if (result.success && result.meeting && result.authToken) {
+      setActiveMeeting(result.meeting)
+      setMyRole("host")
+      setMeetingStartTime(
+        result.meeting.startedAt ? new Date(result.meeting.startedAt) : new Date()
+      )
+      await joinRTKAndSetup(result.authToken)
+    } else {
+      setSetupMessage(null)
+    }
+  }
+
+  function handleStartCourseMeeting(course: CourseSummary) {
+    setSelectedCourse(course)
+    setShowCourseMeetingModal(true)
+  }
+
   async function handleJoinByLink(meetingId: string) {
     // Check if already in this meeting in another tab
     if (tabChannelRef.current) {
@@ -943,7 +984,6 @@ export default function MeetingsPage() {
         const role = (result as { role?: MeetingRole }).role
         setMyRole(role || (result.meeting.hostId === user.id ? "host" : "participant"))
         if (role === "guest") {
-          // Guests join muted with no video
           setIsMuted(true)
           setIsVideoOff(true)
         }
@@ -1189,15 +1229,6 @@ export default function MeetingsPage() {
     await sendReaction(activeMeeting.id, reactionId)
   }
 
-  function copyMeetingLink() {
-    if (!activeMeeting) return
-    navigator.clipboard.writeText(
-      `${window.location.origin}/dashboard/meetings?join=${activeMeeting.id}`
-    )
-    setCopiedLink(true)
-    setTimeout(() => setCopiedLink(false), 2000)
-  }
-
   async function handleKick(userId: string) {
     if (activeMeeting) await kickParticipant(activeMeeting.id, userId)
   }
@@ -1347,7 +1378,7 @@ export default function MeetingsPage() {
     // Split participants into stage and audience based on roles
     const isOnStage = (rtkId: string) => {
       const uid = remoteParticipants.get(rtkId)?.userId
-      if (!uid) return true // unknown = assume stage
+      if (!uid) return true
       const role = participantRoles.get(uid) || "participant"
       return role !== "guest"
     }
@@ -1395,12 +1426,20 @@ export default function MeetingsPage() {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={copyMeetingLink}
+              onClick={() => setShowInviteDialog(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-muted-foreground hover:text-foreground transition-colors border border-border/50"
             >
-              <HugeiconsIcon icon={copiedLink ? CheckmarkCircle01Icon : Link01Icon} size={12} />
-              {copiedLink ? "Copied!" : "Invite"}
+              <HugeiconsIcon icon={Link01Icon} size={12} />
+              Invite
             </button>
+            {activeMeeting && (
+              <InstructorInviteDialog
+                open={showInviteDialog}
+                onOpenChange={setShowInviteDialog}
+                meetingId={activeMeeting.id}
+                meetingLink={`${window.location.origin}${MEETINGS_PATH}?join=${activeMeeting.id}`}
+              />
+            )}
             <button
               onClick={() => meetingCtx.setMinimized(true)}
               className="flex items-center justify-center w-8 h-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-white/10 transition-colors"
@@ -1700,8 +1739,12 @@ export default function MeetingsPage() {
             onJoin={handleJoinByLink}
           />
 
-          {/* Course live session invites */}
-          <MeetingInvitesList onJoin={handleJoinByLink} />
+          {/* Course cards - Go Live from your courses */}
+          <CourseMeetingCards
+            courses={instructorCourses}
+            isLoading={isLoadingCourses}
+            onStartMeeting={handleStartCourseMeeting}
+          />
 
           {/* Two-column: Active meetings + History */}
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
@@ -1743,6 +1786,13 @@ export default function MeetingsPage() {
       </div>
 
       <CreateMeetingModal open={showCreate} onOpenChange={setShowCreate} onCreate={handleCreate} />
+      <CreateCourseMeetingModal
+        key={selectedCourse?.id}
+        open={showCourseMeetingModal}
+        onOpenChange={setShowCourseMeetingModal}
+        course={selectedCourse}
+        onCreate={handleCreateCourseMeeting}
+      />
     </div>
   )
 }

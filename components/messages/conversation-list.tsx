@@ -20,6 +20,7 @@ export type Conversation = {
   unread: number
   isOnline?: boolean
   courseName?: string
+  isInCall?: boolean
 }
 
 type ConversationListProps = {
@@ -27,6 +28,7 @@ type ConversationListProps = {
   selectedId: string | null
   onSelect: (id: string) => void
   searchPlaceholder?: string
+  activeCallConversationId?: string | null
 }
 
 export function ConversationList({
@@ -34,6 +36,7 @@ export function ConversationList({
   selectedId,
   onSelect,
   searchPlaceholder = "Search...",
+  activeCallConversationId,
 }: ConversationListProps) {
   const [search, setSearch] = useState("")
 
@@ -172,9 +175,13 @@ export function ConversationList({
                     <AvatarImage src={c.avatar} />
                     <AvatarFallback>{c.name[0]?.toUpperCase()}</AvatarFallback>
                   </Avatar>
-                  {c.isOnline && (
+                  {activeCallConversationId === c.id ? (
+                    <div className="absolute -bottom-0.5 -right-0.5 flex items-center justify-center h-4 w-4 bg-emerald-500 rounded-full border-2 border-background">
+                      <HugeiconsIcon icon={Call02Icon} size={8} className="text-white" />
+                    </div>
+                  ) : c.isOnline ? (
                     <div className="absolute bottom-0 right-0 h-3 w-3 bg-green-500 rounded-full border-2 border-background" />
-                  )}
+                  ) : null}
                 </div>
 
                 <div className="flex-1 min-w-0">

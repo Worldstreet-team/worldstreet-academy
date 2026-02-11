@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation"
+import { headers } from "next/headers"
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/platform/app-sidebar"
 import { PlatformBottomNav } from "@/components/platform/bottom-nav"
@@ -7,6 +8,7 @@ import { UserProvider } from "@/components/providers/user-provider"
 import { CallProvider } from "@/components/providers/call-provider"
 import { MeetingProvider } from "@/components/providers/meeting-provider"
 import { getCurrentUser } from "@/lib/auth"
+import { buildLoginRedirectUrl } from "@/lib/auth/redirect"
 
 export default async function PlatformLayout({
   children,
@@ -16,7 +18,9 @@ export default async function PlatformLayout({
   const user = await getCurrentUser()
 
   if (!user) {
-    redirect("/unauthorized")
+    const headersList = await headers()
+    const currentPath = headersList.get("x-next-pathname") || "/dashboard"
+    redirect(buildLoginRedirectUrl(currentPath))
   }
 
   return (

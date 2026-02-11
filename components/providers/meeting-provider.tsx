@@ -124,7 +124,13 @@ export function MeetingProvider({ children }: { children: ReactNode }) {
     setPipMuted(muted)
   }, [])
 
-  const isOnMeetingsPage = pathname === "/dashboard/meetings"
+  const MEETINGS_PATHS = ["/dashboard/meetings", "/instructor/meetings"]
+  const isOnMeetingsPage = MEETINGS_PATHS.includes(pathname)
+
+  // Determine which meetings route to navigate to from PiP
+  const meetingsRoute = pathname.startsWith("/instructor")
+    ? "/instructor/meetings"
+    : "/dashboard/meetings"
 
   // When navigating away from meetings page while in a meeting, auto-minimize
   const prevOnMeetingsPage = useRef(true)
@@ -139,7 +145,7 @@ export function MeetingProvider({ children }: { children: ReactNode }) {
 
   function handlePipClick() {
     if (!isOnMeetingsPage) {
-      router.push("/dashboard/meetings")
+      router.push(meetingsRoute)
     }
     setIsMinimized(false)
   }

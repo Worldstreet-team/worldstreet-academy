@@ -25,7 +25,6 @@ import {
   Home01Icon,
   BookOpen01Icon,
   Search01Icon,
-  Settings01Icon,
   HelpCircleIcon,
   UserIcon,
   Logout01Icon,
@@ -34,12 +33,18 @@ import {
   TeachingIcon,
   Call02Icon,
   MeetingRoomIcon,
-  LiveStreamingIcon,
+  Globe02Icon,
+  BitcoinIcon,
+  ShoppingBag01Icon,
+  PlayIcon,
+  UserMultipleIcon,
+  Video01Icon,
 } from "@hugeicons/core-free-icons"
 import { useUser } from "@/components/providers/user-provider"
 import { logoutAction } from "@/lib/auth/actions"
 import { useUnreadCount } from "@/lib/hooks/use-unread-count"
 import { useOngoingCall } from "@/components/providers/call-provider"
+import { useSidebarActivity } from "@/lib/hooks/use-sidebar-activity"
 
 type NavItem = {
   title: string
@@ -88,12 +93,6 @@ const connectItems: NavItem[] = [
     icon: MeetingRoomIcon,
     match: (p) => p.startsWith("/dashboard/meetings"),
   },
-  {
-    title: "Live",
-    href: "/dashboard/live",
-    icon: LiveStreamingIcon,
-    match: (p) => p.startsWith("/dashboard/live"),
-  },
 ]
 
 const accountItems: NavItem[] = [
@@ -104,16 +103,39 @@ const accountItems: NavItem[] = [
     match: (p) => p === "/dashboard/profile",
   },
   {
-    title: "Settings",
-    href: "/dashboard/settings",
-    icon: Settings01Icon,
-    match: (p) => p === "/dashboard/settings",
-  },
-  {
     title: "Help",
     href: "/dashboard/help",
     icon: HelpCircleIcon,
     match: (p) => p === "/dashboard/help",
+  },
+]
+
+type ExternalNavItem = {
+  title: string
+  href: string
+  icon: IconSvgElement
+}
+
+const worldstreetItems: ExternalNavItem[] = [
+  {
+    title: "Crypto Dashboard",
+    href: "https://dashboard.worldstreetgold.com",
+    icon: BitcoinIcon,
+  },
+  {
+    title: "Shop",
+    href: "https://shop.worldstreetgold.com",
+    icon: ShoppingBag01Icon,
+  },
+  {
+    title: "Xtreme Live",
+    href: "https://xtreme.worldstreetgold.com",
+    icon: PlayIcon,
+  },
+  {
+    title: "Social Platform",
+    href: "https://social.worldstreetgold.com",
+    icon: UserMultipleIcon,
   },
 ]
 
@@ -128,6 +150,7 @@ export function AppSidebar() {
   const [isPending, startTransition] = useTransition()
   const unreadCount = useUnreadCount()
   const hasOngoingCall = useOngoingCall()
+  const { activeMeetings, invites, hasActivity } = useSidebarActivity()
 
   const userInitials = `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`.toUpperCase() || "U"
   const isInstructor = user.role === "INSTRUCTOR" || user.role === "ADMIN"
@@ -178,6 +201,36 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
+        {hasActivity && (
+          <>
+            <SidebarSeparator />
+            <SidebarGroup>
+              <SidebarGroupLabel>Activity</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {activeMeetings.slice(0, 3).map((m) => (
+                    <SidebarMenuItem key={m.id}>
+                      <SidebarMenuButton render={<Link href={`/dashboard/meetings?join=${m.id}`} />}>
+                        <HugeiconsIcon icon={Video01Icon} size={18} className="text-muted-foreground" />
+                        <span className="truncate text-xs">{m.title.length > 18 ? m.title.slice(0, 18) + "..." : m.title}</span>
+                        <span className="ml-auto flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                  {invites.slice(0, 2).map((inv) => (
+                    <SidebarMenuItem key={inv.id}>
+                      <SidebarMenuButton render={<Link href={`/dashboard/meetings?join=${inv.meetingId}`} />}>
+                        <HugeiconsIcon icon={Video01Icon} size={18} className="text-muted-foreground" />
+                        <span className="truncate text-xs">{inv.title.length > 18 ? inv.title.slice(0, 18) + "..." : inv.title}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        )}
+
         <SidebarSeparator />
 
         <SidebarGroup>
@@ -223,6 +276,29 @@ export function AppSidebar() {
                   >
                     <HugeiconsIcon icon={item.icon} size={18} />
                     <span>{item.title}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarSeparator />
+
+        <SidebarGroup>
+          <SidebarGroupLabel>WorldStreet</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {worldstreetItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    render={
+                      <a href={item.href} target="_blank" rel="noopener noreferrer" />
+                    }
+                  >
+                    <HugeiconsIcon icon={item.icon} size={18} />
+                    <span>{item.title}</span>
+                    <HugeiconsIcon icon={Globe02Icon} size={12} className="ml-auto text-muted-foreground/40" />
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}

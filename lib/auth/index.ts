@@ -36,5 +36,8 @@ export {
   getLocalUserById,
 } from "./sync"
 
+// Redirect helper
+export { buildLoginRedirectUrl } from "./redirect"
+
 // Service (server-side only)
 export * as authService from "./service"

@@ -59,7 +59,7 @@ export default function InstructorMessagesPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   
-  const { startCall } = useCall()
+  const { startCall, activeCall, callState } = useCall()
   const user = useUser()
   const selectedIdRef = useRef<string | null>(null)
   selectedIdRef.current = selectedId
@@ -483,6 +483,11 @@ export default function InstructorMessagesPage() {
               selectedId={selectedId}
               onSelect={handleSelect}
               searchPlaceholder="Search students..."
+              activeCallConversationId={
+                activeCall && (callState === "connected" || callState === "ringing" || callState === "connecting")
+                  ? activeCall.conversationId ?? null
+                  : null
+              }
             />
           )}
         </div>
