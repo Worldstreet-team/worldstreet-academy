@@ -11,7 +11,6 @@ import {
   UserIcon,
   Video01Icon,
   UserGroupIcon,
-  Calendar03Icon,
   Cancel01Icon,
 } from "@hugeicons/core-free-icons"
 import { Input } from "@/components/ui/input"
@@ -314,21 +313,6 @@ export function CourseMeetingCards({
   isLoading: boolean
   onStartMeeting: (course: CourseSummary) => void
 }) {
-  const [openPopover, setOpenPopover] = useState<string | null>(null)
-  const popoverRef = useRef<HTMLDivElement | null>(null)
-
-  // Close popover on outside click
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
-        setOpenPopover(null)
-      }
-    }
-    if (openPopover) {
-      document.addEventListener("mousedown", handleClick)
-      return () => document.removeEventListener("mousedown", handleClick)
-    }
-  }, [openPopover])
 
   if (isLoading) {
     return (
@@ -382,44 +366,14 @@ export function CourseMeetingCards({
                     </div>
                   </div>
 
-                  {/* Start Call with popover */}
-                  <div className="relative shrink-0" ref={openPopover === course.id ? popoverRef : null}>
-                    <button
-                      onClick={() => setOpenPopover(openPopover === course.id ? null : course.id)}
-                      className="flex items-center gap-1.5 h-8 px-3.5 rounded-xl text-[11px] font-semibold text-white bg-white/20 backdrop-blur-md border border-white/20 hover:bg-white/30 transition-all shadow-lg"
-                    >
-                      <HugeiconsIcon icon={Video01Icon} size={13} />
-                      Start Call
-                    </button>
-
-                    {/* Glassmorphic popover */}
-                    {openPopover === course.id && (
-                      <div className="absolute bottom-full right-0 mb-2 w-44 rounded-xl bg-white/15 backdrop-blur-xl border border-white/20 shadow-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
-                        <button
-                          onClick={() => {
-                            setOpenPopover(null)
-                            onStartMeeting(course)
-                          }}
-                          className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[12px] font-medium text-white hover:bg-white/15 transition-colors"
-                        >
-                          <HugeiconsIcon icon={Video01Icon} size={14} />
-                          Instant Meeting
-                        </button>
-                        <div className="h-px bg-white/10" />
-                        <button
-                          onClick={() => {
-                            setOpenPopover(null)
-                            // For now, same as instant — can extend with scheduling logic
-                            onStartMeeting(course)
-                          }}
-                          className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[12px] font-medium text-white hover:bg-white/15 transition-colors"
-                        >
-                          <HugeiconsIcon icon={Calendar03Icon} size={14} />
-                          Schedule Call
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  {/* Start Call — direct modal trigger */}
+                  <button
+                    onClick={() => onStartMeeting(course)}
+                    className="flex items-center gap-1.5 h-8 px-3.5 rounded-xl text-[11px] font-semibold text-white bg-white/20 backdrop-blur-md border border-white/20 hover:bg-white/30 transition-all shadow-lg shrink-0"
+                  >
+                    <HugeiconsIcon icon={Video01Icon} size={13} />
+                    Start Call
+                  </button>
                 </div>
               </div>
             </div>
@@ -470,62 +424,96 @@ export function CreateCourseMeetingModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => onOpenChange(false)} />
-      <div className="relative w-full max-w-sm mx-4 bg-card border border-border/50 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-200">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-1">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-              <HugeiconsIcon icon={Video01Icon} size={17} className="text-emerald-500" />
-            </div>
-            <div>
-              <h2 className="text-sm font-semibold text-foreground">Start Session</h2>
-              <p className="text-[11px] text-muted-foreground">
-                {course.enrolledCount} student{course.enrolledCount !== 1 ? "s" : ""} will be notified
-              </p>
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => onOpenChange(false)} />
+      <div className="relative w-full max-w-md mx-4 bg-card border border-border/40 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-200">
+        {/* Thumbnail header */}
+        {course.thumbnailUrl ? (
+          <div className="relative h-36 bg-muted/30">
+            <Image src={course.thumbnailUrl} alt={course.title} fill className="object-cover" />
+            <div className="absolute inset-0 bg-black/30" />
+            {/* Close button on thumbnail */}
+            <button
+              onClick={() => onOpenChange(false)}
+              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center hover:bg-black/50 transition-colors"
+            >
+              <HugeiconsIcon icon={Cancel01Icon} size={14} className="text-white" />
+            </button>
+            {/* Floating course title over thumbnail */}
+            <div className="absolute bottom-3 left-4 right-4">
+              <p className="text-white/70 text-[10px] font-medium uppercase tracking-wider">New Session</p>
+              <h3 className="text-white text-sm font-semibold truncate mt-0.5">{course.title}</h3>
             </div>
           </div>
-          <button
-            onClick={() => onOpenChange(false)}
-            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted/80 transition-colors"
-          >
-            <HugeiconsIcon icon={Cancel01Icon} size={16} className="text-muted-foreground" />
-          </button>
-        </div>
+        ) : (
+          <div className="flex items-center justify-between px-5 pt-5 pb-1">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-muted/50 flex items-center justify-center">
+                <HugeiconsIcon icon={Video01Icon} size={18} className="text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">New Session</p>
+                <h2 className="text-sm font-semibold text-foreground">{course.title}</h2>
+              </div>
+            </div>
+            <button
+              onClick={() => onOpenChange(false)}
+              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted/80 transition-colors"
+            >
+              <HugeiconsIcon icon={Cancel01Icon} size={16} className="text-muted-foreground" />
+            </button>
+          </div>
+        )}
 
         {/* Body */}
-        <div className="px-5 pb-5 pt-3 space-y-3">
-          {course.thumbnailUrl && (
-            <div className="relative h-28 rounded-xl overflow-hidden">
-              <Image src={course.thumbnailUrl} alt={course.title} fill className="object-cover" />
-            </div>
-          )}
+        <div className="px-5 py-5 space-y-4">
+          {/* Enrolled count badge */}
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/30">
+            <HugeiconsIcon icon={UserGroupIcon} size={14} className="text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">
+              <span className="font-semibold text-foreground">{course.enrolledCount}</span>{" "}
+              student{course.enrolledCount !== 1 ? "s" : ""} will be notified via email
+            </span>
+          </div>
 
-          <Input
-            ref={inputRef}
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-            className="h-10 text-sm bg-muted/30 border-border/40 focus-visible:ring-1 focus-visible:ring-emerald-500/30"
-          />
+          {/* Session title input */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-medium text-muted-foreground">Session Title</label>
+            <Input
+              ref={inputRef}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+              placeholder="e.g. Week 3 — Market Analysis"
+              className="h-11 text-sm bg-muted/20 border-border/40 rounded-xl focus-visible:ring-1 focus-visible:ring-foreground/20"
+            />
+          </div>
 
-          <Button
-            onClick={handleCreate}
-            disabled={!title.trim() || isCreating}
-            className="w-full gap-2 h-10 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-xl"
-          >
-            {isCreating ? (
-              <>
-                <HugeiconsIcon icon={Loading03Icon} size={15} className="animate-spin" />
-                Starting...
-              </>
-            ) : (
-              <>
-                <HugeiconsIcon icon={Video01Icon} size={15} />
-                Start &amp; Notify Students
-              </>
-            )}
-          </Button>
+          {/* Action buttons */}
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={() => onOpenChange(false)}
+              className="flex-1 h-11 rounded-xl text-sm font-medium text-muted-foreground border border-border/40 hover:bg-muted/40 transition-colors"
+            >
+              Cancel
+            </button>
+            <Button
+              onClick={handleCreate}
+              disabled={!title.trim() || isCreating}
+              className="flex-1 gap-2 h-11 bg-foreground hover:bg-foreground/90 text-background text-sm font-medium rounded-xl"
+            >
+              {isCreating ? (
+                <>
+                  <HugeiconsIcon icon={Loading03Icon} size={15} className="animate-spin" />
+                  Starting...
+                </>
+              ) : (
+                <>
+                  <HugeiconsIcon icon={Video01Icon} size={15} />
+                  Start Session
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

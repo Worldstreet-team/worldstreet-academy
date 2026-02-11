@@ -1669,7 +1669,7 @@ export async function createCourseMeeting(
     })
 
     // Fire-and-forget: Notify all enrolled students via email
-    const meetingLink = `${process.env.NEXT_PUBLIC_APP_URL || "https://worldstreet.academy"}/dashboard/meetings?join=${meeting._id.toString()}`
+    const meetingLink = `${process.env.SITE_URL || "https://worldstreet.academy"}/dashboard/meetings?join=${meeting._id.toString()}`
     const hostName = `${currentUser.firstName} ${currentUser.lastName}`.trim()
 
     backgroundSave(
@@ -1796,7 +1796,7 @@ export async function inviteByEmail(
     }
 
     // Send invite email
-    const meetingLink = `${process.env.NEXT_PUBLIC_APP_URL || "https://worldstreet.academy"}/dashboard/meetings?join=${meetingId}`
+    const meetingLink = `${process.env.SITE_URL || "https://worldstreet.academy"}/dashboard/meetings?join=${meetingId}`
     const result = await sendMeetingInviteEmail(invitee.email, {
       meetingTitle: meeting.title,
       hostName: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
