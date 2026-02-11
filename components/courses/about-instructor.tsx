@@ -43,6 +43,41 @@ export function AboutInstructor({
 
   const totalCourses = otherCourses.length + enrolledCourses.length + 1
   const allCourses = [...enrolledCourses, ...otherCourses]
+  
+  // Check if there's meaningful content to show
+  const hasContent = instructorBio || instructorHeadline || allCourses.length > 0
+
+  // If no content, just show minimal instructor card
+  if (!hasContent) {
+    return (
+      <div className="space-y-5">
+        <h2 className="text-base font-semibold">Instructor</h2>
+        <div className="rounded-2xl bg-muted/30 p-5">
+          <div className="flex items-center gap-4">
+            <Avatar className="h-12 w-12 shrink-0 ring-2 ring-background shadow-sm">
+              {instructorAvatarUrl && (
+                <AvatarImage src={instructorAvatarUrl} alt={instructorName} />
+              )}
+              <AvatarFallback className="text-sm bg-primary/10 text-primary font-semibold">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1">
+              <h3 className="font-semibold text-[15px]">{instructorName}</h3>
+              <Button
+                variant="link"
+                size="sm"
+                className="h-auto p-0 text-xs text-muted-foreground hover:text-primary"
+                render={<Link href={`/dashboard/instructor/${instructorId}`} />}
+              >
+                View profile
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-5">
@@ -77,24 +112,28 @@ export function AboutInstructor({
             )}
 
             {/* Inline stats */}
-            <div className="flex items-center gap-3 mt-2 flex-wrap">
-              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                <HugeiconsIcon icon={BookOpen01Icon} size={12} className="text-primary" />
-                <span className="font-medium text-foreground">{totalCourses}</span> courses
-              </span>
-              {totalStudents != null && totalStudents > 0 && (
-                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                  <HugeiconsIcon icon={UserMultiple02Icon} size={12} className="text-primary" />
-                  <span className="font-medium text-foreground">{totalStudents.toLocaleString()}</span> students
-                </span>
-              )}
-              {averageRating != null && averageRating > 0 && (
-                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                  <HugeiconsIcon icon={StarIcon} size={12} className="text-orange-400" fill="currentColor" />
-                  <span className="font-medium text-foreground">{averageRating.toFixed(1)}</span>
-                </span>
-              )}
-            </div>
+            {(totalCourses > 0 || (totalStudents != null && totalStudents > 0) || (averageRating != null && averageRating > 0)) && (
+              <div className="flex items-center gap-3 mt-2 flex-wrap">
+                {totalCourses > 0 && (
+                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                    <HugeiconsIcon icon={BookOpen01Icon} size={12} className="text-primary" />
+                    <span className="font-medium text-foreground">{totalCourses}</span> {totalCourses === 1 ? 'course' : 'courses'}
+                  </span>
+                )}
+                {totalStudents != null && totalStudents > 0 && (
+                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                    <HugeiconsIcon icon={UserMultiple02Icon} size={12} className="text-primary" />
+                    <span className="font-medium text-foreground">{totalStudents.toLocaleString()}</span> {totalStudents === 1 ? 'student' : 'students'}
+                  </span>
+                )}
+                {averageRating != null && averageRating > 0 && (
+                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                    <HugeiconsIcon icon={StarIcon} size={12} className="text-orange-400" fill="currentColor" />
+                    <span className="font-medium text-foreground">{averageRating.toFixed(1)}</span>
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

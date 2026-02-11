@@ -86,28 +86,38 @@ export default async function InstructorProfilePage({
             </div>
 
             {/* Stats */}
-            <div className="flex items-center gap-6 text-sm">
-              <div className="flex items-center gap-1.5">
-                <HugeiconsIcon
-                  icon={BookOpen01Icon}
-                  size={16}
-                  className="text-primary"
-                />
-                <span className="font-semibold">{instructor.totalCourses}</span>
-                <span className="text-muted-foreground">Courses</span>
+            {(instructor.totalCourses > 0 || instructor.totalStudents > 0) && (
+              <div className="flex items-center gap-6 text-sm">
+                {instructor.totalCourses > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <HugeiconsIcon
+                      icon={BookOpen01Icon}
+                      size={16}
+                      className="text-primary"
+                    />
+                    <span className="font-semibold">{instructor.totalCourses}</span>
+                    <span className="text-muted-foreground">
+                      {instructor.totalCourses === 1 ? 'Course' : 'Courses'}
+                    </span>
+                  </div>
+                )}
+                {instructor.totalStudents > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <HugeiconsIcon
+                      icon={UserMultipleIcon}
+                      size={16}
+                      className="text-primary"
+                    />
+                    <span className="font-semibold">
+                      {instructor.totalStudents.toLocaleString()}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {instructor.totalStudents === 1 ? 'Student' : 'Students'}
+                    </span>
+                  </div>
+                )}
               </div>
-              <div className="flex items-center gap-1.5">
-                <HugeiconsIcon
-                  icon={UserMultipleIcon}
-                  size={16}
-                  className="text-primary"
-                />
-                <span className="font-semibold">
-                  {instructor.totalStudents.toLocaleString()}
-                </span>
-                <span className="text-muted-foreground">Students</span>
-              </div>
-            </div>
+            )}
 
             {/* Expertise Tags */}
             {instructor.expertise.length > 0 && (
