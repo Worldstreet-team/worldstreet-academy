@@ -3,6 +3,9 @@ import { fetchBrowseCourses } from "@/lib/actions/student"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 
+// Force dynamic rendering to show fresh instructor avatars
+export const revalidate = 0
+
 export default async function CoursesPage() {
   const courses = await fetchBrowseCourses()
   

@@ -281,6 +281,9 @@ export function ActiveMeetingsList({
       {meetings.map((meeting) => {
         const isActive = meeting.status === "active"
         const thumbnailUrl = (meeting as MeetingWithDetails & { courseThumbnailUrl?: string }).courseThumbnailUrl
+        const isHostMe = meeting.hostId === userId
+        const hostName = isHostMe ? "You" : meeting.hostName
+        
         return (
           <button
             key={meeting.id}
@@ -312,9 +315,40 @@ export function ActiveMeetingsList({
                 )}
               </div>
               <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-muted-foreground">
-                <span className="truncate">
-                  {meeting.hostId === userId ? "You" : meeting.hostName}
-                </span>
+                {/* Participant avatars (up to 4 + "+N") */}
+                {meeting.participantAvatars && meeting.participantAvatars.length > 0 ? (
+                  <>
+                    <div className="flex -space-x-1.5 shrink-0">
+                      {meeting.participantAvatars.slice(0, 4).map((p, i) => (
+                        <Avatar key={i} className="w-4 h-4 border border-card ring-1 ring-card">
+                          {p.avatar && <AvatarImage src={p.avatar} alt={p.name} />}
+                          <AvatarFallback className="text-[6px]">
+                            {p.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                          </AvatarFallback>
+                        </Avatar>
+                      ))}
+                      {meeting.participantCount > 4 && (
+                        <div className="flex items-center justify-center w-4 h-4 rounded-full border border-card ring-1 ring-card bg-muted text-[6px] font-semibold text-muted-foreground shrink-0">
+                          +{meeting.participantCount - 4}
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-muted-foreground/30">&middot;</span>
+                  </>
+                ) : (
+                  <>
+                    <Avatar className="w-4 h-4 border border-border/50">
+                      {meeting.hostAvatar && (
+                        <AvatarImage src={meeting.hostAvatar} alt={hostName} />
+                      )}
+                      <AvatarFallback className="text-[6px]">
+                        {hostName.split(" ").map(n => n[0]).join("")}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-muted-foreground/30">&middot;</span>
+                  </>
+                )}
+                <span className="truncate">{hostName}</span>
                 <span className="text-muted-foreground/30">&middot;</span>
                 <span className="flex items-center gap-0.5 shrink-0">
                   <HugeiconsIcon icon={UserGroupIcon} size={10} />

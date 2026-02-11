@@ -49,6 +49,8 @@ export type MeetingWithDetails = {
   startedAt?: string
   courseId?: string
   courseThumbnailUrl?: string
+  /** First few admitted participant avatars for sidebar display */
+  participantAvatars?: Array<{ name: string; avatar: string | null }>
 }
 
 /** Converts a Mongoose settings subdocument to a plain object */
@@ -606,16 +608,32 @@ export async function getMyMeetings(): Promise<{
       .sort({ createdAt: -1 })
       .lean()
 
-    const hostIds = [...new Set(meetings.map((m) => m.hostId.toString()))]
-    const hosts = await User.find({ _id: { $in: hostIds } })
+    // Collect all user IDs we need (hosts + participants)
+    const allUserIds = new Set<string>()
+    for (const m of meetings) {
+      allUserIds.add(m.hostId.toString())
+      for (const p of m.participants) {
+        if (p.status === "admitted") allUserIds.add(p.userId.toString())
+      }
+    }
+    const users = await User.find({ _id: { $in: [...allUserIds] } })
       .select("firstName lastName avatarUrl")
       .lean()
-    const hostMap = new Map(hosts.map((h) => [h._id.toString(), h]))
+    const userMap = new Map(users.map((u) => [u._id.toString(), u]))
 
     return {
       success: true,
       meetings: meetings.map((m) => {
-        const host = hostMap.get(m.hostId.toString())
+        const host = userMap.get(m.hostId.toString())
+        const admitted = m.participants.filter((p) => p.status === "admitted")
+        // Get first 4 admitted participant avatars
+        const participantAvatars = admitted.slice(0, 4).map((p) => {
+          const u = userMap.get(p.userId.toString())
+          return {
+            name: u ? `${u.firstName} ${u.lastName}`.trim() : "Unknown",
+            avatar: u?.avatarUrl || null,
+          }
+        })
         return {
           id: m._id.toString(),
           title: m.title,
@@ -625,11 +643,12 @@ export async function getMyMeetings(): Promise<{
           hostAvatar: host?.avatarUrl || null,
           status: m.status,
           meetingId: m.meetingId,
-          participantCount: m.participants.filter((p) => p.status === "admitted").length,
+          participantCount: admitted.length,
           maxParticipants: m.settings.maxParticipants,
           settings: serializeSettings(m.settings),
           createdAt: m.createdAt.toISOString(),
           startedAt: m.startedAt?.toISOString(),
+          participantAvatars,
         }
       }),
     }

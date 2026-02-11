@@ -192,16 +192,6 @@ export function MeetingControls({
           </button>
         )}
 
-        {/* Mobile screen share - hidden for guests */}
-        {isMobile && !isGuest && (
-          <button onClick={onToggleScreenShare} disabled={screenShareDisabled}
-            className="flex flex-col items-center gap-0.5 px-1 disabled:opacity-30 shrink-0">
-            <div className={cn("w-9 h-9 rounded-full flex items-center justify-center transition-all", isScreenSharing ? "bg-foreground/90" : "bg-transparent")}>
-              <HugeiconsIcon icon={ComputerScreenShareIcon} size={16} className={isScreenSharing ? "text-background" : "text-foreground"} />
-            </div>
-          </button>
-        )}
-
         <div className="w-px h-6 md:h-8 bg-white/10 dark:bg-white/6 mx-0.5 shrink-0 hidden md:block" />
 
         {/* Desktop: secondary controls inline */}

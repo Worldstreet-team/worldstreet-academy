@@ -24,6 +24,9 @@ import { LessonPreviewAccordion } from "@/components/courses/lesson-preview-acco
 import { AboutInstructor } from "@/components/courses/about-instructor"
 import { BookmarkButton } from "@/components/courses/bookmark-button"
 
+// Force dynamic rendering to show fresh instructor avatars
+export const revalidate = 0
+
 export default async function CourseDetailPage({
   params,
 }: {

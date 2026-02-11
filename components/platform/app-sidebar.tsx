@@ -214,7 +214,24 @@ export function AppSidebar() {
                       <SidebarMenuButton render={<Link href={`/dashboard/meetings?join=${m.id}`} />}>
                         <HugeiconsIcon icon={Video01Icon} size={18} className="text-muted-foreground" />
                         <span className="truncate text-xs">{m.title.length > 18 ? m.title.slice(0, 18) + "..." : m.title}</span>
-                        <span className="ml-auto flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                        <span className="ml-auto flex items-center -space-x-1.5 shrink-0">
+                          {m.participantAvatars?.slice(0, 4).map((p, i) => (
+                            <Avatar key={i} className="w-4 h-4 border border-sidebar-accent ring-1 ring-sidebar-accent">
+                              {p.avatar && <AvatarImage src={p.avatar} alt={p.name} />}
+                              <AvatarFallback className="text-[6px]">
+                                {p.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                              </AvatarFallback>
+                            </Avatar>
+                          ))}
+                          {m.participantCount > 4 && (
+                            <span className="flex items-center justify-center w-4 h-4 rounded-full border border-sidebar-accent ring-1 ring-sidebar-accent bg-muted text-[6px] font-semibold text-muted-foreground">
+                              +{m.participantCount - 4}
+                            </span>
+                          )}
+                          {(!m.participantAvatars || m.participantAvatars.length === 0) && (
+                            <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                          )}
+                        </span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   ))}

@@ -15,6 +15,9 @@ import {
   UserMultipleIcon,
 } from "@hugeicons/core-free-icons"
 
+// Force dynamic rendering to show fresh instructor avatars
+export const revalidate = 0
+
 export default async function CourseDetailPage({
   params,
 }: {
