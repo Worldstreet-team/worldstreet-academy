@@ -100,7 +100,7 @@ export default function MeetingsPage() {
   const [admittedParticipants, setAdmittedParticipants] = useState<MeetingParticipantDetails[]>([])
   const [pendingRequests, setPendingRequests] = useState<MeetingParticipantDetails[]>([])
   const [remoteParticipants, setRemoteParticipants] = useState<
-    Map<string, { name: string; audioEnabled: boolean; videoEnabled: boolean; userId?: string }>
+    Map<string, { name: string; audioEnabled: boolean; videoEnabled: boolean; userId?: string; avatar?: string | null }>
   >(new Map())
   const [isJoined, setIsJoined] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
@@ -204,6 +204,8 @@ export default function MeetingsPage() {
   meetingStartTimeRef.current = meetingStartTime
   const myRoleRef = useRef(myRole)
   myRoleRef.current = myRole
+  const admittedParticipantsRef = useRef(admittedParticipants)
+  admittedParticipantsRef.current = admittedParticipants
   const joinRTKRef = useRef<(authToken: string, meetingId?: string, meetingTitle?: string) => Promise<void>>(async () => {})
 
   /* ── EFFECTS ── */
@@ -576,11 +578,17 @@ export default function MeetingsPage() {
     const handleParticipantJoined = (p: any) => {
       setRemoteParticipants((prev) => {
         const next = new Map(prev)
+        // Look up avatar from admitted participants
+        const admitted = admittedParticipantsRef.current?.find(
+          (a) => a.userId === p.customParticipantId
+        )
+        console.log("[Meeting] Participant joined:", p.name, "customId:", p.customParticipantId, "avatar:", admitted?.avatar || "NO AVATAR")
         next.set(p.id, {
           name: p.name,
           audioEnabled: p.audioEnabled,
           videoEnabled: p.videoEnabled,
           userId: p.customParticipantId,
+          avatar: admitted?.avatar || null,
         })
         return next
       })
@@ -599,13 +607,19 @@ export default function MeetingsPage() {
       const audioEnabled = p.audioEnabled ?? true
       setRemoteParticipants((prev) => {
         const ex = prev.get(p.id)
-        if (!ex)
+        if (!ex) {
+          // Look up avatar from admitted participants
+          const admitted = admittedParticipantsRef.current?.find(
+            (a) => a.userId === p.customParticipantId
+          )
           return new Map(prev).set(p.id, {
             name: p.name || "Participant",
             audioEnabled,
             videoEnabled: false,
             userId: p.customParticipantId,
+            avatar: admitted?.avatar || null,
           })
+        }
         const n = new Map(prev)
         n.set(p.id, { ...ex, audioEnabled })
         return n
@@ -616,13 +630,19 @@ export default function MeetingsPage() {
       const videoEnabled = p.videoEnabled ?? true
       setRemoteParticipants((prev) => {
         const ex = prev.get(p.id)
-        if (!ex)
+        if (!ex) {
+          // Look up avatar from admitted participants
+          const admitted = admittedParticipantsRef.current?.find(
+            (a) => a.userId === p.customParticipantId
+          )
           return new Map(prev).set(p.id, {
             name: p.name || "Participant",
             audioEnabled: false,
             videoEnabled,
             userId: p.customParticipantId,
+            avatar: admitted?.avatar || null,
           })
+        }
         const n = new Map(prev)
         n.set(p.id, { ...ex, videoEnabled })
         return n
@@ -720,9 +740,11 @@ export default function MeetingsPage() {
   const joinRTKAndSetup = useCallback(
     async (authToken: string, meetingId?: string, meetingTitle?: string) => {
       try {
-        await rtkClient.init(authToken, { audio: true, video: false })
+        // Start with audio disabled (muted) per muteOnEntry setting
+        await rtkClient.init(authToken, { audio: false, video: false })
         await rtkClient.joinRoom()
         setIsJoined(true)
+        setIsMuted(true) // Set UI state to muted to match RTK audio state
         setSetupMessage(null)
         playMeetingJoined()
         let meeting = activeMeetingRef.current
@@ -737,11 +759,29 @@ export default function MeetingsPage() {
             )
             if (details.participants) {
               const admitted = details.participants.filter((p) => p.status === "admitted")
+              console.log("[Meeting] Admitted participants:", admitted.map(p => ({ name: p.name, userId: p.userId, hasAvatar: !!p.avatar })))
               setAdmittedParticipants(admitted)
               // Build participant roles map
               const roles = new Map<string, string>()
               for (const p of admitted) roles.set(p.userId, p.role)
               setParticipantRoles(roles)
+              // Update existing remote participants with avatar data
+              setRemoteParticipants((prev) => {
+                const next = new Map(prev)
+                console.log("[Meeting] Backfilling avatars for", next.size, "existing participants")
+                for (const [id, participant] of next) {
+                  if (participant.userId) {
+                    const admittedP = admitted.find((a) => a.userId === participant.userId)
+                    if (admittedP?.avatar) {
+                      console.log("[Meeting] Setting avatar for", participant.name, ":", admittedP.avatar)
+                      next.set(id, { ...participant, avatar: admittedP.avatar })
+                    } else {
+                      console.log("[Meeting] No avatar found for", participant.name, "userId:", participant.userId)
+                    }
+                  }
+                }
+                return next
+              })
             }
           } else {
             meeting = {

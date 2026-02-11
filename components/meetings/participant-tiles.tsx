@@ -51,6 +51,11 @@ export function ParticipantTile({
     .toUpperCase()
     .slice(0, 2)
 
+  // Debug: log avatar prop
+  if (!isScreenShare) {
+    console.log("[ParticipantTile]", name, "avatar:", avatar || "NO AVATAR")
+  }
+
   // Scale ring width based on speaking level (0-1)
   const isSpeaking = speakingLevel > 0.1
   const ringWidth = Math.min(4, 1 + speakingLevel * 4) // 1-4px dynamic
@@ -169,7 +174,7 @@ export function RemoteParticipantTile({
   className,
 }: {
   participantId: string
-  participant: { name: string; audioEnabled: boolean; videoEnabled: boolean }
+  participant: { name: string; audioEnabled: boolean; videoEnabled: boolean; avatar?: string | null }
   handRaised?: boolean
   reactionId?: string | null
   speakingLevel?: number
@@ -191,6 +196,7 @@ export function RemoteParticipantTile({
   return (
     <ParticipantTile
       name={participant.name}
+      avatar={participant.avatar}
       isMuted={!participant.audioEnabled}
       isVideoOff={!participant.videoEnabled}
       handRaised={handRaised}

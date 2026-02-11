@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { RadialProgress } from "@/components/ui/radial-progress"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Carousel,
@@ -266,6 +266,12 @@ export default function DashboardPage() {
                               </h3>
                               <div className="flex items-center gap-2">
                                 <Avatar size="sm">
+                                  {enrollment.instructorAvatarUrl && (
+                                    <AvatarImage
+                                      src={enrollment.instructorAvatarUrl}
+                                      alt={enrollment.instructorName}
+                                    />
+                                  )}
                                   <AvatarFallback>
                                     {enrollment.instructorName
                                       .split(" ")
@@ -417,6 +423,12 @@ export default function DashboardPage() {
                           </h3>
                           <div className="flex items-center gap-2">
                             <Avatar size="sm">
+                              {course.instructorAvatarUrl && (
+                                <AvatarImage
+                                  src={course.instructorAvatarUrl}
+                                  alt={course.instructorName}
+                                />
+                              )}
                               <AvatarFallback>
                                 {course.instructorName
                                   .split(" ")
@@ -548,6 +560,12 @@ export default function DashboardPage() {
                           </h3>
                           <div className="flex items-center gap-2">
                             <Avatar size="sm">
+                              {bookmark.instructorAvatarUrl && (
+                                <AvatarImage
+                                  src={bookmark.instructorAvatarUrl}
+                                  alt={bookmark.instructorName}
+                                />
+                              )}
                               <AvatarFallback>
                                 {bookmark.instructorName
                                   .split(" ")

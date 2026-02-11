@@ -86,7 +86,7 @@ function PeopleTab({
   myHandRaised: boolean
   myRole: "host" | "participant" | "guest"
   activeMeetingHostId: string
-  remoteParticipants: Map<string, { name: string; audioEnabled: boolean; videoEnabled: boolean; userId?: string }>
+  remoteParticipants: Map<string, { name: string; audioEnabled: boolean; videoEnabled: boolean; userId?: string; avatar?: string | null }>
   participantRoles: Map<string, string>
   raisedHands: Set<string>
   admittedParticipants: Array<{ userId: string; name: string; avatar: string | null; role?: string }>
@@ -101,14 +101,16 @@ function PeopleTab({
   onDeclineStageRequest: (userId: string) => void
 }) {
   // Classify participants into stage and audience
-  const stageEntries: Array<{ id: string; name: string; audioEnabled: boolean; videoEnabled: boolean; userId?: string; isLocal?: boolean }> = []
-  const audienceEntries: Array<{ id: string; name: string; audioEnabled: boolean; videoEnabled: boolean; userId?: string }> = []
+  const stageEntries: Array<{ id: string; name: string; audioEnabled: boolean; videoEnabled: boolean; userId?: string; avatar?: string | null; isLocal?: boolean }> = []
+  const audienceEntries: Array<{ id: string; name: string; audioEnabled: boolean; videoEnabled: boolean; userId?: string; avatar?: string | null }> = []
 
   // Local user
   const isLocalOnStage = myRole === "host" || myRole === "participant"
 
   // Remote participants
+  console.log("[Sidebar] Processing", remoteParticipants.size, "remote participants")
   for (const [id, p] of remoteParticipants.entries()) {
+    console.log("[Sidebar] Participant:", p.name, "has avatar:", !!p.avatar, p.avatar)
     const uid = p.userId || id
     const role = participantRoles.get(uid) || "participant"
     if (role === "guest") {
@@ -193,12 +195,13 @@ function PeopleTab({
           )}
 
           {/* Remote stage participants */}
-          {stageEntries.map(({ id, name, audioEnabled, videoEnabled, userId: uid }) => {
+          {stageEntries.map(({ id, name, audioEnabled, videoEnabled, userId: uid, avatar }) => {
             const pUid = uid || id
             const isParticipantHost = pUid === activeMeetingHostId
             return (
               <div key={id} className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-muted/30 transition-colors group">
                 <Avatar className="w-8 h-8">
+                  {avatar && <AvatarImage src={avatar} alt={name} />}
                   <AvatarFallback className="text-[9px] font-medium bg-muted text-muted-foreground">
                     {name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}
                   </AvatarFallback>
@@ -267,11 +270,12 @@ function PeopleTab({
             )}
 
             {/* Remote audience */}
-            {audienceEntries.map(({ id, name, userId: uid }) => {
+            {audienceEntries.map(({ id, name, userId: uid, avatar }) => {
               const pUid = uid || id
               return (
                 <div key={id} className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-muted/30 transition-colors group">
                   <Avatar className="w-8 h-8">
+                    {avatar && <AvatarImage src={avatar} alt={name} />}
                     <AvatarFallback className="text-[9px] font-medium bg-muted text-muted-foreground">
                       {name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}
                     </AvatarFallback>
@@ -680,7 +684,7 @@ export function MeetingSidePanel({
   myHandRaised: boolean
   myRole: "host" | "participant" | "guest"
   activeMeetingHostId: string
-  remoteParticipants: Map<string, { name: string; audioEnabled: boolean; videoEnabled: boolean; userId?: string }>
+  remoteParticipants: Map<string, { name: string; audioEnabled: boolean; videoEnabled: boolean; userId?: string; avatar?: string | null }>
   participantRoles: Map<string, string>
   raisedHands: Set<string>
   admittedParticipants: Array<{ userId: string; name: string; avatar: string | null; role?: string }>

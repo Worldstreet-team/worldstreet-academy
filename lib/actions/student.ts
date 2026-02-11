@@ -33,6 +33,7 @@ export type StudentEnrollment = {
   courseTitle: string
   courseThumbnail: string | null
   instructorName: string
+  instructorAvatarUrl: string | null
   progress: number
   lastAccessedAt: string
   status: string
@@ -45,6 +46,7 @@ export type StudentBookmark = {
   courseTitle: string
   courseThumbnail: string | null
   instructorName: string
+  instructorAvatarUrl: string | null
   level: string
   pricing: string
   price: number | null
@@ -393,7 +395,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
         select: "title thumbnailUrl instructor",
         populate: {
           path: "instructor",
-          select: "firstName lastName",
+          select: "firstName lastName avatarUrl",
         },
       })
       .sort({ lastAccessedAt: -1 })
@@ -406,7 +408,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
           _id: { toString(): string }
           title: string
           thumbnailUrl: string
-          instructor: { firstName: string; lastName: string }
+          instructor: { firstName: string; lastName: string; avatarUrl: string | null }
         }
         
         const firstLesson = await Lesson.findOne({ course: course._id })
@@ -420,6 +422,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
           courseTitle: course.title,
           courseThumbnail: course.thumbnailUrl,
           instructorName: `${course.instructor.firstName} ${course.instructor.lastName}`,
+          instructorAvatarUrl: course.instructor.avatarUrl,
           progress: enrollment.progress,
           lastAccessedAt: enrollment.lastAccessedAt?.toISOString() || new Date().toISOString(),
           status: enrollment.status,
@@ -455,7 +458,7 @@ export async function fetchMyBookmarks(): Promise<StudentBookmark[]> {
         select: "title thumbnailUrl instructor level pricing price rating enrolledCount",
         populate: {
           path: "instructor",
-          select: "firstName lastName",
+          select: "firstName lastName avatarUrl",
         },
       })
       .sort({ createdAt: -1 })
@@ -468,7 +471,7 @@ export async function fetchMyBookmarks(): Promise<StudentBookmark[]> {
           _id: { toString(): string }
           title: string
           thumbnailUrl: string
-          instructor: { firstName: string; lastName: string }
+          instructor: { firstName: string; lastName: string; avatarUrl: string | null }
           level: string
           pricing: string
           price: number
@@ -482,6 +485,7 @@ export async function fetchMyBookmarks(): Promise<StudentBookmark[]> {
           courseTitle: course.title,
           courseThumbnail: course.thumbnailUrl,
           instructorName: `${course.instructor.firstName} ${course.instructor.lastName}`,
+          instructorAvatarUrl: course.instructor.avatarUrl,
           level: course.level,
           pricing: course.pricing,
           price: course.price,
