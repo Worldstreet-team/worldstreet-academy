@@ -133,7 +133,6 @@ export function Topbar({ title, variant = "platform", breadcrumbOverrides }: Top
             </kbd>
           </button>
 
-          <NotificationBell />
           <ThemeToggle />
 
           {/* User profile dropdown — always visible, especially useful on mobile */}

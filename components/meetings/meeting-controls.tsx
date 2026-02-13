@@ -102,16 +102,20 @@ export function MeetingControls({
 
       {/* Mobile secondary controls row */}
       <div className="pointer-events-auto md:hidden flex items-center gap-0.5 px-2 py-1.5 rounded-2xl bg-white/8 dark:bg-white/6 backdrop-blur-2xl border border-white/10 dark:border-white/8 shadow-2xl shadow-black/20">
-        <button onClick={onToggleHand} className="flex flex-col items-center px-2.5">
-          <div className={cn("w-9 h-9 rounded-full flex items-center justify-center transition-all", myHandRaised ? "bg-amber-500/20" : "bg-transparent")}>
-            <span className={cn("text-base leading-none transition-transform", myHandRaised && "animate-bounce")}>✋</span>
-          </div>
-        </button>
-        <button onClick={onToggleReactionPicker} className="flex flex-col items-center px-2.5">
-          <div className={cn("w-9 h-9 rounded-full flex items-center justify-center transition-all", showReactionPicker ? "bg-foreground/90" : "bg-transparent")}>
-            <span className="text-base leading-none">😊</span>
-          </div>
-        </button>
+        {!isGuest && (
+          <>
+            <button onClick={onToggleHand} className="flex flex-col items-center px-2.5">
+              <div className={cn("w-9 h-9 rounded-full flex items-center justify-center transition-all", myHandRaised ? "bg-amber-500/20" : "bg-transparent")}>
+                <span className={cn("text-base leading-none transition-transform", myHandRaised && "animate-bounce")}>✋</span>
+              </div>
+            </button>
+            <button onClick={onToggleReactionPicker} className="flex flex-col items-center px-2.5">
+              <div className={cn("w-9 h-9 rounded-full flex items-center justify-center transition-all", showReactionPicker ? "bg-foreground/90" : "bg-transparent")}>
+                <span className="text-base leading-none">😊</span>
+              </div>
+            </button>
+          </>
+        )}
         <button onClick={() => onTabChange(activeTab === "people" ? null : "people")} className="flex flex-col items-center px-2.5 relative">
           <div className={cn("w-9 h-9 rounded-full flex items-center justify-center transition-all", activeTab === "people" ? "bg-foreground/90" : "bg-transparent")}>
             <HugeiconsIcon icon={UserGroupIcon} size={16} className={activeTab === "people" ? "text-background" : "text-foreground"} />

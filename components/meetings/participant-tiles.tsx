@@ -85,7 +85,7 @@ export function ParticipantTile({
       ) : (
         <div className="flex flex-col items-center gap-2">
           <Avatar className="w-16 h-16 ring-2 ring-white/10">
-            {avatar && <AvatarImage src={avatar} alt={name} />}
+            <AvatarImage src={avatar || ""} alt={name} />
             <AvatarFallback className="text-xl bg-black/5 dark:bg-white/10 text-foreground/80">
               {initials}
             </AvatarFallback>

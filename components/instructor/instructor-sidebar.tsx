@@ -214,7 +214,7 @@ export function InstructorSidebar() {
                         <span className="ml-auto flex items-center -space-x-1.5 shrink-0">
                           {m.participantAvatars?.slice(0, 4).map((p, i) => (
                             <Avatar key={i} className="w-4 h-4 border border-sidebar-accent ring-1 ring-sidebar-accent">
-                              {p.avatar && <AvatarImage src={p.avatar} alt={p.name} />}
+                              <AvatarImage src={p.avatar || ""} alt={p.name} />
                               <AvatarFallback className="text-[6px]">
                                 {p.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
                               </AvatarFallback>
@@ -263,13 +263,13 @@ export function InstructorSidebar() {
                     {item.title === "Messages" && hasOngoingCall && callInfo && (
                       <span className="ml-auto flex items-center -space-x-1.5 shrink-0">
                         <Avatar className="w-5 h-5 border-2 border-sidebar-accent ring-1 ring-sidebar-accent">
-                          {user.avatarUrl && <AvatarImage src={user.avatarUrl} />}
+                          <AvatarImage src={user.avatarUrl || ""} />
                           <AvatarFallback className="text-[7px] bg-primary/10 text-primary">
                             {user.firstName?.[0]}{user.lastName?.[0]}
                           </AvatarFallback>
                         </Avatar>
                         <Avatar className="w-5 h-5 border-2 border-sidebar-accent ring-1 ring-sidebar-accent">
-                          {callInfo.participantAvatar && <AvatarImage src={callInfo.participantAvatar} />}
+                          <AvatarImage src={callInfo.participantAvatar || ""} />
                           <AvatarFallback className="text-[7px] bg-emerald-500/15 text-emerald-600">
                             {callInfo.participantName?.[0]?.toUpperCase() || "?"}
                           </AvatarFallback>
