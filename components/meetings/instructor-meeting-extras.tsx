@@ -12,10 +12,13 @@ import {
   Video01Icon,
   UserGroupIcon,
   Cancel01Icon,
+  ArrowLeft01Icon,
+  ArrowRight01Icon,
 } from "@hugeicons/core-free-icons"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from "@/components/ui/carousel"
 
 import {
   inviteByEmail,
@@ -313,12 +316,30 @@ export function CourseMeetingCards({
   isLoading: boolean
   onStartMeeting: (course: CourseSummary) => void
 }) {
+  const [api, setApi] = useState<CarouselApi>()
+  const [canScrollPrev, setCanScrollPrev] = useState(false)
+  const [canScrollNext, setCanScrollNext] = useState(false)
+
+  useEffect(() => {
+    if (!api) return
+    const onSelect = () => {
+      setCanScrollPrev(api.canScrollPrev())
+      setCanScrollNext(api.canScrollNext())
+    }
+    onSelect()
+    api.on("reInit", onSelect)
+    api.on("select", onSelect)
+    return () => {
+      api.off("select", onSelect)
+      api.off("reInit", onSelect)
+    }
+  }, [api])
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {[1, 2].map((i) => (
-          <div key={i} className="h-56 rounded-2xl bg-muted/40 animate-pulse" />
+      <div className="flex gap-3 overflow-hidden">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-56 w-64 shrink-0 rounded-2xl bg-muted/40 animate-pulse" />
         ))}
       </div>
     )
@@ -330,56 +351,75 @@ export function CourseMeetingCards({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-foreground">Your Courses</h2>
-        <span className="text-[11px] text-muted-foreground/60">
-          Start a session for your students
-        </span>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {courses.map((course) => (
-          <div
-            key={course.id}
-            className="group relative rounded-2xl border border-border/40 bg-card overflow-hidden hover:border-border/80 hover:shadow-sm transition-all"
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] text-muted-foreground/60 mr-1">
+            Start a session for your students
+          </span>
+          <button
+            onClick={() => api?.scrollPrev()}
+            disabled={!canScrollPrev}
+            className="h-7 w-7 rounded-lg flex items-center justify-center border border-border/40 hover:bg-muted/60 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
           >
-            {/* Thumbnail — 60% longer */}
-            <div className="relative h-56 bg-muted/30">
-              {course.thumbnailUrl ? (
-                <Image
-                  src={course.thumbnailUrl}
-                  alt={course.title}
-                  fill
-                  className="object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <HugeiconsIcon icon={Video01Icon} size={28} className="text-muted-foreground/30" />
-                </div>
-              )}
+            <HugeiconsIcon icon={ArrowLeft01Icon} size={14} className="text-foreground/70" />
+          </button>
+          <button
+            onClick={() => api?.scrollNext()}
+            disabled={!canScrollNext}
+            className="h-7 w-7 rounded-lg flex items-center justify-center border border-border/40 hover:bg-muted/60 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+          >
+            <HugeiconsIcon icon={ArrowRight01Icon} size={14} className="text-foreground/70" />
+          </button>
+        </div>
+      </div>
 
-              {/* Glassmorphic overlay */}
-              <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/60 via-black/30 to-transparent">
-                <div className="flex items-end justify-between gap-2">
-                  <div className="min-w-0">
-                    <h3 className="text-[13px] font-semibold text-white truncate drop-shadow-sm">{course.title}</h3>
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <HugeiconsIcon icon={UserGroupIcon} size={10} className="text-white/70" />
-                      <span className="text-[10px] text-white/70 font-medium">{course.enrolledCount} enrolled</span>
+      <Carousel
+        setApi={setApi}
+        opts={{ align: "start", skipSnaps: true, dragFree: true }}
+        className="w-full"
+      >
+        <CarouselContent className="-ml-3">
+          {courses.map((course) => (
+            <CarouselItem key={course.id} className="pl-3 basis-[260px] sm:basis-[280px] md:basis-[300px]">
+              <div className="group relative rounded-2xl border border-border/40 bg-card overflow-hidden hover:border-border/80 hover:shadow-sm transition-all">
+                <div className="relative h-56 bg-muted/30">
+                  {course.thumbnailUrl ? (
+                    <Image
+                      src={course.thumbnailUrl}
+                      alt={course.title}
+                      fill
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <HugeiconsIcon icon={Video01Icon} size={28} className="text-muted-foreground/30" />
+                    </div>
+                  )}
+
+                  <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/60 via-black/30 to-transparent">
+                    <div className="flex items-end justify-between gap-2">
+                      <div className="min-w-0">
+                        <h3 className="text-[13px] font-semibold text-white truncate drop-shadow-sm">{course.title}</h3>
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <HugeiconsIcon icon={UserGroupIcon} size={10} className="text-white/70" />
+                          <span className="text-[10px] text-white/70 font-medium">{course.enrolledCount} enrolled</span>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => onStartMeeting(course)}
+                        className="flex items-center gap-1.5 h-8 px-3.5 rounded-xl text-[11px] font-semibold text-white bg-white/20 backdrop-blur-md border border-white/20 hover:bg-white/30 transition-all shadow-lg shrink-0"
+                      >
+                        <HugeiconsIcon icon={Video01Icon} size={13} />
+                        Start Call
+                      </button>
                     </div>
                   </div>
-
-                  {/* Start Call — direct modal trigger */}
-                  <button
-                    onClick={() => onStartMeeting(course)}
-                    className="flex items-center gap-1.5 h-8 px-3.5 rounded-xl text-[11px] font-semibold text-white bg-white/20 backdrop-blur-md border border-white/20 hover:bg-white/30 transition-all shadow-lg shrink-0"
-                  >
-                    <HugeiconsIcon icon={Video01Icon} size={13} />
-                    Start Call
-                  </button>
                 </div>
               </div>
-            </div>
-          </div>
-        ))}
-      </div>
+            </CarouselItem>
+          ))}
+        </CarouselContent>
+      </Carousel>
     </div>
   )
 }

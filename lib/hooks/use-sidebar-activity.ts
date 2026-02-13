@@ -21,7 +21,12 @@ export function useSidebarActivity() {
   const { data: invites = [], isSuccess: invitesLoaded } = useMeetingInvites()
 
   const isLoaded = meetingsLoaded || invitesLoaded
-  const hasActivity = activeMeetings.length > 0 || invites.length > 0
 
-  return { activeMeetings, invites, hasActivity, isLoaded }
+  // Filter invites to exclude meetings already in activeMeetings (prevents duplicates)
+  const activeMeetingIds = new Set(activeMeetings.map((m) => m.id))
+  const filteredInvites = invites.filter((inv) => !activeMeetingIds.has(inv.meetingId))
+
+  const hasActivity = activeMeetings.length > 0 || filteredInvites.length > 0
+
+  return { activeMeetings, invites: filteredInvites, hasActivity, isLoaded }
 }

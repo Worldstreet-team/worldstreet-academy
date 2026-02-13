@@ -7,7 +7,7 @@ export default async function WelcomePage() {
   const user = await getCurrentUser()
 
   // Not logged in — send to login
-  if (!user) redirect(buildLoginRedirectUrl("/"))
+  if (!user) redirect(await buildLoginRedirectUrl("/"))
 
   return (
     <WelcomePageClient

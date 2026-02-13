@@ -476,6 +476,7 @@ function PollsTab({
         {polls.map((poll) => {
           const totalVotes = Object.values(poll.votes).reduce((a, b) => a + b, 0)
           const hasVoted = myVotes.has(poll.id)
+          const showResults = hasVoted || isHost
           const isExpanded = expandedPolls.has(poll.id)
           return (
             <div key={poll.id} className="rounded-xl bg-muted/20 p-3.5 space-y-2.5">
@@ -504,12 +505,12 @@ function PollsTab({
                             : "bg-muted/20 hover:bg-muted/40 cursor-pointer",
                         )}
                       >
-                        {hasVoted && (
+                        {showResults && (
                           <div className="absolute inset-y-0 left-0 bg-foreground/8 transition-all duration-500 ease-out" style={{ width: `${pct}%` }} />
                         )}
                         <div className="relative flex items-center justify-between">
                           <span className="text-sm text-foreground">{opt}</span>
-                          {hasVoted && (
+                          {showResults && (
                             <span className="text-xs font-semibold text-muted-foreground tabular-nums">
                               {pct}% {isHost && count > 0 && `(${count})`}
                             </span>
@@ -517,7 +518,7 @@ function PollsTab({
                         </div>
                       </button>
                       {/* Show voter details for hosts when expanded */}
-                      {isHost && isExpanded && hasVoted && optionVoters.length > 0 && (
+                      {isHost && isExpanded && showResults && optionVoters.length > 0 && (
                         <div className="mt-1.5 ml-3 space-y-1">
                           {optionVoters.map((voter) => (
                             <div key={voter.userId} className="flex items-center gap-2 px-2 py-1">
@@ -540,7 +541,7 @@ function PollsTab({
                 <p className="text-[10px] text-muted-foreground/60">by {poll.createdByName}</p>
                 <div className="flex items-center gap-2">
                   <p className="text-[10px] text-muted-foreground/60">{totalVotes} vote{totalVotes !== 1 ? "s" : ""}</p>
-                  {isHost && hasVoted && totalVotes > 0 && (
+                  {isHost && showResults && totalVotes > 0 && (
                     <button
                       onClick={() => togglePollExpansion(poll.id)}
                       className="flex items-center gap-1 text-[10px] text-foreground/60 hover:text-foreground transition-colors"

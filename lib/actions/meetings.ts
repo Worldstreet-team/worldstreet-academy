@@ -1,5 +1,6 @@
 "use server"
 
+import { headers } from "next/headers"
 import { Types } from "mongoose"
 import connectDB from "@/lib/db"
 import { Meeting, User, Course, Enrollment, type IMeeting, type IMeetingParticipant, type MeetingStatus } from "@/lib/db/models"
@@ -1773,7 +1774,10 @@ export async function createCourseMeeting(
     })
 
     // Fire-and-forget: Notify all enrolled students via email
-    const meetingLink = `${process.env.SITE_URL || "https://worldstreet.academy"}/dashboard/meetings?join=${meeting._id.toString()}`
+    const headersList = await headers()
+    const host = headersList.get("host") || "academy.worldstreetgold.com"
+    const protocol = headersList.get("x-forwarded-proto") || "https"
+    const meetingLink = `${protocol}://${host}/dashboard/meetings?join=${meeting._id.toString()}`
     const hostName = `${currentUser.firstName} ${currentUser.lastName}`.trim()
 
     backgroundSave(
@@ -1900,7 +1904,10 @@ export async function inviteByEmail(
     }
 
     // Send invite email
-    const meetingLink = `${process.env.SITE_URL || "https://worldstreet.academy"}/dashboard/meetings?join=${meetingId}`
+    const headersList = await headers()
+    const host = headersList.get("host") || "academy.worldstreetgold.com"
+    const protocol = headersList.get("x-forwarded-proto") || "https"
+    const meetingLink = `${protocol}://${host}/dashboard/meetings?join=${meetingId}`
     const result = await sendMeetingInviteEmail(invitee.email, {
       meetingTitle: meeting.title,
       hostName: `${currentUser.firstName} ${currentUser.lastName}`.trim(),

@@ -21,7 +21,7 @@ export default async function PlatformLayout({
   if (!user) {
     const headersList = await headers()
     const currentPath = headersList.get("x-next-pathname") || "/dashboard"
-    redirect(buildLoginRedirectUrl(currentPath))
+    redirect(await buildLoginRedirectUrl(currentPath))
   }
 
   return (

@@ -21,7 +21,7 @@ export default async function InstructorLayout({
   if (!user) {
     const headersList = await headers()
     const currentPath = headersList.get("x-next-pathname") || "/instructor"
-    redirect(buildLoginRedirectUrl(currentPath))
+    redirect(await buildLoginRedirectUrl(currentPath))
   }
 
   // Allow any authenticated user to access instructor dashboard
