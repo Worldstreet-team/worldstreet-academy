@@ -200,8 +200,67 @@ export async function joinMeeting(meetingId: string): Promise<{
       return { success: false, error: "You have been removed from this meeting and cannot rejoin" }
     }
 
-    // Already admitted — parallelize RTK token + host lookup
+    // User left previously — re-admit them
+    if (existingP?.status === "left") {
+      existingP.status = "admitted"
+      existingP.joinedAt = new Date()
+      existingP.leftAt = undefined
+
+      const admittedIds = meeting.participants
+        .filter((p) => p.status === "admitted" && p.userId.toString() !== currentUser.id)
+        .map((p) => p.userId.toString())
+      const rejoinEvent: MeetingEventPayload = {
+        type: "meeting:participant-joined",
+        meetingId: meeting._id.toString(),
+        meetingTitle: meeting.title,
+        userId: currentUser.id,
+        userName: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
+        userAvatar: currentUser.avatarUrl,
+        role: existingP.role,
+      }
+      const [, participant, host] = await Promise.all([
+        meeting.save(),
+        addParticipant(meeting.meetingId, {
+          name: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
+          customParticipantId: currentUser.id,
+          presetName: "group_call_participant",
+        }),
+        User.findById(meeting.hostId).select("firstName lastName avatarUrl").lean(),
+        admittedIds.length > 0 ? emitEventToMany([...admittedIds, meeting.hostId.toString()], rejoinEvent) : Promise.resolve(),
+      ])
+
+      return {
+        success: true,
+        authToken: participant.authToken,
+        role: (existingP.role as MeetingRole) || "participant",
+        meeting: {
+          id: meeting._id.toString(),
+          title: meeting.title,
+          description: meeting.description,
+          hostId: meeting.hostId.toString(),
+          hostName: host ? `${host.firstName} ${host.lastName}`.trim() : "Host",
+          hostAvatar: host?.avatarUrl || null,
+          status: meeting.status,
+          meetingId: meeting.meetingId,
+          participantCount: meeting.participants.filter((p) => p.status === "admitted").length,
+          maxParticipants: meeting.settings.maxParticipants,
+          settings: serializeSettings(meeting.settings),
+          createdAt: meeting.createdAt.toISOString(),
+          startedAt: meeting.startedAt?.toISOString(),
+        },
+      }
+    }
+
+    // Already admitted — parallelize RTK token + host lookup + notify old sessions
     if (existingP?.status === "admitted") {
+      const sessionReplacedEvent: MeetingEventPayload = {
+        type: "meeting:session-replaced",
+        meetingId: meeting._id.toString(),
+        meetingTitle: meeting.title,
+        userId: currentUser.id,
+        userName: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
+        userAvatar: currentUser.avatarUrl,
+      }
       const [participant, host] = await Promise.all([
         addParticipant(meeting.meetingId, {
           name: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
@@ -209,6 +268,8 @@ export async function joinMeeting(meetingId: string): Promise<{
           presetName: "group_call_participant",
         }),
         User.findById(meeting.hostId).select("firstName lastName avatarUrl").lean(),
+        // Tell the user's other sessions this session is being replaced
+        emitEvent(currentUser.id, sessionReplacedEvent),
       ])
 
       return {
@@ -805,8 +866,32 @@ export async function leaveMeeting(meetingId: string): Promise<{
     if (participant) {
       participant.status = "left"
       participant.leftAt = new Date()
+
+      // Collect other admitted participants + host to notify
+      const othersToNotify = meeting.participants
+        .filter((p) => p.status === "admitted" && p.userId.toString() !== currentUser.id)
+        .map((p) => p.userId.toString())
+      // Always include the host (they may not be in participants array)
+      if (meeting.hostId.toString() !== currentUser.id) {
+        othersToNotify.push(meeting.hostId.toString())
+      }
+      const uniqueIds = [...new Set(othersToNotify)]
+
+      const leftPayload: MeetingEventPayload = {
+        type: "meeting:participant-left",
+        meetingId: meeting._id.toString(),
+        meetingTitle: meeting.title,
+        userId: currentUser.id,
+        userName: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
+        userAvatar: currentUser.avatarUrl,
+        participantCount: meeting.participants.filter((p) => p.status === "admitted").length,
+      }
+
       // Fire-and-forget — user is already leaving, no need to block
       backgroundSave(meeting.save())
+      if (uniqueIds.length > 0) {
+        backgroundSave(emitEventToMany(uniqueIds, leftPayload))
+      }
     }
 
     return { success: true }

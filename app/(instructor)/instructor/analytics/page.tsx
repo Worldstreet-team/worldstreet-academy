@@ -4,26 +4,12 @@ import * as React from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Topbar } from "@/components/platform/topbar"
 import { Skeleton } from "@/components/ui/skeleton"
-import { fetchInstructorCourses, type InstructorCourseItem } from "@/lib/actions/instructor"
+import { type InstructorCourseItem } from "@/lib/actions/instructor"
+import { useInstructorCourses } from "@/lib/hooks/queries"
 import { EmptyState } from "@/components/shared/empty-state"
 
 export default function AnalyticsPage() {
-  const [courses, setCourses] = React.useState<InstructorCourseItem[]>([])
-  const [isLoading, setIsLoading] = React.useState(true)
-
-  React.useEffect(() => {
-    async function loadCourses() {
-      try {
-        const data = await fetchInstructorCourses()
-        setCourses(data)
-      } catch (error) {
-        console.error("Failed to load courses:", error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    loadCourses()
-  }, [])
+  const { data: courses = [], isLoading } = useInstructorCourses()
 
   return (
     <>

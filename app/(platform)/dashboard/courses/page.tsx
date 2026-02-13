@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { HugeiconsIcon } from "@hugeicons/react"
@@ -8,7 +8,8 @@ import { Search01Icon, FilterIcon } from "@hugeicons/core-free-icons"
 import { Topbar } from "@/components/platform/topbar"
 import { CourseGrid } from "@/components/courses/course-grid"
 import { CourseGridSkeleton } from "@/components/skeletons/course-skeletons"
-import { fetchBrowseCourses, type BrowseCourse } from "@/lib/actions/student"
+import { type BrowseCourse } from "@/lib/actions/student"
+import { useBrowseCourses } from "@/lib/hooks/queries"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { PlaceholdersAndVanishInput } from "@/components/ui/placeholders-and-vanish-input"
@@ -35,21 +36,16 @@ const PRICE_FILTERS = ["All", "Free", "Paid"] as const
 type PriceFilter = (typeof PRICE_FILTERS)[number]
 
 export default function BrowseCoursesPage() {
-  const [courses, setCourses] = useState<BrowseCourse[]>([])
-  const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [activeLevel, setActiveLevel] = useState<Level>("All")
   const [priceFilter, setPriceFilter] = useState<PriceFilter>("All")
 
-  useEffect(() => {
-    setIsLoading(true)
-    fetchBrowseCourses({
-      level: activeLevel,
-      pricing: priceFilter,
-    })
-      .then(setCourses)
-      .finally(() => setIsLoading(false))
-  }, [activeLevel, priceFilter])
+  const filters = useMemo(() => ({
+    level: activeLevel,
+    pricing: priceFilter,
+  }), [activeLevel, priceFilter])
+
+  const { data: courses = [], isLoading } = useBrowseCourses(filters)
 
   const filtered = useMemo(() => {
     if (!search.trim()) return courses

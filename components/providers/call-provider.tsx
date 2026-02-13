@@ -28,7 +28,7 @@ import {
 import { useSSEEvents } from "@/lib/hooks/use-call-events"
 import { useUser } from "@/components/providers/user-provider"
 import { callSounds } from "@/lib/call-sounds"
-import { rtkClient } from "@/lib/rtk-client"
+import { rtkClient, preloadRTKSDK } from "@/lib/rtk-client"
 import type { CallEventPayload, SSEEventPayload } from "@/lib/call-events"
 
 type CallType = "video" | "audio"
@@ -109,10 +109,68 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const [showCallUI, setShowCallUI] = useState(false)
   const [remoteRejoined, setRemoteRejoined] = useState(false)
   const dismissedCallsRef = useRef<Set<string>>(new Set())
+  const callTabChannelRef = useRef<BroadcastChannel | null>(null)
 
-  // Preload call sounds on mount so they're ready for instant playback
+  // Multi-tab call sync: when a call is answered/started/ended on one tab,
+  // other tabs dismiss their ringing UI to avoid duplicate joins
+  useEffect(() => {
+    if (typeof BroadcastChannel === "undefined") return
+    const channel = new BroadcastChannel("call-tab-sync")
+    callTabChannelRef.current = channel
+
+    channel.onmessage = (event) => {
+      const { type, callId } = event.data || {}
+
+      if (type === "call:answered-on-other-tab") {
+        // Another tab answered this call — dismiss our ringing UI
+        const current = activeCallRef.current
+        if (current?.callId === callId && callStateRef.current === "ringing") {
+          console.log("[CallProvider] Call answered on another tab — dismissing")
+          dismissedCallsRef.current.add(callId)
+          setActiveCall(null)
+          setCallState("idle")
+          setShowCallUI(false)
+          setIsMinimized(false)
+        }
+      }
+
+      if (type === "call:started-on-other-tab") {
+        // Another tab started/is in a call — if we're idle and get an incoming,
+        // we should treat it as busy. Store the callId for reference.
+        const current = activeCallRef.current
+        if (current?.callId === callId && callStateRef.current === "ringing") {
+          console.log("[CallProvider] Call in progress on another tab — dismissing ringing")
+          dismissedCallsRef.current.add(callId)
+          setActiveCall(null)
+          setCallState("idle")
+          setShowCallUI(false)
+          setIsMinimized(false)
+        }
+      }
+
+      if (type === "call:ended-on-other-tab") {
+        // Another tab ended the call — clean up our state if we're tracking it
+        const current = activeCallRef.current
+        if (current?.callId === callId) {
+          dismissedCallsRef.current.add(callId)
+          setActiveCall(null)
+          setCallState("idle")
+          setShowCallUI(false)
+          setIsMinimized(false)
+        }
+      }
+    }
+
+    return () => {
+      channel.close()
+      callTabChannelRef.current = null
+    }
+  }, [])
+
+  // Preload call sounds and RTK SDK on mount so they're ready for instant playback/init
   useEffect(() => {
     callSounds.preload()
+    preloadRTKSDK().catch(() => {}) // Fire-and-forget — SDK cached for fast init later
   }, [])
 
   // On mount: check for active ongoing call (reconnection), then clean stale calls
@@ -335,6 +393,18 @@ export function CallProvider({ children }: { children: ReactNode }) {
           break
         }
 
+        case "call:tokens-ready": {
+          // Phase 2 complete — update the active call's auth token for fast answer
+          const current = activeCallRef.current
+          if (current?.callId === event.callId && current.isIncoming) {
+            console.log("[CallProvider] Tokens ready — caching receiver token for fast answer")
+            setActiveCall((prev) =>
+              prev ? { ...prev, authToken: event.authToken } : prev
+            )
+          }
+          break
+        }
+
         case "call:participant-rejoined": {
           const current = activeCallRef.current
           if (current?.callId === event.callId) {
@@ -430,6 +500,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
       setShowCallUI(true)
       setIsMinimized(false)
       callSounds.resume()
+      // Notify other tabs that we're starting a call
+      callTabChannelRef.current?.postMessage({
+        type: "call:started-on-other-tab",
+        callId: "outgoing",
+      })
     },
     []
   )
@@ -511,12 +586,22 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
   const onCallConnected = useCallback((callId: string) => {
     setActiveCall((prev) => (prev ? { ...prev, callId } : prev))
+    // Notify other tabs that this call is now active
+    callTabChannelRef.current?.postMessage({
+      type: "call:answered-on-other-tab",
+      callId,
+    })
   }, [])
 
   const onCallEnded = useCallback(() => {
     const current = activeCallRef.current
     if (current?.callId) {
       dismissedCallsRef.current.add(current.callId)
+      // Notify other tabs
+      callTabChannelRef.current?.postMessage({
+        type: "call:ended-on-other-tab",
+        callId: current.callId,
+      })
     }
     setActiveCall(null)
     setCallState("idle")
@@ -530,6 +615,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
     if (current?.callId) {
       dismissedCallsRef.current.add(current.callId)
       endCallAction(current.callId).catch(() => {})
+      // Notify other tabs
+      callTabChannelRef.current?.postMessage({
+        type: "call:ended-on-other-tab",
+        callId: current.callId,
+      })
     }
     setActiveCall(null)
     setCallState("idle")

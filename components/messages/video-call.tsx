@@ -21,6 +21,7 @@ import { rtkClient } from "@/lib/rtk-client"
 import { callSounds } from "@/lib/call-sounds"
 import {
   initiateCall,
+  prepareCallTokens,
   answerCall,
   endCall as endCallAction,
   getCallStatus,
@@ -192,6 +193,37 @@ export function VideoCall({
           callSounds.stopRing()
           callSounds.playBusy()
           rtkClient.leaveRoom().catch(() => {})
+          break
+        }
+
+        case "call:tokens-ready": {
+          // Phase 2 complete — tokens delivered for both caller and receiver
+          const currentCallId = callIdRef.current
+          if (!currentCallId || event.callId !== currentCallId) return
+
+          if (!isIncoming) {
+            // CALLER: extract caller token (piggybacked in status field)
+            const callerToken = event.status
+            if (callerToken) {
+              console.log("[Caller] Tokens ready — pre-initializing RTK")
+              authTokenRef.current = callerToken
+              // Pre-init RTK during ringing so joinRoom() is instant when answer arrives
+              rtkClient.init(callerToken, {
+                audio: true,
+                video: callType === "video",
+              }).then(() => {
+                console.log("[Caller] RTK pre-initialized via tokens-ready")
+              }).catch((err) => {
+                console.warn("[Caller] RTK pre-init failed (will retry on answer):", err)
+              })
+            }
+          } else {
+            // RECEIVER: extract receiver token (in authToken field)
+            if (event.authToken) {
+              console.log("[Receiver] Tokens ready — caching for fast answer")
+              authTokenRef.current = event.authToken
+            }
+          }
           break
         }
 
@@ -521,6 +553,27 @@ export function VideoCall({
     }
   }, [isSpeakerOn])
 
+  // ── Receiver pre-init: start RTK init as soon as token arrives during ringing ──
+  // This means when the receiver hits "Answer", joinRoom() is nearly instant.
+  useEffect(() => {
+    if (!isIncoming || callState !== "ringing") return
+    // Wait for token to be delivered via call:tokens-ready
+    const token = incomingAuthToken || authTokenRef.current
+    if (!token) return
+    // Don't re-init if already initialized
+    if (rtkClient.client) return
+
+    console.log("[Receiver] Pre-initializing RTK during ringing")
+    rtkClient.init(token, {
+      audio: true,
+      video: callType === "video",
+    }).then(() => {
+      console.log("[Receiver] RTK pre-initialized during ringing — joinRoom will be instant on answer")
+    }).catch((err) => {
+      console.warn("[Receiver] RTK pre-init failed (will retry on answer):", err)
+    })
+  }, [isIncoming, callState, callType, incomingAuthToken])
+
   // ── Initiate outgoing call ──
   useEffect(() => {
     if (!open || isIncoming || callState !== "connecting" || callId) return
@@ -534,27 +587,25 @@ export function VideoCall({
         setCallState("ended")
         return
       }
-      console.log("[Caller] Initiating call to:", receiverId)
+      console.log("[Caller] Phase 1: Signaling receiver immediately")
       const result = await initiateCall(receiverId, callType)
-      if (result.success && result.callId && result.authToken) {
-        console.log("[Caller] Call created with ID:", result.callId)
+      if (result.success && result.callId) {
+        console.log("[Caller] Phase 1 complete — call ID:", result.callId)
         setCallId(result.callId)
-        authTokenRef.current = result.authToken
         onCallStarted?.(result.callId)
         setCallState("ringing")
-        // Pre-init RTK during ringing so joinRoom() is instant when answer arrives
-        rtkClient.init(result.authToken, {
-          audio: true,
-          video: callType === "video",
-        }).then(() => {
-          console.log("[Caller] RTK pre-initialized during ringing")
+        // Phase 2: Create RTK room and deliver tokens (fire-and-forget)
+        // Tokens will arrive via call:tokens-ready Ably event
+        prepareCallTokens(result.callId).then((tokenResult) => {
+          if (!tokenResult.success) {
+            console.error("[Caller] Phase 2 failed:", tokenResult.error)
+          }
         }).catch((err) => {
-          console.warn("[Caller] RTK pre-init failed (will retry on answer):", err)
+          console.error("[Caller] Phase 2 error:", err)
         })
       } else {
         console.log("[Caller] Failed to initiate call:", result.error)
         isInitiatingRef.current = false
-        // If the error is "busy" — show busy state instead of ended
         if (result.error === "User is on another call") {
           setCallState("busy")
         } else {
@@ -585,7 +636,9 @@ export function VideoCall({
             const token = authTokenRef.current
             if (token) {
               try {
-                await rtkClient.init(token, { audio: true, video: callType === "video" })
+                if (!rtkClient.client) {
+                  await rtkClient.init(token, { audio: true, video: callType === "video" })
+                }
                 await rtkClient.joinRoom()
                 hasJoinedRoomRef.current = true
                 try { await rtkClient.client?.self.enableAudio() } catch {}
@@ -800,16 +853,19 @@ export function VideoCall({
     if (token) {
       // FAST PATH: We already have the token, start RTK init in parallel with server ack
       authTokenRef.current = token
-      console.log("[Receiver] Fast path — starting RTK init in parallel with answerCall")
+      console.log("[Receiver] Fast path — RTK join in parallel with answerCall")
 
       const [answerResult] = await Promise.all([
         answerCall(incomingCallId),
         (async () => {
           try {
-            await rtkClient.init(token, {
-              audio: true,
-              video: callType === "video",
-            })
+            // Skip init if already pre-initialized during ringing
+            if (!rtkClient.client) {
+              await rtkClient.init(token, {
+                audio: true,
+                video: callType === "video",
+              })
+            }
             console.log("[RTK] Receiver joining room (parallel)...")
             await rtkClient.joinRoom()
             hasJoinedRoomRef.current = true

@@ -37,11 +37,20 @@ export default function CheckoutPage() {
       setIsLoading(false)
       return
     }
-    fetchPublicCourse(courseId).then((c) => {
+    // Fetch course and check enrollment in parallel
+    Promise.all([
+      fetchPublicCourse(courseId),
+      user ? checkEnrollment(user.id, courseId) : Promise.resolve({ isEnrolled: false }),
+    ]).then(([c, enrollment]) => {
+      if (enrollment.isEnrolled) {
+        // Already enrolled — skip checkout entirely
+        router.replace(`/dashboard/checkout/success?courseId=${courseId}`)
+        return
+      }
       setCourse(c)
       setIsLoading(false)
     })
-  }, [courseId])
+  }, [courseId, user, router])
 
   async function handlePurchase() {
     if (!course || !user) return

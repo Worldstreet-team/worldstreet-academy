@@ -7,6 +7,7 @@ import { CommandSearch } from "@/components/shared/command-search"
 import { UserProvider } from "@/components/providers/user-provider"
 import { CallProvider } from "@/components/providers/call-provider"
 import { MeetingProvider } from "@/components/providers/meeting-provider"
+import { QueryProvider } from "@/components/providers/query-provider"
 import { getCurrentUser } from "@/lib/auth"
 import { buildLoginRedirectUrl } from "@/lib/auth/redirect"
 
@@ -27,19 +28,21 @@ export default async function InstructorLayout({
   // They can create and manage their own courses
 
   return (
-    <UserProvider user={user}>
-      <CallProvider>
-        <MeetingProvider>
-          <SidebarProvider>
-            <InstructorSidebar />
-            <SidebarInset>
-              {children}
-            </SidebarInset>
-            <InstructorBottomNav />
-            <CommandSearch />
-          </SidebarProvider>
-        </MeetingProvider>
-      </CallProvider>
-    </UserProvider>
+    <QueryProvider>
+      <UserProvider user={user}>
+        <CallProvider>
+          <MeetingProvider>
+            <SidebarProvider>
+              <InstructorSidebar />
+              <SidebarInset>
+                {children}
+              </SidebarInset>
+              <InstructorBottomNav />
+              <CommandSearch />
+            </SidebarProvider>
+          </MeetingProvider>
+        </CallProvider>
+      </UserProvider>
+    </QueryProvider>
   )
 }

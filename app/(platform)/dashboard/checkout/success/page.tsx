@@ -52,9 +52,9 @@ export default function CheckoutSuccessPage() {
                 variant="outline"
                 className="w-full h-11 gap-2"
                 size="lg"
-                render={<Link href={`/dashboard/courses/${courseId}`} />}
+                render={<Link href={`/dashboard/courses/${courseId}/learn`} />}
               >
-                Go to Course
+                Start Learning
                 <HugeiconsIcon icon={ArrowRight01Icon} size={14} />
               </Button>
             )}

@@ -21,6 +21,7 @@ export type CallEventType =
   | "call:cancelled"
   | "call:busy"
   | "call:participant-rejoined"
+  | "call:tokens-ready"
 
 export type CallEventPayload = {
   type: CallEventType
@@ -69,6 +70,7 @@ export type MeetingEventType =
   | "meeting:screen-share-permission"
   | "meeting:lobby-update"
   | "meeting:speaking"
+  | "meeting:session-replaced"
 
 export type MeetingEventPayload = {
   type: MeetingEventType

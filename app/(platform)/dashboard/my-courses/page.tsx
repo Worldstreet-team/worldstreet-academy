@@ -12,7 +12,8 @@ import { RadialProgress } from "@/components/ui/radial-progress"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { EmptyState } from "@/components/shared/empty-state"
 import { Skeleton } from "@/components/ui/skeleton"
-import { fetchMyEnrollments, type StudentEnrollment } from "@/lib/actions/student"
+import { type StudentEnrollment } from "@/lib/actions/student"
+import { useEnrollments } from "@/lib/hooks/queries"
 import { cn } from "@/lib/utils"
 
 const TABS = ["All", "In Progress", "Completed"] as const
@@ -21,22 +22,7 @@ type Tab = (typeof TABS)[number]
 export default function MyCoursesPage() {
   const [activeTab, setActiveTab] = React.useState<Tab>("All")
   const [search, setSearch] = React.useState("")
-  const [enrolledCourses, setEnrolledCourses] = React.useState<StudentEnrollment[]>([])
-  const [isLoading, setIsLoading] = React.useState(true)
-
-  React.useEffect(() => {
-    async function loadEnrollments() {
-      try {
-        const data = await fetchMyEnrollments()
-        setEnrolledCourses(data)
-      } catch (error) {
-        console.error("Failed to load enrollments:", error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    loadEnrollments()
-  }, [])
+  const { data: enrolledCourses = [], isLoading } = useEnrollments()
 
   const filteredCourses = React.useMemo(() => {
     let courses = enrolledCourses

@@ -7,6 +7,8 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { fetchPublicCourse } from "@/lib/actions/student"
+import { checkEnrollment } from "@/lib/actions/enrollments"
+import { getCurrentUser } from "@/lib/auth"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   StarIcon,
@@ -31,6 +33,12 @@ export default async function CourseDetailPage({
   const totalMins = course.totalDuration % 60
   const durationLabel = totalHours > 0 ? `${totalHours}h ${totalMins}m` : `${totalMins}m`
   const firstLessonId = course.lessons[0]?.id ?? "none"
+
+  // Check enrollment for authenticated users
+  const currentUser = await getCurrentUser().catch(() => null)
+  const isEnrolled = currentUser
+    ? (await checkEnrollment(currentUser.id, courseId)).isEnrolled
+    : false
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -207,9 +215,15 @@ export default async function CourseDetailPage({
 
               <Separator />
 
-              <Button className="w-full" size="lg" render={<Link href={`/dashboard/checkout?courseId=${course.id}`} />}>
-                Enroll Now
-              </Button>
+              {isEnrolled ? (
+                <Button className="w-full" size="lg" render={<Link href={`/dashboard/courses/${course.id}/learn/${firstLessonId}`} />}>
+                  Continue Learning
+                </Button>
+              ) : (
+                <Button className="w-full" size="lg" render={<Link href={`/dashboard/checkout?courseId=${course.id}`} />}>
+                  Enroll Now
+                </Button>
+              )}
             </CardContent>
           </Card>
         </div>

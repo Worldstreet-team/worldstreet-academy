@@ -8,6 +8,7 @@ import {
   Video01Icon,
 } from "@hugeicons/core-free-icons"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
 /* ── Setup overlay (loading spinner) ── */
 
@@ -58,18 +59,34 @@ export function MeetingEndedScreen({
   meetingTitle,
   duration,
   onReturn,
+  reason = "ended",
 }: {
   meetingTitle: string
   duration: string
   onReturn: () => void
+  /** "ended" = host ended the meeting, "left" = participant voluntarily left, "kicked" = removed by host */
+  reason?: "ended" | "left" | "kicked"
 }) {
+  const headings: Record<string, string> = {
+    ended: "Meeting Ended",
+    left: "You Left the Meeting",
+    kicked: "You Were Removed",
+  }
+
   return (
     <div className="fixed inset-0 z-60 bg-background flex flex-col items-center justify-center gap-6">
-      <div className="w-20 h-20 rounded-full border-2 border-red-400/30 flex items-center justify-center">
-        <HugeiconsIcon icon={CallEnd01Icon} size={32} className="text-red-400" />
+      <div className={cn(
+        "w-20 h-20 rounded-full border-2 flex items-center justify-center",
+        reason === "left" ? "border-muted-foreground/30" : "border-red-400/30"
+      )}>
+        <HugeiconsIcon
+          icon={reason === "left" ? ArrowRight01Icon : CallEnd01Icon}
+          size={32}
+          className={reason === "left" ? "text-muted-foreground" : "text-red-400"}
+        />
       </div>
       <div className="text-center space-y-1.5">
-        <h2 className="text-xl font-semibold text-foreground">Meeting Ended</h2>
+        <h2 className="text-xl font-semibold text-foreground">{headings[reason]}</h2>
         <p className="text-sm text-muted-foreground">{meetingTitle}</p>
         {duration && (
           <p className="text-xs text-muted-foreground/60">Duration: {duration}</p>

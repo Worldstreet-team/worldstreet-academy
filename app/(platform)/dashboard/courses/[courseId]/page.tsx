@@ -12,6 +12,8 @@ import {
   fetchInstructorPublicCourses,
   fetchEnrolledCoursesFromInstructor,
 } from "@/lib/actions/student"
+import { checkEnrollment } from "@/lib/actions/enrollments"
+import { getCurrentUser } from "@/lib/auth"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   StarIcon,
@@ -44,11 +46,14 @@ export default async function CourseDetailPage({
   // Get first lesson ID for "Start Learning" button
   const firstLessonId = course.lessons[0]?.id ?? "none"
 
-  // Fetch instructor courses
-  const [instructorCourses, enrolledFromInstructor] = await Promise.all([
+  // Fetch instructor courses + enrollment status in parallel
+  const currentUser = await getCurrentUser()
+  const [instructorCourses, enrolledFromInstructor, enrollmentStatus] = await Promise.all([
     fetchInstructorPublicCourses(course.instructorId),
     fetchEnrolledCoursesFromInstructor(course.instructorId).catch(() => []),
+    currentUser ? checkEnrollment(currentUser.id, courseId) : Promise.resolve({ isEnrolled: false }),
   ])
+  const isEnrolled = enrollmentStatus.isEnrolled
 
   // Filter out the current course from instructor's courses
   const otherInstructorCourses = instructorCourses.filter(
@@ -232,22 +237,36 @@ export default async function CourseDetailPage({
 
           {/* CTA */}
           <div className="sticky bottom-20 md:bottom-4 z-30">
-            <Button
-              className="w-full shadow-lg"
-              size="lg"
-              render={
-                <Link
-                  href={`/dashboard/checkout?courseId=${course.id}`}
-                />
-              }
-            >
-              Enroll Now
-              {course.pricing !== "free" && (
-                <span className="ml-1 font-normal opacity-80">
-                  · ${course.price}
-                </span>
-              )}
-            </Button>
+            {isEnrolled ? (
+              <Button
+                className="w-full shadow-lg"
+                size="lg"
+                render={
+                  <Link
+                    href={`/dashboard/courses/${course.id}/learn/${firstLessonId}`}
+                  />
+                }
+              >
+                Continue Learning
+              </Button>
+            ) : (
+              <Button
+                className="w-full shadow-lg"
+                size="lg"
+                render={
+                  <Link
+                    href={`/dashboard/checkout?courseId=${course.id}`}
+                  />
+                }
+              >
+                Enroll Now
+                {course.pricing !== "free" && (
+                  <span className="ml-1 font-normal opacity-80">
+                    · ${course.price}
+                  </span>
+                )}
+              </Button>
+            )}
           </div>
         </div>
       </div>

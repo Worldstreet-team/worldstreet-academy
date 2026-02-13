@@ -13,7 +13,8 @@ import {
   CarouselContent,
   CarouselItem,
 } from "@/components/ui/carousel"
-import { fetchInstructorCourses, type InstructorCourseItem } from "@/lib/actions/instructor"
+import { type InstructorCourseItem } from "@/lib/actions/instructor"
+import { useInstructorCourses } from "@/lib/hooks/queries"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   BookOpen01Icon,
@@ -87,23 +88,7 @@ function CourseCard({
 export default function InstructorDashboard() {
   const user = useUser()
   const [courseSearch, setCourseSearch] = React.useState("")
-  const [myCourses, setMyCourses] = React.useState<InstructorCourseItem[]>([])
-  const [isLoading, setIsLoading] = React.useState(true)
-
-  // Fetch courses from database
-  React.useEffect(() => {
-    async function loadCourses() {
-      try {
-        const courses = await fetchInstructorCourses()
-        setMyCourses(courses)
-      } catch (error) {
-        console.error("Failed to fetch courses:", error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    loadCourses()
-  }, [])
+  const { data: myCourses = [], isLoading } = useInstructorCourses()
 
   const totalStudents = myCourses.reduce((s, c) => s + c.enrolledCount, 0)
   const totalRevenue = myCourses.reduce(

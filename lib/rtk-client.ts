@@ -58,6 +58,26 @@ const _listeners: Array<{
   callback: RTKEventCallback
 }> = []
 
+// Cached SDK class — preloaded on app mount so init() doesn't pay the dynamic-import cost
+let _CachedClientClass: typeof RTKClientInstance | null = null
+let _preloadPromise: Promise<typeof RTKClientInstance> | null = null
+
+/**
+ * Eagerly import the RTK SDK and cache the constructor.
+ * Call this once on app mount (e.g. in CallProvider useEffect).
+ * Subsequent calls are no-ops — returns the cached class instantly.
+ */
+export function preloadRTKSDK(): Promise<typeof RTKClientInstance> {
+  if (_CachedClientClass) return Promise.resolve(_CachedClientClass)
+  if (_preloadPromise) return _preloadPromise
+  _preloadPromise = import("@cloudflare/realtimekit").then(({ default: C }) => {
+    _CachedClientClass = C
+    console.log("[RTK-Client] SDK preloaded")
+    return C
+  })
+  return _preloadPromise
+}
+
 export const rtkClient: RTKClientManager = {
   get client() {
     return _client
@@ -86,8 +106,8 @@ export const rtkClient: RTKClientManager = {
 
     _isInitializing = true
     try {
-      // Dynamic import to avoid SSR issues — the core SDK is client-only
-      const { default: ClientClass } = await import("@cloudflare/realtimekit")
+      // Use cached SDK class if available, otherwise dynamic import (SSR-safe)
+      const ClientClass = _CachedClientClass ?? await preloadRTKSDK()
       console.log("[RTK-Client] Initializing with token:", authToken.slice(0, 20) + "...")
 
       _client = await ClientClass.init({

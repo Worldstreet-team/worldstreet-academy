@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import Image from "next/image"
 import { AnimatePresence, motion } from "motion/react"
 import { HugeiconsIcon } from "@hugeicons/react"
@@ -32,7 +33,6 @@ import {
   type Attachment,
 } from "@/components/messages"
 import {
-  getConversations,
   getMessages,
   sendMessage,
   searchUsers,
@@ -48,17 +48,19 @@ import { useMessageEvents } from "@/lib/hooks/use-call-events"
 import { useUser } from "@/components/providers/user-provider"
 import { ConversationListSkeleton, MessagesAreaSkeleton } from "@/components/skeletons/message-skeletons"
 import { useCall } from "@/components/providers/call-provider"
+import { useConversations, queryKeys } from "@/lib/hooks/queries"
+import type { ConversationWithDetails as ConvType } from "@/lib/actions/messages"
 
 // Extended message type with status for optimistic updates
 type OptimisticMessage = MessageWithDetails & { status?: "pending" | "sent" | "error"; uploadProgress?: number }
 
 export default function MessagesPage() {
-  const [conversations, setConversations] = useState<ConversationWithDetails[]>([])
+  const queryClient = useQueryClient()
+  const { data: conversations = [], isLoading } = useConversations()
   const [messages, setMessages] = useState<OptimisticMessage[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedParticipant, setSelectedParticipant] = useState<ConversationWithDetails["participant"] | null>(null)
   const [showMobileChat, setShowMobileChat] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   
   const { startCall, activeCall, callState } = useCall()
@@ -76,19 +78,6 @@ export default function MessagesPage() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // Load conversations
-  useEffect(() => {
-    async function loadConversations() {
-      setIsLoading(true)
-      const result = await getConversations()
-      if (result.success && result.conversations) {
-        setConversations(result.conversations)
-      }
-      setIsLoading(false)
-    }
-    loadConversations()
-  }, [])
-
   // Load messages when conversation changes
   useEffect(() => {
     async function loadMessages() {
@@ -104,10 +93,7 @@ export default function MessagesPage() {
       setIsLoadingMessages(false)
       // Mark as read and emit read receipts to sender
       markMessagesAsRead(selectedId).then(() => {
-        // Refresh conversations to update unread counts
-        getConversations().then((r) => {
-          if (r.success && r.conversations) setConversations(r.conversations)
-        })
+        queryClient.invalidateQueries({ queryKey: queryKeys.conversations })
       })
     }
     loadMessages()
@@ -145,11 +131,7 @@ export default function MessagesPage() {
         markMessagesAsRead(currentConvId)
       }
       // Always refresh conversations for unread counts
-      getConversations().then((result) => {
-        if (result.success && result.conversations) {
-          setConversations(result.conversations)
-        }
-      })
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations })
     } else if (event.type === "message:read") {
       // Update read receipts on own messages when the other user reads them
       if (event.conversationId === selectedIdRef.current) {
@@ -158,20 +140,12 @@ export default function MessagesPage() {
         ))
       }
       // Refresh conversations to update unread counts
-      getConversations().then((result) => {
-        if (result.success && result.conversations) {
-          setConversations(result.conversations)
-        }
-      })
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations })
     } else if (event.type === "message:deleted") {
       setMessages((prev) => prev.filter((m) => m.id !== event.messageId))
-      getConversations().then((result) => {
-        if (result.success && result.conversations) {
-          setConversations(result.conversations)
-        }
-      })
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations })
     }
-  }, [])
+  }, [queryClient])
 
   useMessageEvents(user.id, handleMessageEvent)
 
@@ -398,11 +372,7 @@ export default function MessagesPage() {
         )
         
         // Refresh conversations in background (non-blocking)
-        getConversations().then((convResult) => {
-          if (convResult.success && convResult.conversations) {
-            setConversations(convResult.conversations)
-          }
-        })
+        queryClient.invalidateQueries({ queryKey: queryKeys.conversations })
       } else {
         throw new Error(result.error || "Failed to send message")
       }
@@ -451,17 +421,17 @@ export default function MessagesPage() {
       setSearchQuery("")
       setSearchResults([])
       
-      // Refresh conversations and select the new one
-      const convResult = await getConversations()
-      if (convResult.success && convResult.conversations) {
-        setConversations(convResult.conversations)
-        setSelectedId(result.conversationId)
-        const conv = convResult.conversations.find((c) => c.id === result.conversationId)
+      // Refresh conversations cache and select the new one
+      await queryClient.refetchQueries({ queryKey: queryKeys.conversations })
+      const updatedConvs = queryClient.getQueryData<ConvType[]>(queryKeys.conversations)
+      if (updatedConvs) {
+        const conv = updatedConvs.find((c) => c.id === result.conversationId)
         setSelectedParticipant(conv?.participant || null)
-        setShowMobileChat(true)
       }
+      setSelectedId(result.conversationId)
+      setShowMobileChat(true)
     }
-  }, [])
+  }, [queryClient])
 
   return (
     <>

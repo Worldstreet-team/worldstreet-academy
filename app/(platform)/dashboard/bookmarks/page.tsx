@@ -10,34 +10,16 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { EmptyState } from "@/components/shared/empty-state"
 import { Skeleton } from "@/components/ui/skeleton"
-import { fetchMyBookmarks, toggleCourseBookmark, type StudentBookmark } from "@/lib/actions/student"
+import { type StudentBookmark } from "@/lib/actions/student"
+import { useBookmarks, useToggleBookmark } from "@/lib/hooks/queries"
 
 export default function BookmarksPage() {
   const [search, setSearch] = React.useState("")
-  const [bookmarks, setBookmarks] = React.useState<StudentBookmark[]>([])
-  const [isLoading, setIsLoading] = React.useState(true)
+  const { data: bookmarks = [], isLoading } = useBookmarks()
+  const toggleBookmark = useToggleBookmark()
 
-  React.useEffect(() => {
-    async function loadBookmarks() {
-      try {
-        const data = await fetchMyBookmarks()
-        setBookmarks(data)
-      } catch (error) {
-        console.error("Failed to load bookmarks:", error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    loadBookmarks()
-  }, [])
-
-  const handleRemoveBookmark = async (courseId: string) => {
-    try {
-      await toggleCourseBookmark(courseId)
-      setBookmarks((prev) => prev.filter((b) => b.courseId !== courseId))
-    } catch (error) {
-      console.error("Failed to remove bookmark:", error)
-    }
+  const handleRemoveBookmark = (courseId: string) => {
+    toggleBookmark.mutate(courseId)
   }
 
   const filteredCourses = React.useMemo(() => {

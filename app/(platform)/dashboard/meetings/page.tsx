@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { useSearchParams, useRouter } from "next/navigation"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
@@ -19,9 +20,7 @@ import type { MeetingEventPayload } from "@/lib/call-events"
 import {
   createMeeting,
   joinMeeting,
-  getMyMeetings,
   getMeetingDetails,
-  getMeetingHistory as fetchMeetingHistory,
   endMeeting as endMeetingAction,
   leaveMeeting,
   admitParticipant,
@@ -45,6 +44,7 @@ import {
   type MeetingHistoryEntry,
   type MeetingRole,
 } from "@/lib/actions/meetings"
+import { useMyMeetings, useMeetingHistory, queryKeys } from "@/lib/hooks/queries"
 import {
   playMeetingCreating,
   playMeetingJoined,
@@ -86,11 +86,10 @@ export default function MeetingsPage() {
 
   /* ── STATE ── */
 
-  const [meetings, setMeetings] = useState<MeetingWithDetails[]>([])
-  const [isLoadingMeetings, setIsLoadingMeetings] = useState(true)
+  const queryClient = useQueryClient()
+  const { data: meetings = [], isLoading: isLoadingMeetings } = useMyMeetings()
+  const { data: meetingHistory = [], isLoading: isLoadingHistory } = useMeetingHistory()
   const [showCreate, setShowCreate] = useState(false)
-  const [meetingHistory, setMeetingHistory] = useState<MeetingHistoryEntry[]>([])
-  const [isLoadingHistory, setIsLoadingHistory] = useState(true)
 
   const [activeMeeting, setActiveMeeting] = useState<MeetingWithDetails | null>(null)
   const [isMuted, setIsMuted] = useState(false)
@@ -130,7 +129,7 @@ export default function MeetingsPage() {
 
   const [isLoudspeaker, setIsLoudspeaker] = useState(true)
   const [screenSharePermissions, setScreenSharePermissions] = useState<Map<string, boolean>>(new Map())
-  const [showMeetingEnded, setShowMeetingEnded] = useState<{ title: string; duration: string } | null>(null)
+  const [showMeetingEnded, setShowMeetingEnded] = useState<{ title: string; duration: string; reason: "ended" | "left" | "kicked" } | null>(null)
   const [isEndingMeeting, setIsEndingMeeting] = useState(false)
   const hasEndedRef = useRef(false)
 
@@ -210,23 +209,7 @@ export default function MeetingsPage() {
 
   /* ── EFFECTS ── */
 
-  useEffect(() => {
-    let cancelled = false
-    getMyMeetings().then((r) => {
-      if (cancelled) return
-      if (r.success && r.meetings) setMeetings(r.meetings)
-      setIsLoadingMeetings(false)
-    })
-    fetchMeetingHistory().then((r) => {
-      if (cancelled) return
-      if (r.success && r.meetings) setMeetingHistory(r.meetings)
-      setIsLoadingHistory(false)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
+  // SSE-based instant refresh: invalidate TanStack Query cache on meeting events
   useEffect(() => {
     if (activeMeeting) return
     let debounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -242,21 +225,18 @@ export default function MeetingsPage() {
       if (refreshEvents.includes(e.type)) {
         if (debounceTimer) clearTimeout(debounceTimer)
         debounceTimer = setTimeout(() => {
-          getMyMeetings().then((r) => {
-            if (r.success && r.meetings) setMeetings(r.meetings)
-          })
-          fetchMeetingHistory().then((r) => {
-            if (r.success && r.meetings) setMeetingHistory(r.meetings)
-          })
+          queryClient.invalidateQueries({ queryKey: queryKeys.meetings })
+          queryClient.invalidateQueries({ queryKey: queryKeys.meetingHistory })
         }, 500)
       }
     }
     window.addEventListener("sse:event", handleMeetingListEvent)
+
     return () => {
       window.removeEventListener("sse:event", handleMeetingListEvent)
       if (debounceTimer) clearTimeout(debounceTimer)
     }
-  }, [activeMeeting])
+  }, [activeMeeting, queryClient])
 
   useEffect(() => {
     const joinId = searchParams.get("join")
@@ -324,10 +304,16 @@ export default function MeetingsPage() {
           setWaitingForApproval(null)
           break
         case "meeting:ended":
-          if (activeMeetingRef.current && !hasEndedRef.current) handleMeetingEnd()
+          if (activeMeetingRef.current && !hasEndedRef.current) handleMeetingEnd("ended")
           break
         case "meeting:kicked":
-          if (activeMeetingRef.current && !hasEndedRef.current) handleMeetingEnd()
+          if (activeMeetingRef.current && !hasEndedRef.current) handleMeetingEnd("kicked")
+          break
+        case "meeting:session-replaced":
+          // User joined from another device — gracefully close this session
+          if (activeMeetingRef.current && !hasEndedRef.current && e.meetingId === activeMeetingRef.current.id) {
+            handleMeetingEnd("left")
+          }
           break
         case "meeting:hand-raised":
           setRaisedHands((prev) => new Set(prev).add(e.userId))
@@ -742,6 +728,12 @@ export default function MeetingsPage() {
       try {
         // Start with audio disabled (muted) per muteOnEntry setting
         await rtkClient.init(authToken, { audio: false, video: false })
+
+        // Start getMeetingDetails in parallel with joinRoom — saves ~100-300ms
+        const detailsPromise = meetingId && !activeMeetingRef.current
+          ? getMeetingDetails(meetingId)
+          : null
+
         await rtkClient.joinRoom()
         setIsJoined(true)
         setIsMuted(true) // Set UI state to muted to match RTK audio state
@@ -750,7 +742,8 @@ export default function MeetingsPage() {
         let meeting = activeMeetingRef.current
 
         if (!meeting && meetingId) {
-          const details = await getMeetingDetails(meetingId)
+          // Await the pre-started details promise instead of fetching sequentially
+          const details = detailsPromise ? await detailsPromise : await getMeetingDetails(meetingId)
           if (details.success && details.meeting) {
             meeting = details.meeting
             setActiveMeeting(meeting)
@@ -1092,16 +1085,12 @@ export default function MeetingsPage() {
     setHasRequestedStage(false)
     // Refresh meetings list after state is cleared
     setTimeout(() => {
-      getMyMeetings().then((r) => {
-        if (r.success && r.meetings) setMeetings(r.meetings)
-      })
-      fetchMeetingHistory().then((r) => {
-        if (r.success && r.meetings) setMeetingHistory(r.meetings)
-      })
+      queryClient.invalidateQueries({ queryKey: queryKeys.meetings })
+      queryClient.invalidateQueries({ queryKey: queryKeys.meetingHistory })
     }, 100)
   }
 
-  function handleMeetingEnd() {
+  function handleMeetingEnd(reason: "ended" | "left" | "kicked" = "ended") {
     if (hasEndedRef.current) return
     hasEndedRef.current = true
     const title = activeMeetingRef.current?.title || "Meeting"
@@ -1116,7 +1105,7 @@ export default function MeetingsPage() {
     playMeetingEnded()
     resetMeetingState()
     setIsEndingMeeting(false)
-    setShowMeetingEnded({ title, duration })
+    setShowMeetingEnded({ title, duration, reason })
   }
 
   async function handleEndMeeting() {
@@ -1126,7 +1115,7 @@ export default function MeetingsPage() {
     const meetingId = activeMeeting.id
     const wasHost = isHost
     // Clean up locally FIRST — instant UI response
-    handleMeetingEnd()
+    handleMeetingEnd(wasHost ? "ended" : "left")
     // Fire-and-forget server notification — don't block UI
     try {
       if (wasHost) endMeetingAction(meetingId).catch(() => {})
@@ -1331,7 +1320,10 @@ export default function MeetingsPage() {
   }
 
   async function handleDeleteHistory(meetingId: string) {
-    setMeetingHistory((prev) => prev.filter((h) => h.id !== meetingId))
+    // Optimistic removal from cache
+    queryClient.setQueryData<MeetingHistoryEntry[]>(queryKeys.meetingHistory, (old) =>
+      old ? old.filter((h) => h.id !== meetingId) : []
+    )
     await deleteMeetingHistory(meetingId)
   }
 
@@ -1372,6 +1364,7 @@ export default function MeetingsPage() {
       <MeetingEndedScreen
         meetingTitle={showMeetingEnded.title}
         duration={showMeetingEnded.duration}
+        reason={showMeetingEnded.reason}
         onReturn={() => {
           hasEndedRef.current = false
           setShowMeetingEnded(null)

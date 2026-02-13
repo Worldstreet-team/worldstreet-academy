@@ -5,7 +5,7 @@ import connectDB from "@/lib/db"
 import { Call, Conversation, User, Message, type ICall, type CallType } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth"
 import { createMeeting, addParticipant } from "@/lib/realtime"
-import { emitCallEvent, type CallEventPayload } from "@/lib/call-events"
+import { emitCallEvent, emitCallEventToMany, type CallEventPayload } from "@/lib/call-events"
 
 // ── Helpers ──
 
@@ -59,7 +59,6 @@ export async function initiateCall(
 ): Promise<{
   success: boolean
   callId?: string
-  authToken?: string
   error?: string
 }> {
   try {
@@ -111,50 +110,20 @@ export async function initiateCall(
     ])
     if (!caller || !receiver) return { success: false, error: "User not found" }
 
-    // NOTE: We don't check DB status for "busy" detection — DB records can be stale.
-    // Instead, the receiver's CallProvider checks if they have a live RTK connection
-    // and auto-declines incoming calls if already in a call.
-
     const callerName = `${caller.firstName} ${caller.lastName}`.trim()
-    const receiverName = `${receiver.firstName} ${receiver.lastName}`.trim()
 
-    // Create Cloudflare RealtimeKit meeting
-    const meetingId = await createMeeting(
-      `${callerName} → ${receiverName} (${type})`
-    )
-
-    // Use a voice preset for audio-only, group_call_host for video
-    const presetName = type === "audio" ? "group_call_host" : "group_call_host"
-
-    // Add both participants in parallel for faster call setup
-    const [callerParticipant, receiverParticipant] = await Promise.all([
-      addParticipant(meetingId, {
-        name: callerName,
-        customParticipantId: currentUser.id,
-        presetName,
-      }),
-      addParticipant(meetingId, {
-        name: receiverName,
-        customParticipantId: receiverId,
-        presetName,
-      }),
-    ])
-
-    // Create call record
+    // ── Phase 1: Create call record and signal receiver immediately (no RTK room yet) ──
     const call = await Call.create({
       conversationId: conversation._id,
       callerId,
       receiverId: recipientId,
       type,
       status: "ringing",
-      meetingId,
-      callerToken: callerParticipant.authToken,
-      receiverToken: receiverParticipant.authToken,
     })
 
-    console.log(`[InitiateCall] Created call ${call._id} from ${callerId} to ${recipientId}`)
+    console.log(`[InitiateCall] Phase 1: Created call ${call._id} — signaling receiver immediately`)
 
-    // Emit SSE event to the receiver
+    // Signal receiver WITHOUT authToken — they'll get it via call:tokens-ready
     const eventPayload: CallEventPayload = {
       type: "call:incoming",
       callId: call._id.toString(),
@@ -164,18 +133,115 @@ export async function initiateCall(
       callerAvatar: caller.avatarUrl || null,
       receiverId,
       conversationId: conversation._id.toString(),
-      authToken: receiverParticipant.authToken,
+      // No authToken — signal-first: ring starts ~400-900ms faster
     }
     await emitCallEvent(receiverId, eventPayload)
 
     return {
       success: true,
       callId: call._id.toString(),
-      authToken: callerParticipant.authToken,
     }
   } catch (error) {
     console.error("Error initiating call:", error)
     return { success: false, error: "Failed to initiate call" }
+  }
+}
+
+// ──────────────────────────────────────────────
+// Phase 2: Prepare RTK room and deliver tokens
+// ──────────────────────────────────────────────
+
+/**
+ * Creates the RTK meeting room and delivers auth tokens to both parties.
+ * Called fire-and-forget by the caller after Phase 1 returns.
+ * Emits `call:tokens-ready` to both caller and receiver via Ably.
+ */
+export async function prepareCallTokens(callId: string): Promise<{
+  success: boolean
+  callerToken?: string
+  error?: string
+}> {
+  try {
+    const currentUser = await initAction()
+    if (!currentUser) return { success: false, error: "Unauthorized" }
+
+    const call = await Call.findById(callId)
+    if (!call) return { success: false, error: "Call not found" }
+    if (call.callerId.toString() !== currentUser.id) {
+      return { success: false, error: "Not authorized" }
+    }
+    // Allow both ringing and ongoing — receiver may answer before tokens are ready
+    if (call.status !== "ringing" && call.status !== "ongoing") {
+      return { success: false, error: "Call is no longer active" }
+    }
+
+    const [caller, receiver] = await Promise.all([
+      User.findById(call.callerId).lean(),
+      User.findById(call.receiverId).lean(),
+    ])
+    if (!caller || !receiver) return { success: false, error: "User not found" }
+
+    const callerName = `${caller.firstName} ${caller.lastName}`.trim()
+    const receiverName = `${receiver.firstName} ${receiver.lastName}`.trim()
+
+    // Create Cloudflare RealtimeKit meeting
+    const meetingId = await createMeeting(
+      `${callerName} → ${receiverName} (${call.type})`
+    )
+
+    const presetName = "group_call_host"
+
+    // Add both participants in parallel
+    const [callerParticipant, receiverParticipant] = await Promise.all([
+      addParticipant(meetingId, {
+        name: callerName,
+        customParticipantId: currentUser.id,
+        presetName,
+      }),
+      addParticipant(meetingId, {
+        name: receiverName,
+        customParticipantId: call.receiverId.toString(),
+        presetName,
+      }),
+    ])
+
+    // Update call record with meeting details
+    call.meetingId = meetingId
+    call.callerToken = callerParticipant.authToken
+    call.receiverToken = receiverParticipant.authToken
+    await call.save()
+
+    console.log(`[PrepareCallTokens] Phase 2: RTK room ready for call ${callId}`)
+
+    // Deliver tokens to BOTH parties via Ably
+    const basePayload: CallEventPayload = {
+      type: "call:tokens-ready",
+      callId: call._id.toString(),
+      callType: call.type,
+      callerId: currentUser.id,
+      callerName,
+      callerAvatar: caller.avatarUrl || null,
+      receiverId: call.receiverId.toString(),
+      conversationId: call.conversationId.toString(),
+    }
+
+    await emitCallEventToMany(
+      [currentUser.id, call.receiverId.toString()],
+      {
+        ...basePayload,
+        // Each user gets both tokens — the client picks the right one based on role
+        authToken: receiverParticipant.authToken,
+        status: callerParticipant.authToken, // piggyback caller token in status field
+      }
+    )
+
+    return {
+      success: true,
+      callerToken: callerParticipant.authToken,
+    }
+  } catch (error) {
+    console.error("Error preparing call tokens:", error)
+    return { success: false, error: "Failed to prepare call" }
   }
 }
 

@@ -28,7 +28,8 @@ import {
   Analytics01Icon,
 } from "@hugeicons/core-free-icons"
 import type { IconSvgElement } from "@hugeicons/react"
-import { fetchBrowseCourses, type BrowseCourse } from "@/lib/actions/student"
+import { type BrowseCourse } from "@/lib/actions/student"
+import { useBrowseCourses } from "@/lib/hooks/queries"
 
 /* ── Types ────────────────────────────────────────────── */
 type CommandItem = {
@@ -301,15 +302,10 @@ export function CommandSearch() {
   const [open, setOpen] = React.useState(false)
   const [query, setQuery] = React.useState("")
   const [activeIndex, setActiveIndex] = React.useState(0)
-  const [courses, setCourses] = React.useState<BrowseCourse[]>([])
+  const { data: courses = [] } = useBrowseCourses()
   const listRef = React.useRef<HTMLDivElement>(null)
   const inputRef = React.useRef<HTMLInputElement>(null)
   const isMobile = useIsMobile()
-
-  // Load courses when component mounts
-  React.useEffect(() => {
-    fetchBrowseCourses().then(setCourses).catch(console.error)
-  }, [])
 
   const items = useCommandItems(courses)
 

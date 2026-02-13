@@ -15,7 +15,8 @@ import {
   CarouselPrevious,
   CarouselNext,
 } from "@/components/ui/carousel"
-import { fetchInstructorCourses, type InstructorCourseItem } from "@/lib/actions/instructor"
+import { type InstructorCourseItem } from "@/lib/actions/instructor"
+import { useInstructorCourses } from "@/lib/hooks/queries"
 import { InstructorCoursesPageSkeleton } from "@/components/skeletons/course-skeletons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
@@ -82,15 +83,8 @@ function CourseCard({
 }
 
 export default function InstructorCoursesPage() {
-  const [courses, setCourses] = React.useState<InstructorCourseItem[]>([])
-  const [isLoading, setIsLoading] = React.useState(true)
   const [courseSearch, setCourseSearch] = React.useState("")
-
-  React.useEffect(() => {
-    fetchInstructorCourses()
-      .then(setCourses)
-      .finally(() => setIsLoading(false))
-  }, [])
+  const { data: courses = [], isLoading } = useInstructorCourses()
 
   const totalStudents = courses.reduce((s, c) => s + c.enrolledCount, 0)
   const publishedCount = courses.filter((c) => c.status === "published").length

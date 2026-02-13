@@ -19,14 +19,10 @@ import {
 } from "@/components/ui/carousel"
 import { EmptyState } from "@/components/shared/empty-state"
 import { 
-  fetchMyEnrollments, 
-  fetchMyBookmarks, 
-  fetchBrowseCourses,
-  toggleCourseBookmark,
   type StudentEnrollment,
-  type StudentBookmark,
   type BrowseCourse,
 } from "@/lib/actions/student"
+import { useEnrollments, useBookmarks, useBookmarkedIds, useBrowseCourses, useToggleBookmark } from "@/lib/hooks/queries"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   ArrowRight01Icon,
@@ -58,53 +54,17 @@ function CourseCardSkeleton() {
 export default function DashboardPage() {
   const user = useUser()
   const [courseSearch, setCourseSearch] = React.useState("")
-  const [enrollments, setEnrollments] = React.useState<StudentEnrollment[]>([])
-  const [bookmarks, setBookmarks] = React.useState<StudentBookmark[]>([])
-  const [browseCourses, setBrowseCourses] = React.useState<BrowseCourse[]>([])
-  const [bookmarkedIds, setBookmarkedIds] = React.useState<Set<string>>(new Set())
-  const [isLoading, setIsLoading] = React.useState(true)
 
-  // Fetch data on mount
-  React.useEffect(() => {
-    async function loadData() {
-      try {
-        const [enrollmentsData, bookmarksData, browseData] = await Promise.all([
-          fetchMyEnrollments(),
-          fetchMyBookmarks(),
-          fetchBrowseCourses(),
-        ])
-        setEnrollments(enrollmentsData)
-        setBookmarks(bookmarksData)
-        setBrowseCourses(browseData)
-        setBookmarkedIds(new Set(bookmarksData.map((b) => b.courseId)))
-      } catch (error) {
-        console.error("Failed to load dashboard data:", error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    loadData()
-  }, [])
+  const { data: enrollments = [], isLoading: isLoadingEnrollments } = useEnrollments()
+  const { data: bookmarks = [], isLoading: isLoadingBookmarks } = useBookmarks()
+  const { data: browseCourses = [], isLoading: isLoadingBrowse } = useBrowseCourses()
+  const bookmarkedIds = useBookmarkedIds()
+  const toggleBookmark = useToggleBookmark()
 
-  const handleToggleBookmark = async (courseId: string) => {
-    // Optimistic update
-    setBookmarkedIds((prev) => {
-      const newSet = new Set(prev)
-      if (newSet.has(courseId)) {
-        newSet.delete(courseId)
-      } else {
-        newSet.add(courseId)
-      }
-      return newSet
-    })
-    
-    const result = await toggleCourseBookmark(courseId)
-    if (result.success) {
-      // Refresh bookmarks list
-      const updatedBookmarks = await fetchMyBookmarks()
-      setBookmarks(updatedBookmarks)
-      setBookmarkedIds(new Set(updatedBookmarks.map((b) => b.courseId)))
-    }
+  const isLoading = isLoadingEnrollments || isLoadingBookmarks || isLoadingBrowse
+
+  const handleToggleBookmark = (courseId: string) => {
+    toggleBookmark.mutate(courseId)
   }
 
   const filteredEnrolled = React.useMemo(() => {
