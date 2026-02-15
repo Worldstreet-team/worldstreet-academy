@@ -177,8 +177,14 @@ export function AppSidebar() {
 
   function handleLogout() {
     startTransition(async () => {
-      await signOut()
-      window.location.href = "https://www.worldstreetgold.com/login"
+      try {
+        await signOut()
+      } catch (error) {
+        console.error("Sign out error:", error)
+      } finally {
+        // Always redirect regardless of signOut result
+        window.location.href = "https://www.worldstreetgold.com/login"
+      }
     })
   }
 
