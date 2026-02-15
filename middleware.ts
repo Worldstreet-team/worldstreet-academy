@@ -16,7 +16,7 @@ export default clerkMiddleware(async (auth, request) => {
     const { userId } = await auth()
 
     if (!userId) {
-      const returnUrl = `${request.nextUrl.origin}${pathname}${request.nextUrl.search}`
+      const returnUrl = `https://academy.worldstreetgold.com${pathname}${request.nextUrl.search}`
       const authUrl = new URL(signInUrl)
       authUrl.searchParams.set("redirect", returnUrl)
       return NextResponse.redirect(authUrl)
