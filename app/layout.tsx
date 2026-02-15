@@ -42,6 +42,9 @@ export default function RootLayout({
       domain="worldstreetgold.com"
       isSatellite={true}
       signInUrl="https://www.worldstreetgold.com/login"
+      signUpUrl="https://www.worldstreetgold.com/register"
+      signInFallbackRedirectUrl="https://academy.worldstreetgold.com/dashboard"
+      signUpFallbackRedirectUrl="https://academy.worldstreetgold.com/dashboard"
     >
       <html lang="en" className={publicSans.variable} suppressHydrationWarning>
         <body
