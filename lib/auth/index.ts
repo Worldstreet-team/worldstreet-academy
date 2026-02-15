@@ -12,19 +12,12 @@ export type {
 
 export type { LocalUser } from "./sync"
 
-// Server actions
+// Server actions (Clerk-based)
 export {
-  registerAction,
-  loginAction,
   logoutAction,
   logoutAllAction,
   getCurrentUser,
   verifyAuth,
-  forgotPasswordAction,
-  resetPasswordAction,
-  changePasswordAction,
-  resendVerificationAction,
-  refreshTokensAction,
   isAuthenticated,
   getAccessToken,
 } from "./actions"
@@ -35,9 +28,3 @@ export {
   getLocalUserByAuthId,
   getLocalUserById,
 } from "./sync"
-
-// Redirect helper
-export { buildLoginRedirectUrl } from "./redirect"
-
-// Service (server-side only)
-export * as authService from "./service"

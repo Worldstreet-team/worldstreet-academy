@@ -41,7 +41,7 @@ import {
   Video01Icon,
 } from "@hugeicons/core-free-icons"
 import { useUser } from "@/components/providers/user-provider"
-import { logoutAction } from "@/lib/auth/actions"
+import { useClerk } from "@clerk/nextjs"
 import { useUnreadCount } from "@/lib/hooks/use-unread-count"
 import { useOngoingCall, useActiveCallInfo } from "@/components/providers/call-provider"
 import { useSidebarActivity } from "@/lib/hooks/use-sidebar-activity"
@@ -154,6 +154,7 @@ export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const user = useUser()
+  const { signOut } = useClerk()
   const [isPending, startTransition] = useTransition()
   const unreadCount = useUnreadCount()
   const hasOngoingCall = useOngoingCall()
@@ -176,7 +177,8 @@ export function AppSidebar() {
 
   function handleLogout() {
     startTransition(async () => {
-      await logoutAction()
+      await signOut()
+      window.location.href = "https://www.worldstreetgold.com/login"
     })
   }
 

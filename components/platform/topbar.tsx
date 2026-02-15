@@ -28,7 +28,7 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import { UserIcon, Settings01Icon, Logout01Icon, Search01Icon, CommandIcon, TeachingIcon, DashboardSpeed01Icon } from "@hugeicons/core-free-icons"
 import { NotificationBell } from "@/components/shared/notification-bell"
 import { useUser } from "@/components/providers/user-provider"
-import { logoutAction } from "@/lib/auth/actions"
+import { useClerk } from "@clerk/nextjs"
 
 /* ── Path → breadcrumb label map ────────────────────────── */
 const labelMap: Record<string, string> = {
@@ -74,6 +74,7 @@ export function Topbar({ title, variant = "platform", breadcrumbOverrides }: Top
   const pathname = usePathname()
   const crumbs = buildCrumbs(pathname, breadcrumbOverrides)
   const user = useUser()
+  const { signOut } = useClerk()
   const [isPending, startTransition] = useTransition()
 
   const userInitials = `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`.toUpperCase() || "U"
@@ -81,7 +82,8 @@ export function Topbar({ title, variant = "platform", breadcrumbOverrides }: Top
 
   function handleLogout() {
     startTransition(async () => {
-      await logoutAction()
+      await signOut()
+      window.location.href = "https://www.worldstreetgold.com/login"
     })
   }
 

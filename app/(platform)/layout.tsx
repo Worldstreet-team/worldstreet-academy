@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation"
-import { headers } from "next/headers"
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/platform/app-sidebar"
 import { PlatformBottomNav } from "@/components/platform/bottom-nav"
@@ -9,7 +8,6 @@ import { CallProvider } from "@/components/providers/call-provider"
 import { MeetingProvider } from "@/components/providers/meeting-provider"
 import { QueryProvider } from "@/components/providers/query-provider"
 import { getCurrentUser } from "@/lib/auth"
-import { buildLoginRedirectUrl } from "@/lib/auth/redirect"
 
 export default async function PlatformLayout({
   children,
@@ -19,9 +17,7 @@ export default async function PlatformLayout({
   const user = await getCurrentUser()
 
   if (!user) {
-    const headersList = await headers()
-    const currentPath = headersList.get("x-next-pathname") || "/dashboard"
-    redirect(await buildLoginRedirectUrl(currentPath))
+    redirect("https://www.worldstreetgold.com/login")
   }
 
   return (
