@@ -237,7 +237,7 @@ export function PreviewVideoPlayer({
             <Button
               size="sm"
               className="gap-2"
-              render={<Link href={`/courses/${courseId}`} />}
+              render={<Link href={`/dashboard/courses/${courseId}`} />}
             >
               <HugeiconsIcon icon={ShoppingCart01Icon} size={16} />
               {coursePricing === "free" || !coursePrice

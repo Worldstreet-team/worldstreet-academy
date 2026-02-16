@@ -333,7 +333,7 @@ export default function DashboardPage() {
                     className="pl-3 basis-[85%] sm:basis-1/2 lg:basis-1/3 2xl:basis-1/4"
                   >
                     <Link
-                      href={`/courses/${course.id}`}
+                      href={`/dashboard/courses/${course.id}`}
                       className="group block"
                     >
                       <Card className="h-full transition-all hover:shadow-md hover:border-primary/30">
@@ -478,7 +478,7 @@ export default function DashboardPage() {
                     className="pl-3 basis-[85%] sm:basis-1/2 lg:basis-1/3 2xl:basis-1/4"
                   >
                     <Link
-                      href={`/courses/${bookmark.courseId}`}
+                      href={`/dashboard/courses/${bookmark.courseId}`}
                       className="group block"
                     >
                       <Card className="h-full transition-all hover:shadow-md hover:border-primary/30">

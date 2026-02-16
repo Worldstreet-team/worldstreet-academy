@@ -5,6 +5,8 @@ import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { fetchCourseForLearning, fetchOtherCourses, getCompletedLessons } from "@/lib/actions/student"
+import { getCourseRatingSummary, getUserReview } from "@/lib/actions/reviews"
+import { getCurrentUser } from "@/lib/auth"
 import { LessonVideoPlayer } from "@/components/learn/lesson-video-player"
 import { LessonSidebar } from "@/components/learn/lesson-sidebar"
 import { CourseCarousel } from "@/components/learn/course-carousel"
@@ -39,9 +41,12 @@ export default async function LessonPage({
   const prevLesson = currentIndex > 0 ? lessons[currentIndex - 1] : null
   const nextLesson = currentIndex < lessons.length - 1 ? lessons[currentIndex + 1] : null
 
-  const [otherCourses, completedLessonIds] = await Promise.all([
+  const currentUser = await getCurrentUser()
+  const [otherCourses, completedLessonIds, ratingSummary, userReview] = await Promise.all([
     fetchOtherCourses(courseId),
     getCompletedLessons(courseId),
+    getCourseRatingSummary(courseId),
+    currentUser ? getUserReview(currentUser.id, courseId) : Promise.resolve(null),
   ])
 
   return (
@@ -216,7 +221,14 @@ export default async function LessonPage({
               
               {/* Rating */}
               <div className="pt-2 border-t">
-                <CourseRating courseId={courseId} currentRating={course.rating ?? undefined} inline />
+                <CourseRating
+                  courseId={courseId}
+                  currentRating={ratingSummary?.average}
+                  ratingCount={ratingSummary?.count}
+                  userRating={userReview?.rating}
+                  userReviewId={userReview?.id}
+                  inline
+                />
               </div>
             </div>
 

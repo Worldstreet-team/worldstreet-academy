@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import mongoose from "mongoose"
 import connectDB from "@/lib/db"
 import { Review, Course, Enrollment } from "@/lib/db/models"
 import { z } from "zod/v4"
@@ -426,10 +427,11 @@ export async function getUserReview(
  * Recalculate and update course rating aggregate
  */
 async function updateCourseRating(courseId: string) {
+  const objectId = new mongoose.Types.ObjectId(courseId)
   const stats = await Review.aggregate([
     {
       $match: {
-        course: courseId,
+        course: objectId,
         isApproved: true,
         isHidden: false,
       },

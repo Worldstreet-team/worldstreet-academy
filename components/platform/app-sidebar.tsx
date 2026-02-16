@@ -39,6 +39,7 @@ import {
   PlayIcon,
   UserMultipleIcon,
   Video01Icon,
+  Certificate01Icon,
 } from "@hugeicons/core-free-icons"
 import { useUser } from "@/components/providers/user-provider"
 import { useClerk } from "@clerk/nextjs"
@@ -77,6 +78,12 @@ const mainItems: NavItem[] = [
     href: "/dashboard/bookmarks",
     icon: Bookmark01Icon,
     match: (p) => p === "/dashboard/bookmarks",
+  },
+  {
+    title: "Certificates",
+    href: "/dashboard/certificates",
+    icon: Certificate01Icon,
+    match: (p) => p === "/dashboard/certificates" || p.includes("/certificate"),
   },
   {
     title: "Instructor Dashboard",

@@ -55,6 +55,13 @@ export default async function CourseDetailPage({
   ])
   const isEnrolled = enrollmentStatus.isEnrolled
 
+  // Calculate instructor's average rating across all their courses
+  const ratedInstructorCourses = instructorCourses.filter((c) => c.rating != null && c.rating > 0)
+  const instructorAvgRating =
+    ratedInstructorCourses.length > 0
+      ? ratedInstructorCourses.reduce((sum, c) => sum + (c.rating ?? 0), 0) / ratedInstructorCourses.length
+      : undefined
+
   // Filter out the current course from instructor's courses
   const otherInstructorCourses = instructorCourses.filter(
     (c) => c.id !== course.id
@@ -233,6 +240,7 @@ export default async function CourseDetailPage({
             otherCourses={otherInstructorCourses}
             enrolledCourses={enrolledFromInstructor}
             totalStudents={course.instructorTotalStudents}
+            averageRating={instructorAvgRating}
           />
 
           {/* CTA */}
