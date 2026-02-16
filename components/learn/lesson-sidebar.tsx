@@ -15,6 +15,7 @@ type LessonSidebarProps = {
   currentLessonId: string
   nextLessonId: string | null
   completedLessonIds?: string[]
+  watchProgressMap?: Record<string, number>
 }
 
 const typeIcons = {
@@ -56,6 +57,7 @@ export function LessonSidebar({
   currentLessonId,
   nextLessonId,
   completedLessonIds = [],
+  watchProgressMap = {},
 }: LessonSidebarProps) {
   const completedCount = completedLessonIds.length
   
@@ -74,6 +76,7 @@ export function LessonSidebar({
               const isCurrent = lesson.id === currentLessonId
               const isUpNext = lesson.id === nextLessonId
               const isCompleted = completedLessonIds.includes(lesson.id)
+              const watchPercent = watchProgressMap[lesson.id] ?? 0
 
               return (
                 <motion.div
@@ -137,7 +140,19 @@ export function LessonSidebar({
                       <p className="text-xs text-muted-foreground capitalize">
                         {lesson.type}
                         {lesson.duration ? ` · ${Math.floor(lesson.duration / 60)}:${String(lesson.duration % 60).padStart(2, '0')}` : ""}
+                        {watchPercent > 0 && !isCompleted && (
+                          <span className="text-primary"> · {watchPercent}%</span>
+                        )}
                       </p>
+                      {/* Watch progress bar */}
+                      {watchPercent > 0 && !isCompleted && (
+                        <div className="mt-1 h-1 w-full rounded-full bg-muted overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-primary transition-all duration-300"
+                            style={{ width: `${watchPercent}%` }}
+                          />
+                        </div>
+                      )}
                     </div>
                     <AnimatePresence mode="wait">
                       {isCurrent ? (

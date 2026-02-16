@@ -19,6 +19,7 @@ import {
 } from "@hugeicons/core-free-icons"
 import { cn } from "@/lib/utils"
 import { AnimatePresence, motion } from "motion/react"
+import { saveWatchProgress } from "@/lib/actions/watch-progress"
 import {
   Popover,
   PopoverTrigger,
@@ -45,10 +46,12 @@ type Lesson = {
 type VideoPlayerProps = {
   src: string
   courseId: string
+  lessonId?: string
   nextLesson: Lesson | null
   currentTitle: string
   onLightsOut?: (active: boolean) => void
   onComplete?: () => void
+  initialTime?: number
 }
 
 const PLAYBACK_RATES = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
@@ -67,10 +70,12 @@ function formatTime(seconds: number) {
 export function VideoPlayer({
   src,
   courseId,
+  lessonId,
   nextLesson,
   currentTitle,
   onLightsOut,
   onComplete,
+  initialTime,
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -116,6 +121,9 @@ export function VideoPlayer({
 
   // Mobile settings drawer
   const [showMobileSettings, setShowMobileSettings] = useState(false)
+
+  // Buffering state
+  const [isBuffering, setIsBuffering] = useState(false)
 
   const router = useRouter()
 
@@ -188,6 +196,56 @@ export function VideoPlayer({
     raf = requestAnimationFrame(sync)
     return () => cancelAnimationFrame(raf)
   }, [])
+
+  /* ---- Resume from saved position ---- */
+  const hasResumed = useRef(false)
+  useEffect(() => {
+    if (hasResumed.current || initialTime == null || initialTime <= 0) return
+    const video = videoRef.current
+    if (!video) return
+    const tryResume = () => {
+      if (video.duration && isFinite(video.duration) && video.readyState >= 1) {
+        video.currentTime = Math.min(initialTime, video.duration - 1)
+        setCurrentTime(video.currentTime)
+        hasResumed.current = true
+      }
+    }
+    if (video.readyState >= 1) {
+      tryResume()
+    } else {
+      video.addEventListener("loadedmetadata", tryResume, { once: true })
+      return () => video.removeEventListener("loadedmetadata", tryResume)
+    }
+  }, [initialTime])
+
+  /* ---- Periodically save watch progress (every 5s) ---- */
+  useEffect(() => {
+    if (!lessonId) return
+    const interval = setInterval(() => {
+      const video = videoRef.current
+      if (!video || video.paused || !isFinite(video.duration)) return
+      saveWatchProgress(courseId, lessonId, video.currentTime, video.duration)
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [courseId, lessonId])
+
+  /* ---- Save progress on unmount / page hide ---- */
+  useEffect(() => {
+    if (!lessonId) return
+    const saveOnLeave = () => {
+      const video = videoRef.current
+      if (!video || !isFinite(video.duration)) return
+      saveWatchProgress(courseId, lessonId, video.currentTime, video.duration)
+    }
+    window.addEventListener("beforeunload", saveOnLeave)
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") saveOnLeave()
+    })
+    return () => {
+      saveOnLeave()
+      window.removeEventListener("beforeunload", saveOnLeave)
+    }
+  }, [courseId, lessonId])
 
   const handleEnded = useCallback(() => {
     setIsPlaying(false)
@@ -524,6 +582,10 @@ export function VideoPlayer({
         onLoadedMetadata={handleLoadedMetadata}
         onEnded={handleEnded}
         onClick={handleVideoTap}
+        onWaiting={() => setIsBuffering(true)}
+        onPlaying={() => setIsBuffering(false)}
+        onCanPlay={() => setIsBuffering(false)}
+        onSeeked={() => setIsBuffering(false)}
         preload="auto"
         playsInline
       />
@@ -554,6 +616,31 @@ export function VideoPlayer({
       </AnimatePresence>
 
       {/* ---- OSD flash (volume %, speed, skip) ---- */}
+      <AnimatePresence>
+        {isBuffering && isPlaying && (
+          <motion.div
+            key="buffering"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="absolute inset-0 flex items-center justify-center pointer-events-none z-20"
+          >
+            <div className="flex h-12 w-12 md:h-14 md:w-14 items-center justify-center rounded-full bg-black/50 backdrop-blur-sm">
+              <svg
+                className="animate-spin h-6 w-6 md:h-7 md:w-7 text-white"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {osd && (
           <motion.div

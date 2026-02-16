@@ -1,9 +1,10 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useTransition } from "react"
+import { useTransition, useEffect, useState } from "react"
 import { VideoPlayer } from "@/components/learn/video-player"
 import { markLessonComplete } from "@/lib/actions/student"
+import { getLessonWatchProgress } from "@/lib/actions/watch-progress"
 
 type Lesson = {
   id: string
@@ -29,6 +30,16 @@ export function LessonVideoPlayer({
 }: LessonVideoPlayerProps) {
   const router = useRouter()
   const [, startTransition] = useTransition()
+  const [initialTime, setInitialTime] = useState<number | undefined>(undefined)
+  
+  // Fetch saved watch position on mount
+  useEffect(() => {
+    getLessonWatchProgress(lessonId).then((progress) => {
+      if (progress && progress.currentTime > 0) {
+        setInitialTime(progress.currentTime)
+      }
+    })
+  }, [lessonId])
   
   const handleComplete = () => {
     startTransition(async () => {
@@ -41,9 +52,11 @@ export function LessonVideoPlayer({
     <VideoPlayer
       src={src}
       courseId={courseId}
+      lessonId={lessonId}
       currentTitle={currentTitle}
       nextLesson={nextLesson}
       onComplete={handleComplete}
+      initialTime={initialTime}
     />
   )
 }

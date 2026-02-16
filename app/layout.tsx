@@ -30,6 +30,10 @@ export const metadata: Metadata = {
   },
   description:
     "Learn cryptocurrency trading, DeFi, risk management, and blockchain development from industry experts.",
+  icons: {
+    icon: "/worldstreet-logo/WorldStreet1.png",
+    apple: "/worldstreet-logo/WorldStreet1.png",
+  },
 };
 
 export default function RootLayout({

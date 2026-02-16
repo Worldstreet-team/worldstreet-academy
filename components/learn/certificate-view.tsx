@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback } from "react"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
@@ -110,12 +111,13 @@ function CertificatePreview({ data }: { data: CertificateData }) {
 
           {/* Seal */}
           <div className="flex flex-col items-center">
-            <svg className="w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 text-neutral-800" viewBox="0 0 64 64" fill="none">
-              <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="1" />
-              <circle cx="32" cy="32" r="24" stroke="currentColor" strokeWidth="0.5" />
-              <text x="32" y="29" textAnchor="middle" className="text-[5px] sm:text-[6px]" fill="currentColor" fontWeight="600" letterSpacing="1.5">WORLDSTREET</text>
-              <text x="32" y="37" textAnchor="middle" className="text-[4px] sm:text-[5px]" fill="currentColor" letterSpacing="1">ACADEMY</text>
-            </svg>
+            <Image
+              src="/worldstreet-logo/WorldStreet3x.png"
+              alt="WorldStreet Academy"
+              width={64}
+              height={64}
+              className="w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 object-contain"
+            />
           </div>
 
           {/* Instructor */}
@@ -143,6 +145,20 @@ export function CertificateClient({ data }: { data: CertificateData }) {
 
     const w = 297
     const h = 210
+
+    // Load WorldStreet logo for the seal
+    let logoDataUrl: string | null = null
+    try {
+      const resp = await fetch("/worldstreet-logo/WorldStreet3x.png")
+      const blob = await resp.blob()
+      logoDataUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader()
+        reader.onloadend = () => resolve(reader.result as string)
+        reader.readAsDataURL(blob)
+      })
+    } catch {
+      // Fallback to text seal if image fails
+    }
 
     // White background
     doc.setFillColor(255, 255, 255)
@@ -266,18 +282,22 @@ export function CertificateClient({ data }: { data: CertificateData }) {
     doc.setTextColor(60, 60, 60)
     doc.text(dateFormatted, 70, botY + 11, { align: "center" })
 
-    // Seal (center)
-    doc.setDrawColor(30, 30, 30)
-    doc.setLineWidth(0.4)
-    doc.circle(cx, botY + 2, 12)
-    doc.setLineWidth(0.2)
-    doc.circle(cx, botY + 2, 10)
-    doc.setFont("helvetica", "bold")
-    doc.setFontSize(5)
-    doc.setTextColor(30, 30, 30)
-    doc.text("WORLDSTREET", cx, botY, { align: "center" })
-    doc.setFontSize(4)
-    doc.text("ACADEMY", cx, botY + 4, { align: "center" })
+    // Seal (center) — use logo image if available
+    if (logoDataUrl) {
+      doc.addImage(logoDataUrl, "PNG", cx - 12, botY - 10, 24, 24)
+    } else {
+      doc.setDrawColor(30, 30, 30)
+      doc.setLineWidth(0.4)
+      doc.circle(cx, botY + 2, 12)
+      doc.setLineWidth(0.2)
+      doc.circle(cx, botY + 2, 10)
+      doc.setFont("helvetica", "bold")
+      doc.setFontSize(5)
+      doc.setTextColor(30, 30, 30)
+      doc.text("WORLDSTREET", cx, botY, { align: "center" })
+      doc.setFontSize(4)
+      doc.text("ACADEMY", cx, botY + 4, { align: "center" })
+    }
 
     // Instructor (right)
     doc.setDrawColor(180, 180, 180)

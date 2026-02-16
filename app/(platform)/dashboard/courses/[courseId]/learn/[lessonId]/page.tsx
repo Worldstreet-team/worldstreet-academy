@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { fetchCourseForLearning, fetchOtherCourses, getCompletedLessons } from "@/lib/actions/student"
 import { getCourseRatingSummary, getUserReview } from "@/lib/actions/reviews"
+import { getCourseWatchProgress } from "@/lib/actions/watch-progress"
 import { getCurrentUser } from "@/lib/auth"
 import { LessonVideoPlayer } from "@/components/learn/lesson-video-player"
 import { LessonSidebar } from "@/components/learn/lesson-sidebar"
@@ -42,12 +43,19 @@ export default async function LessonPage({
   const nextLesson = currentIndex < lessons.length - 1 ? lessons[currentIndex + 1] : null
 
   const currentUser = await getCurrentUser()
-  const [otherCourses, completedLessonIds, ratingSummary, userReview] = await Promise.all([
+  const [otherCourses, completedLessonIds, ratingSummary, userReview, watchProgress] = await Promise.all([
     fetchOtherCourses(courseId),
     getCompletedLessons(courseId),
     getCourseRatingSummary(courseId),
     currentUser ? getUserReview(currentUser.id, courseId) : Promise.resolve(null),
+    getCourseWatchProgress(courseId),
   ])
+
+  // Build a map of lessonId -> watch percent
+  const watchProgressMap: Record<string, number> = {}
+  watchProgress.forEach((wp) => {
+    watchProgressMap[wp.lessonId] = wp.percent
+  })
 
   return (
     <div className="flex min-h-svh flex-col lg:h-svh">
@@ -183,6 +191,7 @@ export default async function LessonPage({
                   currentLessonId={actualLessonId}
                   nextLessonId={nextLesson?.id ?? null}
                   completedLessonIds={completedLessonIds}
+                  watchProgressMap={watchProgressMap}
                 />
               </div>
             </div>
@@ -252,6 +261,7 @@ export default async function LessonPage({
           currentLessonId={actualLessonId}
           nextLessonId={nextLesson?.id ?? null}
           completedLessonIds={completedLessonIds}
+          watchProgressMap={watchProgressMap}
         />
       </div>
     </div>
