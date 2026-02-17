@@ -106,6 +106,20 @@ function CertificatePreview({
         />
       </div>
 
+      {/* ── Unsigned overlay (prevents screenshots) ────────────── */}
+      {!data.instructorSignatureUrl && (
+        <div className="absolute inset-0 bg-white/80 dark:bg-neutral-950/80 backdrop-blur-sm flex items-center justify-center pointer-events-none z-10">
+          <div className="text-center space-y-2">
+            <p className="text-lg sm:text-xl md:text-2xl font-semibold text-neutral-800 dark:text-neutral-200">
+              Pending Instructor Signature
+            </p>
+            <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400">
+              This certificate will be available once your instructor signs it
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* ── Content ────────────────────────────────────────────── */}
       <div className="relative h-full flex flex-col items-center justify-between px-8 py-10 sm:px-10 sm:py-12 md:px-20 md:py-14">
         {/* Header — Logo + Institution */}
@@ -461,9 +475,14 @@ export function CertificateClient({ data }: { data: CertificateData }) {
           My Certificates
         </Button>
 
-        <Button size="sm" onClick={downloadPDF} className="gap-1.5">
+        <Button
+          size="sm"
+          onClick={downloadPDF}
+          disabled={!data.instructorSignatureUrl}
+          className="gap-1.5"
+        >
           <HugeiconsIcon icon={Download01Icon} size={16} />
-          Download PDF
+          {data.instructorSignatureUrl ? "Download PDF" : "Awaiting Signature"}
         </Button>
       </div>
 
@@ -524,36 +543,14 @@ export function CertificateClient({ data }: { data: CertificateData }) {
               )}
             </div>
 
-            {/* Divider */}
-            <div className="w-full max-w-xs h-px bg-neutral-100 dark:bg-neutral-800" />
-
-            {/* Instructor signature */}
-            <div className="flex flex-col items-center gap-2">
-              <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
-                Instructor Signature
-              </p>
-              {data.instructorSignatureUrl ? (
-                <>
-                  <div className="w-48 h-16 rounded-lg border border-neutral-200 dark:border-neutral-700 flex items-center justify-center overflow-hidden">
-                    <img
-                      src={data.instructorSignatureUrl}
-                      alt="Instructor signature"
-                      className="h-full w-auto object-contain p-2"
-                    />
-                  </div>
-                  <div className="flex items-center gap-1 text-emerald-600">
-                    <HugeiconsIcon icon={Tick02Icon} size={12} />
-                    <span className="text-[10px] font-medium">Signed</span>
-                  </div>
-                </>
-              ) : (
-                <div className="w-48 h-16 rounded-lg border-2 border-dashed border-neutral-200 dark:border-neutral-700 flex items-center justify-center">
-                  <span className="text-[10px] text-muted-foreground">
-                    Awaiting signature
-                  </span>
-                </div>
-              )}
-            </div>
+            {/* Status message for unsigned certificates */}
+            {!data.instructorSignatureUrl && (
+              <div className="w-full text-center py-2">
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  ⏳ Your instructor needs to sign this certificate before you can download it
+                </p>
+              </div>
+            )}
           </div>
 
           {isSigned && (

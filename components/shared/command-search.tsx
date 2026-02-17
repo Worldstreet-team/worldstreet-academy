@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Image from "next/image"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { useTheme } from "next-themes"
 import {
   Dialog,
@@ -43,11 +43,11 @@ type CommandItem = {
 }
 
 /* ── Pages & tools factory ────────────────────────────── */
-function useCommandItems(courses: BrowseCourse[]) {
+function useCommandItems(courses: BrowseCourse[], isInstructor: boolean) {
   const router = useRouter()
   const { resolvedTheme, setTheme } = useTheme()
 
-  const pages: CommandItem[] = [
+  const studentPages: CommandItem[] = [
     {
       id: "page-dashboard",
       label: "Dashboard",
@@ -105,6 +105,59 @@ function useCommandItems(courses: BrowseCourse[]) {
       section: "pages",
     },
   ]
+
+  const instructorPages: CommandItem[] = [
+    {
+      id: "page-instructor-dashboard",
+      label: "Instructor Dashboard",
+      description: "View analytics and stats",
+      icon: Analytics01Icon,
+      action: () => router.push("/instructor"),
+      section: "pages",
+    },
+    {
+      id: "page-my-courses",
+      label: "My Courses",
+      description: "Manage your courses",
+      icon: BookOpen01Icon,
+      action: () => router.push("/instructor/courses"),
+      section: "pages",
+    },
+    {
+      id: "page-certificates",
+      label: "Certificates & Ratings",
+      description: "View student certificates",
+      icon: Bookmark01Icon,
+      action: () => router.push("/instructor/certificates"),
+      section: "pages",
+    },
+    {
+      id: "page-new-course",
+      label: "Create New Course",
+      description: "Start a new course",
+      icon: Settings01Icon,
+      action: () => router.push("/instructor/courses/new"),
+      section: "pages",
+    },
+    {
+      id: "page-settings",
+      label: "Settings",
+      description: "Instructor settings",
+      icon: Settings01Icon,
+      action: () => router.push("/instructor/settings"),
+      section: "pages",
+    },
+    {
+      id: "page-student-view",
+      label: "Student Dashboard",
+      description: "Switch to student view",
+      icon: Home01Icon,
+      action: () => router.push("/dashboard"),
+      section: "pages",
+    },
+  ]
+
+  const pages = isInstructor ? instructorPages : studentPages
 
   const tools: CommandItem[] = [
     {
@@ -306,8 +359,12 @@ export function CommandSearch() {
   const listRef = React.useRef<HTMLDivElement>(null)
   const inputRef = React.useRef<HTMLInputElement>(null)
   const isMobile = useIsMobile()
+  const pathname = usePathname()
+  
+  // Detect if user is on instructor routes
+  const isInstructor = pathname?.startsWith("/instructor") ?? false
 
-  const items = useCommandItems(courses)
+  const items = useCommandItems(courses, isInstructor)
 
   const filtered = React.useMemo(() => {
     if (!query.trim()) return items

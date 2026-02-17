@@ -38,6 +38,7 @@ import {
   PlayIcon,
   UserMultipleIcon,
   Video01Icon,
+  Certificate01Icon,
 } from "@hugeicons/core-free-icons"
 import { useUser } from "@/components/providers/user-provider"
 import { useClerk } from "@clerk/nextjs"
@@ -73,6 +74,12 @@ const teachItems: NavItem[] = [
     href: "/instructor/courses/new",
     icon: Add01Icon,
     match: (p) => p === "/instructor/courses/new",
+  },
+  {
+    title: "Certificates",
+    href: "/instructor/certificates",
+    icon: Certificate01Icon,
+    match: (p) => p === "/instructor/certificates",
   },
   {
     title: "Analytics",
