@@ -44,6 +44,7 @@ export type LocalUser = {
   lastName: string
   bio: string | null
   avatarUrl: string | null
+  signatureUrl: string | null
   role: "USER" | "INSTRUCTOR" | "ADMIN"
   verified: boolean
   walletBalance: number
@@ -135,6 +136,7 @@ export async function syncUserToLocal(authUser: AuthUser, updateNames = true): P
     lastName: user.lastName,
     bio: user.bio,
     avatarUrl: user.avatarUrl,
+    signatureUrl: user.signatureUrl ?? null,
     role: user.role,
     verified: user.verified,
     walletBalance: user.walletBalance,
@@ -165,6 +167,7 @@ export async function getLocalUserByAuthId(authUserId: string): Promise<LocalUse
     lastName: user.lastName,
     bio: user.bio,
     avatarUrl: user.avatarUrl,
+    signatureUrl: user.signatureUrl ?? null,
     role: user.role,
     verified: user.verified,
     walletBalance: user.walletBalance,
@@ -195,6 +198,7 @@ export async function getLocalUserById(id: string): Promise<LocalUser | null> {
     lastName: user.lastName,
     bio: user.bio,
     avatarUrl: user.avatarUrl,
+    signatureUrl: user.signatureUrl ?? null,
     role: user.role,
     verified: user.verified,
     walletBalance: user.walletBalance,
