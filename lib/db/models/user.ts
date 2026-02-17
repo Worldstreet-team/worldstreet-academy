@@ -9,6 +9,7 @@ export interface IUser extends Document {
   lastName: string
   bio: string | null
   avatarUrl: string | null
+  signatureUrl: string | null
   role: "USER" | "INSTRUCTOR" | "ADMIN"
   verified: boolean
   walletBalance: number
@@ -68,6 +69,10 @@ const UserSchema = new Schema<IUser>(
       default: null,
     },
     avatarUrl: {
+      type: String,
+      default: null,
+    },
+    signatureUrl: {
       type: String,
       default: null,
     },

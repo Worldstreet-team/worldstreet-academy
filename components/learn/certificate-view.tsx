@@ -1,19 +1,136 @@
 "use client"
 
-import { useCallback } from "react"
+import { useCallback, useRef, useState } from "react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   ArrowLeft01Icon,
   Download01Icon,
+  Upload03Icon,
+  Tick02Icon,
 } from "@hugeicons/core-free-icons"
 import Link from "next/link"
 import type { CertificateData } from "@/lib/actions/certificates"
+import { saveSignature } from "@/lib/actions/signature"
+import { getImageUploadUrl } from "@/lib/actions/upload"
+
+// ── Helper: fetch image as base64 data URL ───────────────────────────────────
+
+async function fetchAsDataUrl(url: string): Promise<string | null> {
+  try {
+    const resp = await fetch(url)
+    const blob = await resp.blob()
+    return new Promise<string>((resolve) => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(reader.result as string)
+      reader.readAsDataURL(blob)
+    })
+  } catch {
+    return null
+  }
+}
+
+// ── Signature Upload Component ───────────────────────────────────────────────
+
+function SignatureUpload({
+  label,
+  currentUrl,
+  onUpload,
+}: {
+  label: string
+  currentUrl: string | null
+  onUpload: (url: string) => void
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const [preview, setPreview] = useState<string | null>(currentUrl)
+
+  const handleFile = async (file: File) => {
+    if (!file.type.startsWith("image/")) return
+    setIsUploading(true)
+    try {
+      const result = await getImageUploadUrl(file.name, file.type)
+      if (!result.success || !result.uploadUrl || !result.publicUrl) {
+        throw new Error("Failed to get upload URL")
+      }
+      await fetch(result.uploadUrl, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      })
+      await saveSignature(result.publicUrl)
+      setPreview(result.publicUrl)
+      onUpload(result.publicUrl)
+    } catch (error) {
+      console.error("Signature upload error:", error)
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
+        {label}
+      </p>
+      {preview ? (
+        <button
+          onClick={() => inputRef.current?.click()}
+          className="group relative w-40 h-16 rounded-lg border border-dashed border-neutral-300 dark:border-neutral-700 hover:border-primary/50 transition-colors overflow-hidden"
+        >
+          <img
+            src={preview}
+            alt="Signature"
+            className="w-full h-full object-contain p-1"
+          />
+          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+            <span className="text-white text-[10px] font-medium">Change</span>
+          </div>
+        </button>
+      ) : (
+        <button
+          onClick={() => inputRef.current?.click()}
+          disabled={isUploading}
+          className="w-40 h-16 rounded-lg border-2 border-dashed border-neutral-300 dark:border-neutral-700 hover:border-primary/50 transition-colors flex flex-col items-center justify-center gap-1 text-muted-foreground hover:text-primary"
+        >
+          {isUploading ? (
+            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+          ) : (
+            <>
+              <HugeiconsIcon icon={Upload03Icon} size={16} />
+              <span className="text-[10px] font-medium">Upload Signature</span>
+            </>
+          )}
+        </button>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) handleFile(file)
+          e.target.value = ""
+        }}
+      />
+    </div>
+  )
+}
 
 // ── Certificate visual component (used for preview) ──────────────────────────
 
-function CertificatePreview({ data }: { data: CertificateData }) {
+function CertificatePreview({
+  data,
+  studentSignature,
+}: {
+  data: CertificateData
+  studentSignature: string | null
+}) {
   const completedDate = new Date(data.completedAt).toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
@@ -21,116 +138,132 @@ function CertificatePreview({ data }: { data: CertificateData }) {
   })
 
   return (
-    <div className="relative w-full aspect-[1.414/1] bg-white text-black overflow-hidden" id="certificate-preview">
-      {/* Outer border pattern */}
-      <div className="absolute inset-3 sm:inset-4 md:inset-6 border-2 border-neutral-800" />
-      <div className="absolute inset-4 sm:inset-5 md:inset-7 border border-neutral-400" />
+    <div
+      className="relative w-full aspect-[1.414/1] bg-white text-black overflow-hidden"
+      id="certificate-preview"
+    >
+      {/* Subtle double border */}
+      <div className="absolute inset-4 sm:inset-5 md:inset-8 border border-neutral-200" />
+      <div className="absolute inset-[18px] sm:inset-[22px] md:inset-[34px] border border-neutral-100" />
 
-      {/* Corner ornaments */}
-      <svg className="absolute top-5 left-5 sm:top-6 sm:left-6 md:top-8 md:left-8 w-8 h-8 sm:w-10 sm:h-10 md:w-14 md:h-14 text-neutral-800" viewBox="0 0 64 64" fill="none">
-        <path d="M0 0 L32 0 L32 4 L4 4 L4 32 L0 32 Z" fill="currentColor" />
-        <path d="M8 8 L24 8 L24 10 L10 10 L10 24 L8 24 Z" fill="currentColor" opacity="0.4" />
-      </svg>
-      <svg className="absolute top-5 right-5 sm:top-6 sm:right-6 md:top-8 md:right-8 w-8 h-8 sm:w-10 sm:h-10 md:w-14 md:h-14 text-neutral-800 rotate-90" viewBox="0 0 64 64" fill="none">
-        <path d="M0 0 L32 0 L32 4 L4 4 L4 32 L0 32 Z" fill="currentColor" />
-        <path d="M8 8 L24 8 L24 10 L10 10 L10 24 L8 24 Z" fill="currentColor" opacity="0.4" />
-      </svg>
-      <svg className="absolute bottom-5 left-5 sm:bottom-6 sm:left-6 md:bottom-8 md:left-8 w-8 h-8 sm:w-10 sm:h-10 md:w-14 md:h-14 text-neutral-800 -rotate-90" viewBox="0 0 64 64" fill="none">
-        <path d="M0 0 L32 0 L32 4 L4 4 L4 32 L0 32 Z" fill="currentColor" />
-        <path d="M8 8 L24 8 L24 10 L10 10 L10 24 L8 24 Z" fill="currentColor" opacity="0.4" />
-      </svg>
-      <svg className="absolute bottom-5 right-5 sm:bottom-6 sm:right-6 md:bottom-8 md:right-8 w-8 h-8 sm:w-10 sm:h-10 md:w-14 md:h-14 text-neutral-800 rotate-180" viewBox="0 0 64 64" fill="none">
-        <path d="M0 0 L32 0 L32 4 L4 4 L4 32 L0 32 Z" fill="currentColor" />
-        <path d="M8 8 L24 8 L24 10 L10 10 L10 24 L8 24 Z" fill="currentColor" opacity="0.4" />
-      </svg>
+      {/* Top accent line */}
+      <div className="absolute top-4 sm:top-5 md:top-8 left-4 sm:left-5 md:left-8 right-4 sm:right-5 md:right-8 h-[2px] bg-neutral-800" />
+
+      {/* Bottom accent line */}
+      <div className="absolute bottom-4 sm:bottom-5 md:bottom-8 left-4 sm:left-5 md:left-8 right-4 sm:right-5 md:right-8 h-[2px] bg-neutral-800" />
 
       {/* Content */}
-      <div className="relative h-full flex flex-col items-center justify-between px-6 py-10 sm:px-8 sm:py-12 md:px-16 md:py-16">
-        {/* Header */}
-        <div className="text-center space-y-1 sm:space-y-2">
-          <p className="text-[10px] sm:text-xs md:text-sm tracking-[0.3em] sm:tracking-[0.4em] uppercase text-neutral-500 font-medium">
+      <div className="relative h-full flex flex-col items-center justify-between px-8 py-8 sm:px-10 sm:py-10 md:px-20 md:py-14">
+        {/* Header — Logo + Institution */}
+        <div className="flex flex-col items-center gap-2 sm:gap-3">
+          <Image
+            src="/worldstreet-logo/WorldStreet1x.png"
+            alt="WorldStreet Academy"
+            width={48}
+            height={48}
+            className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 object-contain"
+          />
+          <p className="text-[9px] sm:text-[10px] md:text-xs tracking-[0.35em] uppercase text-neutral-400 font-medium">
             WorldStreet Academy
           </p>
-          <div className="flex items-center justify-center gap-2 sm:gap-3 md:gap-4">
-            <div className="h-px w-8 sm:w-12 md:w-20 bg-neutral-300" />
-            <svg className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-neutral-800" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
-            </svg>
-            <div className="h-px w-8 sm:w-12 md:w-20 bg-neutral-300" />
-          </div>
         </div>
 
         {/* Title */}
-        <div className="text-center space-y-1.5 sm:space-y-2">
-          <h1 className="text-lg sm:text-2xl md:text-4xl font-light tracking-widest uppercase text-neutral-800">
+        <div className="text-center space-y-1 sm:space-y-1.5">
+          <h1 className="text-xl sm:text-3xl md:text-[42px] font-extralight tracking-[0.2em] sm:tracking-[0.25em] uppercase text-neutral-800 leading-none">
             Certificate
           </h1>
-          <p className="text-[9px] sm:text-[10px] md:text-xs tracking-[0.25em] sm:tracking-[0.35em] uppercase text-neutral-500">
+          <p className="text-[8px] sm:text-[9px] md:text-[11px] tracking-[0.3em] uppercase text-neutral-400 font-light">
             of Completion
           </p>
         </div>
 
         {/* Presented to */}
-        <div className="text-center space-y-1.5 sm:space-y-3">
-          <p className="text-[9px] sm:text-[10px] md:text-xs tracking-[0.15em] sm:tracking-[0.2em] uppercase text-neutral-500">
-            This is proudly presented to
+        <div className="text-center space-y-2 sm:space-y-3">
+          <p className="text-[8px] sm:text-[9px] md:text-[10px] tracking-[0.2em] uppercase text-neutral-400">
+            This certifies that
           </p>
           <div className="relative">
             <p
-              className="text-xl sm:text-3xl md:text-5xl text-neutral-900"
-              style={{ fontFamily: "'Playfair Display', 'Georgia', serif", fontStyle: "italic" }}
+              className="text-xl sm:text-3xl md:text-[44px] text-neutral-900 leading-tight"
+              style={{
+                fontFamily: "'Georgia', 'Times New Roman', serif",
+                fontStyle: "italic",
+              }}
             >
               {data.studentName}
             </p>
-            <div className="mt-1.5 sm:mt-2 mx-auto w-32 sm:w-48 md:w-64 h-px bg-neutral-300" />
+            <div className="mt-2 sm:mt-3 mx-auto w-28 sm:w-40 md:w-56 h-px bg-neutral-200" />
           </div>
         </div>
 
         {/* Course info */}
-        <div className="text-center space-y-1 sm:space-y-2 max-w-xs sm:max-w-md md:max-w-lg">
-          <p className="text-[9px] sm:text-[10px] md:text-xs text-neutral-500">
-            For successfully completing the course
+        <div className="text-center max-w-[70%]">
+          <p className="text-[8px] sm:text-[9px] md:text-[10px] text-neutral-400 mb-1.5 sm:mb-2">
+            has successfully completed
           </p>
-          <p className="text-sm sm:text-base md:text-xl font-semibold text-neutral-800 leading-snug">
+          <p className="text-xs sm:text-sm md:text-lg font-medium text-neutral-800 leading-snug">
             {data.courseTitle}
           </p>
         </div>
 
-        {/* Bottom section — date + instructor */}
-        <div className="w-full flex items-end justify-between px-2 sm:px-4 md:px-8">
-          {/* Date */}
-          <div className="text-center">
-            <div className="w-20 sm:w-28 md:w-36 h-px bg-neutral-300 mb-1 sm:mb-1.5" />
-            <p className="text-[8px] sm:text-[9px] md:text-[10px] text-neutral-500 uppercase tracking-wider">
-              Date
+        {/* Bottom — Date, Signatures, Seal */}
+        <div className="w-full grid grid-cols-3 items-end gap-4 px-0 sm:px-2 md:px-6">
+          {/* Student signature + Date */}
+          <div className="flex flex-col items-center gap-1">
+            {studentSignature && (
+              <img
+                src={studentSignature}
+                alt="Student signature"
+                className="h-6 sm:h-8 md:h-10 w-auto object-contain mb-0.5"
+              />
+            )}
+            <div className="w-full max-w-[120px] sm:max-w-[140px] md:max-w-[160px] h-px bg-neutral-300" />
+            <p className="text-[7px] sm:text-[8px] md:text-[9px] text-neutral-400 uppercase tracking-widest mt-0.5">
+              Student
             </p>
-            <p className="text-[9px] sm:text-[10px] md:text-xs text-neutral-700 font-medium mt-0.5">
+            <p className="text-[8px] sm:text-[9px] md:text-[10px] text-neutral-600 font-medium">
               {completedDate}
             </p>
           </div>
 
-          {/* Seal */}
+          {/* Center seal — Logo */}
           <div className="flex flex-col items-center">
             <Image
-              src="/worldstreet-logo/WorldStreet3x.png"
+              src="/worldstreet-logo/WorldStreet1x.png"
               alt="WorldStreet Academy"
-              width={64}
-              height={64}
-              className="w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 object-contain"
+              width={56}
+              height={56}
+              className="w-8 h-8 sm:w-10 sm:h-10 md:w-14 md:h-14 object-contain"
             />
+            <p className="text-[6px] sm:text-[7px] md:text-[8px] text-neutral-300 tracking-widest uppercase mt-1">
+              Verified
+            </p>
           </div>
 
-          {/* Instructor */}
-          <div className="text-center">
-            <div className="w-20 sm:w-28 md:w-36 h-px bg-neutral-300 mb-1 sm:mb-1.5" />
-            <p className="text-[8px] sm:text-[9px] md:text-[10px] text-neutral-500 uppercase tracking-wider">
+          {/* Instructor signature */}
+          <div className="flex flex-col items-center gap-1">
+            {data.instructorSignatureUrl && (
+              <img
+                src={data.instructorSignatureUrl}
+                alt="Instructor signature"
+                className="h-6 sm:h-8 md:h-10 w-auto object-contain mb-0.5"
+              />
+            )}
+            <div className="w-full max-w-[120px] sm:max-w-[140px] md:max-w-[160px] h-px bg-neutral-300" />
+            <p className="text-[7px] sm:text-[8px] md:text-[9px] text-neutral-400 uppercase tracking-widest mt-0.5">
               Instructor
             </p>
-            <p className="text-[9px] sm:text-[10px] md:text-xs text-neutral-700 font-medium mt-0.5">
+            <p className="text-[8px] sm:text-[9px] md:text-[10px] text-neutral-600 font-medium">
               {data.instructorName}
             </p>
           </div>
         </div>
+
+        {/* Certificate ID — very bottom */}
+        <p className="absolute bottom-3 sm:bottom-4 md:bottom-5 left-0 right-0 text-center text-[6px] sm:text-[7px] md:text-[8px] text-neutral-300 tracking-wider">
+          WSA-{data.id.slice(-8).toUpperCase()}
+        </p>
       </div>
     </div>
   )
@@ -139,186 +272,180 @@ function CertificatePreview({ data }: { data: CertificateData }) {
 // ── Main certificate page client component ───────────────────────────────────
 
 export function CertificateClient({ data }: { data: CertificateData }) {
+  const [studentSig, setStudentSig] = useState<string | null>(
+    data.studentSignatureUrl
+  )
+  const [isSigned, setIsSigned] = useState(!!data.studentSignatureUrl)
+
   const downloadPDF = useCallback(async () => {
     const { jsPDF } = await import("jspdf")
-    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" })
+    const doc = new jsPDF({
+      orientation: "landscape",
+      unit: "mm",
+      format: "a4",
+    })
 
     const w = 297
     const h = 210
+    const cx = w / 2
 
-    // Load WorldStreet logo for the seal
-    let logoDataUrl: string | null = null
-    try {
-      const resp = await fetch("/worldstreet-logo/WorldStreet3x.png")
-      const blob = await resp.blob()
-      logoDataUrl = await new Promise<string>((resolve) => {
-        const reader = new FileReader()
-        reader.onloadend = () => resolve(reader.result as string)
-        reader.readAsDataURL(blob)
-      })
-    } catch {
-      // Fallback to text seal if image fails
-    }
+    // ── Load images in parallel ──────────────────────────────────
+    const [logoDataUrl, instructorSigDataUrl, studentSigDataUrl] =
+      await Promise.all([
+        fetchAsDataUrl("/worldstreet-logo/WorldStreet1x.png"),
+        data.instructorSignatureUrl
+          ? fetchAsDataUrl(data.instructorSignatureUrl)
+          : null,
+        studentSig ? fetchAsDataUrl(studentSig) : null,
+      ])
 
-    // White background
+    // ── White background ─────────────────────────────────────────
     doc.setFillColor(255, 255, 255)
     doc.rect(0, 0, w, h, "F")
 
-    // Outer border
-    doc.setDrawColor(30, 30, 30)
-    doc.setLineWidth(0.8)
-    doc.rect(8, 8, w - 16, h - 16)
-
-    // Inner border
-    doc.setDrawColor(180, 180, 180)
+    // ── Subtle double border ─────────────────────────────────────
+    doc.setDrawColor(220, 220, 220)
     doc.setLineWidth(0.3)
     doc.rect(10, 10, w - 20, h - 20)
+    doc.setDrawColor(240, 240, 240)
+    doc.setLineWidth(0.2)
+    doc.rect(12, 12, w - 24, h - 24)
 
-    // Corner ornaments (L-shaped brackets)
-    const corners = [
-      { x: 12, y: 12, sx: 1, sy: 1 },
-      { x: w - 12, y: 12, sx: -1, sy: 1 },
-      { x: 12, y: h - 12, sx: 1, sy: -1 },
-      { x: w - 12, y: h - 12, sx: -1, sy: -1 },
-    ]
+    // ── Top accent line ──────────────────────────────────────────
     doc.setDrawColor(30, 30, 30)
-    doc.setLineWidth(0.6)
-    corners.forEach(({ x, y, sx, sy }) => {
-      doc.line(x, y, x + 16 * sx, y)
-      doc.line(x, y, x, y + 16 * sy)
-    })
-    doc.setDrawColor(180, 180, 180)
-    doc.setLineWidth(0.3)
-    corners.forEach(({ x, y, sx, sy }) => {
-      const offset = 3 * sx
-      const offsetY = 3 * sy
-      doc.line(x + offset, y + offsetY, x + offset + 10 * sx, y + offsetY)
-      doc.line(x + offset, y + offsetY, x + offset, y + offsetY + 10 * sy)
-    })
+    doc.setLineWidth(0.8)
+    doc.line(10, 10, w - 10, 10)
 
-    const cx = w / 2
+    // ── Bottom accent line ───────────────────────────────────────
+    doc.line(10, h - 10, w - 10, h - 10)
 
-    // Header — "WORLDSTREET ACADEMY"
+    // ── Logo (top center) ────────────────────────────────────────
+    if (logoDataUrl) {
+      doc.addImage(logoDataUrl, "PNG", cx - 7, 18, 14, 14)
+    }
+
+    // ── Institution name ─────────────────────────────────────────
     doc.setFont("helvetica", "normal")
-    doc.setFontSize(9)
-    doc.setTextColor(140, 140, 140)
-    doc.text("WORLDSTREET ACADEMY", cx, 30, { align: "center", charSpace: 3 })
-
-    // Decorative star
-    doc.setDrawColor(30, 30, 30)
-    doc.setLineWidth(0.3)
-    const starY = 36
-    doc.line(cx - 25, starY, cx - 8, starY)
-    doc.line(cx + 8, starY, cx + 25, starY)
-    // Simple diamond shape as star
-    doc.setFillColor(30, 30, 30)
-    doc.triangle(cx, starY - 3, cx - 3, starY, cx + 3, starY, "F")
-    doc.triangle(cx, starY + 3, cx - 3, starY, cx + 3, starY, "F")
-
-    // Title — "CERTIFICATE"
-    doc.setFont("helvetica", "normal")
-    doc.setFontSize(30)
-    doc.setTextColor(50, 50, 50)
-    doc.text("CERTIFICATE", cx, 54, { align: "center", charSpace: 5 })
-
-    // Subtitle — "OF COMPLETION"
-    doc.setFontSize(8)
-    doc.setTextColor(140, 140, 140)
-    doc.text("OF COMPLETION", cx, 61, { align: "center", charSpace: 3 })
-
-    // "This is proudly presented to"
     doc.setFontSize(7)
-    doc.setTextColor(140, 140, 140)
-    doc.text("THIS IS PROUDLY PRESENTED TO", cx, 76, { align: "center", charSpace: 1.5 })
+    doc.setTextColor(160, 160, 160)
+    doc.text("WORLDSTREET ACADEMY", cx, 38, { align: "center" })
 
-    // Student name (calligraphic style — using Times Italic)
+    // ── "Certificate" title ──────────────────────────────────────
+    doc.setFont("helvetica", "normal")
+    doc.setFontSize(32)
+    doc.setTextColor(50, 50, 50)
+    doc.text("CERTIFICATE", cx, 56, { align: "center" })
+
+    // ── "of Completion" subtitle ─────────────────────────────────
+    doc.setFontSize(7)
+    doc.setTextColor(160, 160, 160)
+    doc.text("OF COMPLETION", cx, 63, { align: "center" })
+
+    // ── "This certifies that" ────────────────────────────────────
+    doc.setFontSize(6.5)
+    doc.setTextColor(160, 160, 160)
+    doc.text("THIS CERTIFIES THAT", cx, 78, { align: "center" })
+
+    // ── Student name ─────────────────────────────────────────────
     doc.setFont("times", "bolditalic")
-    doc.setFontSize(28)
-    doc.setTextColor(20, 20, 20)
-    doc.text(data.studentName, cx, 92, { align: "center" })
+    doc.setFontSize(26)
+    doc.setTextColor(25, 25, 25)
+    doc.text(data.studentName, cx, 93, { align: "center" })
 
     // Line under name
-    doc.setDrawColor(180, 180, 180)
-    doc.setLineWidth(0.3)
-    doc.line(cx - 45, 96, cx + 45, 96)
+    doc.setDrawColor(210, 210, 210)
+    doc.setLineWidth(0.25)
+    doc.line(cx - 40, 97, cx + 40, 97)
 
-    // "For successfully completing the course"
+    // ── "has successfully completed" ─────────────────────────────
     doc.setFont("helvetica", "normal")
-    doc.setFontSize(7)
-    doc.setTextColor(140, 140, 140)
-    doc.text("For successfully completing the course", cx, 108, { align: "center" })
+    doc.setFontSize(6.5)
+    doc.setTextColor(160, 160, 160)
+    doc.text("HAS SUCCESSFULLY COMPLETED", cx, 108, { align: "center" })
 
-    // Course title
+    // ── Course title ─────────────────────────────────────────────
     doc.setFont("helvetica", "bold")
-    doc.setFontSize(14)
-    doc.setTextColor(40, 40, 40)
-
-    // Handle long course titles by splitting
+    doc.setFontSize(13)
+    doc.setTextColor(50, 50, 50)
     const courseTitle = data.courseTitle
-    if (courseTitle.length > 50) {
-      const lines = doc.splitTextToSize(courseTitle, 180)
+    if (courseTitle.length > 55) {
+      const lines = doc.splitTextToSize(courseTitle, 170)
       doc.text(lines, cx, 118, { align: "center" })
     } else {
       doc.text(courseTitle, cx, 118, { align: "center" })
     }
 
-    // Bottom section
-    const botY = h - 38
+    // ── Bottom section: 3-column layout ──────────────────────────
+    const botY = h - 42
+    const colLeft = 65
+    const colRight = w - 65
 
-    // Date (left)
-    const dateFormatted = new Date(data.completedAt).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    })
-    doc.setDrawColor(180, 180, 180)
-    doc.setLineWidth(0.3)
-    doc.line(40, botY, 100, botY)
-    doc.setFont("helvetica", "normal")
-    doc.setFontSize(6)
-    doc.setTextColor(140, 140, 140)
-    doc.text("DATE", 70, botY + 5, { align: "center" })
-    doc.setFontSize(8)
-    doc.setTextColor(60, 60, 60)
-    doc.text(dateFormatted, 70, botY + 11, { align: "center" })
-
-    // Seal (center) — use logo image if available
-    if (logoDataUrl) {
-      doc.addImage(logoDataUrl, "PNG", cx - 12, botY - 10, 24, 24)
-    } else {
-      doc.setDrawColor(30, 30, 30)
-      doc.setLineWidth(0.4)
-      doc.circle(cx, botY + 2, 12)
-      doc.setLineWidth(0.2)
-      doc.circle(cx, botY + 2, 10)
-      doc.setFont("helvetica", "bold")
-      doc.setFontSize(5)
-      doc.setTextColor(30, 30, 30)
-      doc.text("WORLDSTREET", cx, botY, { align: "center" })
-      doc.setFontSize(4)
-      doc.text("ACADEMY", cx, botY + 4, { align: "center" })
+    // ── Left column: Student signature + Date ────────────────────
+    if (studentSigDataUrl) {
+      doc.addImage(studentSigDataUrl, "PNG", colLeft - 18, botY - 12, 36, 12)
     }
+    doc.setDrawColor(190, 190, 190)
+    doc.setLineWidth(0.25)
+    doc.line(colLeft - 22, botY, colLeft + 22, botY)
 
-    // Instructor (right)
-    doc.setDrawColor(180, 180, 180)
-    doc.setLineWidth(0.3)
-    doc.line(w - 100, botY, w - 40, botY)
     doc.setFont("helvetica", "normal")
-    doc.setFontSize(6)
-    doc.setTextColor(140, 140, 140)
-    doc.text("INSTRUCTOR", w - 70, botY + 5, { align: "center" })
-    doc.setFontSize(8)
-    doc.setTextColor(60, 60, 60)
-    doc.text(data.instructorName, w - 70, botY + 11, { align: "center" })
+    doc.setFontSize(5.5)
+    doc.setTextColor(160, 160, 160)
+    doc.text("STUDENT", colLeft, botY + 5, { align: "center" })
 
-    // Certificate ID (bottom)
+    const dateFormatted = new Date(data.completedAt).toLocaleDateString(
+      "en-US",
+      { year: "numeric", month: "long", day: "numeric" }
+    )
+    doc.setFontSize(7)
+    doc.setTextColor(80, 80, 80)
+    doc.text(dateFormatted, colLeft, botY + 11, { align: "center" })
+
+    // ── Center: Seal / Logo ──────────────────────────────────────
+    if (logoDataUrl) {
+      doc.addImage(logoDataUrl, "PNG", cx - 8, botY - 10, 16, 16)
+    }
     doc.setFont("helvetica", "normal")
     doc.setFontSize(5)
-    doc.setTextColor(180, 180, 180)
-    doc.text(`Certificate ID: WSA-${data.id.slice(-8).toUpperCase()}`, cx, h - 14, { align: "center" })
+    doc.setTextColor(190, 190, 190)
+    doc.text("VERIFIED", cx, botY + 11, { align: "center" })
 
-    doc.save(`WorldStreet-Academy-Certificate-${data.courseTitle.replace(/[^a-zA-Z0-9]/g, "-")}.pdf`)
-  }, [data])
+    // ── Right column: Instructor signature + Name ────────────────
+    if (instructorSigDataUrl) {
+      doc.addImage(
+        instructorSigDataUrl,
+        "PNG",
+        colRight - 18,
+        botY - 12,
+        36,
+        12
+      )
+    }
+    doc.setDrawColor(190, 190, 190)
+    doc.setLineWidth(0.25)
+    doc.line(colRight - 22, botY, colRight + 22, botY)
+
+    doc.setFont("helvetica", "normal")
+    doc.setFontSize(5.5)
+    doc.setTextColor(160, 160, 160)
+    doc.text("INSTRUCTOR", colRight, botY + 5, { align: "center" })
+
+    doc.setFontSize(7)
+    doc.setTextColor(80, 80, 80)
+    doc.text(data.instructorName, colRight, botY + 11, { align: "center" })
+
+    // ── Certificate ID ───────────────────────────────────────────
+    doc.setFont("helvetica", "normal")
+    doc.setFontSize(5)
+    doc.setTextColor(200, 200, 200)
+    doc.text(`WSA-${data.id.slice(-8).toUpperCase()}`, cx, h - 14, {
+      align: "center",
+    })
+
+    doc.save(
+      `WorldStreet-Certificate-${data.courseTitle.replace(/[^a-zA-Z0-9]/g, "-")}.pdf`
+    )
+  }, [data, studentSig])
 
   return (
     <div className="min-h-screen flex flex-col items-center bg-neutral-50 dark:bg-neutral-950">
@@ -334,23 +461,72 @@ export function CertificateClient({ data }: { data: CertificateData }) {
           My Certificates
         </Button>
 
-        <Button
-          size="sm"
-          onClick={downloadPDF}
-          className="gap-1.5"
-        >
+        <Button size="sm" onClick={downloadPDF} className="gap-1.5">
           <HugeiconsIcon icon={Download01Icon} size={16} />
           Download PDF
         </Button>
       </div>
 
       {/* Certificate */}
+      <div className="w-full max-w-4xl px-4 pb-6">
+        <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 shadow-2xl overflow-hidden">
+          <CertificatePreview data={data} studentSignature={studentSig} />
+        </div>
+      </div>
+
+      {/* Signature section */}
       <div className="w-full max-w-4xl px-4 pb-12">
-        <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 shadow-xl overflow-hidden">
-          <CertificatePreview data={data} />
+        <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-8">
+            <SignatureUpload
+              label="Your Signature"
+              currentUrl={studentSig}
+              onUpload={(url) => {
+                setStudentSig(url)
+                setIsSigned(true)
+              }}
+            />
+
+            {data.instructorSignatureUrl ? (
+              <div className="flex flex-col items-center gap-2">
+                <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
+                  Instructor Signature
+                </p>
+                <div className="w-40 h-16 rounded-lg border border-neutral-200 dark:border-neutral-700 flex items-center justify-center overflow-hidden">
+                  <img
+                    src={data.instructorSignatureUrl}
+                    alt="Instructor signature"
+                    className="h-full w-auto object-contain p-2"
+                  />
+                </div>
+                <div className="flex items-center gap-1 text-emerald-600">
+                  <HugeiconsIcon icon={Tick02Icon} size={12} />
+                  <span className="text-[10px] font-medium">Signed</span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-2">
+                <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
+                  Instructor Signature
+                </p>
+                <div className="w-40 h-16 rounded-lg border-2 border-dashed border-neutral-200 dark:border-neutral-700 flex items-center justify-center">
+                  <span className="text-[10px] text-muted-foreground">
+                    Awaiting signature
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {isSigned && (
+            <p className="text-center text-xs text-emerald-600 mt-4 flex items-center justify-center gap-1">
+              <HugeiconsIcon icon={Tick02Icon} size={14} />
+              Your signature has been added to the certificate
+            </p>
+          )}
         </div>
 
-        <p className="text-center text-xs text-muted-foreground mt-4">
+        <p className="text-center text-[11px] text-muted-foreground mt-4">
           Certificate ID: WSA-{data.id.slice(-8).toUpperCase()}
         </p>
       </div>

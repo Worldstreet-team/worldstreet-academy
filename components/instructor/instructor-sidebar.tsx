@@ -175,7 +175,7 @@ export function InstructorSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" render={<Link href="/instructor" />}>
               <Image
-                src="/worldstreet-logo/WorldStreet2.png"
+                src="/worldstreet-logo/WorldStreet1x.png"
                 alt="WorldStreet Academy"
                 width={32}
                 height={32}

@@ -203,7 +203,7 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" render={<Link href="/dashboard" />}>
               <Image
-                src="/worldstreet-logo/WorldStreet2.png"
+                src="/worldstreet-logo/WorldStreet1x.png"
                 alt="WorldStreet Academy"
                 width={32}
                 height={32}

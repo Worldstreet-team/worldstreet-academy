@@ -5,8 +5,12 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Topbar } from "@/components/platform/topbar"
+import { getMySignature } from "@/lib/actions/signature"
+import { InstructorSignatureUpload } from "./signature-upload"
 
-export default function InstructorSettingsPage() {
+export default async function InstructorSettingsPage() {
+  const currentSignature = await getMySignature()
+
   return (
     <>
       <Topbar title="Settings" variant="instructor" />
@@ -46,6 +50,19 @@ export default function InstructorSettingsPage() {
                 defaultValue="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=96&h=96&fit=crop&crop=face"
               />
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Certificate Signature</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Upload your signature to appear on student certificates. Use a
+              transparent PNG for best results.
+            </p>
+            <InstructorSignatureUpload currentSignatureUrl={currentSignature} />
           </CardContent>
         </Card>
 

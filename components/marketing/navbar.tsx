@@ -16,7 +16,7 @@ export async function Navbar() {
         <div className="flex items-center gap-8">
           <Link href="/" className="flex items-center gap-2">
             <Image
-              src="/worldstreet-logo/WorldStreet2.png"
+              src="/worldstreet-logo/WorldStreet1x.png"
               alt="WorldStreet Academy"
               width={32}
               height={32}

@@ -15,6 +15,8 @@ export type CertificateData = {
   instructorName: string
   completedAt: string
   courseId: string
+  instructorSignatureUrl: string | null
+  studentSignatureUrl: string | null
 }
 
 export type StudentCertificate = {
@@ -58,7 +60,7 @@ export async function fetchCertificate(courseId: string): Promise<CertificateDat
     if (!enrollment || !enrollment.completedAt) return null
 
     const course = await Course.findById(courseId)
-      .populate("instructor", "firstName lastName")
+      .populate("instructor", "firstName lastName signatureUrl")
       .lean()
 
     if (!course) return null
@@ -66,9 +68,10 @@ export async function fetchCertificate(courseId: string): Promise<CertificateDat
     const instructor = course.instructor as unknown as {
       firstName: string
       lastName: string
+      signatureUrl: string | null
     }
 
-    const user = await User.findById(currentUser.id).select("firstName lastName").lean()
+    const user = await User.findById(currentUser.id).select("firstName lastName signatureUrl").lean()
     if (!user) return null
 
     return {
@@ -78,6 +81,8 @@ export async function fetchCertificate(courseId: string): Promise<CertificateDat
       instructorName: `${instructor.firstName} ${instructor.lastName}`,
       completedAt: enrollment.completedAt.toISOString(),
       courseId: courseId,
+      instructorSignatureUrl: instructor.signatureUrl ?? null,
+      studentSignatureUrl: user.signatureUrl ?? null,
     }
   } catch (error) {
     console.error("Fetch certificate error:", error)
