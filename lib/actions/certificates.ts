@@ -38,6 +38,16 @@ export type InstructorCertificateStats = {
   ratingCount: number
 }
 
+export type InstructorCourseCertificate = {
+  id: string
+  studentId: string
+  studentName: string
+  studentEmail: string
+  studentAvatarUrl: string | null
+  completedAt: string
+  hasStudentSigned: boolean
+}
+
 // ============================================================================
 // STUDENT ACTIONS
 // ============================================================================
@@ -190,6 +200,61 @@ export async function fetchInstructorCertificateStats(): Promise<InstructorCerti
     return results
   } catch (error) {
     console.error("Fetch instructor certificate stats error:", error)
+    return []
+  }
+}
+
+/**
+ * Fetch all certificates for a specific course (instructor only)
+ */
+export async function fetchCourseCertificates(
+  courseId: string
+): Promise<InstructorCourseCertificate[]> {
+  try {
+    await connectDB()
+    const currentUser = await getCurrentUser()
+    if (!currentUser) return []
+
+    // Verify the instructor owns the course
+    const course = await Course.findOne({
+      _id: courseId,
+      instructor: currentUser.id,
+    }).lean()
+
+    if (!course) return []
+
+    // Get all completed enrollments for this course
+    const enrollments = await Enrollment.find({
+      course: courseId,
+      status: "completed",
+      completedAt: { $ne: null },
+    })
+      .populate("user", "firstName lastName email avatarUrl signatureUrl")
+      .sort({ completedAt: -1 })
+      .lean()
+
+    return enrollments.map((enrollment) => {
+      const student = enrollment.user as unknown as {
+        _id: { toString(): string }
+        firstName: string
+        lastName: string
+        email: string
+        avatarUrl: string | null
+        signatureUrl: string | null
+      }
+
+      return {
+        id: enrollment._id.toString(),
+        studentId: student._id.toString(),
+        studentName: `${student.firstName} ${student.lastName}`,
+        studentEmail: student.email,
+        studentAvatarUrl: student.avatarUrl,
+        completedAt: enrollment.completedAt!.toISOString(),
+        hasStudentSigned: !!student.signatureUrl,
+      }
+    })
+  } catch (error) {
+    console.error("Fetch course certificates error:", error)
     return []
   }
 }

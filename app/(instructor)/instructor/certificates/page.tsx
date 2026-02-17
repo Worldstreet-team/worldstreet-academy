@@ -110,7 +110,7 @@ export default function InstructorCertificatesPage() {
             {stats.map((course) => (
               <Link
                 key={course.courseId}
-                href={`/instructor/courses/${course.courseId}`}
+                href={`/instructor/certificates/${course.courseId}`}
                 className="group"
               >
                 <Card className="h-full transition-all hover:shadow-md hover:border-primary/30">
