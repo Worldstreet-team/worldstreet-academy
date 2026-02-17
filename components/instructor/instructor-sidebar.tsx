@@ -86,7 +86,7 @@ const teachItems: NavItem[] = [
     title: "Certificates",
     href: "/instructor/certificates",
     icon: Certificate01Icon,
-    match: (p) => p === "/instructor/certificates",
+    match: (p) => p.startsWith("/instructor/certificates"),
   },
   {
     title: "Analytics",

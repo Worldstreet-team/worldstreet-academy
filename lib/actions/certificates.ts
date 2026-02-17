@@ -48,6 +48,11 @@ export type InstructorCourseCertificate = {
   hasStudentSigned: boolean
 }
 
+export type CourseCertificatesResult = {
+  courseTitle: string
+  certificates: InstructorCourseCertificate[]
+}
+
 // ============================================================================
 // STUDENT ACTIONS
 // ============================================================================
@@ -209,11 +214,11 @@ export async function fetchInstructorCertificateStats(): Promise<InstructorCerti
  */
 export async function fetchCourseCertificates(
   courseId: string
-): Promise<InstructorCourseCertificate[]> {
+): Promise<CourseCertificatesResult> {
   try {
     await connectDB()
     const currentUser = await getCurrentUser()
-    if (!currentUser) return []
+    if (!currentUser) return { courseTitle: "", certificates: [] }
 
     // Verify the instructor owns the course
     const course = await Course.findOne({
@@ -221,7 +226,7 @@ export async function fetchCourseCertificates(
       instructor: currentUser.id,
     }).lean()
 
-    if (!course) return []
+    if (!course) return { courseTitle: "", certificates: [] }
 
     // Get all completed enrollments for this course
     const enrollments = await Enrollment.find({
@@ -233,7 +238,7 @@ export async function fetchCourseCertificates(
       .sort({ completedAt: -1 })
       .lean()
 
-    return enrollments.map((enrollment) => {
+    const certificates = enrollments.map((enrollment) => {
       const student = enrollment.user as unknown as {
         _id: { toString(): string }
         firstName: string
@@ -253,8 +258,13 @@ export async function fetchCourseCertificates(
         hasStudentSigned: !!student.signatureUrl,
       }
     })
+
+    return {
+      courseTitle: course.title,
+      certificates,
+    }
   } catch (error) {
     console.error("Fetch course certificates error:", error)
-    return []
+    return { courseTitle: "", certificates: [] }
   }
 }

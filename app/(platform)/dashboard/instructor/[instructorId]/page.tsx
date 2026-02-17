@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Topbar } from "@/components/platform/topbar"
+import { MessageInstructorButton } from "./message-instructor-button"
 import {
   fetchInstructorProfile,
   fetchInstructorPublicCourses,
@@ -138,6 +139,9 @@ export default async function InstructorProfilePage({
                 ))}
               </div>
             )}
+
+            {/* Message button */}
+            <MessageInstructorButton instructorId={instructorId} />
           </div>
         </div>
 

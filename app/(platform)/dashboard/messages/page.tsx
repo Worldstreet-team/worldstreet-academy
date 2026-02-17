@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useQueryClient } from "@tanstack/react-query"
+import { useSearchParams } from "next/navigation"
 import Image from "next/image"
 import { AnimatePresence, motion } from "motion/react"
 import { HugeiconsIcon } from "@hugeicons/react"
@@ -56,6 +57,7 @@ type OptimisticMessage = MessageWithDetails & { status?: "pending" | "sent" | "e
 
 export default function MessagesPage() {
   const queryClient = useQueryClient()
+  const searchParams = useSearchParams()
   const { data: conversations = [], isLoading } = useConversations()
   const [messages, setMessages] = useState<OptimisticMessage[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -77,6 +79,19 @@ export default function MessagesPage() {
   const [isLoadingRecent, setIsLoadingRecent] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Check for conversation ID in URL query params
+  useEffect(() => {
+    const conversationId = searchParams.get("c")
+    if (conversationId && conversations.length > 0) {
+      const conv = conversations.find((c) => c.id === conversationId)
+      if (conv) {
+        setSelectedId(conversationId)
+        setSelectedParticipant(conv.participant)
+        setShowMobileChat(true)
+      }
+    }
+  }, [searchParams, conversations])
 
   // Load messages when conversation changes
   useEffect(() => {

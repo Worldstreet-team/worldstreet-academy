@@ -25,10 +25,13 @@ export default function CourseCertificatesPage() {
   const params = useParams()
   const courseId = params.courseId as string
 
-  const { data: certificates = [], isLoading } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["instructor", "course-certificates", courseId],
     queryFn: () => fetchCourseCertificates(courseId),
   })
+
+  const certificates = data?.certificates ?? []
+  const courseTitle = data?.courseTitle ?? ""
 
   const { data: instructorSignature, isLoading: signatureLoading } = useQuery({
     queryKey: ["instructor", "signature"],
@@ -47,7 +50,11 @@ export default function CourseCertificatesPage() {
 
   return (
     <>
-      <Topbar title="Course Certificates" variant="instructor" />
+      <Topbar 
+        title="Course Certificates" 
+        variant="instructor"
+        breadcrumbOverrides={courseTitle ? { [courseId]: courseTitle } : undefined}
+      />
       <div className="p-4 md:p-6 space-y-6 pb-24 md:pb-8">
         {/* Header */}
         <div className="flex items-center justify-between">

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useRef, useState } from "react"
+import { useCallback, useState } from "react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { HugeiconsIcon } from "@hugeicons/react"
@@ -12,6 +12,7 @@ import {
 import Link from "next/link"
 import type { CertificateData } from "@/lib/actions/certificates"
 import { SignatureCanvas } from "@/components/shared/signature-canvas"
+import { useTheme } from "next-themes"
 
 // ── Helper: fetch image as base64 data URL ───────────────────────────────────
 
@@ -69,6 +70,12 @@ function CertificatePreview({
   data: CertificateData
   studentSignature: string | null
 }) {
+  const { theme, systemTheme } = useTheme()
+  const currentTheme = theme === "system" ? systemTheme : theme
+  const logoPath = currentTheme === "light" 
+    ? "/worldstreet-logo/WorldStreet4x.png"
+    : "/worldstreet-logo/WorldStreet1x.png"
+
   const completedDate = new Date(data.completedAt).toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
@@ -94,10 +101,10 @@ function CertificatePreview({
       <CornerOrnament className="absolute bottom-4 left-4 sm:bottom-5 sm:left-5 md:bottom-7 md:left-7 w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 text-neutral-800 -rotate-90" />
       <CornerOrnament className="absolute bottom-4 right-4 sm:bottom-5 sm:right-5 md:bottom-7 md:right-7 w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 text-neutral-800 rotate-180" />
 
-      {/* ── Center watermark — WorldStreet1 monochrome ─────────── */}
+      {/* ── Center watermark — theme-based logo monochrome ─────────── */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <Image
-          src="/worldstreet-logo/WorldStreet1.png"
+          src={logoPath}
           alt=""
           width={320}
           height={320}
@@ -125,7 +132,7 @@ function CertificatePreview({
         {/* Header — Logo + Institution */}
         <div className="flex flex-col items-center gap-2 sm:gap-3">
           <Image
-            src="/worldstreet-logo/WorldStreet3x.png"
+            src={logoPath}
             alt="WorldStreet Academy"
             width={48}
             height={48}
@@ -196,7 +203,7 @@ function CertificatePreview({
           {/* Center seal — Logo */}
           <div className="flex flex-col items-center">
             <Image
-              src="/worldstreet-logo/WorldStreet3x.png"
+              src={logoPath}
               alt="WorldStreet Academy"
               width={64}
               height={64}
@@ -238,6 +245,12 @@ function CertificatePreview({
 // ── Main certificate page client component ───────────────────────────────────
 
 export function CertificateClient({ data }: { data: CertificateData }) {
+  const { theme, systemTheme } = useTheme()
+  const currentTheme = theme === "system" ? systemTheme : theme
+  const logoPath = currentTheme === "light" 
+    ? "/worldstreet-logo/WorldStreet4x.png"
+    : "/worldstreet-logo/WorldStreet1x.png"
+
   const [studentSig, setStudentSig] = useState<string | null>(
     data.studentSignatureUrl
   )
@@ -259,8 +272,8 @@ export function CertificateClient({ data }: { data: CertificateData }) {
     // ── Load images in parallel ──────────────────────────────────
     const [logoDataUrl, watermarkDataUrl, instructorSigDataUrl, studentSigDataUrl] =
       await Promise.all([
-        fetchAsDataUrl("/worldstreet-logo/WorldStreet3x.png"),
-        fetchAsDataUrl("/worldstreet-logo/WorldStreet1.png"),
+        fetchAsDataUrl(logoPath),
+        fetchAsDataUrl(logoPath),
         data.instructorSignatureUrl
           ? fetchAsDataUrl(data.instructorSignatureUrl)
           : null,
@@ -328,7 +341,10 @@ export function CertificateClient({ data }: { data: CertificateData }) {
 
     // ── Logo (top center) — WorldStreet3x ────────────────────────
     if (logoDataUrl) {
-      doc.addImage(logoDataUrl, "PNG", cx - 7, 18, 14, 14)
+      // Maintain aspect ratio - WorldStreet logo is wider than tall
+      const logoWidth = 18
+      const logoHeight = 12
+      doc.addImage(logoDataUrl, "PNG", cx - logoWidth/2, 18, logoWidth, logoHeight)
     }
 
     // ── Institution name with flanking lines ─────────────────────
@@ -417,7 +433,10 @@ export function CertificateClient({ data }: { data: CertificateData }) {
 
     // ── Center: Seal / Logo — WorldStreet3x ──────────────────────
     if (logoDataUrl) {
-      doc.addImage(logoDataUrl, "PNG", cx - 10, botY - 12, 20, 20)
+      // Maintain aspect ratio - WorldStreet logo is wider than tall
+      const sealWidth = 24
+      const sealHeight = 16
+      doc.addImage(logoDataUrl, "PNG", cx - sealWidth/2, botY - 12, sealWidth, sealHeight)
     }
     doc.setFont("helvetica", "normal")
     doc.setFontSize(5)
@@ -459,7 +478,7 @@ export function CertificateClient({ data }: { data: CertificateData }) {
     doc.save(
       `WorldStreet-Certificate-${data.courseTitle.replace(/[^a-zA-Z0-9]/g, "-")}.pdf`
     )
-  }, [data, studentSig])
+  }, [data, studentSig, logoPath])
 
   return (
     <div className="min-h-screen flex flex-col items-center bg-neutral-50 dark:bg-neutral-950">

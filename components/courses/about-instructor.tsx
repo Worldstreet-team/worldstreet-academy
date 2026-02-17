@@ -1,5 +1,9 @@
+"use client"
+
+import { useState, useTransition } from "react"
 import Link from "next/link"
 import Image from "next/image"
+import { useRouter } from "next/navigation"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { HugeiconsIcon } from "@hugeicons/react"
@@ -9,7 +13,9 @@ import {
   BookOpen01Icon,
   UserMultiple02Icon,
   CheckmarkBadge01Icon,
+  Message01Icon,
 } from "@hugeicons/core-free-icons"
+import { getOrCreateConversation } from "@/lib/actions/messages"
 import type { InstructorCourse } from "@/lib/actions/student"
 
 interface AboutInstructorProps {
@@ -35,6 +41,9 @@ export function AboutInstructor({
   totalStudents,
   averageRating,
 }: AboutInstructorProps) {
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
+  
   const initials = instructorName
     .split(" ")
     .map((n) => n[0])
@@ -46,6 +55,15 @@ export function AboutInstructor({
   
   // Check if there's meaningful content to show
   const hasContent = instructorBio || instructorHeadline || allCourses.length > 0
+  
+  const handleMessage = () => {
+    startTransition(async () => {
+      const result = await getOrCreateConversation(instructorId)
+      if (result.success && result.conversationId) {
+        router.push(`/dashboard/messages?c=${result.conversationId}`)
+      }
+    })
+  }
 
   // If no content, just show minimal instructor card
   if (!hasContent) {
@@ -64,14 +82,26 @@ export function AboutInstructor({
             </Avatar>
             <div className="flex-1">
               <h3 className="font-semibold text-[15px]">{instructorName}</h3>
-              <Button
-                variant="link"
-                size="sm"
-                className="h-auto p-0 text-xs text-muted-foreground hover:text-primary"
-                render={<Link href={`/dashboard/instructor/${instructorId}`} />}
-              >
-                View profile
-              </Button>
+              <div className="flex items-center gap-2 mt-1">
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="h-auto p-0 text-xs text-muted-foreground hover:text-primary"
+                  render={<Link href={`/dashboard/instructor/${instructorId}`} />}
+                >
+                  View profile
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 gap-1 text-xs"
+                  onClick={handleMessage}
+                  disabled={isPending}
+                >
+                  <HugeiconsIcon icon={Message01Icon} size={12} />
+                  Message
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -144,15 +174,27 @@ export function AboutInstructor({
           </p>
         )}
 
-        <Button
-          variant="ghost"
-          size="sm"
-          className="gap-1.5 -ml-2 text-primary hover:text-primary"
-          render={<Link href={`/dashboard/instructor/${instructorId}`} />}
-        >
-          View full profile
-          <HugeiconsIcon icon={ArrowRight01Icon} size={13} />
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 -ml-2 text-primary hover:text-primary"
+            render={<Link href={`/dashboard/instructor/${instructorId}`} />}
+          >
+            View full profile
+            <HugeiconsIcon icon={ArrowRight01Icon} size={13} />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={handleMessage}
+            disabled={isPending}
+          >
+            <HugeiconsIcon icon={Message01Icon} size={14} />
+            Message
+          </Button>
+        </div>
       </div>
 
       {/* More courses by this instructor */}

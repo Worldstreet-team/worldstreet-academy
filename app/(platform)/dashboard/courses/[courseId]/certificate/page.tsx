@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation"
 import { fetchCertificate } from "@/lib/actions/certificates"
 import { CertificateClient } from "@/components/learn/certificate-view"
+import { Topbar } from "@/components/platform/topbar"
 
 export default async function CertificatePage({
   params,
@@ -12,5 +13,16 @@ export default async function CertificatePage({
 
   if (!certificate) notFound()
 
-  return <CertificateClient data={certificate} />
+  return (
+    <>
+      <Topbar 
+        title="Certificate" 
+        breadcrumbOverrides={{ 
+          [courseId]: certificate.courseTitle,
+          certificate: "Certificate"
+        }} 
+      />
+      <CertificateClient data={certificate} />
+    </>
+  )
 }
