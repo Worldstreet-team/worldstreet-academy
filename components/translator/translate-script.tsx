@@ -26,6 +26,26 @@ function patchDomForTranslate() {
 }
 
 /**
+ * Clear all googtrans cookies across every domain/path variant Google may use.
+ */
+function clearGoogTransCookies() {
+  const expiry = "expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"
+  const hostname = window.location.hostname
+  // Build a list of domain variants to clear against
+  const domains = ["", `domain=${hostname};`, `domain=.${hostname};`]
+  // Also try the parent domain (e.g. .worldstreetgold.com from academy.worldstreetgold.com)
+  const parts = hostname.split(".")
+  if (parts.length > 2) {
+    const parent = parts.slice(1).join(".")
+    domains.push(`domain=.${parent};`)
+  }
+  domains.forEach((d) => {
+    document.cookie = `googtrans=; ${expiry} ${d}`
+    document.cookie = `googtrans=/en/en; ${expiry} ${d}`
+  })
+}
+
+/**
  * Programmatically change the page language via the hidden Google Translate select.
  */
 export function changeLanguage(langCode: string): Promise<void> {
@@ -35,7 +55,6 @@ export function changeLanguage(langCode: string): Promise<void> {
       if (select) {
         select.value = langCode
         select.dispatchEvent(new Event("change"))
-        // Give Google Translate a moment to process
         setTimeout(resolve, 800)
         return
       }
@@ -51,30 +70,34 @@ export function changeLanguage(langCode: string): Promise<void> {
 
 /**
  * Reset page back to English.
+ * Clears all googtrans cookies then reloads — the only fully reliable reset.
  */
 export function resetToEnglish(): Promise<void> {
   return new Promise((resolve) => {
-    // Clear googtrans cookies
-    const expiry = "expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"
-    document.cookie = `googtrans=; ${expiry}`
-    document.cookie = `googtrans=; ${expiry} domain=${window.location.hostname}`
-    document.cookie = `googtrans=; ${expiry} domain=.${window.location.hostname}`
+    clearGoogTransCookies()
 
+    // Try the select first for a soft reset (no flash)
     const attempt = (tries: number) => {
       const select = document.querySelector<HTMLSelectElement>(".goog-te-combo")
       if (select) {
         select.value = ""
         select.dispatchEvent(new Event("change"))
-        setTimeout(resolve, 800)
+        // After soft reset, clear again in case translate re-set the cookie
+        setTimeout(() => {
+          clearGoogTransCookies()
+          resolve()
+        }, 800)
         return
       }
       if (tries > 0) {
         setTimeout(() => attempt(tries - 1), 300)
       } else {
+        // No widget found — cookie is cleared, just reload
+        window.location.reload()
         resolve()
       }
     }
-    attempt(15)
+    attempt(10)
   })
 }
 
@@ -97,6 +120,13 @@ export function TranslateScript({ initialLanguage }: TranslateScriptProps) {
   useEffect(() => {
     // Patch DOM once
     patchDomForTranslate()
+
+    // If the user's saved language is English (or not set), clear any stale
+    // googtrans cookie immediately — before the widget even initialises.
+    // This is what prevents the foreign language persisting across reloads.
+    if (!initialLanguage || initialLanguage === "en") {
+      clearGoogTransCookies()
+    }
 
     // Inject hide styles
     const style = document.createElement("style")
@@ -167,6 +197,9 @@ export function TranslateScript({ initialLanguage }: TranslateScriptProps) {
         if (initialLanguage && initialLanguage !== "en" && !hasInitialized.current) {
           hasInitialized.current = true
           changeLanguage(initialLanguage)
+        } else if (!initialLanguage || initialLanguage === "en") {
+          // Clear cookies again after widget init in case Google re-set them
+          clearGoogTransCookies()
         }
       }
     }
