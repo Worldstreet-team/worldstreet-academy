@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useTransition } from "react"
+
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -28,7 +28,7 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import { UserIcon, Settings01Icon, Logout01Icon, Search01Icon, CommandIcon, TeachingIcon, DashboardSpeed01Icon } from "@hugeicons/core-free-icons"
 import { NotificationBell } from "@/components/shared/notification-bell"
 import { useUser } from "@/components/providers/user-provider"
-import { useClerk } from "@clerk/nextjs"
+import { LogoutConfirmDialog } from "@/components/shared/logout-confirm-dialog"
 
 /* ── Path → breadcrumb label map ────────────────────────── */
 const labelMap: Record<string, string> = {
@@ -74,24 +74,8 @@ export function Topbar({ title, variant = "platform", breadcrumbOverrides }: Top
   const pathname = usePathname()
   const crumbs = buildCrumbs(pathname, breadcrumbOverrides)
   const user = useUser()
-  const { signOut } = useClerk()
-  const [isPending, startTransition] = useTransition()
-
   const userInitials = `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`.toUpperCase() || "U"
   const isInstructor = user.role === "INSTRUCTOR" || user.role === "ADMIN"
-
-  function handleLogout() {
-    startTransition(async () => {
-      try {
-        await signOut()
-      } catch (error) {
-        console.error("Sign out error:", error)
-      } finally {
-        // Always redirect regardless of signOut result
-        window.location.href = "https://www.worldstreetgold.com/login"
-      }
-    })
-  }
 
   return (
     <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b">
@@ -188,13 +172,17 @@ export function Topbar({ title, variant = "platform", breadcrumbOverrides }: Top
                 Settings
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem 
-                variant="destructive" 
-                render={<button type="button" className="w-full" onClick={handleLogout} disabled={isPending} />}
-              >
-                <HugeiconsIcon icon={Logout01Icon} size={16} />
-                {isPending ? "Logging out..." : "Log out"}
-              </DropdownMenuItem>
+              <LogoutConfirmDialog>
+                {(openLogout) => (
+                  <DropdownMenuItem
+                    variant="destructive"
+                    render={<button type="button" className="w-full" onClick={openLogout} />}
+                  >
+                    <HugeiconsIcon icon={Logout01Icon} size={16} />
+                    Log out
+                  </DropdownMenuItem>
+                )}
+              </LogoutConfirmDialog>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

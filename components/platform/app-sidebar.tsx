@@ -3,7 +3,7 @@
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
-import { useTransition, useEffect } from "react"
+import { useEffect } from "react"
 import {
   Sidebar,
   SidebarContent,
@@ -43,7 +43,7 @@ import {
   Certificate01Icon,
 } from "@hugeicons/core-free-icons"
 import { useUser } from "@/components/providers/user-provider"
-import { useClerk } from "@clerk/nextjs"
+import { LogoutConfirmDialog } from "@/components/shared/logout-confirm-dialog"
 import { useUnreadCount } from "@/lib/hooks/use-unread-count"
 import { useOngoingCall, useActiveCallInfo } from "@/components/providers/call-provider"
 import { useSidebarActivity } from "@/lib/hooks/use-sidebar-activity"
@@ -162,8 +162,6 @@ export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const user = useUser()
-  const { signOut } = useClerk()
-  const [isPending, startTransition] = useTransition()
   const unreadCount = useUnreadCount()
   const hasOngoingCall = useOngoingCall()
   const callInfo = useActiveCallInfo()
@@ -182,19 +180,6 @@ export function AppSidebar() {
       router.prefetch(route)
     })
   }, [router])
-
-  function handleLogout() {
-    startTransition(async () => {
-      try {
-        await signOut()
-      } catch (error) {
-        console.error("Sign out error:", error)
-      } finally {
-        // Always redirect regardless of signOut result
-        window.location.href = "https://www.worldstreetgold.com/login"
-      }
-    })
-  }
 
   return (
     <Sidebar collapsible="icon">
@@ -402,12 +387,14 @@ export function AppSidebar() {
             </div>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton 
-              render={<button type="button" onClick={handleLogout} disabled={isPending} />}
-            >
-              <HugeiconsIcon icon={Logout01Icon} size={18} />
-              <span>{isPending ? "Logging out..." : "Log out"}</span>
-            </SidebarMenuButton>
+            <LogoutConfirmDialog>
+              {(openLogout) => (
+                <SidebarMenuButton render={<button type="button" onClick={openLogout} />}>
+                  <HugeiconsIcon icon={Logout01Icon} size={18} />
+                  <span>Log out</span>
+                </SidebarMenuButton>
+              )}
+            </LogoutConfirmDialog>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
