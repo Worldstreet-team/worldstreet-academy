@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
@@ -76,9 +77,12 @@ export function Topbar({ title, variant = "platform", breadcrumbOverrides }: Top
   const user = useUser()
   const userInitials = `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`.toUpperCase() || "U"
   const isInstructor = user.role === "INSTRUCTOR" || user.role === "ADMIN"
+  const [logoutOpen, setLogoutOpen] = useState(false)
 
   return (
     <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b">
+      {/* Logout confirm dialog — rendered outside dropdown so it survives dropdown close */}
+      <LogoutConfirmDialog open={logoutOpen} onOpenChange={setLogoutOpen} />
       {/* Main bar */}
       <div className="flex h-14 shrink-0 items-center gap-2 px-4">
         <SidebarTrigger className="-ml-1" />
@@ -172,17 +176,13 @@ export function Topbar({ title, variant = "platform", breadcrumbOverrides }: Top
                 Settings
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <LogoutConfirmDialog>
-                {(openLogout) => (
-                  <DropdownMenuItem
-                    variant="destructive"
-                    render={<button type="button" className="w-full" onClick={openLogout} />}
-                  >
-                    <HugeiconsIcon icon={Logout01Icon} size={16} />
-                    Log out
-                  </DropdownMenuItem>
-                )}
-              </LogoutConfirmDialog>
+              <DropdownMenuItem
+                variant="destructive"
+                render={<button type="button" className="w-full" onClick={() => setLogoutOpen(true)} />}
+              >
+                <HugeiconsIcon icon={Logout01Icon} size={16} />
+                Log out
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

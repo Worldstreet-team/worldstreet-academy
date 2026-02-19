@@ -18,18 +18,32 @@ import {
 
 const LOGOUT_URL = "https://www.worldstreetgold.com/login"
 
-interface LogoutConfirmDialogProps {
-  /**
-   * Render prop — receives `openDialog` callback to attach to your trigger element.
-   * Example: {(open) => <button onClick={open}>Log out</button>}
-   */
-  children: (openDialog: () => void) => React.ReactNode
-}
+type LogoutConfirmDialogProps =
+  | {
+      /** Render-prop mode: wraps a trigger element that opens the dialog. */
+      children: (openDialog: () => void) => React.ReactNode
+      open?: never
+      onOpenChange?: never
+    }
+  | {
+      /** Controlled mode: manage open state externally (use when trigger is in a Dropdown/Popover). */
+      open: boolean
+      onOpenChange: (open: boolean) => void
+      children?: never
+    }
 
-export function LogoutConfirmDialog({ children }: LogoutConfirmDialogProps) {
+export function LogoutConfirmDialog({ children, open: controlledOpen, onOpenChange: controlledOnOpenChange }: LogoutConfirmDialogProps) {
   const { signOut } = useClerk()
-  const [isOpen, setIsOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+
+  const isOpen = controlledOpen !== undefined ? controlledOpen : internalOpen
+
+  function handleOpenChange(open: boolean) {
+    if (isLoggingOut) return
+    if (controlledOnOpenChange) controlledOnOpenChange(open)
+    else setInternalOpen(open)
+  }
 
   async function handleConfirmLogout() {
     setIsLoggingOut(true)
@@ -42,14 +56,9 @@ export function LogoutConfirmDialog({ children }: LogoutConfirmDialogProps) {
     }
   }
 
-  function handleOpenChange(open: boolean) {
-    // Don't allow closing while logging out
-    if (!isLoggingOut) setIsOpen(open)
-  }
-
   return (
     <>
-      {children(() => setIsOpen(true))}
+      {children && children(() => handleOpenChange(true))}
       <AlertDialog open={isOpen} onOpenChange={handleOpenChange}>
         <AlertDialogContent size="sm">
           <AlertDialogHeader>
