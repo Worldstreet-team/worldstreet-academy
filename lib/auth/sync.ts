@@ -49,6 +49,7 @@ export type LocalUser = {
   verified: boolean
   walletBalance: number
   hasOnboarded: boolean
+  preferredLanguage: string | null
   createdAt: string
   updatedAt: string
 }
@@ -141,6 +142,7 @@ export async function syncUserToLocal(authUser: AuthUser, updateNames = true): P
     verified: user.verified,
     walletBalance: user.walletBalance,
     hasOnboarded: user.hasOnboarded ?? false,
+    preferredLanguage: user.preferredLanguage ?? null,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
   }
@@ -172,6 +174,7 @@ export async function getLocalUserByAuthId(authUserId: string): Promise<LocalUse
     verified: user.verified,
     walletBalance: user.walletBalance,
     hasOnboarded: user.hasOnboarded ?? false,
+    preferredLanguage: user.preferredLanguage ?? null,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
   }
@@ -203,6 +206,7 @@ export async function getLocalUserById(id: string): Promise<LocalUser | null> {
     verified: user.verified,
     walletBalance: user.walletBalance,
     hasOnboarded: user.hasOnboarded ?? false,
+    preferredLanguage: user.preferredLanguage ?? null,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
   }

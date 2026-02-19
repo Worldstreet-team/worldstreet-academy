@@ -14,6 +14,7 @@ export interface IUser extends Document {
   verified: boolean
   walletBalance: number
   hasOnboarded: boolean
+  preferredLanguage: string | null
   // For instructors
   instructorProfile?: {
     headline: string | null
@@ -92,6 +93,10 @@ const UserSchema = new Schema<IUser>(
     hasOnboarded: {
       type: Boolean,
       default: false,
+    },
+    preferredLanguage: {
+      type: String,
+      default: null,
     },
     instructorProfile: {
       headline: { type: String, default: null },

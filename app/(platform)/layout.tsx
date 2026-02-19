@@ -8,6 +8,7 @@ import { CallProvider } from "@/components/providers/call-provider"
 import { MeetingProvider } from "@/components/providers/meeting-provider"
 import { QueryProvider } from "@/components/providers/query-provider"
 import { getCurrentUser } from "@/lib/auth"
+import { TranslateScript } from "@/components/translator/translate-script"
 
 export default async function PlatformLayout({
   children,
@@ -32,6 +33,7 @@ export default async function PlatformLayout({
               </SidebarInset>
               <PlatformBottomNav />
               <CommandSearch />
+              <TranslateScript initialLanguage={user.preferredLanguage} />
             </SidebarProvider>
           </MeetingProvider>
         </CallProvider>

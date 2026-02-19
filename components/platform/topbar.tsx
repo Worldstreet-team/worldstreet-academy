@@ -30,6 +30,7 @@ import { UserIcon, Settings01Icon, Logout01Icon, Search01Icon, CommandIcon, Teac
 import { NotificationBell } from "@/components/shared/notification-bell"
 import { useUser } from "@/components/providers/user-provider"
 import { LogoutConfirmDialog } from "@/components/shared/logout-confirm-dialog"
+import { LanguagePicker } from "@/components/translator/language-picker"
 
 /* ── Path → breadcrumb label map ────────────────────────── */
 const labelMap: Record<string, string> = {
@@ -130,6 +131,24 @@ export function Topbar({ title, variant = "platform", breadcrumbOverrides }: Top
           </button>
 
           <ThemeToggle />
+
+          {/* Language picker */}
+          <LanguagePicker defaultLanguage={user.preferredLanguage}>
+            {({ currentLanguage, isTranslating }) => (
+              <button
+                type="button"
+                aria-label="Change language"
+                className="relative flex h-8 w-8 items-center justify-center rounded-full border text-muted-foreground hover:bg-muted transition-colors disabled:pointer-events-none disabled:opacity-50"
+                disabled={isTranslating}
+              >
+                {isTranslating ? (
+                  <div className="h-3.5 w-3.5 rounded-full border-2 border-muted-foreground/30 border-t-foreground animate-spin" />
+                ) : (
+                  <span className="text-sm leading-none notranslate" translate="no">{currentLanguage.flag}</span>
+                )}
+              </button>
+            )}
+          </LanguagePicker>
 
           {/* User profile dropdown — always visible, especially useful on mobile */}
           <DropdownMenu>
