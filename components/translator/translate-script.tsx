@@ -104,9 +104,19 @@ export function TranslateScript({ initialLanguage }: TranslateScriptProps) {
       .goog-te-banner-frame,
       #goog-gt-tt,
       .goog-te-balloon-frame,
+      .goog-te-menu-frame,
       .skiptranslate iframe,
-      .goog-te-spinner-pos {
+      .goog-te-spinner-pos,
+      .VIpgJd-ZVi9od-ORHb-OEVmcd,
+      .VIpgJd-ZVi9od-aZ2wEe-wOHMyf,
+      .VIpgJd-ZVi9od-xl07Ob-OEVmcd,
+      .goog-tooltip,
+      .goog-tooltip-card,
+      .goog-snackbar-container {
         display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
       }
       body {
         top: 0 !important;
@@ -171,8 +181,38 @@ export function TranslateScript({ initialLanguage }: TranslateScriptProps) {
       document.body.appendChild(script)
     }
 
+    // Watch for any Google Translate UI injected dynamically and kill it immediately
+    const HIDDEN_SELECTORS = [
+      ".goog-te-banner-frame",
+      ".goog-te-balloon-frame",
+      ".goog-te-menu-frame",
+      ".goog-te-spinner-pos",
+      ".VIpgJd-ZVi9od-ORHb-OEVmcd",
+      ".VIpgJd-ZVi9od-aZ2wEe-wOHMyf",
+      ".VIpgJd-ZVi9od-xl07Ob-OEVmcd",
+      ".goog-tooltip",
+      ".goog-tooltip-card",
+      ".goog-snackbar-container",
+      "#goog-gt-tt",
+    ]
+
+    const hideGoogleUI = () => {
+      HIDDEN_SELECTORS.forEach((sel) => {
+        document.querySelectorAll(sel).forEach((el) => {
+          ;(el as HTMLElement).style.cssText =
+            "display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;"
+        })
+      })
+      // Keep body from shifting
+      document.body.style.top = "0px"
+    }
+
+    const observer = new MutationObserver(hideGoogleUI)
+    observer.observe(document.body, { childList: true, subtree: true })
+
     return () => {
       style.remove()
+      observer.disconnect()
     }
   }, [initialLanguage])
 

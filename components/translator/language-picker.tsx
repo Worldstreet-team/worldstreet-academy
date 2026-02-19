@@ -8,7 +8,6 @@ import { changeLanguage, resetToEnglish } from "./translate-script"
 import { updatePreferredLanguage } from "@/lib/actions/language"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Button } from "@/components/ui/button"
 import {
   Popover,
   PopoverTrigger,
@@ -71,11 +70,6 @@ export function LanguagePicker({ defaultLanguage, children }: LanguagePickerProp
 
   const handleSelect = useCallback(
     async (lang: Language) => {
-      if (lang.code === currentCode) {
-        setOpen(false)
-        return
-      }
-
       setIsTranslating(true)
       setSearch("")
 
@@ -98,7 +92,7 @@ export function LanguagePicker({ defaultLanguage, children }: LanguagePickerProp
         setOpen(false)
       }
     },
-    [currentCode]
+    []
   )
 
   // Focus search input when popover/sheet opens
@@ -153,14 +147,13 @@ export function LanguagePicker({ defaultLanguage, children }: LanguagePickerProp
                   Popular
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-0.5 px-0.5">
+              <div className="space-y-0.5 px-0.5">
                 {popular.map((lang) => (
                   <LanguageItem
                     key={lang.code}
                     lang={lang}
                     isSelected={lang.code === currentCode}
                     onSelect={handleSelect}
-                    compact
                   />
                 ))}
               </div>
@@ -196,28 +189,16 @@ export function LanguagePicker({ defaultLanguage, children }: LanguagePickerProp
         </div>
       </ScrollArea>
 
-      {/* Footer — shows loading state inline while translating */}
-      <div className="border-t px-3 py-2 flex items-center justify-between bg-muted/30">
-        <div className="flex items-center gap-2 min-w-0">
-          {isTranslating ? (
-            <div className="h-3.5 w-3.5 shrink-0 rounded-full border-2 border-muted-foreground/30 border-t-foreground animate-spin" />
-          ) : (
-            <span className="text-base leading-none notranslate" translate="no">{currentLanguage.flag}</span>
-          )}
-          <span className="text-xs font-medium text-foreground truncate notranslate" translate="no">
-            {isTranslating ? `Applying ${currentLanguage.name}…` : currentLanguage.name}
-          </span>
-        </div>
-        {!isTranslating && currentCode !== "en" && (
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={() => handleSelect(getLanguage("en"))}
-            className="text-muted-foreground hover:text-foreground shrink-0"
-          >
-            Reset
-          </Button>
+      {/* Footer — current language + inline loading indicator */}
+      <div className="border-t px-3 py-2.5 flex items-center gap-2 bg-muted/30">
+        {isTranslating ? (
+          <div className="h-3.5 w-3.5 shrink-0 rounded-full border-2 border-muted-foreground/30 border-t-foreground animate-spin" />
+        ) : (
+          <span className="text-base leading-none notranslate shrink-0" translate="no">{currentLanguage.flag}</span>
         )}
+        <span className="text-xs text-muted-foreground truncate notranslate" translate="no">
+          {isTranslating ? "Applying…" : currentLanguage.name}
+        </span>
       </div>
     </div>
   )
@@ -284,43 +265,38 @@ function LanguageItem({
   lang,
   isSelected,
   onSelect,
-  compact = false,
 }: {
   lang: Language
   isSelected: boolean
   onSelect: (lang: Language) => void
-  compact?: boolean
 }) {
   return (
     <button
       type="button"
       onClick={() => onSelect(lang)}
       className={cn(
-        "w-full flex items-center gap-2.5 rounded-md px-2 text-left transition-colors",
-        compact ? "py-1.5" : "py-2",
+        "w-full flex items-center gap-2.5 rounded-md px-2 py-2 text-left transition-colors",
         isSelected
-          ? "bg-primary/5 text-foreground"
-          : "text-foreground/80 hover:bg-muted/80 hover:text-foreground"
+          ? "bg-muted text-foreground"
+          : "text-foreground/80 hover:bg-muted/60 hover:text-foreground"
       )}
     >
-      <span className={cn("leading-none notranslate", compact ? "text-base" : "text-lg")} translate="no">
+      <span className="text-lg leading-none notranslate shrink-0" translate="no">
         {lang.flag}
       </span>
       <div className="flex-1 min-w-0">
-        <span className={cn("font-medium truncate block notranslate", compact ? "text-xs" : "text-[13px]")} translate="no">
+        <span className="text-[13px] font-medium truncate block notranslate" translate="no">
           {lang.name}
         </span>
-        {!compact && (
-          <span className="text-[11px] text-muted-foreground truncate block notranslate" translate="no">
-            {lang.nativeName}
-          </span>
-        )}
+        <span className="text-[11px] text-muted-foreground truncate block notranslate" translate="no">
+          {lang.nativeName}
+        </span>
       </div>
       {isSelected && (
         <HugeiconsIcon
           icon={Tick01Icon}
           size={14}
-          className="text-primary shrink-0"
+          className="text-foreground/50 shrink-0"
           strokeWidth={2.5}
         />
       )}
