@@ -26,7 +26,6 @@ import {
   Search01Icon,
   Cancel01Icon,
   Tick01Icon,
-  LanguageSkillIcon,
 } from "@hugeicons/core-free-icons"
 
 type LanguagePickerProps = {
@@ -78,7 +77,6 @@ export function LanguagePicker({ defaultLanguage, children }: LanguagePickerProp
       }
 
       setIsTranslating(true)
-      setOpen(false)
       setSearch("")
 
       try {
@@ -97,6 +95,7 @@ export function LanguagePicker({ defaultLanguage, children }: LanguagePickerProp
         // Silently fail — translation may partially work
       } finally {
         setIsTranslating(false)
+        setOpen(false)
       }
     },
     [currentCode]
@@ -115,7 +114,7 @@ export function LanguagePicker({ defaultLanguage, children }: LanguagePickerProp
   }, [open])
 
   const pickerContent = (
-    <div className="flex flex-col h-full max-h-[min(70vh,480px)] md:max-h-105">
+    <div className="flex flex-col">
       {/* Search */}
       <div className="px-3 pt-3 pb-2">
         <div className="relative">
@@ -143,8 +142,8 @@ export function LanguagePicker({ defaultLanguage, children }: LanguagePickerProp
         </div>
       </div>
 
-      {/* Language list */}
-      <ScrollArea className="flex-1 min-h-0">
+      {/* Language list — explicit max-h so ScrollArea actually scrolls */}
+      <ScrollArea className="max-h-65">
         <div className="px-1.5 pb-2">
           {/* Popular section — only when not searching */}
           {!search.trim() && (
@@ -197,15 +196,19 @@ export function LanguagePicker({ defaultLanguage, children }: LanguagePickerProp
         </div>
       </ScrollArea>
 
-      {/* Current selection footer */}
+      {/* Footer — shows loading state inline while translating */}
       <div className="border-t px-3 py-2 flex items-center justify-between bg-muted/30">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-base leading-none notranslate" translate="no">{currentLanguage.flag}</span>
+          {isTranslating ? (
+            <div className="h-3.5 w-3.5 shrink-0 rounded-full border-2 border-muted-foreground/30 border-t-foreground animate-spin" />
+          ) : (
+            <span className="text-base leading-none notranslate" translate="no">{currentLanguage.flag}</span>
+          )}
           <span className="text-xs font-medium text-foreground truncate notranslate" translate="no">
-            {currentLanguage.name}
+            {isTranslating ? `Applying ${currentLanguage.name}…` : currentLanguage.name}
           </span>
         </div>
-        {currentCode !== "en" && (
+        {!isTranslating && currentCode !== "en" && (
           <Button
             variant="ghost"
             size="xs"
@@ -219,67 +222,60 @@ export function LanguagePicker({ defaultLanguage, children }: LanguagePickerProp
     </div>
   )
 
-  const triggerButton = children ? (
-    children({ currentLanguage, isTranslating })
-  ) : (
-    <DefaultTrigger
-      currentLanguage={currentLanguage}
-      isTranslating={isTranslating}
-    />
-  )
+  const triggerButton = children
+    ? children({ currentLanguage, isTranslating })
+    : (
+        <button
+          type="button"
+          className="flex h-8 w-8 items-center justify-center rounded-full border text-muted-foreground hover:bg-muted transition-colors"
+        >
+          <span className="text-sm leading-none notranslate" translate="no">{currentLanguage.flag}</span>
+        </button>
+      )
 
   if (isMobile) {
     return (
-      <>
-        <Sheet open={open} onOpenChange={setOpen}>
-          <SheetTrigger render={<div className="w-full" />}>
-            {triggerButton}
-          </SheetTrigger>
-          <SheetContent side="bottom" showCloseButton={false} className="px-0 pb-0 rounded-t-2xl max-h-[85vh]">
-            <SheetHeader className="px-4 pb-0">
-              <div className="flex items-center justify-between">
-                <SheetTitle className="text-sm font-semibold">Language</SheetTitle>
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-muted text-muted-foreground"
-                >
-                  <HugeiconsIcon icon={Cancel01Icon} size={14} />
-                </button>
-              </div>
-            </SheetHeader>
-            {pickerContent}
-          </SheetContent>
-        </Sheet>
-
-        {/* Translation overlay */}
-        <TranslateOverlay isTranslating={isTranslating} language={currentLanguage} />
-      </>
+      <Sheet open={open} onOpenChange={(o) => { if (!isTranslating) setOpen(o) }}>
+        <SheetTrigger render={<div className="w-full" />}>
+          {triggerButton}
+        </SheetTrigger>
+        <SheetContent side="bottom" showCloseButton={false} className="px-0 pb-0 rounded-t-2xl">
+          <SheetHeader className="px-4 pb-0">
+            <div className="flex items-center justify-between">
+              <SheetTitle className="text-sm font-semibold">Language</SheetTitle>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                disabled={isTranslating}
+                className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-muted text-muted-foreground disabled:opacity-40"
+              >
+                <HugeiconsIcon icon={Cancel01Icon} size={14} />
+              </button>
+            </div>
+          </SheetHeader>
+          {pickerContent}
+        </SheetContent>
+      </Sheet>
     )
   }
 
   return (
-    <>
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger render={<div />}>
-          {triggerButton}
-        </PopoverTrigger>
-        <PopoverContent
-          side="right"
-          align="end"
-          sideOffset={12}
-          className="w-[320px] p-0 overflow-hidden"
-        >
-          <div className="px-3 pt-3 pb-1.5 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-foreground">Language</h3>
-          </div>
-          {pickerContent}
-        </PopoverContent>
-      </Popover>
-
-      {/* Translation overlay */}
-      <TranslateOverlay isTranslating={isTranslating} language={currentLanguage} />
-    </>
+    <Popover open={open} onOpenChange={(o) => { if (!isTranslating) setOpen(o) }}>
+      <PopoverTrigger render={<div />}>
+        {triggerButton}
+      </PopoverTrigger>
+      <PopoverContent
+        side="bottom"
+        align="end"
+        sideOffset={8}
+        className="w-75 p-0 overflow-hidden"
+      >
+        <div className="px-3 pt-3 pb-1.5 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-foreground">Language</h3>
+        </div>
+        {pickerContent}
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -329,67 +325,5 @@ function LanguageItem({
         />
       )}
     </button>
-  )
-}
-
-/** Default trigger button for sidebar */
-function DefaultTrigger({
-  currentLanguage,
-  isTranslating,
-}: {
-  currentLanguage: Language
-  isTranslating: boolean
-}) {
-  return (
-    <button
-      type="button"
-      className={cn(
-        "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors",
-        "hover:bg-muted/80 text-foreground/80 hover:text-foreground",
-        isTranslating && "opacity-60 pointer-events-none"
-      )}
-    >
-      {isTranslating ? (
-        <div className="h-4 w-4 shrink-0 rounded-full border-2 border-muted-foreground/30 border-t-foreground animate-spin" />
-      ) : (
-        <HugeiconsIcon icon={LanguageSkillIcon} size={18} />
-      )}
-      <span className="truncate notranslate" translate="no">{currentLanguage.name}</span>
-      <span className="ml-auto text-base leading-none shrink-0 notranslate" translate="no">{currentLanguage.flag}</span>
-    </button>
-  )
-}
-
-/** Full-screen loading overlay while translation is being applied */
-function TranslateOverlay({
-  isTranslating,
-  language,
-}: {
-  isTranslating: boolean
-  language: Language
-}) {
-  if (!isTranslating) return null
-
-  return (
-    <div className="fixed inset-0 z-9999 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-      <div className="flex flex-col items-center gap-4">
-        <div className="relative flex items-center justify-center">
-          {/* Outer ring */}
-          <div className="absolute h-16 w-16 rounded-full border-2 border-muted-foreground/10" />
-          {/* Spinning arc */}
-          <div className="absolute h-16 w-16 rounded-full border-2 border-transparent border-t-foreground/60 animate-spin" />
-          {/* Flag */}
-          <span className="text-2xl notranslate" translate="no">{language.flag}</span>
-        </div>
-        <div className="flex flex-col items-center gap-1">
-          <p className="text-sm font-medium text-foreground notranslate" translate="no">
-            Translating to {language.name}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            This may take a moment...
-          </p>
-        </div>
-      </div>
-    </div>
   )
 }

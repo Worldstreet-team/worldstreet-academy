@@ -130,7 +130,9 @@ export function Topbar({ title, variant = "platform", breadcrumbOverrides }: Top
             </kbd>
           </button>
 
-          <ThemeToggle />
+          <div className="hidden sm:flex">
+            <ThemeToggle />
+          </div>
 
           {/* Language picker */}
           <LanguagePicker defaultLanguage={user.preferredLanguage}>
