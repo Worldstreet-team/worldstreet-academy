@@ -46,6 +46,8 @@ const SERVER_TO_OVERLAY: Record<string, OverlaySection> = {
   getUserProfile: "profile",
   getMyCertificates: "certificates",
   initiateCall: "meetings",
+  getBookmarks: "courses",
+  searchUsers: "search-results",
 }
 
 // ============================================================================
@@ -356,6 +358,59 @@ export function VividProvider({ children }: VividProviderProps) {
           }
         }
 
+        case "toggleTheme": {
+          // Toggle document class for dark/light mode
+          const root = document.documentElement
+          const current = root.classList.contains("dark") ? "dark" : "light"
+          const next = current === "dark" ? "light" : "dark"
+          root.classList.remove(current)
+          root.classList.add(next)
+          // Persist via localStorage for next-themes
+          localStorage.setItem("theme", next)
+          // Dispatch storage event so next-themes picks it up
+          window.dispatchEvent(new StorageEvent("storage", { key: "theme", newValue: next }))
+          return { success: true, theme: next, message: `Switched to ${next} mode` }
+        }
+
+        case "playPauseVideo": {
+          const action = (args.action as string) || "toggle"
+          try {
+            const video = document.querySelector("video") as HTMLVideoElement | null
+            if (!video) return { success: false, error: "No video player found on this page" }
+            if (action === "play") { await video.play(); return { success: true, state: "playing" } }
+            if (action === "pause") { video.pause(); return { success: true, state: "paused" } }
+            // toggle
+            if (video.paused) { await video.play(); return { success: true, state: "playing" } }
+            else { video.pause(); return { success: true, state: "paused" } }
+          } catch (error) {
+            console.error("[Vivid] playPauseVideo error:", error)
+            return { success: false, error: "Could not control the video" }
+          }
+        }
+
+        case "copyToClipboard": {
+          const text = args.text as string
+          const label = (args.label as string) || "Text"
+          try {
+            await navigator.clipboard.writeText(text)
+            return { success: true, message: `${label} copied to clipboard!` }
+          } catch {
+            return { success: false, error: "Failed to copy to clipboard" }
+          }
+        }
+
+        case "scrollToSection": {
+          const sectionId = args.sectionId as string
+          try {
+            const el = document.querySelector(sectionId)
+            if (!el) return { success: false, error: `Section "${sectionId}" not found on this page` }
+            el.scrollIntoView({ behavior: "smooth", block: "start" })
+            return { success: true, scrolledTo: sectionId }
+          } catch {
+            return { success: false, error: "Failed to scroll" }
+          }
+        }
+
         default:
           return { success: false, error: `Unknown client function: ${name}` }
       }
@@ -379,7 +434,7 @@ export function VividProvider({ children }: VividProviderProps) {
       let data: unknown = null
       switch (section) {
         case "courses":
-          data = r.courses || []
+          data = r.courses || r.bookmarks || []
           break
         case "course-detail":
           data = r
@@ -398,6 +453,9 @@ export function VividProvider({ children }: VividProviderProps) {
           break
         case "certificates":
           data = r.certificates || []
+          break
+        case "search-results":
+          data = r.users || r.results || []
           break
       }
 

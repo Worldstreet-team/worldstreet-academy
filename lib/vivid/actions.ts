@@ -682,6 +682,245 @@ export async function vividGetUserSignature() {
 }
 
 // ============================================================================
+// Toggle Bookmark (B1)
+// ============================================================================
+
+export async function vividToggleBookmark(p: { courseId: string }) {
+  try {
+    const currentUser = await initAction()
+    if (!currentUser) return { success: false, error: "Not authenticated" }
+
+    const { toggleCourseBookmark } = await import("@/lib/actions/student")
+    const result = await toggleCourseBookmark(p.courseId)
+    return {
+      success: true,
+      isBookmarked: result.isBookmarked,
+      message: result.isBookmarked ? "Course bookmarked!" : "Bookmark removed.",
+    }
+  } catch (error) {
+    console.error("[Vivid] toggleBookmark error:", error)
+    return { success: false, error: "Failed to toggle bookmark" }
+  }
+}
+
+// ============================================================================
+// Mark Lesson Complete (B2)
+// ============================================================================
+
+export async function vividMarkLessonComplete(p: { courseId: string; lessonId: string }) {
+  try {
+    const currentUser = await initAction()
+    if (!currentUser) return { success: false, error: "Not authenticated" }
+
+    const { markLessonComplete } = await import("@/lib/actions/student")
+    await markLessonComplete(p.courseId, p.lessonId)
+    return { success: true, message: "Lesson marked as complete!" }
+  } catch (error) {
+    console.error("[Vivid] markLessonComplete error:", error)
+    return { success: false, error: "Failed to mark lesson complete" }
+  }
+}
+
+// ============================================================================
+// Mark Course Complete (B3)
+// ============================================================================
+
+export async function vividMarkCourseComplete(p: { courseId: string }) {
+  try {
+    const currentUser = await initAction()
+    if (!currentUser) return { success: false, error: "Not authenticated" }
+
+    const { markCourseComplete } = await import("@/lib/actions/student")
+    await markCourseComplete(p.courseId)
+    return { success: true, message: "Course completed! Your certificate is ready." }
+  } catch (error) {
+    console.error("[Vivid] markCourseComplete error:", error)
+    return { success: false, error: "Failed to mark course complete" }
+  }
+}
+
+// ============================================================================
+// Get Watch Progress (B4)
+// ============================================================================
+
+export async function vividGetWatchProgress(p: { courseId: string }) {
+  try {
+    const currentUser = await initAction()
+    if (!currentUser) return { success: false, error: "Not authenticated" }
+
+    const { getCourseWatchProgress } = await import("@/lib/actions/watch-progress")
+    const progress = await getCourseWatchProgress(p.courseId)
+
+    // Also get the enrollment to return overall progress
+    const enrollment = await Enrollment.findOne({ user: currentUser.id, course: p.courseId })
+      .select("progress completedLessons")
+      .lean()
+
+    return {
+      success: true,
+      courseId: p.courseId,
+      overallProgress: enrollment?.progress || 0,
+      completedLessonCount: enrollment?.completedLessons?.length || 0,
+      lessonProgress: progress || [],
+    }
+  } catch (error) {
+    console.error("[Vivid] getWatchProgress error:", error)
+    return { success: false, error: "Failed to get watch progress" }
+  }
+}
+
+// ============================================================================
+// Get Bookmarks (B5)
+// ============================================================================
+
+export async function vividGetBookmarks() {
+  try {
+    const currentUser = await initAction()
+    if (!currentUser) return { success: false, bookmarks: [], error: "Not authenticated" }
+
+    const { fetchMyBookmarks } = await import("@/lib/actions/student")
+    const bookmarks = await fetchMyBookmarks()
+
+    return {
+      success: true,
+      bookmarks: Array.isArray(bookmarks) ? bookmarks.map((b: Doc) => ({
+        id: b._id?.toString() || b.id,
+        courseId: b.course?._id?.toString() || b.courseId,
+        courseTitle: b.course?.title || b.title || "Unknown",
+        thumbnailUrl: b.course?.thumbnailUrl || b.thumbnailUrl,
+        instructorName: b.course?.instructor
+          ? `${b.course.instructor.firstName || ""} ${b.course.instructor.lastName || ""}`.trim()
+          : b.instructorName || "",
+        level: b.course?.level || b.level,
+        rating: b.course?.rating?.average || b.rating || 0,
+      })) : [],
+    }
+  } catch (error) {
+    console.error("[Vivid] getBookmarks error:", error)
+    return { success: false, bookmarks: [], error: "Failed to get bookmarks" }
+  }
+}
+
+// ============================================================================
+// Join Meeting (B6)
+// ============================================================================
+
+export async function vividJoinMeeting(p: { meetingId: string }) {
+  try {
+    const currentUser = await initAction()
+    if (!currentUser) return { success: false, error: "Not authenticated" }
+
+    const { joinMeeting } = await import("@/lib/actions/meetings")
+    const result = await joinMeeting(p.meetingId)
+
+    return {
+      success: true,
+      joinUrl: `/dashboard/meetings?meetingId=${p.meetingId}`,
+      meeting: result,
+    }
+  } catch (error) {
+    console.error("[Vivid] joinMeeting error:", error)
+    return { success: false, error: "Failed to join meeting" }
+  }
+}
+
+// ============================================================================
+// Search Users (B7)
+// ============================================================================
+
+export async function vividSearchUsers(p: { query: string; limit?: number }) {
+  try {
+    const currentUser = await initAction()
+    if (!currentUser) return { success: false, users: [], error: "Not authenticated" }
+
+    const { searchUsers } = await import("@/lib/actions/messages")
+    const users = await searchUsers(p.query)
+
+    const limited = Array.isArray(users) ? users.slice(0, p.limit || 5) : []
+    return {
+      success: true,
+      users: limited.map((u: Doc) => ({
+        id: u._id?.toString() || u.id,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        fullName: `${u.firstName || ""} ${u.lastName || ""}`.trim(),
+        avatarUrl: u.avatarUrl,
+        email: u.email,
+        bio: u.bio,
+        role: u.role,
+      })),
+    }
+  } catch (error) {
+    console.error("[Vivid] searchUsers error:", error)
+    return { success: false, users: [], error: "Failed to search users" }
+  }
+}
+
+// ============================================================================
+// Get Unread Count (B8)
+// ============================================================================
+
+export async function vividGetUnreadCount() {
+  try {
+    const currentUser = await initAction()
+    if (!currentUser) return { success: false, error: "Not authenticated" }
+
+    const { getTotalUnreadCount } = await import("@/lib/actions/messages")
+    const raw = await getTotalUnreadCount()
+    const count = raw?.count ?? 0
+
+    return {
+      success: true,
+      unreadCount: count,
+      message: count === 0 ? "No unread messages." : `You have ${count} unread message${count === 1 ? "" : "s"}.`,
+    }
+  } catch (error) {
+    console.error("[Vivid] getUnreadCount error:", error)
+    return { success: false, error: "Failed to get unread count" }
+  }
+}
+
+// ============================================================================
+// Get Completed Lessons (B9)
+// ============================================================================
+
+export async function vividGetCompletedLessons(p: { courseId: string }) {
+  try {
+    const currentUser = await initAction()
+    if (!currentUser) return { success: false, error: "Not authenticated" }
+
+    const { getCompletedLessons } = await import("@/lib/actions/student")
+    const completed = await getCompletedLessons(p.courseId)
+
+    // Also get all lessons for context
+    const lessons = await Lesson.find({ course: p.courseId, isPublished: true })
+      .sort({ order: 1 })
+      .select("_id title order")
+      .lean()
+
+    const completedSet = new Set(
+      Array.isArray(completed) ? completed.map((id: string | Types.ObjectId) => id.toString()) : []
+    )
+
+    return {
+      success: true,
+      courseId: p.courseId,
+      totalLessons: lessons.length,
+      completedCount: completedSet.size,
+      lessons: lessons.map((l, i) => ({
+        id: l._id.toString(),
+        title: l.title,
+        order: l.order || i + 1,
+        isCompleted: completedSet.has(l._id.toString()),
+      })),
+    }
+  } catch (error) {
+    console.error("[Vivid] getCompletedLessons error:", error)
+    return { success: false, error: "Failed to get completed lessons" }
+  }
+}
+
+// ============================================================================
 // Create Vivid Session Token
 // ============================================================================
 
@@ -764,6 +1003,15 @@ const handlers: Record<string, (args: Record<string, unknown>) => Promise<unknow
   saveSignature: (a) => vividSaveSignature(a as Parameters<typeof vividSaveSignature>[0]),
   initiateCall: (a) => vividInitiateCall(a as Parameters<typeof vividInitiateCall>[0]),
   getUserSignature: () => vividGetUserSignature(),
+  toggleBookmark: (a) => vividToggleBookmark(a as Parameters<typeof vividToggleBookmark>[0]),
+  markLessonComplete: (a) => vividMarkLessonComplete(a as Parameters<typeof vividMarkLessonComplete>[0]),
+  markCourseComplete: (a) => vividMarkCourseComplete(a as Parameters<typeof vividMarkCourseComplete>[0]),
+  getWatchProgress: (a) => vividGetWatchProgress(a as Parameters<typeof vividGetWatchProgress>[0]),
+  getBookmarks: () => vividGetBookmarks(),
+  joinMeeting: (a) => vividJoinMeeting(a as Parameters<typeof vividJoinMeeting>[0]),
+  searchUsers: (a) => vividSearchUsers(a as Parameters<typeof vividSearchUsers>[0]),
+  getUnreadCount: () => vividGetUnreadCount(),
+  getCompletedLessons: (a) => vividGetCompletedLessons(a as Parameters<typeof vividGetCompletedLessons>[0]),
 }
 
 export async function executeVividFunction(name: string, args: Record<string, unknown>) {

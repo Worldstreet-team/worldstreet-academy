@@ -98,9 +98,13 @@ const requestOnDemandUI: VividFunctionConfig = {
   - signature-canvas: for signing certificates (config: { quickSign: boolean })
   - confirmation: ask user to confirm an action (config: { action, details })
   - rating: ask user to rate something (config: { courseId, courseName })
-  - language-picker: let user pick language for the platform`,
+  - language-picker: let user pick language for the platform
+  - bookmark-toggle: show bookmark toggle card (config: { courseId, courseTitle, thumbnailUrl, isBookmarked })
+  - progress-dashboard: show progress ring + lesson checklist (config: { courseId, courseTitle, thumbnailUrl })
+  - contact-card: show user contact card with message/call actions (config: { userId, userName, userAvatar, bio })
+  - checkout-confirm: show purchase confirmation card (config: { courseId, courseTitle, thumbnailUrl, price, walletBalance })`,
   parameters: params({
-    type: enm("UI type", ["file-upload", "signature-canvas", "confirmation", "rating", "language-picker"], true),
+    type: enm("UI type", ["file-upload", "signature-canvas", "confirmation", "rating", "language-picker", "bookmark-toggle", "progress-dashboard", "contact-card", "checkout-confirm"], true),
     title: str("Title for the UI prompt", true),
     description: str("Description text", false),
     config: str("JSON config for the UI type", false),
@@ -169,11 +173,52 @@ const closeOverlay: VividFunctionConfig = {
 
 const clearOnDemandUI: VividFunctionConfig = {
   name: "clearOnDemandUI",
-  description: `Dismiss any on-demand UI that is currently showing (file-upload, signature-canvas, confirmation, rating, language-picker). Use when:
+  description: `Dismiss any on-demand UI that is currently showing (file-upload, signature-canvas, confirmation, rating, language-picker, bookmark-toggle, progress-dashboard, contact-card, checkout-confirm). Use when:
   - User says "cancel", "never mind", "skip"
   - The operation was completed or is no longer needed
   - Before switching to a completely different task`,
   parameters: params({}),
+  handler: noop,
+  executionContext: "client",
+}
+
+// ── New Client Functions ──
+
+const toggleTheme: VividFunctionConfig = {
+  name: "toggleTheme",
+  description: "Toggle between dark and light mode instantly. Use when user says 'dark mode', 'light mode', 'switch theme', 'toggle theme', 'change theme'.",
+  parameters: params({}),
+  handler: noop,
+  executionContext: "client",
+}
+
+const playPauseVideo: VividFunctionConfig = {
+  name: "playPauseVideo",
+  description: "Play or pause the lesson video on the current page. Only works when user is on a lesson page (/dashboard/courses/{courseId}/learn/{lessonId}). Use when user says 'play', 'pause', 'stop the video', 'resume'.",
+  parameters: params({
+    action: enm("Play or pause", ["play", "pause", "toggle"], true),
+  }),
+  handler: noop,
+  executionContext: "client",
+}
+
+const copyToClipboard: VividFunctionConfig = {
+  name: "copyToClipboard",
+  description: "Copy text to the user's clipboard. Use for sharing meeting links, course URLs, referral codes, or any text the user wants to copy.",
+  parameters: params({
+    text: str("The text to copy to clipboard", true),
+    label: str("What was copied, shown in toast (e.g. 'Meeting link')", false),
+  }),
+  handler: noop,
+  executionContext: "client",
+}
+
+const scrollToSection: VividFunctionConfig = {
+  name: "scrollToSection",
+  description: "Scroll the page to a specific section. Use on course detail pages to jump to reviews, lessons, description, requirements. Or on any page with sections.",
+  parameters: params({
+    sectionId: str("CSS selector or id of the section to scroll to (e.g. '#reviews', '#lessons', '.course-description')", true),
+  }),
   handler: noop,
   executionContext: "client",
 }
@@ -355,6 +400,96 @@ const getUserSignature: VividFunctionConfig = {
   executionContext: "server",
 }
 
+// ── New Server Functions (B1-B9) ──
+
+const toggleBookmark: VividFunctionConfig = {
+  name: "toggleBookmark",
+  description: "Bookmark or unbookmark a course. Returns the new bookmark state. Use when user says 'bookmark this', 'save this course', 'remove bookmark', 'unbookmark'.",
+  parameters: params({
+    courseId: str("Course ID to toggle bookmark on", true),
+  }),
+  handler: noop,
+  executionContext: "server",
+}
+
+const markLessonComplete: VividFunctionConfig = {
+  name: "markLessonComplete",
+  description: "Mark a specific lesson as complete. Use when user says 'I finished this lesson', 'mark as done', 'lesson complete', or after they've been on a lesson page for a while.",
+  parameters: params({
+    courseId: str("Course ID the lesson belongs to", true),
+    lessonId: str("Lesson ID to mark complete", true),
+  }),
+  handler: noop,
+  executionContext: "server",
+}
+
+const markCourseComplete: VividFunctionConfig = {
+  name: "markCourseComplete",
+  description: "Mark an entire course as completed. This triggers certificate generation. Use when ALL lessons are done or user explicitly asks to complete the course.",
+  parameters: params({
+    courseId: str("Course ID to mark complete", true),
+  }),
+  handler: noop,
+  executionContext: "server",
+}
+
+const getWatchProgress: VividFunctionConfig = {
+  name: "getWatchProgress",
+  description: "Get video watch progress for a course — how far the user has gotten through each lesson. Shows percentage watched per lesson.",
+  parameters: params({
+    courseId: str("Course ID to check progress for", true),
+  }),
+  handler: noop,
+  executionContext: "server",
+}
+
+const getBookmarks: VividFunctionConfig = {
+  name: "getBookmarks",
+  description: "Fetch all bookmarked courses for the user. Use when user says 'show my bookmarks', 'saved courses', 'what did I bookmark'.",
+  parameters: params({}),
+  handler: noop,
+  executionContext: "server",
+}
+
+const joinMeeting: VividFunctionConfig = {
+  name: "joinMeeting",
+  description: "Join an existing meeting room by meeting ID. Returns join URL. ⚠️ Remember to end the AI session FIRST before joining — audio conflict!",
+  parameters: params({
+    meetingId: str("Meeting ID to join", true),
+  }),
+  handler: noop,
+  executionContext: "server",
+}
+
+const searchUsers: VividFunctionConfig = {
+  name: "searchUsers",
+  description: "Search users by name or email. Use to find contacts for messaging, calling, or adding to meetings. Returns list of matching users with IDs.",
+  parameters: params({
+    query: str("Search term (name or email)", true),
+    limit: num("Max results (default 5)", false),
+  }),
+  handler: noop,
+  executionContext: "server",
+}
+
+const getUnreadCount: VividFunctionConfig = {
+  name: "getUnreadCount",
+  description: "Check total unread message count. Use when user asks 'do I have messages', 'any unread', 'check notifications'.",
+  parameters: params({}),
+  handler: noop,
+  executionContext: "server",
+}
+
+const getCompletedLessons: VividFunctionConfig = {
+  name: "getCompletedLessons",
+  description: "Get list of completed lesson IDs for a course. Use to show progress, determine next lesson, or check what's left.",
+  parameters: params({
+    courseId: str("Course ID to check", true),
+  }),
+  handler: noop,
+  executionContext: "server",
+}
+
 // ============================================================================
 // Exports
 // ============================================================================
@@ -369,6 +504,10 @@ export const clientFunctions: VividFunctionConfig[] = [
   endSession,
   closeOverlay,
   clearOnDemandUI,
+  toggleTheme,
+  playPauseVideo,
+  copyToClipboard,
+  scrollToSection,
 ]
 
 export const serverFunctions: VividFunctionConfig[] = [
@@ -389,6 +528,15 @@ export const serverFunctions: VividFunctionConfig[] = [
   saveSignature,
   initiateCall,
   getUserSignature,
+  toggleBookmark,
+  markLessonComplete,
+  markCourseComplete,
+  getWatchProgress,
+  getBookmarks,
+  joinMeeting,
+  searchUsers,
+  getUnreadCount,
+  getCompletedLessons,
 ]
 
 export const allVividFunctions: VividFunctionConfig[] = [

@@ -119,6 +119,10 @@ export type OnDemandUIType =
   | "confirmation"
   | "rating"
   | "language-picker"
+  | "bookmark-toggle"
+  | "progress-dashboard"
+  | "contact-card"
+  | "checkout-confirm"
 
 export interface OnDemandUI {
   id: string
