@@ -64,10 +64,10 @@ export async function Navbar() {
           ) : (
             // Not authenticated: Show sign in buttons
             <>
-              <Button variant="ghost" size="sm" render={<a href="https://worldstreetgold.com/login" />}>
+              <Button variant="ghost" size="sm" render={<a href={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_") ? "/login" : "https://worldstreetgold.com/login"} />}>
                 Sign In
               </Button>
-              <Button size="sm" render={<a href="https://worldstreetgold.com/register" />}>
+              <Button size="sm" render={<a href={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_") ? "/register" : "https://worldstreetgold.com/register"} />}>
                 Get Started
               </Button>
             </>

@@ -7,6 +7,10 @@ import {
   type ReactNode,
 } from "react"
 
+const LOGIN_URL = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_")
+  ? "/login"
+  : "https://www.worldstreetgold.com/login"
+
 type AuthContextType = {
   user: {
     id: string
@@ -42,7 +46,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const logout = async () => {
     await signOut()
-    window.location.href = "https://www.worldstreetgold.com/login"
+    window.location.href = LOGIN_URL
   }
 
   return (

@@ -42,6 +42,9 @@ export const metadata: Metadata = {
   },
 };
 
+// Detect local development vs production satellite mode
+const isLocalDev = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_")
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -49,12 +52,21 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider
-      domain="worldstreetgold.com"
-      isSatellite={true}
-      signInUrl="https://www.worldstreetgold.com/login"
-      signUpUrl="https://www.worldstreetgold.com/register"
-      signInFallbackRedirectUrl="https://academy.worldstreetgold.com/dashboard"
-      signUpFallbackRedirectUrl="https://academy.worldstreetgold.com/dashboard"
+      {...(!isLocalDev
+        ? {
+            domain: "worldstreetgold.com",
+            isSatellite: true,
+            signInUrl: "https://www.worldstreetgold.com/login",
+            signUpUrl: "https://www.worldstreetgold.com/register",
+            signInFallbackRedirectUrl: "https://academy.worldstreetgold.com/dashboard",
+            signUpFallbackRedirectUrl: "https://academy.worldstreetgold.com/dashboard",
+          }
+        : {
+            signInUrl: "/login",
+            signUpUrl: "/register",
+            signInFallbackRedirectUrl: "/dashboard",
+            signUpFallbackRedirectUrl: "/dashboard",
+          })}
     >
       <html lang="en" className={publicSans.variable} suppressHydrationWarning>
         <body

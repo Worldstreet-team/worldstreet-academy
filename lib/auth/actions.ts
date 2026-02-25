@@ -5,6 +5,10 @@ import { redirect } from "next/navigation"
 import { syncUserToLocal, getLocalUserByAuthId, type LocalUser } from "./sync"
 import type { AuthUser } from "./types"
 
+const LOGIN_URL = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_")
+  ? "/login"
+  : "https://www.worldstreetgold.com/login"
+
 // ============================================================================
 // CLERK-BASED AUTH ACTIONS
 // ============================================================================
@@ -62,14 +66,14 @@ export async function verifyAuth(): Promise<{ user: LocalUser } | null> {
  * The actual session invalidation is handled by Clerk.
  */
 export async function logoutAction() {
-  redirect("https://www.worldstreetgold.com/login")
+  redirect(LOGIN_URL)
 }
 
 /**
  * Logout from all sessions.
  */
 export async function logoutAllAction() {
-  redirect("https://www.worldstreetgold.com/login")
+  redirect(LOGIN_URL)
 }
 
 /**

@@ -7,6 +7,7 @@ import { UserProvider } from "@/components/providers/user-provider"
 import { CallProvider } from "@/components/providers/call-provider"
 import { MeetingProvider } from "@/components/providers/meeting-provider"
 import { QueryProvider } from "@/components/providers/query-provider"
+import { VividWrapper } from "@/components/vivid/vivid-wrapper"
 import { getCurrentUser } from "@/lib/auth"
 import { TranslateScript } from "@/components/translator/translate-script"
 
@@ -18,7 +19,8 @@ export default async function PlatformLayout({
   const user = await getCurrentUser()
 
   if (!user) {
-    redirect("https://www.worldstreetgold.com/login")
+    const isLocalDev = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_")
+    redirect(isLocalDev ? "/login" : "https://www.worldstreetgold.com/login")
   }
 
   return (
@@ -26,15 +28,26 @@ export default async function PlatformLayout({
       <UserProvider user={user}>
         <CallProvider>
           <MeetingProvider>
-            <SidebarProvider>
-              <AppSidebar />
-              <SidebarInset>
-                {children}
-              </SidebarInset>
-              <PlatformBottomNav />
-              <CommandSearch />
-              <TranslateScript initialLanguage={user.preferredLanguage} />
-            </SidebarProvider>
+            <VividWrapper
+              user={{
+                id: user.id,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                email: user.email,
+                role: user.role,
+                avatarUrl: user.avatarUrl,
+              }}
+            >
+              <SidebarProvider>
+                <AppSidebar />
+                <SidebarInset>
+                  {children}
+                </SidebarInset>
+                <PlatformBottomNav />
+                <CommandSearch />
+                <TranslateScript initialLanguage={user.preferredLanguage} />
+              </SidebarProvider>
+            </VividWrapper>
           </MeetingProvider>
         </CallProvider>
       </UserProvider>

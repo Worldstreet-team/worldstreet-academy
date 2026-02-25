@@ -16,7 +16,9 @@ import {
   AlertDialogMedia,
 } from "@/components/ui/alert-dialog"
 
-const LOGOUT_URL = "https://www.worldstreetgold.com/login"
+const LOGOUT_URL = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_")
+  ? "/login"
+  : "https://www.worldstreetgold.com/login"
 
 type LogoutConfirmDialogProps =
   | {

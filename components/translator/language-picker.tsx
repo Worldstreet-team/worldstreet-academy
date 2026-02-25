@@ -7,7 +7,6 @@ import { languages, getLanguage, type Language } from "./languages"
 import { changeLanguage, resetToEnglish } from "./translate-script"
 import { updatePreferredLanguage } from "@/lib/actions/language"
 import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Popover,
   PopoverTrigger,
@@ -136,8 +135,8 @@ export function LanguagePicker({ defaultLanguage, children }: LanguagePickerProp
         </div>
       </div>
 
-      {/* Language list — explicit max-h so ScrollArea actually scrolls */}
-      <ScrollArea className="max-h-65">
+      {/* Language list */}
+      <div className="overflow-y-auto max-h-65">
         <div className="px-1.5 pb-2">
           {/* Popular section — only when not searching */}
           {!search.trim() && (
@@ -187,7 +186,7 @@ export function LanguagePicker({ defaultLanguage, children }: LanguagePickerProp
             )}
           </div>
         </div>
-      </ScrollArea>
+      </div>
 
       {/* Footer — current language + inline loading indicator */}
       <div className="border-t px-3 py-2.5 flex items-center gap-2 bg-muted/30">

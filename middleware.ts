@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 
 const isProtectedRoute = createRouteMatcher(["/dashboard(.*)", "/instructor(.*)"])
 
-const signInUrl = "https://www.worldstreetgold.com/login"
+const isLocalDev = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_")
 
 export default clerkMiddleware(async (auth, request) => {
   const { pathname } = request.nextUrl
@@ -16,8 +16,15 @@ export default clerkMiddleware(async (auth, request) => {
     const { userId } = await auth()
 
     if (!userId) {
+      if (isLocalDev) {
+        // Local dev: redirect to local sign-in
+        const loginUrl = new URL("/login", request.url)
+        loginUrl.searchParams.set("redirect_url", pathname)
+        return NextResponse.redirect(loginUrl)
+      }
+
       const returnUrl = `https://academy.worldstreetgold.com${pathname}${request.nextUrl.search}`
-      const authUrl = new URL(signInUrl)
+      const authUrl = new URL("https://www.worldstreetgold.com/login")
       authUrl.searchParams.set("redirect", returnUrl)
       return NextResponse.redirect(authUrl)
     }
@@ -26,7 +33,18 @@ export default clerkMiddleware(async (auth, request) => {
   return NextResponse.next({
     request: { headers: requestHeaders },
   })
-})
+}, isLocalDev
+  ? {
+      signInUrl: "/login",
+      signUpUrl: "/register",
+    }
+  : {
+      domain: "worldstreetgold.com",
+      isSatellite: true,
+      signInUrl: "https://www.worldstreetgold.com/login",
+      signUpUrl: "https://www.worldstreetgold.com/register",
+    }
+)
 
 export const config = {
   matcher: [

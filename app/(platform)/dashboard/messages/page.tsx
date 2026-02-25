@@ -79,6 +79,8 @@ export default function MessagesPage() {
   const [isLoadingRecent, setIsLoadingRecent] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  // Guard ref so the userId/callType URL params are processed only once
+  const processedUserIdRef = useRef<string | null>(null)
 
   // Check for conversation ID in URL query params
   useEffect(() => {
@@ -92,6 +94,50 @@ export default function MessagesPage() {
       }
     }
   }, [searchParams, conversations])
+
+  // Handle ?userId= (+ optional ?callType=) from Vivid AI call flow
+  // Opens the conversation with the user and optionally triggers outgoing call UI
+  useEffect(() => {
+    const userId = searchParams.get("userId")
+    const callType = searchParams.get("callType") as "audio" | "video" | null
+    if (!userId || processedUserIdRef.current === userId) return
+    processedUserIdRef.current = userId
+
+    async function openConversationAndCall() {
+      // Get or create a conversation with this user
+      const result = await getOrCreateConversation(userId!)
+      if (!result.success || !result.conversationId) return
+
+      // Refresh conversations cache so the new conversation appears in the list
+      await queryClient.refetchQueries({ queryKey: queryKeys.conversations })
+      const updatedConvs = queryClient.getQueryData<ConvType[]>(queryKeys.conversations)
+      const conv = updatedConvs?.find((c) => c.id === result.conversationId)
+      const participant = conv?.participant ?? null
+
+      // Select the conversation
+      setSelectedId(result.conversationId)
+      setSelectedParticipant(participant)
+      setShowMobileChat(true)
+
+      // Replace URL to persist conversation and strip userId/callType to prevent re-trigger on refresh
+      window.history.replaceState(null, "", `/dashboard/messages?c=${result.conversationId}`)
+
+      // If callType is specified, trigger the outgoing call after a short delay
+      // so the call-provider renders with the correct participant context
+      if (callType && participant) {
+        setTimeout(() => {
+          startCall({
+            participantId: participant.id,
+            participantName: participant.name,
+            participantAvatar: participant.avatar || undefined,
+            callType,
+          })
+        }, 300)
+      }
+    }
+
+    openConversationAndCall()
+  }, [searchParams, queryClient, startCall])
 
   // Load messages when conversation changes
   useEffect(() => {
@@ -221,6 +267,8 @@ export default function MessagesPage() {
     const conv = conversations.find((c) => c.id === id)
     setSelectedParticipant(conv?.participant || null)
     setShowMobileChat(true)
+    // Persist selected conversation in URL for refresh resilience
+    window.history.replaceState(null, "", `/dashboard/messages?c=${id}`)
   }, [conversations])
 
   const handleSendMessage = useCallback(async (content: string, attachments?: Attachment[]) => {
