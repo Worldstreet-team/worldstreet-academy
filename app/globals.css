@@ -196,3 +196,68 @@
 .animate-float-up {
   animation: float-up 2.5s ease-out forwards;
 }
+
+/* ── Google Translate — permanently hide ALL default UI ──
+   These rules fire before JS loads, preventing any flash of Google UI.
+   The MutationObserver in translate-script.tsx is a secondary enforcer. */
+
+.goog-te-banner-frame,
+.goog-te-ftab-frame,
+#gt-nvframe {
+  position: fixed !important;
+  z-index: -9999 !important;
+  top: -500px !important;
+  left: -500px !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  clip: rect(0, 0, 0, 0) !important;
+}
+
+#goog-gt-tt,
+.goog-te-balloon-frame,
+.goog-te-menu-frame,
+.goog-te-spinner-pos,
+.goog-te-menu2,
+.goog-tooltip,
+.goog-tooltip-card,
+.goog-snackbar-container,
+.VIpgJd-ZVi9od-ORHb-OEVmcd,
+.VIpgJd-ZVi9od-aZ2wEe-wOHMyf,
+.VIpgJd-ZVi9od-xl07Ob-OEVmcd,
+.VIpgJd-ZVi9od-SmfAz,
+.VIpgJd-ZVi9od-aZ2wEe-OiiCO,
+div.skiptranslate:not(#google_translate_element) {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  position: fixed !important;
+  top: -9999px !important;
+  left: -9999px !important;
+}
+
+#google_translate_element {
+  position: absolute !important;
+  top: -9999px !important;
+  left: -9999px !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.goog-te-gadget {
+  font-size: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+}
+
+body {
+  top: 0 !important;
+}
