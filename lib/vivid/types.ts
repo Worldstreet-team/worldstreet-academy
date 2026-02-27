@@ -123,6 +123,7 @@ export type OnDemandUIType =
   | "progress-dashboard"
   | "contact-card"
   | "checkout-confirm"
+  | "friend-search"
 
 export interface OnDemandUI {
   id: string

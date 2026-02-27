@@ -102,9 +102,10 @@ const requestOnDemandUI: VividFunctionConfig = {
   - bookmark-toggle: show bookmark toggle card (config: { courseId, courseTitle, thumbnailUrl, isBookmarked })
   - progress-dashboard: show progress ring + lesson checklist (config: { courseId, courseTitle, thumbnailUrl })
   - contact-card: show user contact card with message/call actions (config: { userId, userName, userAvatar, bio })
-  - checkout-confirm: show purchase confirmation card (config: { courseId, courseTitle, thumbnailUrl, price, walletBalance })`,
+  - checkout-confirm: show purchase confirmation card (config: { courseId, courseTitle, thumbnailUrl, price, walletBalance })
+  - friend-search: search for users and add them as friends/contacts`,
   parameters: params({
-    type: enm("UI type", ["file-upload", "signature-canvas", "confirmation", "rating", "language-picker", "bookmark-toggle", "progress-dashboard", "contact-card", "checkout-confirm"], true),
+    type: enm("UI type", ["file-upload", "signature-canvas", "confirmation", "rating", "language-picker", "bookmark-toggle", "progress-dashboard", "contact-card", "checkout-confirm", "friend-search"], true),
     title: str("Title for the UI prompt", true),
     description: str("Description text", false),
     config: str("JSON config for the UI type", false),
@@ -236,7 +237,7 @@ const searchCourses: VividFunctionConfig = {
     pricing: enm("Price filter", ["free", "paid"], false),
     category: str("Category filter", false),
     sortBy: enm("Sort", ["popular", "newest", "rating", "price-low", "price-high"], false),
-    limit: num("Max results (default 8)", false),
+    limit: num("Max results (default 20)", false),
   }),
   handler: noop,
   executionContext: "server",
@@ -298,7 +299,7 @@ const getRecentMessages: VividFunctionConfig = {
   name: "getRecentMessages",
   description: "Get recent message conversations with last message preview. Use for 'check messages', 'who messaged me', 'read last message'.",
   parameters: params({
-    limit: num("Max conversations (default 5)", false),
+    limit: num("Max conversations (default 15)", false),
   }),
   handler: noop,
   executionContext: "server",
@@ -466,7 +467,7 @@ const searchUsers: VividFunctionConfig = {
   description: "Search users by name or email. Use to find contacts for messaging, calling, or adding to meetings. Returns list of matching users with IDs.",
   parameters: params({
     query: str("Search term (name or email)", true),
-    limit: num("Max results (default 5)", false),
+    limit: num("Max results (default 15)", false),
   }),
   handler: noop,
   executionContext: "server",

@@ -62,6 +62,8 @@ async function getAuthenticatedUser() {
     throw new Error("Not authenticated")
   }
   
+  // getCurrentUser already fetches the user from DB — reuse directly.
+  // Only fall back to findById if we need the full Mongoose doc.
   await connectDB()
   const user = await User.findById(authUser.id)
   

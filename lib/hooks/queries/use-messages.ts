@@ -18,7 +18,7 @@ export function useConversations() {
       return r.success && r.conversations ? r.conversations : []
     },
     staleTime: 30 * 1000,
-    refetchInterval: 6 * 1000,
+    refetchInterval: 30 * 1000, // poll every 30s
   })
 }
 
@@ -43,7 +43,7 @@ export function useUnreadCount() {
       return r.success && typeof r.count === "number" ? r.count : 0
     },
     staleTime: 30 * 1000,
-    refetchInterval: 6 * 1000,
+    refetchInterval: 30 * 1000, // poll every 30s
   })
 }
 

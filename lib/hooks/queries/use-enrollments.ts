@@ -9,7 +9,7 @@ export function useEnrollments() {
     queryKey: queryKeys.enrollments,
     queryFn: fetchMyEnrollments,
     staleTime: 5 * 60 * 1000, // 5 min — enrollments rarely change
-    refetchInterval: 6 * 1000, // background poll every 6s
+    refetchInterval: 60 * 1000, // background poll every 60s
   })
 }
 

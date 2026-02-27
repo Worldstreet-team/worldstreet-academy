@@ -1,17 +1,17 @@
 "use client"
 
 /**
- * Vivid Minimized Bar — Compact floating assistant bar (award-worthy design).
+ * Vivid Minimized Bar — Compact floating assistant bar.
  *
  * Appears when the session is active but minimized. Shows:
  * - Subtle animated waveform
- * - Real-time word-by-word transcript with scroll-up animation
+ * - Status text (Listening, Speaking, etc.)
  * - Expand / Close controls
  * - Smooth spring transitions
  */
 
-import { useRef, useEffect, useMemo, useState } from "react"
-import { motion, AnimatePresence } from "motion/react"
+import { useRef, useEffect, useState } from "react"
+import { motion } from "motion/react"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   ArrowExpand02Icon,
@@ -21,39 +21,6 @@ import {
 import { useVivid } from "@/lib/vivid/provider"
 
 const MINI_BARS = 16
-
-/** Strip markdown wrappers for clean display */
-function stripMd(text: string): string {
-  return text
-    .replace(/\*{1,3}(.*?)\*{1,3}/g, "$1")
-    .replace(/_{1,3}(.*?)_{1,3}/g, "$1")
-    .replace(/`([^`]+)`/g, "$1")
-    .replace(/^#{1,6}\s+/gm, "")
-    .replace(/^[\s]*[-*+]\s+/gm, "")
-    .replace(/^[\s]*\d+\.\s+/gm, "")
-    .replace(/([^\\])\*/g, "$1")
-    .replace(/^\*/g, "")
-    .replace(/\n/g, " ")
-    .trim()
-}
-
-/** Split text into word tokens with offsets */
-function tokenize(text: string) {
-  const tokens: { word: string; start: number; end: number; isSpace: boolean }[] = []
-  let i = 0
-  while (i < text.length) {
-    if (/\s/.test(text[i])) {
-      const s = i
-      while (i < text.length && /\s/.test(text[i])) i++
-      tokens.push({ word: text.slice(s, i), start: s, end: i, isSpace: true })
-    } else {
-      const s = i
-      while (i < text.length && !/\s/.test(text[i])) i++
-      tokens.push({ word: text.slice(s, i), start: s, end: i, isSpace: false })
-    }
-  }
-  return tokens
-}
 
 export function MinimizedBar() {
   const vivid = useVivid()
@@ -110,37 +77,7 @@ export function MinimizedBar() {
     return () => cancelAnimationFrame(animRef.current)
   }, [vivid])
 
-  // ── Streaming transcript with word-by-word animation ──
-
-  const lastLine = vivid.transcriptLines
-    .filter((l) => l.role === "assistant")
-    .slice(-1)[0]
-
-  const rawText = lastLine?.text || ""
-  const spokenIndex = lastLine?.spokenIndex ?? 0
-  const isFinal = lastLine?.isFinal ?? true
-  const cleanText = useMemo(() => stripMd(rawText), [rawText])
-  const tokens = useMemo(() => tokenize(cleanText), [cleanText])
-
-  // Derive a stable message key from the line ID for enter/exit animations
-  const messageKey = lastLine?.id ?? "empty"
-
-  // How many words fit in the container (~48ch ≈ 280px @ text-xs)
-  const MAX_VISIBLE_CHARS = 55
-  const visibleTokens = useMemo(() => {
-    if (tokens.length === 0) return []
-    // Show a trailing window of words that fit
-    let charCount = 0
-    let startIdx = tokens.length
-    for (let i = tokens.length - 1; i >= 0; i--) {
-      charCount += tokens[i].word.length
-      if (charCount > MAX_VISIBLE_CHARS) break
-      startIdx = i
-    }
-    return tokens.slice(startIdx)
-  }, [tokens])
-
-  const displayLabel = !cleanText ? stateLabel(vivid.state) : null
+  const label = stateLabel(vivid.state)
 
   return (
     <>
@@ -159,23 +96,23 @@ export function MinimizedBar() {
         initial={{ y: 80, opacity: 0, scale: 0.9 }}
         animate={{ y: 0, opacity: 1, scale: 1 }}
         exit={{ y: 80, opacity: 0, scale: 0.9 }}
-        transition={{ type: "spring", stiffness: 400, damping: 30 }}
+        transition={{ type: "spring", stiffness: 260, damping: 28 }}
         className="fixed bottom-6 left-1/2 -translate-x-1/2 z-999 touch-none"
       >
         <motion.div
-          layout
           layoutId="vivid-surface"
-          className="flex items-center gap-3 px-4 py-2.5 rounded-2xl
+          className="flex items-center gap-3 px-4 py-2.5
                      bg-background/80 backdrop-blur-2xl border border-border/30
                      shadow-[0_8px_32px_rgba(0,0,0,0.12),0_2px_8px_rgba(0,0,0,0.08)]
                      max-w-md cursor-grab active:cursor-grabbing select-none"
+          style={{ borderRadius: 16 }}
           onClick={() => {
             if (!isDragging) vivid.setViewMode("expanded")
           }}
           whileHover={{ scale: 1.01, y: -1 }}
           whileTap={{ scale: 0.99 }}
         >
-        {/* Pulsing indicator with green glow */}
+        {/* Pulsing indicator */}
         <div className="relative flex items-center justify-center w-8 h-8 shrink-0">
           <motion.div
             animate={{
@@ -197,67 +134,10 @@ export function MinimizedBar() {
           className="w-16 h-6 shrink-0"
         />
 
-        {/* Word-by-word streaming transcript */}
-        <div className="flex-1 max-w-52 h-5 overflow-hidden relative">
-          <AnimatePresence mode="popLayout">
-            {displayLabel ? (
-              <motion.p
-                key="label"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 0.6, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                className="text-xs text-foreground/70 font-medium truncate absolute inset-0"
-              >
-                {displayLabel}
-              </motion.p>
-            ) : (
-              <motion.div
-                key={`msg-${messageKey}`}
-                initial={{ y: 12, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: -12, opacity: 0 }}
-                transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                className="flex items-center gap-0 flex-nowrap whitespace-nowrap absolute inset-0"
-              >
-                {visibleTokens.map((token, i) => {
-                  if (token.isSpace) return <span key={`s-${i}`}>&nbsp;</span>
-                  const isSpoken = token.end <= spokenIndex
-                  const isCurrent = !isSpoken && token.start < spokenIndex
-
-                  // Words animate in one by one as they arrive from the stream
-                  return (
-                    <motion.span
-                      key={`w-${token.start}-${token.word}`}
-                      initial={{ opacity: 0, y: 6, filter: "blur(2px)" }}
-                      animate={{
-                        opacity: isSpoken || isCurrent ? 1 : 0.4,
-                        y: 0,
-                        filter: "blur(0px)",
-                      }}
-                      transition={{ duration: 0.15, ease: "easeOut" }}
-                      className="text-xs font-medium inline-block"
-                      style={{
-                        color: isSpoken || isCurrent
-                          ? "var(--foreground)"
-                          : "color-mix(in srgb, var(--foreground) 40%, transparent)",
-                      }}
-                    >
-                      {token.word}
-                    </motion.span>
-                  )
-                })}
-                {/* Blinking cursor while streaming */}
-                {!isFinal && (
-                  <motion.span
-                    animate={{ opacity: [1, 0.2, 1] }}
-                    transition={{ repeat: Infinity, duration: 0.8 }}
-                    className="inline-block w-0.5 h-3 bg-foreground/40 rounded-full ml-0.5"
-                  />
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+        {/* Status text */}
+        <p className="flex-1 max-w-44 text-xs text-foreground/60 font-medium truncate">
+          {label}
+        </p>
 
         {/* Controls */}
         <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -288,11 +168,11 @@ export function MinimizedBar() {
 
 function stateLabel(state: string): string {
   switch (state) {
-    case "connecting": return "Connecting…"
-    case "ready": return "Listening…"
-    case "listening": return "Hearing you…"
-    case "processing": return "Thinking…"
-    case "speaking": return "Speaking…"
+    case "connecting": return "Connecting\u2026"
+    case "ready": return "Listening\u2026"
+    case "listening": return "Hearing you\u2026"
+    case "processing": return "Thinking\u2026"
+    case "speaking": return "Speaking\u2026"
     default: return "WorldStreet AI"
   }
 }

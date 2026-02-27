@@ -20,7 +20,7 @@ export function useMyMeetings() {
       return r.success && r.meetings ? r.meetings : []
     },
     staleTime: 30 * 1000, // 30s — meetings are time-sensitive
-    refetchInterval: 6 * 1000,
+    refetchInterval: 30 * 1000, // poll every 30s
   })
 }
 
@@ -43,7 +43,7 @@ export function useMeetingInvites() {
       return r.success && r.invites ? r.invites : []
     },
     staleTime: 30 * 1000,
-    refetchInterval: 6 * 1000,
+    refetchInterval: 30 * 1000, // poll every 30s
   })
 }
 

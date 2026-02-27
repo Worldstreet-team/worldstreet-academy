@@ -70,34 +70,30 @@ export function changeLanguage(langCode: string): Promise<void> {
 
 /**
  * Reset page back to English.
- * Clears all googtrans cookies then reloads — the only fully reliable reset.
+ * Soft-resetting Google Translate is fundamentally unreliable — Google re-sets
+ * cookies asynchronously after the change event, defeating interval-based clears.
+ * The only bulletproof approach: clear cookies then hard-reload the page.
  */
 export function resetToEnglish(): Promise<void> {
-  return new Promise((resolve) => {
-    clearGoogTransCookies()
+  // 1. Aggressively clear all googtrans cookies
+  clearGoogTransCookies()
 
-    // Try the select first for a soft reset (no flash)
-    const attempt = (tries: number) => {
-      const select = document.querySelector<HTMLSelectElement>(".goog-te-combo")
-      if (select) {
-        select.value = ""
-        select.dispatchEvent(new Event("change"))
-        // After soft reset, clear again in case translate re-set the cookie
-        setTimeout(() => {
-          clearGoogTransCookies()
-          resolve()
-        }, 800)
-        return
-      }
-      if (tries > 0) {
-        setTimeout(() => attempt(tries - 1), 300)
-      } else {
-        // No widget found — cookie is cleared, just reload
-        window.location.reload()
-        resolve()
-      }
-    }
-    attempt(10)
+  // 2. Try to trigger the widget's "show original" mechanism
+  const select = document.querySelector<HTMLSelectElement>(".goog-te-combo")
+  if (select) {
+    select.value = ""
+    select.dispatchEvent(new Event("change"))
+  }
+
+  // 3. Clear cookies one more time after the event to win any race
+  clearGoogTransCookies()
+
+  // 4. Hard reload — the only way to guarantee English text
+  //    Short delay to let the cookie clears persist
+  return new Promise(() => {
+    setTimeout(() => {
+      window.location.reload()
+    }, 150)
   })
 }
 

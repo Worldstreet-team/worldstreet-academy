@@ -8,14 +8,14 @@ import { CallProvider } from "@/components/providers/call-provider"
 import { MeetingProvider } from "@/components/providers/meeting-provider"
 import { QueryProvider } from "@/components/providers/query-provider"
 import { VividWrapper } from "@/components/vivid/vivid-wrapper"
-import { getCurrentUser } from "@/lib/auth"
+import { getCachedUser } from "@/lib/auth/cached"
 
 export default async function InstructorLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const user = await getCurrentUser()
+  const user = await getCachedUser()
 
   if (!user) {
     const isLocalDev = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_")

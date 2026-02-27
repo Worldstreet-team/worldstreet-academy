@@ -469,7 +469,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    const interval = setInterval(poll, 5000)
+    const interval = setInterval(poll, 20000)
     return () => clearInterval(interval)
   }, [])
 

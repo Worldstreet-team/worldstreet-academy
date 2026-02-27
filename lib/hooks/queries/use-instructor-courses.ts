@@ -9,7 +9,7 @@ export function useInstructorCourses() {
     queryKey: queryKeys.instructorCourses,
     queryFn: fetchInstructorCourses,
     staleTime: 5 * 60 * 1000, // 5 min
-    refetchInterval: 6 * 1000, // background poll every 6s
+    refetchInterval: 60 * 1000, // background poll every 60s
   })
 }
 
