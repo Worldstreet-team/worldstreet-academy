@@ -230,9 +230,12 @@ function CommandList({
 
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-sm text-muted-foreground">
-        <p>No results found</p>
-        {query && <p className="text-xs mt-1">Try a different search term</p>}
+      <div className="flex flex-col items-center justify-center py-14 text-center">
+        <div className="h-10 w-10 rounded-xl bg-muted/50 flex items-center justify-center mb-3">
+          <HugeiconsIcon icon={Search01Icon} size={18} className="text-muted-foreground/50" />
+        </div>
+        <p className="text-sm text-muted-foreground">No results found</p>
+        {query && <p className="text-[11px] text-muted-foreground/60 mt-1">Try a different search term</p>}
       </div>
     )
   }
@@ -240,8 +243,8 @@ function CommandList({
   return (
     <>
       {Array.from(sections.entries()).map(([section, sectionItems]) => (
-        <div key={section} className="px-2 py-1.5">
-          <p className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <div key={section} className="px-1.5 py-1">
+          <p className="px-2.5 py-1.5 text-[10px] font-medium uppercase tracking-widest text-muted-foreground/60">
             {sectionLabels[section] ?? section}
           </p>
           {sectionItems.map((item) => {
@@ -255,14 +258,14 @@ function CommandList({
                 data-active={isActive}
                 onClick={() => onSelect(item)}
                 onMouseEnter={() => setActiveIndex(idx)}
-                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
+                className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition-all duration-150 ${
                   isActive
-                    ? "bg-accent text-accent-foreground"
-                    : "text-foreground hover:bg-accent/50 hover:text-accent-foreground"
+                    ? "bg-accent/80 text-accent-foreground"
+                    : "text-foreground/80 hover:bg-accent/40"
                 }`}
               >
                 {item.thumbnail ? (
-                  <div className="relative h-8 w-12 rounded-md bg-muted overflow-hidden shrink-0">
+                  <div className="relative h-8 w-12 rounded-md bg-muted overflow-hidden shrink-0 ring-1 ring-border/20">
                     <Image
                       src={item.thumbnail}
                       alt={item.label}
@@ -273,27 +276,27 @@ function CommandList({
                   </div>
                 ) : (
                   <div
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                      isActive ? "bg-accent-foreground/10" : "bg-muted/60"
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                      isActive ? "bg-foreground/10" : "bg-muted/50"
                     }`}
                   >
                     <HugeiconsIcon
                       icon={item.icon}
-                      size={16}
-                      className={isActive ? "text-accent-foreground" : "text-muted-foreground"}
+                      size={14}
+                      className={isActive ? "text-accent-foreground" : "text-muted-foreground/70"}
                     />
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate text-[13px]">{item.label}</p>
+                  <p className="font-medium truncate text-[13px] leading-tight">{item.label}</p>
                   {item.description && (
-                    <p className="text-[11px] text-muted-foreground truncate">
+                    <p className="text-[11px] text-muted-foreground/70 truncate mt-0.5">
                       {item.description}
                     </p>
                   )}
                 </div>
                 {isActive && (
-                  <kbd className="text-[10px] hidden sm:inline text-muted-foreground">↵</kbd>
+                  <kbd className="text-[9px] hidden sm:inline-flex items-center rounded border border-border/40 bg-muted/50 px-1 py-0.5 font-mono text-muted-foreground/60">↵</kbd>
                 )}
               </button>
             )
@@ -319,18 +322,18 @@ function SearchInput({
   showEsc?: boolean
 }) {
   return (
-    <div className="flex items-center gap-3 border-b px-4 py-3">
-      <HugeiconsIcon icon={Search01Icon} size={18} className="text-muted-foreground shrink-0" />
+    <div className="flex items-center gap-3 border-b border-border/50 px-4 py-2.5">
+      <HugeiconsIcon icon={Search01Icon} size={16} className="text-muted-foreground/60 shrink-0" />
       <input
         ref={inputRef}
         value={query}
         onChange={(e) => onQueryChange(e.target.value)}
         onKeyDown={onKeyDown}
         placeholder="Search courses, pages, tools…"
-        className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+        className="flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground/50"
       />
       {showEsc && (
-        <kbd className="hidden sm:inline-flex items-center rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+        <kbd className="hidden sm:inline-flex items-center rounded border border-border/40 bg-muted/50 px-1.5 py-0.5 text-[9px] font-mono text-muted-foreground/60">
           ESC
         </kbd>
       )}
@@ -473,7 +476,7 @@ export function CommandSearch() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent
         showCloseButton={false}
-        className="sm:max-w-lg p-0 gap-0 overflow-hidden"
+        className="sm:max-w-md p-0 gap-0 overflow-hidden rounded-xl border-border/50 shadow-xl"
       >
         <DialogTitle className="sr-only">Search</DialogTitle>
 
@@ -485,7 +488,7 @@ export function CommandSearch() {
           showEsc
         />
 
-        <div ref={listRef} className="max-h-80 overflow-y-auto overscroll-contain">
+        <div ref={listRef} className="max-h-72 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
           <CommandList
             items={filtered}
             query={query}
@@ -497,17 +500,17 @@ export function CommandSearch() {
         </div>
 
         {/* Footer hint */}
-        <div className="border-t px-4 py-2 flex items-center gap-3 text-[10px] text-muted-foreground">
+        <div className="border-t border-border/40 px-4 py-1.5 flex items-center gap-3 text-[9px] text-muted-foreground/50">
           <span className="inline-flex items-center gap-1">
-            <kbd className="rounded border bg-muted px-1 py-0.5 font-mono">↑↓</kbd>
+            <kbd className="rounded border border-border/40 bg-muted/40 px-1 py-0.5 font-mono">↑↓</kbd>
             navigate
           </span>
           <span className="inline-flex items-center gap-1">
-            <kbd className="rounded border bg-muted px-1 py-0.5 font-mono">↵</kbd>
+            <kbd className="rounded border border-border/40 bg-muted/40 px-1 py-0.5 font-mono">↵</kbd>
             select
           </span>
           <span className="inline-flex items-center gap-1">
-            <kbd className="rounded border bg-muted px-1 py-0.5 font-mono">esc</kbd>
+            <kbd className="rounded border border-border/40 bg-muted/40 px-1 py-0.5 font-mono">esc</kbd>
             close
           </span>
         </div>

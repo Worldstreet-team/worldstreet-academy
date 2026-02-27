@@ -583,7 +583,9 @@ export function VideoPlayer({
         onEnded={handleEnded}
         onClick={handleVideoTap}
         onWaiting={() => setIsBuffering(true)}
-        onPlaying={() => setIsBuffering(false)}
+        onPlaying={() => { setIsBuffering(false); setIsPlaying(true) }}
+        onPause={() => setIsPlaying(false)}
+        onPlay={() => { setIsPlaying(true); resetHideTimer() }}
         onCanPlay={() => setIsBuffering(false)}
         onSeeked={() => setIsBuffering(false)}
         preload="auto"

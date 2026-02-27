@@ -74,10 +74,15 @@ export function LanguagePicker({ defaultLanguage, children }: LanguagePickerProp
 
       try {
         if (lang.code === "en") {
-          await resetToEnglish()
-        } else {
-          await changeLanguage(lang.code)
+          // For English: persist to DB BEFORE the page reload,
+          // otherwise the reload re-reads the stale DB value.
+          setCurrentCode("en")
+          await updatePreferredLanguage("en")
+          await resetToEnglish() // triggers window.location.reload()
+          return // reload will unmount — nothing below runs
         }
+
+        await changeLanguage(lang.code)
         setCurrentCode(lang.code)
 
         // Persist to DB in background

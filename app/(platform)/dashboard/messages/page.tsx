@@ -164,12 +164,13 @@ export default function MessagesPage() {
   const handleMessageEvent = useCallback((event: import("@/lib/call-events").MessageEventPayload) => {
     if (event.type === "message:new") {
       const currentConvId = selectedIdRef.current
+      const isFromMe = event.senderId === user.id
       // If this message is for the active conversation, add it to the list
       if (currentConvId && event.conversationId === currentConvId) {
         const newMsg: MessageWithDetails = {
           id: event.messageId,
           senderId: event.senderId,
-          senderName: event.senderName,
+          senderName: isFromMe ? "You" : event.senderName,
           senderAvatar: event.senderAvatar,
           content: event.content,
           type: event.messageType,
@@ -179,7 +180,7 @@ export default function MessagesPage() {
           fileSize: event.fileSize,
           duration: event.duration,
           waveform: event.waveform,
-          isOwn: false,
+          isOwn: isFromMe,
           isRead: false,
           isDelivered: true,
           timestamp: new Date(event.timestamp),
@@ -189,7 +190,7 @@ export default function MessagesPage() {
           return [...prev, { ...newMsg, isNew: true } as OptimisticMessage & { isNew?: boolean }]
         })
         // Auto-mark as read since the conversation is open
-        markMessagesAsRead(currentConvId)
+        if (!isFromMe) markMessagesAsRead(currentConvId)
       }
       // Always refresh conversations for unread counts
       queryClient.invalidateQueries({ queryKey: queryKeys.conversations })

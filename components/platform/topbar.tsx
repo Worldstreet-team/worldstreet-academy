@@ -80,56 +80,81 @@ export function Topbar({ title, variant = "platform", breadcrumbOverrides }: Top
   const isInstructor = user.role === "INSTRUCTOR" || user.role === "ADMIN"
   const [logoutOpen, setLogoutOpen] = useState(false)
 
+  // Shared cmd+k trigger
+  const triggerSearch = () => {
+    document.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true })
+    )
+  }
+
   return (
-    <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b">
+    <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border/50">
       {/* Logout confirm dialog — rendered outside dropdown so it survives dropdown close */}
       <LogoutConfirmDialog open={logoutOpen} onOpenChange={setLogoutOpen} />
-      {/* Main bar */}
-      <div className="flex h-14 shrink-0 items-center gap-2 px-4">
-        <SidebarTrigger className="-ml-1" />
-        <Separator orientation="vertical" className="mr-2 !h-4" />
-        <span className="font-semibold text-sm truncate">
-          {title ?? "Dashboard"}
+
+      {/* Single compact bar */}
+      <div className="flex h-12 shrink-0 items-center gap-2 px-3 sm:px-4">
+        <SidebarTrigger className="-ml-0.5 shrink-0" />
+        <Separator orientation="vertical" className="h-4! mx-1 hidden sm:block" />
+
+        {/* Breadcrumbs — desktop only, replaces the old title + separate breadcrumb bar */}
+        {crumbs.length > 1 ? (
+          <Breadcrumb className="hidden sm:flex min-w-0">
+            <BreadcrumbList className="flex-nowrap gap-1">
+              {crumbs.map((crumb, i) => {
+                const isLast = i === crumbs.length - 1
+                return (
+                  <React.Fragment key={crumb.href}>
+                    <BreadcrumbItem className="whitespace-nowrap">
+                      {!isLast ? (
+                        <BreadcrumbLink render={<Link href={crumb.href} />} className="text-xs">
+                          {crumb.label}
+                        </BreadcrumbLink>
+                      ) : (
+                        <BreadcrumbPage className="text-xs font-medium">{crumb.label}</BreadcrumbPage>
+                      )}
+                    </BreadcrumbItem>
+                    {!isLast && <BreadcrumbSeparator className="[&>svg]:w-3 [&>svg]:h-3" />}
+                  </React.Fragment>
+                )
+              })}
+            </BreadcrumbList>
+          </Breadcrumb>
+        ) : (
+          <span className="hidden sm:block text-sm font-medium text-foreground/90 truncate">
+            {title ?? "Dashboard"}
+          </span>
+        )}
+
+        {/* Mobile: page title only */}
+        <span className="sm:hidden text-sm font-medium text-foreground/90 truncate">
+          {title ?? crumbs[crumbs.length - 1]?.label ?? "Dashboard"}
         </span>
 
-        <div className="ml-auto flex items-center gap-1">
-          {/* Mobile search icon — triggers cmd+k drawer */}
+        {/* Right actions */}
+        <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+          {/* Cmd+K search — desktop: pill button, mobile: icon */}
           <button
             type="button"
-            onClick={() => {
-              const event = new KeyboardEvent("keydown", {
-                key: "k",
-                metaKey: true,
-                bubbles: true,
-              })
-              document.dispatchEvent(event)
-            }}
-            className="sm:hidden flex h-8 w-8 items-center justify-center rounded-full border text-muted-foreground hover:bg-muted transition-colors"
+            onClick={triggerSearch}
+            className="sm:hidden flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
             aria-label="Search"
           >
-            <HugeiconsIcon icon={Search01Icon} size={16} />
+            <HugeiconsIcon icon={Search01Icon} size={15} />
           </button>
-
-          {/* Cmd+K search trigger — desktop */}
           <button
             type="button"
-            onClick={() => {
-              const event = new KeyboardEvent("keydown", {
-                key: "k",
-                metaKey: true,
-                bubbles: true,
-              })
-              document.dispatchEvent(event)
-            }}
-            className="hidden sm:inline-flex items-center gap-1.5 text-xs text-muted-foreground rounded-lg border bg-muted/40 px-2.5 py-1.5 hover:bg-muted transition-colors"
+            onClick={triggerSearch}
+            className="hidden sm:inline-flex items-center gap-1.5 text-xs text-muted-foreground rounded-lg border border-border/50 bg-muted/30 px-2.5 py-1 hover:bg-muted/60 hover:text-foreground transition-colors"
           >
-            <HugeiconsIcon icon={Search01Icon} size={14} />
-            <span>Search…</span>
-            <kbd className="pointer-events-none inline-flex items-center gap-0.5 rounded border bg-background px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-              <HugeiconsIcon icon={CommandIcon} size={10} />K
+            <HugeiconsIcon icon={Search01Icon} size={13} />
+            <span className="text-[11px]">Search…</span>
+            <kbd className="pointer-events-none inline-flex items-center gap-0.5 rounded border border-border/50 bg-background/80 px-1 font-mono text-[9px] font-medium text-muted-foreground/70">
+              <HugeiconsIcon icon={CommandIcon} size={9} />K
             </kbd>
           </button>
 
+          {/* Theme toggle — desktop only */}
           <div className="hidden sm:flex">
             <ThemeToggle />
           </div>
@@ -140,11 +165,11 @@ export function Topbar({ title, variant = "platform", breadcrumbOverrides }: Top
               <button
                 type="button"
                 aria-label="Change language"
-                className="relative flex h-8 w-8 items-center justify-center rounded-full border text-muted-foreground hover:bg-muted transition-colors disabled:pointer-events-none disabled:opacity-50"
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors disabled:pointer-events-none disabled:opacity-50"
                 disabled={isTranslating}
               >
                 {isTranslating ? (
-                  <div className="h-3.5 w-3.5 rounded-full border-2 border-muted-foreground/30 border-t-foreground animate-spin" />
+                  <div className="h-3 w-3 rounded-full border-2 border-muted-foreground/30 border-t-foreground animate-spin" />
                 ) : (
                   <span className="text-sm leading-none notranslate" translate="no">{currentLanguage.flag}</span>
                 )}
@@ -152,12 +177,15 @@ export function Topbar({ title, variant = "platform", breadcrumbOverrides }: Top
             )}
           </LanguagePicker>
 
-          {/* User profile dropdown — always visible, especially useful on mobile */}
+          {/* Separator before avatar — visual breathing room */}
+          <Separator orientation="vertical" className="h-4! hidden sm:block" />
+
+          {/* User profile dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger className="focus:outline-none">
-              <Avatar className="h-8 w-8 cursor-pointer">
+              <Avatar className="h-7 w-7 cursor-pointer ring-1 ring-border/40 hover:ring-border transition-all">
                 {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.firstName} />}
-                <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
                   {userInitials}
                 </AvatarFallback>
               </Avatar>
@@ -208,36 +236,6 @@ export function Topbar({ title, variant = "platform", breadcrumbOverrides }: Top
           </DropdownMenu>
         </div>
       </div>
-
-      {/* Breadcrumbs bar — scrollable */}
-      {crumbs.length > 1 && (
-        <>
-          <Separator />
-          <div className="flex h-9 items-center px-4 overflow-x-auto scrollbar-none">
-            <Breadcrumb>
-              <BreadcrumbList className="flex-nowrap">
-                {crumbs.map((crumb, i) => {
-                  const isLast = i === crumbs.length - 1
-                  return (
-                    <React.Fragment key={crumb.href}>
-                      <BreadcrumbItem className="whitespace-nowrap">
-                        {!isLast ? (
-                          <BreadcrumbLink render={<Link href={crumb.href} />}>
-                            {crumb.label}
-                          </BreadcrumbLink>
-                        ) : (
-                          <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
-                        )}
-                      </BreadcrumbItem>
-                      {!isLast && <BreadcrumbSeparator />}
-                    </React.Fragment>
-                  )
-                })}
-              </BreadcrumbList>
-            </Breadcrumb>
-          </div>
-        </>
-      )}
     </header>
   )
 }

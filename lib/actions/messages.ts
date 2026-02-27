@@ -227,7 +227,9 @@ export async function sendMessage(
     const senderName = `${currentUser.firstName} ${currentUser.lastName}`.trim()
     const senderAvatar = currentUser.avatarUrl || null
 
-    // Emit SSE event to the receiver for instant delivery
+    // Emit SSE event to both the receiver AND sender for instant delivery.
+    // Sender needs the event too — when Vivid AI sends a message on the
+    // user's behalf, the messages page is open but has no optimistic update.
     const msgEvent: MessageEventPayload = {
       type: "message:new",
       messageId: message._id.toString(),
@@ -245,7 +247,10 @@ export async function sendMessage(
       waveform: fileData?.waveform,
       timestamp: message.createdAt.toISOString(),
     }
-    await emitEvent(recipientId.toString(), msgEvent)
+    await Promise.all([
+      emitEvent(recipientId.toString(), msgEvent),
+      emitEvent(senderId.toString(), { ...msgEvent }),
+    ])
 
     return {
       success: true,
