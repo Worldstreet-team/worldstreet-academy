@@ -1,24 +1,23 @@
-# Use Node 22 (adjust if needed)
-FROM node:22-alpine
-
-# Set working directory
+# Stage 1: Build
+FROM node:22-alpine AS builder
 WORKDIR /app
 
-# Copy package files first (for caching)
 COPY package.json pnpm-lock.yaml ./
+RUN npm install -g pnpm && pnpm install --frozen-lockfile
 
-# Install pnpm and dependencies
-RUN npm install -g pnpm \
-    && pnpm install --frozen-lockfile
-
-# Copy the rest of the project
 COPY . .
-
-# Build the Next.js app
 RUN pnpm build
 
-# Expose the port Next.js runs on
-EXPOSE 3000
+# Stage 2: Run
+FROM node:22-alpine AS runner
+WORKDIR /app
 
-# Start the app
+# Copy only necessary files from builder
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY package.json pnpm-lock.yaml ./
+
+RUN npm install -g pnpm && pnpm install --prod --frozen-lockfile
+
+EXPOSE 3000
 CMD ["pnpm", "start"]
