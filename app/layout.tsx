@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Public_Sans, Dancing_Script } from "next/font/google";
+import { Geist_Mono, Public_Sans, Dancing_Script } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
@@ -10,11 +10,6 @@ const dancingScript = Dancing_Script({
   subsets: ['latin'],
   variable: '--font-cursive',
   weight: ['400', '500', '600', '700'],
-});
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
 });
 
 const geistMono = Geist_Mono({
@@ -70,7 +65,7 @@ export default function RootLayout({
     >
       <html lang="en" className={publicSans.variable} suppressHydrationWarning>
         <body
-          className={`${geistSans.variable} ${geistMono.variable} ${dancingScript.variable} antialiased`}
+          className={`${geistMono.variable} ${dancingScript.variable} antialiased`}
         >
           <ThemeProvider
             attribute="class"
