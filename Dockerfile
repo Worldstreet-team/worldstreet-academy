@@ -22,6 +22,10 @@ RUN apk add --no-cache libc6-compat ca-certificates
 # Copy only necessary files from builder
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
+# next.config.ts is read at RUNTIME by `next start` (loaded via jiti, bundled with next).
+# Without it, next/image loses its remotePatterns and rejects every remote thumbnail
+# with `"url" parameter is not allowed`. Also needed for redirects/headers/etc.
+COPY --from=builder /app/next.config.ts ./
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 RUN npm install -g pnpm@10.32.0 && pnpm install --prod --frozen-lockfile
