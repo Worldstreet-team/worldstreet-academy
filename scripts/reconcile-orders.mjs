@@ -5,7 +5,24 @@
  * charges still granting access, and orphaned charges (paid but never
  * enrolled).
  *
- * Usage: node scripts/reconcile-orders.mjs   (read-only; exits 1 on mismatch)
+ * This is also the Academy's answer to "we have no payment webhooks", and it is
+ * deliberately not a webhook:
+ *
+ *   - The wallet's spend API is SYNCHRONOUS. A charge returns its outcome on the
+ *     same request, so unlike a card gateway there is no async confirmation to
+ *     wait for. Nothing would ever arrive on a "payment succeeded" webhook.
+ *   - Charges are PLATFORM-SCOPED: refundSpendCharge filters on the calling
+ *     branch, so only the `academy` token can reverse an academy charge. No
+ *     other actor can reverse a purchase behind our back.
+ *
+ * What's left is drift from bugs, manual DB edits, or a future admin-refund
+ * path — and polling catches all of those, including the case a webhook would
+ * miss (an event that never fired). Run it on a schedule; with --heal it also
+ * repairs the one drift that matters to a user: access outliving its payment.
+ *
+ * Usage:
+ *   node scripts/reconcile-orders.mjs           # report only (exits 1 on mismatch)
+ *   node scripts/reconcile-orders.mjs --heal    # + revoke access whose charge was refunded
  */
 import mongoose from "mongoose"
 import { config } from "dotenv"
@@ -13,6 +30,7 @@ import { config } from "dotenv"
 config({ path: ".env.local" })
 config()
 
+const HEAL = process.argv.includes("--heal")
 const uri = process.env.MONGODB_URI
 const WALLET_BASE_URL = (process.env.WALLET_BASE_URL ?? "").replace(/\/+$/, "")
 const WALLET_SERVICE_TOKEN = process.env.WALLET_SERVICE_TOKEN ?? ""
@@ -38,6 +56,7 @@ const orders = db.collection("orders")
 const enrollments = db.collection("enrollments")
 
 const problems = []
+const healed = []
 const paidOrders = await orders.find({ status: { $in: ["paid", "enrolled", "refunded"] } }).toArray()
 
 console.log(`Reconciling ${paidOrders.length} order(s) against the wallet service...`)
@@ -58,6 +77,20 @@ for (const order of paidOrders) {
   const enrollment = await enrollments.findOne({ transactionId: order.chargeId })
   if (charge.status === "refunded" && enrollment && enrollment.status !== "refunded") {
     problems.push(`${label}: wallet charge refunded but enrollment ${enrollment._id} still grants access`)
+    if (HEAL) {
+      // The wallet is the source of truth for whether the money is still ours.
+      // Revoking is safe and idempotent; the row stays for the audit trail.
+      await enrollments.updateOne({ _id: enrollment._id }, { $set: { status: "refunded" } })
+      await orders.updateOne({ _id: order._id }, {
+        $set: { status: "refunded" },
+        $push: { history: { status: "refunded", at: new Date(), note: "reconciliation: wallet reports charge refunded" } },
+      })
+      await db.collection("paymentevents").insertOne({
+        order: order._id, reference: order.reference, type: "access_revoked_by_reconciliation",
+        payload: { chargeId: order.chargeId, enrollmentId: enrollment._id }, createdAt: new Date(),
+      })
+      healed.push(`revoked access for enrollment ${enrollment._id} (charge ${order.chargeId} was refunded)`)
+    }
   }
   if (charge.status === "succeeded" && ["paid"].includes(order.status) && !enrollment) {
     problems.push(`${label}: charged but never enrolled (orphaned charge — refund or enroll)`)
@@ -73,13 +106,19 @@ for (const e of paidEnrollments) {
   if (!order) problems.push(`enrollment ${e._id}: has charge ${e.transactionId} but no order record`)
 }
 
+if (healed.length > 0) {
+  console.log(`\nHealed ${healed.length}:`)
+  for (const h of healed) console.log("  ✓ " + h)
+}
+
 if (problems.length === 0) {
   console.log("✓ Reconciliation clean — academy orders and wallet charges agree.")
   await mongoose.disconnect()
   process.exit(0)
 }
 
-console.error(`✗ ${problems.length} mismatch(es):`)
+console.error(`\n✗ ${problems.length} mismatch(es):`)
 for (const p of problems) console.error("  - " + p)
+if (!HEAL) console.error("\nRe-run with --heal to revoke access whose charge was refunded.")
 await mongoose.disconnect()
 process.exit(1)
