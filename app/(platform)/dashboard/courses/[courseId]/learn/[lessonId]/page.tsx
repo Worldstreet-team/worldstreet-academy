@@ -15,6 +15,7 @@ import { MobileLessonList } from "@/components/learn/mobile-lesson-list"
 import { CourseRating } from "@/components/learn/course-rating"
 import { RichTextContent } from "@/components/ui/rich-text-editor"
 import { FinishCourseButton } from "@/components/learn/finish-course-button"
+import { CourseResources } from "@/components/learn/course-resources"
 
 export default async function LessonPage({
   params,
@@ -199,6 +200,10 @@ export default async function LessonPage({
                 />
               </div>
             </div>
+
+            {/* Downloadable materials for this lesson + the course */}
+            <Separator />
+            <CourseResources courseId={courseId} lessonId={actualLessonId} />
 
             {/* Instructor & Course Interaction */}
             <Separator />

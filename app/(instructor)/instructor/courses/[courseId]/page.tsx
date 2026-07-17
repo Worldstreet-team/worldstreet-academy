@@ -13,6 +13,7 @@ import {
   Delete01Icon,
 } from "@hugeicons/core-free-icons"
 import { deleteCourse, fetchCourseForEdit } from "@/lib/actions/instructor"
+import { ResourceManager } from "@/components/instructor/resource-manager"
 
 export default async function InstructorCourseInfoPage({
   params,
@@ -168,6 +169,11 @@ export default async function InstructorCourseInfoPage({
                 </div>
               )}
             </div>
+
+            <Separator />
+
+            {/* Downloadable materials */}
+            <ResourceManager courseId={course.id} />
           </div>
 
           {/* Sidebar — Stats & Actions */}

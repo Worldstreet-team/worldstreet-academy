@@ -25,6 +25,7 @@ import {
 import { LessonPreviewAccordion } from "@/components/courses/lesson-preview-accordion"
 import { AboutInstructor } from "@/components/courses/about-instructor"
 import { BookmarkButton } from "@/components/courses/bookmark-button"
+import { CourseResources } from "@/components/learn/course-resources"
 
 // Force dynamic rendering to show fresh instructor avatars
 export const revalidate = 0
@@ -227,6 +228,12 @@ export default async function CourseDetailPage({
               </p>
             )}
           </div>
+
+          <Separator />
+
+          {/* Included materials — locked until enrolled, but visible so buyers
+              can see what the course comes with. */}
+          <CourseResources courseId={course.id} />
 
           <Separator />
 

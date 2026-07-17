@@ -23,7 +23,12 @@ export interface ILesson extends Document {
   order: number
   isFree: boolean // Preview lesson (accessible without purchase)
   isPublished: boolean
-  // Resources
+  /**
+   * @deprecated Superseded by the `Resource` collection (./resource.ts), which
+   * supports course-level attachments, private storage keys and
+   * enrollment-gated signed downloads. Nothing reads or writes this array; it
+   * remains only so existing documents deserialize.
+   */
   resources: {
     title: string
     url: string
