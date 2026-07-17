@@ -198,7 +198,11 @@ export async function refundEnrollment(enrollmentId: string, reason: string) {
       })
     }
 
-    const earning = await Earning.findOne({ enrollment: enrollment._id, kind: "sale" })
+    // Newest first: a re-purchased course has one sale row per generation, and
+    // it's the current one being refunded.
+    const earning = await Earning.findOne({ enrollment: enrollment._id, kind: "sale" }).sort({
+      createdAt: -1,
+    })
     if (earning) {
       if (earning.status === "pending") {
         earning.status = "reversed"
@@ -219,7 +223,9 @@ export async function refundEnrollment(enrollmentId: string, reason: string) {
           currency: earning.currency,
           status: "pending",
           availableAt: new Date(),
-          creditReference: `academy_clawback_${enrollment._id.toString()}`,
+          // Keyed on the earning being reversed, not the enrollment: a
+          // re-purchased-then-refunded course would collide on the latter.
+          creditReference: `academy_clawback_${earning._id.toString()}`,
           chargeId: earning.chargeId,
           note: `refund after clearing: ${reason}`,
         })

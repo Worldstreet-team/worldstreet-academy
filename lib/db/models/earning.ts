@@ -66,11 +66,12 @@ const EarningSchema = new Schema<IEarning>(
   { timestamps: true }
 )
 
-// One sale row per enrollment (adjustments use their own creditReference).
-EarningSchema.index(
-  { enrollment: 1 },
-  { unique: true, partialFilterExpression: { kind: "sale", enrollment: { $type: "objectId" } } }
-)
+// Lookup only — deliberately NOT unique. A course can legitimately be sold
+// against the same enrollment row more than once (buy → refund → re-buy
+// reactivates that row), so uniqueness lives on `creditReference`, which
+// carries the purchase generation and is what actually makes clearing
+// idempotent.
+EarningSchema.index({ enrollment: 1, createdAt: -1 })
 EarningSchema.index({ instructor: 1, status: 1, availableAt: 1 })
 
 export const Earning: Model<IEarning> =

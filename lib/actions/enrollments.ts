@@ -101,11 +101,15 @@ export async function purchaseCourse(courseId: string): Promise<PurchaseResult> 
       return { success: false, error: "You need to be signed in to enroll", code: "auth" }
     }
 
-    // Idempotent short-circuit — an existing enrollment is a success, not an error.
+    // Idempotent short-circuit — an existing access-granting enrollment is a
+    // success, not an error. A refunded row means this is a RE-purchase: the
+    // row is kept for audit, so we reactivate it rather than insert (the
+    // {user, course} unique index forbids a second row).
     const existing = await Enrollment.findOne({ user: user.id, course: courseId })
     if (existing && existing.status !== "refunded") {
       return { success: true, data: { enrollmentId: existing._id.toString(), alreadyEnrolled: true } }
     }
+    const isRepurchase = Boolean(existing)
 
     const course = await Course.findOne({ _id: courseId, status: "published" })
     if (!course) {
@@ -115,7 +119,20 @@ export async function purchaseCourse(courseId: string): Promise<PurchaseResult> 
     const price = course.pricing === "paid" ? course.price ?? 0 : 0
     const amountMinor = Math.round(price * 100)
     const isPaid = amountMinor > 0
-    const reference = `academy_enroll_${user.id}_${courseId}`
+
+    // The charge reference is deterministic per PURCHASE GENERATION, not per
+    // user+course. Within one generation, retries and double-clicks replay the
+    // same charge (never a second debit). But a re-purchase after a refund must
+    // get a fresh reference: the wallet replays a stored idempotent response for
+    // 24h, so reusing the old key would hand back the already-refunded charge
+    // and the student would get the course without paying again.
+    const generation = await Order.countDocuments({
+      user: user.id,
+      course: courseId,
+      status: "refunded",
+    })
+    const baseReference = `academy_enroll_${user.id}_${courseId}`
+    const reference = generation > 0 ? `${baseReference}_r${generation}` : baseReference
 
     let chargeId: string | null = null
     let order: IOrder | null = null
@@ -206,17 +223,38 @@ export async function purchaseCourse(courseId: string): Promise<PurchaseResult> 
       }
     }
 
-    // Create the enrollment — access unlocks here and never before payment.
+    // Create (or reactivate) the enrollment — access unlocks here and never
+    // before payment.
     let enrollment
     try {
-      enrollment = await Enrollment.create({
-        user: user.id,
-        course: courseId,
-        pricePaid: price,
-        currency: "USD",
-        transactionId: chargeId,
-        purchasedAt: new Date(),
-      })
+      if (isRepurchase) {
+        // Restore the audited row. Progress is deliberately preserved: the
+        // student is buying the same course back, not starting over.
+        enrollment = await Enrollment.findOneAndUpdate(
+          { user: user.id, course: courseId },
+          {
+            $set: {
+              status: "active",
+              pricePaid: price,
+              currency: "USD",
+              transactionId: chargeId,
+              purchasedAt: new Date(),
+              legacyUnpaid: false,
+            },
+          },
+          { new: true }
+        )
+        if (!enrollment) throw new Error("re-purchase: enrollment row vanished")
+      } else {
+        enrollment = await Enrollment.create({
+          user: user.id,
+          course: courseId,
+          pricePaid: price,
+          currency: "USD",
+          transactionId: chargeId,
+          purchasedAt: new Date(),
+        })
+      }
     } catch (err: unknown) {
       const isDuplicate = typeof err === "object" && err !== null && (err as { code?: number }).code === 11000
       if (isDuplicate) {
@@ -273,7 +311,13 @@ export async function purchaseCourse(courseId: string): Promise<PurchaseResult> 
             currency: "USD",
             status: "pending",
             availableAt: new Date(Date.now() + EARNINGS_CLEARING_DAYS * 24 * 60 * 60 * 1000),
-            creditReference: `academy_earn_${enrollment._id.toString()}`,
+            // Same generation suffix as the charge: a re-purchase is a new sale
+            // and must earn again, but the enrollment id is unchanged so the
+            // bare reference would collide with the original (refunded) sale.
+            creditReference:
+              generation > 0
+                ? `academy_earn_${enrollment._id.toString()}_r${generation}`
+                : `academy_earn_${enrollment._id.toString()}`,
             chargeId,
           })
         } catch (err) {
@@ -408,9 +452,13 @@ export async function getUserEnrollments(
   try {
     await connectDB()
 
+    // "all" means all of the user's LIVE courses — a refunded purchase is not
+    // one of them (the row is retained only for the payment audit trail).
     const query: Record<string, unknown> = { user: userId }
     if (status && status !== "all") {
       query.status = status
+    } else {
+      query.status = { $in: ["active", "completed", "expired"] }
     }
 
     const enrollments = await Enrollment.find(query)
@@ -498,9 +546,15 @@ export async function checkEnrollment(
   try {
     await connectDB()
 
+    // Access-granting statuses only: a refunded/expired row still exists (kept
+    // for audit) but must read as "not enrolled", or the course page would
+    // offer "Continue learning" into content the server will refuse, and
+    // checkout would bounce the user to the success screen instead of letting
+    // them buy the course back.
     const enrollment = await Enrollment.findOne({
       user: userId,
       course: courseId,
+      status: { $in: ["active", "completed"] },
     }).select("status")
 
     if (!enrollment) {
