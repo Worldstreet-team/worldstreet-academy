@@ -2,8 +2,28 @@
 
 import { revalidatePath } from "next/cache"
 import connectDB from "@/lib/db"
-import { Course, Enrollment, User, Lesson } from "@/lib/db/models"
+import {
+  Course,
+  Enrollment,
+  User,
+  Lesson,
+  Order,
+  PaymentEvent,
+  Earning,
+  INSTRUCTOR_REVENUE_SHARE,
+  EARNINGS_CLEARING_DAYS,
+  type IOrder,
+  type OrderStatus,
+} from "@/lib/db/models"
 import { Types } from "mongoose"
+import { getCurrentUser } from "@/lib/auth/actions"
+import {
+  createWalletCharge,
+  refundWalletCharge,
+  isInsufficientBalance,
+  walletEnabled,
+  WalletError,
+} from "@/lib/wallet"
 
 // ============================================================================
 // TYPES
@@ -32,70 +52,252 @@ export type EnrollmentProgress = {
 // ENROLLMENT ACTIONS
 // ============================================================================
 
-/**
- * Enroll user in a course (purchase)
- */
-export async function enrollInCourse(
-  userId: string,
-  courseId: string,
-  pricePaid: number,
-  transactionId?: string
+export type PurchaseResult =
+  | { success: true; data: { enrollmentId: string; alreadyEnrolled?: boolean } }
+  | {
+      success: false
+      error: string
+      code?: "auth" | "not_found" | "insufficient_funds" | "wallet_unavailable" | "enroll_failed"
+      shortfallMinor?: number
+      availableMinor?: number
+    }
+
+async function transitionOrder(order: IOrder, status: OrderStatus, note?: string) {
+  order.status = status
+  order.history.push({ status, at: new Date(), ...(note ? { note } : {}) })
+  await order.save()
+}
+
+async function logPaymentEvent(
+  orderId: Types.ObjectId | null,
+  reference: string,
+  type: string,
+  payload: Record<string, unknown>
 ) {
+  try {
+    await PaymentEvent.create({ order: orderId, reference, type, payload })
+  } catch (err) {
+    console.error("[Payments] failed to log payment event", type, err)
+  }
+}
+
+/**
+ * Purchase / enroll in a course.
+ *
+ * The caller supplies only the courseId: identity comes from the session and
+ * the price from the course record — nothing money-related is trusted from
+ * the client. Paid courses debit the central Worldstreet wallet service
+ * server-to-server and enroll ONLY after the wallet confirms the charge.
+ * The debit is idempotent (deterministic reference per user+course), so a
+ * retried or double-clicked purchase can never charge twice. If the wallet is
+ * unreachable we fail closed: no enrollment, no fake success.
+ */
+export async function purchaseCourse(courseId: string): Promise<PurchaseResult> {
   try {
     await connectDB()
 
-    // Check if already enrolled
-    const existing = await Enrollment.findOne({
-      user: userId,
-      course: courseId,
-    })
-
-    if (existing) {
-      return { success: false, error: "Already enrolled in this course" }
+    const user = await getCurrentUser()
+    if (!user) {
+      return { success: false, error: "You need to be signed in to enroll", code: "auth" }
     }
 
-    // Verify course exists and is published
-    const course = await Course.findOne({
-      _id: courseId,
-      status: "published",
-    })
+    // Idempotent short-circuit — an existing enrollment is a success, not an error.
+    const existing = await Enrollment.findOne({ user: user.id, course: courseId })
+    if (existing && existing.status !== "refunded") {
+      return { success: true, data: { enrollmentId: existing._id.toString(), alreadyEnrolled: true } }
+    }
 
+    const course = await Course.findOne({ _id: courseId, status: "published" })
     if (!course) {
-      return { success: false, error: "Course not found or not available" }
+      return { success: false, error: "Course not found or not available", code: "not_found" }
     }
 
-    // Create enrollment
-    const enrollment = await Enrollment.create({
-      user: userId,
-      course: courseId,
-      pricePaid,
-      transactionId,
-      purchasedAt: new Date(),
-    })
+    const price = course.pricing === "paid" ? course.price ?? 0 : 0
+    const amountMinor = Math.round(price * 100)
+    const isPaid = amountMinor > 0
+    const reference = `academy_enroll_${user.id}_${courseId}`
 
-    // Update course enrolled count
-    await Course.findByIdAndUpdate(courseId, {
-      $inc: { enrolledCount: 1 },
-    })
+    let chargeId: string | null = null
+    let order: IOrder | null = null
 
-    // Update instructor stats
+    if (isPaid) {
+      if (!walletEnabled()) {
+        // Never enroll a paid course without a confirmed debit.
+        return {
+          success: false,
+          error: "Payments are temporarily unavailable. Please try again later.",
+          code: "wallet_unavailable",
+        }
+      }
+
+      const ord = await Order.findOneAndUpdate(
+        { reference },
+        {
+          $setOnInsert: {
+            user: user.id,
+            authUserId: user.authUserId,
+            course: courseId,
+            reference,
+            amountMinor,
+            currency: "USD",
+            status: "pending",
+            history: [{ status: "pending", at: new Date() }],
+          },
+        },
+        { upsert: true, new: true }
+      )
+      if (!ord) {
+        return { success: false, error: "Failed to open an order", code: "enroll_failed" }
+      }
+      order = ord
+
+      await transitionOrder(ord, "payment_requested")
+      await logPaymentEvent(ord._id, reference, "charge_requested", {
+        amountMinor,
+        courseId,
+        authUserId: user.authUserId,
+      })
+
+      try {
+        const { charge } = await createWalletCharge(user.authUserId, {
+          amountMinor,
+          description: `Course: ${course.title}`,
+          metadata: { courseId: course._id.toString(), courseSlug: course.slug ?? "" },
+          idempotencyKey: reference,
+        })
+        chargeId = charge.id
+        ord.chargeId = charge.id
+        await transitionOrder(ord, "paid")
+        await logPaymentEvent(ord._id, reference, "charge_confirmed", {
+          chargeId: charge.id,
+          amountMinor: charge.amountMinor,
+        })
+      } catch (err) {
+        if (isInsufficientBalance(err)) {
+          const details = err.details as { availableMinor?: number }
+          const availableMinor = typeof details.availableMinor === "number" ? details.availableMinor : 0
+          ord.failureCode = "insufficient_funds"
+          await transitionOrder(ord, "failed", "insufficient funds")
+          await logPaymentEvent(ord._id, reference, "charge_failed", {
+            code: "INSUFFICIENT_BALANCE",
+            availableMinor,
+          })
+          return {
+            success: false,
+            error: "Your Worldstreet balance doesn't cover this course.",
+            code: "insufficient_funds",
+            availableMinor,
+            shortfallMinor: Math.max(0, amountMinor - availableMinor),
+          }
+        }
+        const code = err instanceof WalletError ? err.code : "WALLET_ERROR"
+        ord.failureCode = code
+        await transitionOrder(ord, "failed", code)
+        await logPaymentEvent(ord._id, reference, "charge_failed", {
+          code,
+          message: err instanceof Error ? err.message : String(err),
+        })
+        console.error("[Payments] wallet charge failed:", err)
+        return {
+          success: false,
+          error: "We couldn't reach the payment service. You have not been charged.",
+          code: "wallet_unavailable",
+        }
+      }
+    }
+
+    // Create the enrollment — access unlocks here and never before payment.
+    let enrollment
+    try {
+      enrollment = await Enrollment.create({
+        user: user.id,
+        course: courseId,
+        pricePaid: price,
+        currency: "USD",
+        transactionId: chargeId,
+        purchasedAt: new Date(),
+      })
+    } catch (err: unknown) {
+      const isDuplicate = typeof err === "object" && err !== null && (err as { code?: number }).code === 11000
+      if (isDuplicate) {
+        // Raced with another request for the same user+course; the charge is
+        // idempotent, so the money side is consistent either way.
+        const winner = await Enrollment.findOne({ user: user.id, course: courseId })
+        if (winner) {
+          if (order) await transitionOrder(order, "enrolled", "concurrent enrollment")
+          return { success: true, data: { enrollmentId: winner._id.toString(), alreadyEnrolled: true } }
+        }
+      }
+      // Charged but couldn't enroll — compensate with a refund so no money is kept
+      // without access. If the refund also fails, the reconciliation job surfaces it.
+      if (isPaid && chargeId) {
+        try {
+          await refundWalletCharge(user.authUserId, chargeId, "enrollment creation failed")
+          if (order) {
+            await transitionOrder(order, "refunded", "compensating refund after enroll failure")
+            await logPaymentEvent(order._id, reference, "charge_refunded", { chargeId })
+          }
+        } catch (refundErr) {
+          console.error("[Payments] ORPHANED CHARGE — refund failed, needs reconciliation:", chargeId, refundErr)
+          if (order) {
+            await transitionOrder(order, "failed", "enroll failed AND refund failed — orphaned charge")
+            await logPaymentEvent(order._id, reference, "refund_failed", { chargeId })
+          }
+        }
+      }
+      console.error("Enroll in course error:", err)
+      return { success: false, error: "Failed to enroll in course", code: "enroll_failed" }
+    }
+
+    if (order) await transitionOrder(order, "enrolled")
+
+    // Instructor earnings: ledger row stays pending through the clearing
+    // window, then clears into their central wallet balance.
+    if (isPaid) {
+      const feeMinor = Math.round(amountMinor * (1 - INSTRUCTOR_REVENUE_SHARE))
+      const netMinor = amountMinor - feeMinor
+      const instructor = await User.findById(course.instructor).select("authUserId")
+      if (instructor?.authUserId) {
+        try {
+          await Earning.create({
+            enrollment: enrollment._id,
+            order: order?._id ?? null,
+            course: course._id,
+            instructor: course.instructor,
+            instructorAuthUserId: instructor.authUserId,
+            student: user.id,
+            kind: "sale",
+            grossMinor: amountMinor,
+            feeMinor,
+            netMinor,
+            currency: "USD",
+            status: "pending",
+            availableAt: new Date(Date.now() + EARNINGS_CLEARING_DAYS * 24 * 60 * 60 * 1000),
+            creditReference: `academy_earn_${enrollment._id.toString()}`,
+            chargeId,
+          })
+        } catch (err) {
+          console.error("[Earnings] failed to record sale earning:", err)
+        }
+      }
+    }
+
+    // Update course + instructor aggregates
+    await Course.findByIdAndUpdate(courseId, { $inc: { enrolledCount: 1 } })
     await User.findByIdAndUpdate(course.instructor, {
       $inc: {
         "instructorProfile.totalStudents": 1,
-        "instructorProfile.totalEarnings": pricePaid,
+        "instructorProfile.totalEarnings": isPaid ? (price * INSTRUCTOR_REVENUE_SHARE) : 0,
       },
     })
 
     revalidatePath("/dashboard/my-courses")
     revalidatePath(`/courses/${courseId}`)
 
-    return {
-      success: true,
-      data: { enrollmentId: enrollment._id.toString() },
-    }
+    return { success: true, data: { enrollmentId: enrollment._id.toString() } }
   } catch (error) {
     console.error("Enroll in course error:", error)
-    return { success: false, error: "Failed to enroll in course" }
+    return { success: false, error: "Failed to enroll in course", code: "enroll_failed" }
   }
 }
 

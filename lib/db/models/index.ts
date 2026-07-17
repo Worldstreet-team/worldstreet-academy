@@ -8,3 +8,6 @@ export { Message, Conversation, type IMessage, type IConversation } from "./mess
 export { Call, type ICall, type CallStatus, type CallType } from "./call"
 export { Meeting, type IMeeting, type IMeetingParticipant, type IMeetingInvite, type MeetingStatus } from "./meeting"
 export { WatchProgress, type IWatchProgress } from "./watch-progress"
+export { Order, type IOrder, type OrderStatus } from "./order"
+export { PaymentEvent, type IPaymentEvent } from "./payment-event"
+export { Earning, type IEarning, type EarningStatus, type EarningKind, INSTRUCTOR_REVENUE_SHARE, EARNINGS_CLEARING_DAYS } from "./earning"

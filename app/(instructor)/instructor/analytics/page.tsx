@@ -9,6 +9,7 @@ import { useInstructorCourses } from "@/lib/hooks/queries"
 import { EmptyState } from "@/components/shared/empty-state"
 import { useQuery } from "@tanstack/react-query"
 import { fetchInstructorCertificateStats } from "@/lib/actions/certificates"
+import { getMyInstructorEarnings } from "@/lib/actions/earnings"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   StarIcon,
@@ -22,6 +23,10 @@ export default function AnalyticsPage() {
   const { data: certStats = [], isLoading: isLoadingStats } = useQuery({
     queryKey: ["instructor", "certificates"],
     queryFn: () => fetchInstructorCertificateStats(),
+  })
+  const { data: earnings } = useQuery({
+    queryKey: ["instructor", "earnings"],
+    queryFn: () => getMyInstructorEarnings(),
   })
 
   // Compute overall stats
@@ -115,12 +120,20 @@ export default function AnalyticsPage() {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Revenue</p>
+                    <p className="text-xs text-muted-foreground">Earnings (net)</p>
                     <p className="text-xl font-bold">
-                      {totalRevenue > 0
-                        ? `$${totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
-                        : "—"}
+                      {earnings
+                        ? `$${(earnings.lifetimeNetMinor / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                        : totalRevenue > 0
+                          ? `$${totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                          : "—"}
                     </p>
+                    {earnings && (
+                      <p className="text-[10px] text-muted-foreground">
+                        ${(earnings.clearedMinor / 100).toFixed(2)} in wallet · $
+                        {(earnings.pendingMinor / 100).toFixed(2)} clearing
+                      </p>
+                    )}
                   </div>
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500/10">
                     <HugeiconsIcon icon={AnalyticsUpIcon} size={18} className="text-emerald-500" />
@@ -204,7 +217,7 @@ export default function AnalyticsPage() {
                             ? `$${((course.price ?? 0) * course.enrolledCount * 0.85).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
                             : "Free"}
                         </p>
-                        <p className="text-[11px] text-muted-foreground">Revenue</p>
+                        <p className="text-[11px] text-muted-foreground">Revenue (est.)</p>
                       </div>
                     </div>
 

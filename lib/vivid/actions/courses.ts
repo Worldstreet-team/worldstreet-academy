@@ -204,17 +204,16 @@ export async function vividEnrollInCourse(p: { courseId: string }) {
     if (existing) return { success: true, already: true, message: "Already enrolled" }
 
     if (course.pricing === "free") {
-      await Enrollment.create({
-        user: currentUser.id,
-        course: course._id,
-        status: "active",
-        progress: 0,
-        completedLessons: [],
-      })
-      await Course.findByIdAndUpdate(course._id, { $inc: { enrolledCount: 1 } })
+      // Route through the shared purchase action so enrollment side-effects
+      // (counts, instructor stats) stay in one place.
+      const { purchaseCourse } = await import("@/lib/actions/enrollments")
+      const result = await purchaseCourse(course._id.toString())
+      if (!result.success) return { success: false, error: result.error }
       return { success: true, enrolled: true, message: "Enrolled successfully!" }
     }
 
+    // Paid courses go through the real checkout — the wallet debit happens
+    // server-side there; Vivid never marks a paid course as purchased itself.
     return {
       success: true,
       needsCheckout: true,

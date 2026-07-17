@@ -1,6 +1,6 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose"
 
-export type EnrollmentStatus = "active" | "completed" | "expired"
+export type EnrollmentStatus = "active" | "completed" | "expired" | "refunded"
 
 export interface IEnrollment extends Document {
   _id: Types.ObjectId
@@ -12,6 +12,8 @@ export interface IEnrollment extends Document {
   pricePaid: number
   currency: string
   transactionId: string | null
+  /** True for pre-payment-integration paid enrollments granted without a real charge (grandfathered, excluded from earnings). */
+  legacyUnpaid: boolean
   // Progress tracking
   progress: number // 0-100 percentage
   completedLessons: Types.ObjectId[] // Array of completed lesson IDs
@@ -38,7 +40,7 @@ const EnrollmentSchema = new Schema<IEnrollment>(
     },
     status: {
       type: String,
-      enum: ["active", "completed", "expired"],
+      enum: ["active", "completed", "expired", "refunded"],
       default: "active",
     },
     purchasedAt: {
@@ -56,6 +58,10 @@ const EnrollmentSchema = new Schema<IEnrollment>(
     transactionId: {
       type: String,
       default: null,
+    },
+    legacyUnpaid: {
+      type: Boolean,
+      default: false,
     },
     progress: {
       type: Number,

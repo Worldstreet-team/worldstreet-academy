@@ -276,53 +276,84 @@ export type LearnCourse = {
   instructorName: string
   instructorAvatarUrl: string | null
   rating: number | null
+  /** False when the caller isn't enrolled — paid lesson media is withheld. */
+  hasAccess: boolean
   lessons: LearnLesson[]
 }
 
 /**
- * Fetch course and lessons for the learn page
+ * Fetch course and lessons for the learn page.
+ *
+ * Access is enforced server-side: full lesson media (videoUrl/content) is only
+ * returned to enrolled students, the course's instructor, or admins. Everyone
+ * else gets metadata plus free-preview lessons only — a paid course can no
+ * longer be consumed by navigating straight to the learn URL.
  */
 export async function fetchCourseForLearning(courseId: string): Promise<LearnCourse | null> {
   try {
     await connectDB()
-    
-    const { Lesson } = await import("@/lib/db/models")
-    
+
+    const { Lesson, Enrollment } = await import("@/lib/db/models")
+    const { getCurrentUser } = await import("@/lib/auth/actions")
+
     const course = await Course.findById(courseId)
       .populate("instructor", "firstName lastName avatarUrl")
       .lean()
-    
+
     if (!course) return null
-    
+
+    const user = await getCurrentUser()
+    let hasAccess = false
+    if (user) {
+      if (user.role === "ADMIN") {
+        hasAccess = true
+      } else if (
+        (course.instructor as unknown as { _id?: { toString(): string } })?._id?.toString() === user.id
+      ) {
+        hasAccess = true
+      } else {
+        const enrollment = await Enrollment.findOne({
+          user: user.id,
+          course: courseId,
+          status: { $in: ["active", "completed"] },
+        }).select("_id")
+        hasAccess = Boolean(enrollment)
+      }
+    }
+
     const instructor = course.instructor as unknown as {
       firstName: string
       lastName: string
       avatarUrl: string
     }
-    
+
     const lessons = await Lesson.find({ course: courseId })
       .sort({ order: 1 })
       .lean()
-    
+
     return {
       id: course._id.toString(),
       title: course.title,
       instructorName: `${instructor.firstName} ${instructor.lastName}`,
       instructorAvatarUrl: instructor.avatarUrl,
       rating: course.rating?.average || null,
-      lessons: lessons.map((l) => ({
-        id: l._id.toString(),
-        courseId: courseId,
-        title: l.title,
-        description: l.description || "",
-        type: l.type as "video" | "live" | "text",
-        videoUrl: l.videoUrl || null,
-        thumbnailUrl: l.videoThumbnailUrl || null,
-        content: l.content || null,
-        duration: l.videoDuration ? Math.round(l.videoDuration / 60) : null,
-        order: l.order,
-        isFree: l.isFree,
-      })),
+      hasAccess,
+      lessons: lessons.map((l) => {
+        const unlocked = hasAccess || l.isFree
+        return {
+          id: l._id.toString(),
+          courseId: courseId,
+          title: l.title,
+          description: l.description || "",
+          type: l.type as "video" | "live" | "text",
+          videoUrl: unlocked ? (l.videoUrl || null) : null,
+          thumbnailUrl: l.videoThumbnailUrl || null,
+          content: unlocked ? (l.content || null) : null,
+          duration: l.videoDuration ? Math.round(l.videoDuration / 60) : null,
+          order: l.order,
+          isFree: l.isFree,
+        }
+      }),
     }
   } catch (error) {
     console.error("Fetch course for learning error:", error)

@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/carousel"
 import { type InstructorCourseItem } from "@/lib/actions/instructor"
 import { useInstructorCourses } from "@/lib/hooks/queries"
+import { useQuery } from "@tanstack/react-query"
+import { getMyInstructorEarnings } from "@/lib/actions/earnings"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   BookOpen01Icon,
@@ -89,6 +91,10 @@ export default function InstructorDashboard() {
   const user = useUser()
   const [courseSearch, setCourseSearch] = React.useState("")
   const { data: myCourses = [], isLoading } = useInstructorCourses()
+  const { data: earnings } = useQuery({
+    queryKey: ["instructor", "earnings"],
+    queryFn: () => getMyInstructorEarnings(),
+  })
 
   const totalStudents = myCourses.reduce((s, c) => s + c.enrolledCount, 0)
   const totalRevenue = myCourses.reduce(
@@ -105,8 +111,10 @@ export default function InstructorDashboard() {
     { label: "Total Courses", value: myCourses.length, icon: BookOpen01Icon },
     { label: "Total Students", value: totalStudents.toLocaleString(), icon: UserMultipleIcon },
     {
-      label: "Revenue (est.)",
-      value: `$${totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
+      label: earnings ? "Earnings (net)" : "Revenue (est.)",
+      value: earnings
+        ? `$${(earnings.lifetimeNetMinor / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+        : `$${totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
       icon: DollarCircleIcon,
     },
     { label: "Avg. Rating", value: avgRating, icon: StarIcon, iconColor: "text-orange-500" },

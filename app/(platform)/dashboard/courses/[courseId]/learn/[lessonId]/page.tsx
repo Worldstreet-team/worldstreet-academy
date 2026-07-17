@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
@@ -24,6 +24,10 @@ export default async function LessonPage({
   const { courseId, lessonId } = await params
   const course = await fetchCourseForLearning(courseId)
   if (!course) notFound()
+
+  // Content is gated on enrollment server-side; send non-enrolled users to the
+  // course page to enroll (or preview free lessons) instead of a broken player.
+  if (!course.hasAccess) redirect(`/dashboard/courses/${courseId}`)
 
   const lessons = course.lessons
   

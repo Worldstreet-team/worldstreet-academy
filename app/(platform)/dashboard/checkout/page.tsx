@@ -17,7 +17,8 @@ import { Topbar } from "@/components/platform/topbar"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { useUser } from "@/components/providers/user-provider"
-import { enrollInCourse, checkEnrollment } from "@/lib/actions/enrollments"
+import { purchaseCourse, checkEnrollment } from "@/lib/actions/enrollments"
+import { getMyWalletBalance, type MyWalletBalance } from "@/lib/actions/wallet"
 import { fetchPublicCourse, type PublicCourse } from "@/lib/actions/student"
 
 export default function CheckoutPage() {
@@ -27,57 +28,70 @@ export default function CheckoutPage() {
 
   const courseId = searchParams.get("courseId")
   const [course, setCourse] = useState<PublicCourse | null>(null)
+  const [wallet, setWallet] = useState<MyWalletBalance | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isProcessing, setIsProcessing] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [shortfallMinor, setShortfallMinor] = useState<number | null>(null)
 
   useEffect(() => {
     if (!courseId) {
       setIsLoading(false)
       return
     }
-    // Fetch course and check enrollment in parallel
+    // Fetch course, enrollment state and central wallet balance in parallel
     Promise.all([
       fetchPublicCourse(courseId),
       user ? checkEnrollment(user.id, courseId) : Promise.resolve({ isEnrolled: false }),
-    ]).then(([c, enrollment]) => {
+      getMyWalletBalance(),
+    ]).then(([c, enrollment, walletBalance]) => {
       if (enrollment.isEnrolled) {
         // Already enrolled — skip checkout entirely
         router.replace(`/dashboard/checkout/success?courseId=${courseId}`)
         return
       }
       setCourse(c)
+      setWallet(walletBalance)
       setIsLoading(false)
     })
   }, [courseId, user, router])
+
+  function openFunding() {
+    if (!wallet) return
+    const returnTo = typeof window !== "undefined" ? window.location.href : ""
+    const url = `${wallet.fundingUrl}${wallet.fundingUrl.includes("?") ? "&" : "?"}redirect=${encodeURIComponent(returnTo)}`
+    window.open(url, "_blank", "noopener")
+  }
 
   async function handlePurchase() {
     if (!course || !user) return
     setIsProcessing(true)
     setError(null)
+    setShortfallMinor(null)
 
     try {
-      // Check if already enrolled
-      const check = await checkEnrollment(user.id, course.id)
-      if (check.isEnrolled) {
-        setIsSuccess(true)
-        router.push(`/dashboard/checkout/success?courseId=${course.id}`)
-        return
-      }
-
-      const price = course.pricing === "free" ? 0 : (course.price ?? 0)
-      const result = await enrollInCourse(user.id, course.id, price)
+      // The server derives identity from the session and price from the course
+      // record; enrollment is only granted after the central Worldstreet wallet
+      // confirms the debit. No optimistic success.
+      const result = await purchaseCourse(course.id)
 
       if (result.success) {
         setIsSuccess(true)
         router.push(`/dashboard/checkout/success?courseId=${course.id}`)
       } else {
-        setError(result.error || "Something went wrong")
+        if (result.code === "insufficient_funds") {
+          setShortfallMinor(result.shortfallMinor ?? null)
+          setError(null)
+          // Refresh the displayed balance to what the wallet reported
+          getMyWalletBalance().then(setWallet)
+        } else {
+          setError(result.error || "Something went wrong")
+        }
         setIsProcessing(false)
       }
     } catch {
-      setError("Something went wrong. Please try again.")
+      setError("Something went wrong. You have not been charged.")
       setIsProcessing(false)
     }
   }
@@ -181,6 +195,16 @@ export default function CheckoutPage() {
                   {price === 0 ? "Free" : `$${price.toFixed(2)}`}
                 </span>
               </div>
+              {price > 0 && wallet?.enabled && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Worldstreet balance</span>
+                  <span
+                    className={`font-medium ${wallet.usdAvailable >= price ? "" : "text-red-500"}`}
+                  >
+                    ${wallet.usdAvailable.toFixed(2)}
+                  </span>
+                </div>
+              )}
               <Separator />
               <div className="flex items-center justify-between text-sm">
                 <span className="font-semibold">Total</span>
@@ -194,8 +218,29 @@ export default function CheckoutPage() {
           {/* Secure checkout note */}
           <div className="flex items-center gap-2 justify-center text-xs text-muted-foreground/60">
             <HugeiconsIcon icon={SecurityCheckIcon} size={13} />
-            <span>Secure checkout</span>
+            <span>
+              {price === 0
+                ? "Secure checkout"
+                : "Paid from your Worldstreet wallet — funding & withdrawals live on the Worldstreet dashboard"}
+            </span>
           </div>
+
+          {/* Insufficient funds */}
+          {shortfallMinor !== null && (
+            <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 px-4 py-3 space-y-2">
+              <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
+                Insufficient balance
+              </p>
+              <p className="text-xs text-muted-foreground">
+                You need ${(shortfallMinor / 100).toFixed(2)} more in your Worldstreet wallet to buy
+                this course. Top up on the Worldstreet dashboard, then come back — your order will
+                still be here.
+              </p>
+              <Button variant="outline" size="sm" className="w-full" onClick={openFunding}>
+                Fund my Worldstreet wallet
+              </Button>
+            </div>
+          )}
 
           {/* Error */}
           {error && (
