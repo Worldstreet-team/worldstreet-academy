@@ -40,6 +40,13 @@ export type AdminOverview = {
   }[]
   /** Gross order revenue per day, oldest→newest, last 14 days (minor units). */
   revenueByDay: { date: string; minor: number }[]
+  /** Instructor-application funnel over the last 30 days. */
+  funnel: {
+    submitted30d: number
+    approved30d: number
+    rejected30d: number
+    approvalRatePct: number | null
+  }
 }
 
 export async function getAdminOverview(): Promise<AdminOverview | null> {
@@ -103,6 +110,21 @@ export async function getAdminOverview(): Promise<AdminOverview | null> {
       revenueByDay.push({ date: key, minor: dailyMap.get(key) ?? 0 })
     }
 
+    // Application funnel, trailing 30 days.
+    const since30 = new Date(Date.now() - 30 * 24 * 3600 * 1000)
+    const [submitted30d, approved30d, rejected30d] = await Promise.all([
+      InstructorApplication.countDocuments({ createdAt: { $gte: since30 } }),
+      InstructorApplication.countDocuments({ status: "approved", decidedAt: { $gte: since30 } }),
+      InstructorApplication.countDocuments({ status: "rejected", decidedAt: { $gte: since30 } }),
+    ])
+    const decided = approved30d + rejected30d
+    const funnel = {
+      submitted30d,
+      approved30d,
+      rejected30d,
+      approvalRatePct: decided > 0 ? Math.round((approved30d / decided) * 100) : null,
+    }
+
     let pendingEarningsMinor = 0
     let clearedEarningsMinor = 0
     for (const g of earningsAgg as { _id: string; total: number }[]) {
@@ -145,6 +167,7 @@ export async function getAdminOverview(): Promise<AdminOverview | null> {
         createdAt: e.createdAt.toISOString(),
       })),
       revenueByDay,
+      funnel,
     }
   } catch (error) {
     console.error("Admin overview error:", error)

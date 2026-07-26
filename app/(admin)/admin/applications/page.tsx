@@ -2,14 +2,16 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useMutation } from "@tanstack/react-query"
 import { Topbar } from "@/components/platform/topbar"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { EmptyState } from "@/components/shared/empty-state"
 import { TeachingIcon } from "@hugeicons/core-free-icons"
-import { adminListApplications } from "@/lib/actions/applications"
+import { adminListApplications, adminExportApplicationsCsv } from "@/lib/actions/applications"
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import { formatDate, StatusBadge, FilterChips, Pagination } from "@/components/admin/shared"
 
@@ -18,10 +20,38 @@ type StatusFilter = "active" | "all" | "submitted" | "under_review" | "approved"
 export default function AdminApplicationsPage() {
   const [status, setStatus] = React.useState<StatusFilter>("active")
   const [page, setPage] = React.useState(1)
+  const [mine, setMine] = React.useState(false)
+  const [expertise, setExpertise] = React.useState("")
+  const [debouncedExpertise, setDebouncedExpertise] = React.useState("")
+
+  React.useEffect(() => {
+    const t = setTimeout(() => setDebouncedExpertise(expertise), 350)
+    return () => clearTimeout(t)
+  }, [expertise])
 
   const { data, isLoading } = useQuery({
-    queryKey: queryKeys.adminApplications({ status, page }),
-    queryFn: () => adminListApplications({ status, page }),
+    queryKey: [...queryKeys.adminApplications({ status, page }), mine, debouncedExpertise],
+    queryFn: () =>
+      adminListApplications({
+        status,
+        page,
+        mine,
+        expertise: debouncedExpertise || undefined,
+      }),
+  })
+
+  const exportCsv = useMutation({
+    mutationFn: () => adminExportApplicationsCsv(),
+    onSuccess: (res) => {
+      if (!res.success) return
+      const blob = new Blob([res.csv], { type: "text/csv;charset=utf-8" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = "instructor-applications.csv"
+      a.click()
+      URL.revokeObjectURL(url)
+    },
   })
 
   const counts = data?.counts ?? {}
@@ -39,21 +69,56 @@ export default function AdminApplicationsPage() {
           </p>
         </div>
 
-        <FilterChips
-          value={status}
-          onChange={(v) => {
-            setStatus(v)
-            setPage(1)
-          }}
-          options={[
-            { value: "active", label: "Needs attention", count: activeCount },
-            { value: "submitted", label: "Submitted", count: counts.submitted ?? 0 },
-            { value: "under_review", label: "In review", count: counts.under_review ?? 0 },
-            { value: "approved", label: "Approved", count: counts.approved ?? 0 },
-            { value: "rejected", label: "Rejected", count: counts.rejected ?? 0 },
-            { value: "all", label: "All" },
-          ]}
-        />
+        <div className="flex items-center gap-3 flex-wrap">
+          <FilterChips
+            value={status}
+            onChange={(v) => {
+              setStatus(v)
+              setPage(1)
+            }}
+            options={[
+              { value: "active", label: "Needs attention", count: activeCount },
+              { value: "submitted", label: "Submitted", count: counts.submitted ?? 0 },
+              { value: "under_review", label: "In review", count: counts.under_review ?? 0 },
+              { value: "approved", label: "Approved", count: counts.approved ?? 0 },
+              { value: "rejected", label: "Rejected", count: counts.rejected ?? 0 },
+              { value: "all", label: "All" },
+            ]}
+          />
+          <div className="flex items-center gap-2 ml-auto">
+            <button
+              type="button"
+              onClick={() => {
+                setMine((m) => !m)
+                setPage(1)
+              }}
+              className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                mine
+                  ? "bg-foreground text-background border-foreground"
+                  : "border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+            >
+              Assigned to me
+            </button>
+            <Input
+              value={expertise}
+              onChange={(e) => {
+                setExpertise(e.target.value)
+                setPage(1)
+              }}
+              placeholder="Filter by expertise…"
+              className="h-7 w-40 text-xs"
+            />
+            <Button
+              size="xs"
+              variant="outline"
+              disabled={exportCsv.isPending}
+              onClick={() => exportCsv.mutate()}
+            >
+              {exportCsv.isPending ? "Exporting…" : "Export CSV"}
+            </Button>
+          </div>
+        </div>
 
         {isLoading ? (
           <div className="space-y-2">
@@ -103,8 +168,14 @@ export default function AdminApplicationsPage() {
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">
-                    <StatusBadge status={a.status} />
+                    <div className="flex items-center gap-1.5">
+                      {a.overdue && (
+                        <Badge variant="destructive" className="text-[9px]">&gt;48h</Badge>
+                      )}
+                      <StatusBadge status={a.status} />
+                    </div>
                     <span className="text-[10px] text-muted-foreground">
+                      {a.assignedToName ? `${a.assignedToName} · ` : ""}
                       {formatDate(a.createdAt)}
                     </span>
                   </div>

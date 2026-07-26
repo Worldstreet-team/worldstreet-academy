@@ -72,6 +72,9 @@ export default function AdminExamsPage() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-sm font-medium truncate">{e.title}</p>
                     <StatusBadge status={e.status} />
+                    {e.scope === "lesson" && (
+                      <Badge variant="outline" className="text-[9px]">knowledge check</Badge>
+                    )}
                     {e.required && <Badge variant="secondary" className="text-[9px]">required</Badge>}
                   </div>
                   <p className="text-xs text-muted-foreground truncate">

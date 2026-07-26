@@ -77,6 +77,31 @@ export async function getAudioUploadUrl(
 }
 
 /**
+ * Get a presigned URL for uploading a document (CV / credentials — PDF only).
+ * Used by the instructor application flow.
+ */
+export async function getDocumentUploadUrl(
+  filename: string,
+  contentType: string
+): Promise<PresignedUrlResponse> {
+  try {
+    if (contentType !== "application/pdf") {
+      return { success: false, error: "Invalid file type. Please upload a PDF." }
+    }
+
+    const timestamp = Date.now()
+    const randomId = Math.random().toString(36).substring(2, 10)
+    const key = `worldstreet-academy/documents/${timestamp}-${randomId}.pdf`
+    const { uploadUrl, publicUrl } = await generatePresignedUploadUrl(key, contentType)
+
+    return { success: true, uploadUrl, publicUrl, key }
+  } catch (error) {
+    console.error("Document upload URL error:", error)
+    return { success: false, error: "Failed to prepare upload. Please try again." }
+  }
+}
+
+/**
  * Delete a file from R2
  */
 export async function deleteUploadedFile(key: string): Promise<{ success: boolean; error?: string }> {

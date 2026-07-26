@@ -9,6 +9,7 @@ import { getCourseRatingSummary, getUserReview } from "@/lib/actions/reviews"
 import { getCourseWatchProgress } from "@/lib/actions/watch-progress"
 import { getCurrentUser } from "@/lib/auth"
 import { LessonVideoPlayer } from "@/components/learn/lesson-video-player"
+import { LessonQuizCard } from "@/components/learn/lesson-quiz-card"
 import { LessonSidebar } from "@/components/learn/lesson-sidebar"
 import { CourseCarousel } from "@/components/learn/course-carousel"
 import { MobileLessonList } from "@/components/learn/mobile-lesson-list"
@@ -200,6 +201,9 @@ export default async function LessonPage({
                 />
               </div>
             </div>
+
+            {/* Knowledge check for this lesson (renders only when one exists) */}
+            <LessonQuizCard courseId={courseId} lessonId={actualLessonId} />
 
             {/* Downloadable materials for this lesson + the course */}
             <Separator />

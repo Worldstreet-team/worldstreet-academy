@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useActionState, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -114,6 +115,16 @@ export function LessonManager({
                         )}
                       </div>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs px-2"
+                      render={
+                        <Link href={`/instructor/courses/${courseId}/exam?lesson=${lesson.id}`} />
+                      }
+                    >
+                      Quiz
+                    </Button>
                     <form action={deleteLesson}>
                       <input type="hidden" name="courseId" value={courseId} />
                       <input

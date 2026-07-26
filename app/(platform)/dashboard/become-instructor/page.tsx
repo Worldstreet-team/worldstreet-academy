@@ -29,9 +29,96 @@ import {
   submitInstructorApplication,
   getMyInstructorApplication,
   withdrawInstructorApplication,
+  pickInterviewSlot,
   type ApplicationAnswersInput,
 } from "@/lib/actions/applications"
+import { getVideoUploadUrl, getDocumentUploadUrl } from "@/lib/actions/upload"
 import { queryKeys } from "@/lib/hooks/queries/keys"
+
+/* ── Upload-or-paste field (sample video / CV) ── */
+
+function UploadField({
+  label,
+  accept,
+  kind,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string
+  accept: string
+  kind: "video" | "document"
+  value: string
+  onChange: (v: string) => void
+  placeholder: string
+}) {
+  const inputRef = React.useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = React.useState(false)
+  const [uploadError, setUploadError] = React.useState<string | null>(null)
+
+  const handleFile = async (file: File) => {
+    setUploading(true)
+    setUploadError(null)
+    try {
+      const presign =
+        kind === "video"
+          ? await getVideoUploadUrl(file.name, file.type)
+          : await getDocumentUploadUrl(file.name, file.type)
+      if (!presign.success || !presign.uploadUrl || !presign.publicUrl) {
+        setUploadError(presign.error ?? "Upload failed")
+        return
+      }
+      const res = await fetch(presign.uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file,
+      })
+      if (!res.ok) {
+        setUploadError("Upload failed — try again")
+        return
+      }
+      onChange(presign.publicUrl)
+    } catch {
+      setUploadError("Upload failed — try again")
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <div className="space-y-1">
+      <label className="text-xs font-medium">{label}</label>
+      <div className="flex gap-2">
+        <Input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+        />
+        <input
+          ref={inputRef}
+          type="file"
+          accept={accept}
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            if (f) void handleFile(f)
+            e.target.value = ""
+          }}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={uploading}
+          onClick={() => inputRef.current?.click()}
+        >
+          {uploading ? "Uploading…" : "Upload"}
+        </Button>
+      </div>
+      {uploadError && <p className="text-[10px] text-destructive">{uploadError}</p>}
+    </div>
+  )
+}
 
 const EXPERIENCE_OPTIONS = ["<1", "1-3", "3-5", "5+"]
 
@@ -120,6 +207,8 @@ function ApplicationForm({ onSubmitted }: { onSubmitted: () => void }) {
   const [twitter, setTwitter] = React.useState("")
   const [website, setWebsite] = React.useState("")
   const [sampleVideoUrl, setSampleVideoUrl] = React.useState("")
+  const [cvUrl, setCvUrl] = React.useState("")
+  const [termsAccepted, setTermsAccepted] = React.useState(false)
 
   const submit = useMutation({
     mutationFn: (input: ApplicationAnswersInput) => submitInstructorApplication(input),
@@ -300,49 +389,73 @@ function ApplicationForm({ onSubmitted }: { onSubmitted: () => void }) {
         {step === 2 && (
           <div className="space-y-4">
             <p className="text-xs text-muted-foreground">
-              All optional — but a portfolio or sample video makes review much faster.
+              Optional — but a sample video or CV makes review much faster.
             </p>
-            <div className="grid sm:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs font-medium">Portfolio / work URL</label>
-                <Input
-                  value={portfolioUrl}
-                  onChange={(e) => setPortfolioUrl(e.target.value)}
-                  placeholder="https://…"
-                />
+            <div className="space-y-3">
+              <UploadField
+                label="Sample teaching video"
+                accept="video/*"
+                kind="video"
+                value={sampleVideoUrl}
+                onChange={setSampleVideoUrl}
+                placeholder="Paste a link (YouTube, Loom…) or upload"
+              />
+              <UploadField
+                label="CV / credentials (PDF)"
+                accept="application/pdf"
+                kind="document"
+                value={cvUrl}
+                onChange={setCvUrl}
+                placeholder="Paste a link or upload a PDF"
+              />
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium">Portfolio / work URL</label>
+                  <Input
+                    value={portfolioUrl}
+                    onChange={(e) => setPortfolioUrl(e.target.value)}
+                    placeholder="https://…"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium">LinkedIn</label>
+                  <Input
+                    value={linkedin}
+                    onChange={(e) => setLinkedin(e.target.value)}
+                    placeholder="linkedin.com/in/…"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium">Twitter / X</label>
+                  <Input
+                    value={twitter}
+                    onChange={(e) => setTwitter(e.target.value)}
+                    placeholder="x.com/…"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium">Website</label>
+                  <Input
+                    value={website}
+                    onChange={(e) => setWebsite(e.target.value)}
+                    placeholder="https://…"
+                  />
+                </div>
               </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium">Sample teaching video URL</label>
-                <Input
-                  value={sampleVideoUrl}
-                  onChange={(e) => setSampleVideoUrl(e.target.value)}
-                  placeholder="YouTube, Loom, Drive…"
+
+              {/* Terms of teaching */}
+              <label className="flex items-start gap-2.5 rounded-lg border border-border/60 px-3 py-2.5 cursor-pointer hover:bg-muted/40 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                  className="mt-0.5 accent-primary"
                 />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium">LinkedIn</label>
-                <Input
-                  value={linkedin}
-                  onChange={(e) => setLinkedin(e.target.value)}
-                  placeholder="linkedin.com/in/…"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium">Twitter / X</label>
-                <Input
-                  value={twitter}
-                  onChange={(e) => setTwitter(e.target.value)}
-                  placeholder="x.com/…"
-                />
-              </div>
-              <div className="space-y-1 sm:col-span-2">
-                <label className="text-xs font-medium">Website</label>
-                <Input
-                  value={website}
-                  onChange={(e) => setWebsite(e.target.value)}
-                  placeholder="https://…"
-                />
-              </div>
+                <span className="text-[11px] text-muted-foreground leading-relaxed">
+                  I agree to the WorldStreet Academy instructor terms: original content only,
+                  85/15 revenue share, refund-window clawbacks, and course quality standards.
+                </span>
+              </label>
             </div>
           </div>
         )}
@@ -368,7 +481,7 @@ function ApplicationForm({ onSubmitted }: { onSubmitted: () => void }) {
             <Button
               type="button"
               size="sm"
-              disabled={submit.isPending}
+              disabled={submit.isPending || !termsAccepted}
               onClick={() =>
                 submit.mutate({
                   headline,
@@ -381,6 +494,8 @@ function ApplicationForm({ onSubmitted }: { onSubmitted: () => void }) {
                   twitter: twitter || undefined,
                   website: website || undefined,
                   sampleVideoUrl: sampleVideoUrl || undefined,
+                  cvUrl: cvUrl || undefined,
+                  termsAccepted,
                 })
               }
             >
@@ -411,6 +526,16 @@ export default function BecomeInstructorPage() {
     mutationFn: () => withdrawInstructorApplication(),
     onSuccess: () => {
       setWithdrawOpen(false)
+      queryClient.invalidateQueries({ queryKey: queryKeys.myApplication })
+    },
+  })
+
+  const [slotError, setSlotError] = React.useState<string | null>(null)
+  const pickSlot = useMutation({
+    mutationFn: (slotAt: string) => pickInterviewSlot(application!.id, slotAt),
+    onSuccess: (res) => {
+      if (!res.success) setSlotError(res.error ?? "Failed to confirm the slot")
+      else setSlotError(null)
       queryClient.invalidateQueries({ queryKey: queryKeys.myApplication })
     },
   })
@@ -473,6 +598,37 @@ export default function BecomeInstructorPage() {
                       : "interview scheduled — see below"}
                 </p>
               </div>
+              {application.proposedSlots.length > 0 && !application.interview && (
+                <div className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-3 space-y-2">
+                  <p className="text-xs font-semibold">🗓️ Pick your interview time</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Our team proposed {application.proposedSlots.length} time
+                    {application.proposedSlots.length === 1 ? "" : "s"} — choose what works for you.
+                  </p>
+                  <div className="space-y-1.5">
+                    {application.proposedSlots.map((slot) => (
+                      <button
+                        key={slot.at}
+                        type="button"
+                        disabled={pickSlot.isPending}
+                        onClick={() => pickSlot.mutate(slot.at)}
+                        className="w-full flex items-center justify-between rounded-lg border border-border/60 bg-background px-3 py-2 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors disabled:opacity-50"
+                      >
+                        <span className="text-xs font-medium">
+                          {new Date(slot.at).toLocaleString("en-US", {
+                            dateStyle: "full",
+                            timeStyle: "short",
+                          })}
+                        </span>
+                        <span className="text-[10px] text-primary font-semibold">
+                          {pickSlot.isPending ? "Confirming…" : "Choose"}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  {slotError && <p className="text-[11px] text-destructive">{slotError}</p>}
+                </div>
+              )}
               {application.status === "interview_scheduled" && application.interview && (
                 <div className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-3 flex items-center justify-between gap-3 flex-wrap">
                   <div>

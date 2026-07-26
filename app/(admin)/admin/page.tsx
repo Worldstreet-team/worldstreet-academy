@@ -79,7 +79,9 @@ export default function AdminOverviewPage() {
               <StatCard
                 label="Pending applications"
                 value={data.totals.pendingApplications.toLocaleString()}
-                sub="awaiting review"
+                sub={`30d: ${data.funnel.submitted30d} in · ${data.funnel.approved30d}✓ ${data.funnel.rejected30d}✗${
+                  data.funnel.approvalRatePct != null ? ` · ${data.funnel.approvalRatePct}% approved` : ""
+                }`}
                 icon={TeachingIcon}
               />
               <StatCard

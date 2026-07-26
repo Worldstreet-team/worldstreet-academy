@@ -45,6 +45,13 @@ async function requireCourseOwner(courseId: string) {
   return { user, course }
 }
 
+/** Filter for the two exam flavors: course final vs per-lesson knowledge check. */
+function examFilter(courseId: string, lessonId?: string | null) {
+  return lessonId
+    ? { course: courseId, scope: "lesson" as const, lesson: lessonId }
+    : { course: courseId, scope: "final" as const }
+}
+
 /* ═══════════════════ instructor: exam builder ═══════════════════ */
 
 export type ExamSettingsInput = Partial<IExamSettings>
@@ -62,6 +69,8 @@ export type InstructorQuestion = {
 export type InstructorExam = {
   id: string
   courseId: string
+  scope: "final" | "lesson"
+  lessonId: string | null
   title: string
   instructions: string
   status: "draft" | "published"
@@ -72,10 +81,13 @@ export type InstructorExam = {
   questions: InstructorQuestion[]
 }
 
-export async function getCourseExamForInstructor(courseId: string): Promise<InstructorExam | null> {
+export async function getCourseExamForInstructor(
+  courseId: string,
+  lessonId?: string | null
+): Promise<InstructorExam | null> {
   try {
     const { course } = await requireCourseOwner(courseId)
-    const exam = await Exam.findOne({ course: courseId })
+    const exam = await Exam.findOne(examFilter(courseId, lessonId))
     if (!exam) return null
 
     const questions = await Question.find({ exam: exam._id })
@@ -85,6 +97,8 @@ export async function getCourseExamForInstructor(courseId: string): Promise<Inst
     return {
       id: exam._id.toString(),
       courseId,
+      scope: (exam.scope ?? "final") as "final" | "lesson",
+      lessonId: exam.lesson ? exam.lesson.toString() : null,
       title: exam.title,
       instructions: exam.instructions,
       status: exam.status,
@@ -110,7 +124,7 @@ export async function getCourseExamForInstructor(courseId: string): Promise<Inst
 
 export async function upsertExam(
   courseId: string,
-  input: { title: string; instructions?: string; settings?: ExamSettingsInput }
+  input: { title: string; instructions?: string; settings?: ExamSettingsInput; lessonId?: string | null }
 ) {
   try {
     const { user, course } = await requireCourseOwner(courseId)
@@ -118,8 +132,14 @@ export async function upsertExam(
     const title = input.title?.trim()
     if (!title || title.length < 3) return { success: false, error: "Give the exam a title" }
 
+    if (input.lessonId) {
+      const { Lesson } = await import("@/lib/db/models")
+      const lesson = await Lesson.findOne({ _id: input.lessonId, course: courseId }).select("_id")
+      if (!lesson) return { success: false, error: "Lesson not found in this course" }
+    }
+
     const exam = await Exam.findOneAndUpdate(
-      { course: courseId },
+      examFilter(courseId, input.lessonId),
       {
         $set: {
           title,
@@ -130,7 +150,13 @@ export async function upsertExam(
               )
             : {}),
         },
-        $setOnInsert: { course: course._id, instructor: user.id, status: "draft" },
+        $setOnInsert: {
+          course: course._id,
+          scope: input.lessonId ? "lesson" : "final",
+          lesson: input.lessonId ?? null,
+          instructor: user.id,
+          status: "draft",
+        },
       },
       { new: true, upsert: true }
     )
@@ -174,10 +200,10 @@ function validateQuestion(input: QuestionInput): string | null {
   return null
 }
 
-export async function addExamQuestion(courseId: string, input: QuestionInput) {
+export async function addExamQuestion(courseId: string, input: QuestionInput, lessonId?: string | null) {
   try {
     await requireCourseOwner(courseId)
-    const exam = await Exam.findOne({ course: courseId })
+    const exam = await Exam.findOne(examFilter(courseId, lessonId))
     if (!exam) return { success: false, error: "Create the exam first" }
 
     const invalid = validateQuestion(input)
@@ -209,10 +235,15 @@ export async function addExamQuestion(courseId: string, input: QuestionInput) {
   }
 }
 
-export async function updateExamQuestion(courseId: string, questionId: string, input: QuestionInput) {
+export async function updateExamQuestion(
+  courseId: string,
+  questionId: string,
+  input: QuestionInput,
+  lessonId?: string | null
+) {
   try {
     await requireCourseOwner(courseId)
-    const exam = await Exam.findOne({ course: courseId }).select("_id")
+    const exam = await Exam.findOne(examFilter(courseId, lessonId)).select("_id")
     if (!exam) return { success: false, error: "Exam not found" }
 
     const invalid = validateQuestion(input)
@@ -247,10 +278,10 @@ export async function updateExamQuestion(courseId: string, questionId: string, i
   }
 }
 
-export async function deleteExamQuestion(courseId: string, questionId: string) {
+export async function deleteExamQuestion(courseId: string, questionId: string, lessonId?: string | null) {
   try {
     await requireCourseOwner(courseId)
-    const exam = await Exam.findOne({ course: courseId }).select("_id")
+    const exam = await Exam.findOne(examFilter(courseId, lessonId)).select("_id")
     if (!exam) return { success: false, error: "Exam not found" }
 
     await Question.deleteOne({ _id: questionId, exam: exam._id })
@@ -264,10 +295,10 @@ export async function deleteExamQuestion(courseId: string, questionId: string) {
   }
 }
 
-export async function setExamPublished(courseId: string, published: boolean) {
+export async function setExamPublished(courseId: string, published: boolean, lessonId?: string | null) {
   try {
     await requireCourseOwner(courseId)
-    const exam = await Exam.findOne({ course: courseId })
+    const exam = await Exam.findOne(examFilter(courseId, lessonId))
     if (!exam) return { success: false, error: "Create the exam first" }
 
     if (published && exam.questionCount === 0) {
@@ -276,9 +307,9 @@ export async function setExamPublished(courseId: string, published: boolean) {
     exam.status = published ? "published" : "draft"
     await exam.save()
 
-    // Unpublishing an exam that gates completion would strand students —
-    // flip the gate off with it.
-    if (!published) {
+    // Unpublishing a FINAL exam that gates completion would strand students —
+    // flip the gate off with it. (Lesson quizzes never gate anything in v1.)
+    if (!published && (exam.scope ?? "final") === "final") {
       await Course.updateOne({ _id: courseId }, { $set: { examRequired: false } })
     }
 
@@ -294,7 +325,7 @@ export async function setCourseExamRequired(courseId: string, required: boolean)
   try {
     await requireCourseOwner(courseId)
     if (required) {
-      const exam = await Exam.findOne({ course: courseId }).select("status questionCount")
+      const exam = await Exam.findOne({ course: courseId, scope: "final" }).select("status questionCount")
       if (!exam || exam.status !== "published" || exam.questionCount === 0) {
         return { success: false, error: "Publish the exam (with questions) before requiring it" }
       }
@@ -330,21 +361,25 @@ export type StudentExamStatus = {
   lastResult: { status: AttemptStatus; scorePercent: number | null } | null
 }
 
-export async function getStudentExamStatus(courseId: string): Promise<StudentExamStatus | null> {
+export async function getStudentExamStatus(
+  courseId: string,
+  lessonId?: string | null
+): Promise<StudentExamStatus | null> {
   try {
     const user = await initAction()
     if (!user) return null
 
     const [course, exam, enrollment] = await Promise.all([
       Course.findById(courseId).select("examRequired").lean(),
-      Exam.findOne({ course: courseId, status: "published" }).lean(),
+      Exam.findOne({ ...examFilter(courseId, lessonId), status: "published" }).lean(),
       Enrollment.findOne({ user: user.id, course: courseId, status: { $in: ["active", "completed"] } }).lean(),
     ])
     if (!course) return null
+    const isLessonQuiz = !!lessonId
     if (!exam || !enrollment) {
       return {
         hasExam: !!exam,
-        examRequired: !!course.examRequired,
+        examRequired: !isLessonQuiz && !!course.examRequired,
         title: exam?.title ?? "",
         instructions: exam?.instructions ?? "",
         durationMinutes: exam?.settings.durationMinutes ?? 0,
@@ -374,7 +409,7 @@ export async function getStudentExamStatus(courseId: string): Promise<StudentExa
     const max = exam.settings.maxAttempts
     return {
       hasExam: true,
-      examRequired: !!course.examRequired,
+      examRequired: !isLessonQuiz && !!course.examRequired,
       title: exam.title,
       instructions: exam.instructions ?? "",
       durationMinutes: exam.settings.durationMinutes,
@@ -383,9 +418,10 @@ export async function getStudentExamStatus(courseId: string): Promise<StudentExa
       questionCount: exam.questionCount,
       attemptsUsed,
       attemptsLeft: max === 0 ? null : Math.max(0, max - attemptsUsed),
-      examPassed: !!enrollment.examPassed,
-      bestScorePercent: enrollment.bestScorePercent ?? null,
-      eligible: (enrollment.progress ?? 0) >= 100,
+      examPassed: isLessonQuiz ? (last?.status === "passed") : !!enrollment.examPassed,
+      bestScorePercent: isLessonQuiz ? (last?.scorePercent ?? null) : (enrollment.bestScorePercent ?? null),
+      // Final exams unlock at 100% progress; knowledge checks just need enrollment.
+      eligible: isLessonQuiz ? true : (enrollment.progress ?? 0) >= 100,
       progress: enrollment.progress ?? 0,
       activeAttemptId: active ? active._id.toString() : null,
       lastResult: last ? { status: last.status, scorePercent: last.scorePercent ?? null } : null,
@@ -447,8 +483,10 @@ async function gradeAttempt(attempt: HydratedDocument<import("@/lib/db/models").
   attempt.pointsTotal = pointsTotal
   await attempt.save()
 
-  // Enrollment side-effects
-  const enrollment = await Enrollment.findById(attempt.enrollment)
+  // Enrollment side-effects — FINAL exams only. Lesson knowledge checks are
+  // practice: their results live on the attempt rows alone.
+  const enrollment =
+    (exam.scope ?? "final") === "final" ? await Enrollment.findById(attempt.enrollment) : null
   if (enrollment) {
     const best = Math.max(enrollment.bestScorePercent ?? 0, scorePercent)
     enrollment.bestScorePercent = best
@@ -467,7 +505,10 @@ async function gradeAttempt(attempt: HydratedDocument<import("@/lib/db/models").
   return { passed, scorePercent, pointsEarned, pointsTotal, showResults: exam.settings.showResults }
 }
 
-export async function startExamAttempt(courseId: string): Promise<
+export async function startExamAttempt(
+  courseId: string,
+  lessonId?: string | null
+): Promise<
   | { success: true; runner: RunnerPayload; resumed: boolean }
   | { success: false; error: string }
 > {
@@ -475,7 +516,7 @@ export async function startExamAttempt(courseId: string): Promise<
     const user = await initAction()
     if (!user) return { success: false, error: "Not authenticated" }
 
-    const exam = await Exam.findOne({ course: courseId, status: "published" })
+    const exam = await Exam.findOne({ ...examFilter(courseId, lessonId), status: "published" })
     if (!exam) return { success: false, error: "This course has no published exam" }
     if (exam.questionCount === 0) return { success: false, error: "The exam has no questions yet" }
 
@@ -485,7 +526,7 @@ export async function startExamAttempt(courseId: string): Promise<
       status: { $in: ["active", "completed"] },
     })
     if (!enrollment) return { success: false, error: "You're not enrolled in this course" }
-    if ((enrollment.progress ?? 0) < 100) {
+    if (!lessonId && (enrollment.progress ?? 0) < 100) {
       return { success: false, error: "Finish all lessons first — the exam unlocks at 100% progress" }
     }
 
@@ -638,7 +679,7 @@ export async function submitExamAttempt(
     const attempt = await ExamAttempt.findOne({ _id: attemptId, user: user.id })
     if (!attempt) return { success: false, error: "Attempt not found" }
 
-    const exam = await Exam.findById(attempt.exam).select("settings title course")
+    const exam = await Exam.findById(attempt.exam).select("settings title course scope")
     if (!exam) return { success: false, error: "Exam not found" }
 
     if (attempt.status === "in_progress") {
@@ -665,11 +706,16 @@ export async function submitExamAttempt(
       const enrollment = await Enrollment.findById(attempt.enrollment).select("status").lean()
 
       if (graded.passed) {
+        const isFinal = (exam.scope ?? "final") === "final"
         void notifyUser(user.id, {
           type: "course",
           title: `You passed ${exam.title} 🎉`,
-          body: `Score: ${graded.scorePercent}% — your certificate is unlocked.`,
-          href: `/dashboard/courses/${exam.course.toString()}/certificate`,
+          body: isFinal
+            ? `Score: ${graded.scorePercent}% — your certificate is unlocked.`
+            : `Knowledge check score: ${graded.scorePercent}%. Keep going!`,
+          href: isFinal
+            ? `/dashboard/courses/${exam.course.toString()}/certificate`
+            : `/dashboard/courses/${exam.course.toString()}`,
         })
       }
 
@@ -723,6 +769,7 @@ export async function submitExamAttempt(
 export type AdminExamRow = {
   id: string
   title: string
+  scope: "final" | "lesson"
   courseTitle: string
   courseId: string
   instructorName: string
@@ -765,6 +812,7 @@ export async function adminListExams(): Promise<AdminExamRow[]> {
       return {
         id: e._id.toString(),
         title: e.title,
+        scope: (e.scope ?? "final") as "final" | "lesson",
         courseTitle: course?.title ?? "Course",
         courseId: course?._id?.toString() ?? "",
         instructorName: instructor

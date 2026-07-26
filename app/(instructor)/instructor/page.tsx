@@ -29,6 +29,7 @@ import {
 } from "@hugeicons/core-free-icons"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useUser } from "@/components/providers/user-provider"
+import { OnboardingChecklist } from "@/components/instructor/onboarding-checklist"
 
 /* ── Reusable grid course card ────────────────────────────── */
 function CourseCard({
@@ -154,6 +155,9 @@ export default function InstructorDashboard() {
             New Course
           </Button>
         </div>
+
+        {/* Post-approval onboarding (hides itself when complete) */}
+        <OnboardingChecklist />
 
         {/* Stats Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

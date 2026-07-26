@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useParams } from "next/navigation"
+import { useParams, useSearchParams } from "next/navigation"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Topbar } from "@/components/platform/topbar"
 import { Card, CardContent } from "@/components/ui/card"
@@ -28,7 +28,6 @@ import {
   deleteExamQuestion,
   setExamPublished,
   setCourseExamRequired,
-  type InstructorExam,
   type InstructorQuestion,
   type QuestionInput,
 } from "@/lib/actions/exams"
@@ -211,13 +210,24 @@ function QuestionDialog({
 /* ── Page ── */
 
 export default function InstructorExamPage() {
+  return (
+    <React.Suspense fallback={null}>
+      <InstructorExamPageInner />
+    </React.Suspense>
+  )
+}
+
+function InstructorExamPageInner() {
   const params = useParams<{ courseId: string }>()
   const courseId = params.courseId
+  const search = useSearchParams()
+  // ?lesson=<id> switches the builder to that lesson's knowledge check.
+  const lessonId = search.get("lesson")
   const queryClient = useQueryClient()
 
   const { data: exam, isLoading } = useQuery({
-    queryKey: queryKeys.courseExam(courseId),
-    queryFn: () => getCourseExamForInstructor(courseId),
+    queryKey: [...queryKeys.courseExam(courseId), lessonId ?? "final"],
+    queryFn: () => getCourseExamForInstructor(courseId, lessonId),
   })
 
   const [title, setTitle] = React.useState("")
@@ -248,13 +258,15 @@ export default function InstructorExamPage() {
     }
   }, [exam])
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: queryKeys.courseExam(courseId) })
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: [...queryKeys.courseExam(courseId), lessonId ?? "final"] })
 
   const save = useMutation({
     mutationFn: () =>
       upsertExam(courseId, {
         title,
         instructions,
+        lessonId,
         settings: {
           durationMinutes: Math.min(240, Math.max(5, Number(duration) || 30)),
           passMarkPercent: Math.min(100, Math.max(1, Number(passMark) || 70)),
@@ -277,8 +289,8 @@ export default function InstructorExamPage() {
   const saveQuestion = useMutation({
     mutationFn: (input: QuestionInput) =>
       editingQuestion
-        ? updateExamQuestion(courseId, editingQuestion.id, input)
-        : addExamQuestion(courseId, input),
+        ? updateExamQuestion(courseId, editingQuestion.id, input, lessonId)
+        : addExamQuestion(courseId, input, lessonId),
     onSuccess: (res) => {
       if (!res.success) {
         setQError(res.error ?? "Failed")
@@ -292,12 +304,12 @@ export default function InstructorExamPage() {
   })
 
   const removeQuestion = useMutation({
-    mutationFn: (questionId: string) => deleteExamQuestion(courseId, questionId),
+    mutationFn: (questionId: string) => deleteExamQuestion(courseId, questionId, lessonId),
     onSuccess: invalidate,
   })
 
   const publish = useMutation({
-    mutationFn: (published: boolean) => setExamPublished(courseId, published),
+    mutationFn: (published: boolean) => setExamPublished(courseId, published, lessonId),
     onSuccess: (res) => {
       setToggleError(res.success ? null : (res.error ?? "Failed"))
       invalidate()
@@ -318,9 +330,13 @@ export default function InstructorExamPage() {
       <div className="p-4 sm:p-6 space-y-4 pb-24 md:pb-6 max-w-3xl">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
-            <h1 className="text-lg font-semibold">Course exam (CBT)</h1>
+            <h1 className="text-lg font-semibold">
+              {lessonId ? "Lesson knowledge check" : "Course exam (CBT)"}
+            </h1>
             <p className="text-sm text-muted-foreground">
-              Timed multiple-choice exam — optionally required for the certificate.
+              {lessonId
+                ? "Short practice quiz shown to students on this lesson — never gates the certificate."
+                : "Timed multiple-choice exam — optionally required for the certificate."}
             </p>
           </div>
           {exam && (
@@ -501,6 +517,7 @@ export default function InstructorExamPage() {
                       disabled={publish.isPending}
                     />
                   </div>
+                  {!lessonId && (
                   <div className="flex items-center justify-between gap-3 pt-2 border-t border-border/50">
                     <div>
                       <p className="text-xs font-semibold">Required for certificate</p>
@@ -516,6 +533,7 @@ export default function InstructorExamPage() {
                       disabled={requireExam.isPending || exam.status !== "published"}
                     />
                   </div>
+                  )}
                   {toggleError && <p className="text-xs text-destructive">{toggleError}</p>}
                 </CardContent>
               </Card>

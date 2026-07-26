@@ -25,7 +25,19 @@ import {
   adminAddApplicationNote,
   adminDecideApplication,
   adminScheduleInterview,
+  adminProposeSlots,
+  adminAssignApplication,
+  adminSaveScorecard,
 } from "@/lib/actions/applications"
+import type { RejectionReason } from "@/lib/db/models"
+
+const REJECTION_REASONS: { value: RejectionReason; label: string }[] = [
+  { value: "not_enough_experience", label: "Not enough experience" },
+  { value: "content_fit", label: "Not a fit for our catalog" },
+  { value: "quality_concerns", label: "Quality concerns" },
+  { value: "incomplete_application", label: "Incomplete application" },
+  { value: "other", label: "Other" },
+]
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import { formatDate, formatDateTime, StatusBadge } from "@/components/admin/shared"
 
@@ -59,6 +71,17 @@ export default function AdminApplicationDetailPage() {
   const [scheduleAt, setScheduleAt] = React.useState("")
   const [scheduleError, setScheduleError] = React.useState<string | null>(null)
   const [scheduleMin, setScheduleMin] = React.useState("")
+  const [proposeOpen, setProposeOpen] = React.useState(false)
+  const [proposeSlots, setProposeSlots] = React.useState<string[]>(["", "", ""])
+  const [proposeError, setProposeError] = React.useState<string | null>(null)
+  const [rejectionReason, setRejectionReason] = React.useState<RejectionReason>("other")
+  // Scorecard local state
+  const [scDepth, setScDepth] = React.useState(3)
+  const [scComms, setScComms] = React.useState(3)
+  const [scProd, setScProd] = React.useState(3)
+  const [scRec, setScRec] = React.useState<"approve" | "reject" | "unsure">("unsure")
+  const [scNotes, setScNotes] = React.useState("")
+  const [scSaved, setScSaved] = React.useState(false)
 
   const { data: app, isLoading } = useQuery({
     queryKey: queryKeys.adminApplicationDetail(applicationId),
@@ -89,7 +112,12 @@ export default function AdminApplicationDetailPage() {
 
   const decide = useMutation({
     mutationFn: (decision: "approved" | "rejected") =>
-      adminDecideApplication(applicationId, decision, decisionNote),
+      adminDecideApplication(
+        applicationId,
+        decision,
+        decisionNote,
+        decision === "rejected" ? rejectionReason : undefined
+      ),
     onSuccess: (res) => {
       if (!res.success) {
         setActionError(res.error ?? "Failed")
@@ -115,6 +143,59 @@ export default function AdminApplicationDetailPage() {
       invalidate()
     },
   })
+
+  const propose = useMutation({
+    mutationFn: () =>
+      adminProposeSlots(
+        applicationId,
+        proposeSlots.filter(Boolean).map((at) => ({ at: new Date(at).toISOString() }))
+      ),
+    onSuccess: (res) => {
+      if (!res.success) {
+        setProposeError(res.error ?? "Failed to propose slots")
+      } else {
+        setProposeError(null)
+        setProposeOpen(false)
+        setProposeSlots(["", "", ""])
+      }
+      invalidate()
+    },
+  })
+
+  const assign = useMutation({
+    mutationFn: (v: boolean) => adminAssignApplication(applicationId, v),
+    onSuccess: invalidate,
+  })
+
+  const saveScorecard = useMutation({
+    mutationFn: () =>
+      adminSaveScorecard(applicationId, {
+        expertiseDepth: scDepth,
+        communication: scComms,
+        productionReadiness: scProd,
+        recommendation: scRec,
+        notes: scNotes,
+      }),
+    onSuccess: (res) => {
+      if (res.success) {
+        setScSaved(true)
+        setTimeout(() => setScSaved(false), 1500)
+      }
+      invalidate()
+    },
+  })
+
+  // Hydrate scorecard form when the application loads
+  React.useEffect(() => {
+    if (app?.scorecard) {
+      setScDepth(app.scorecard.expertiseDepth)
+      setScComms(app.scorecard.communication)
+      setScProd(app.scorecard.productionReadiness)
+      setScRec(app.scorecard.recommendation)
+      setScNotes(app.scorecard.notes)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [app?.scorecard?.at])
 
   const isActive =
     app && ["submitted", "under_review", "interview_scheduled"].includes(app.status)
@@ -158,6 +239,14 @@ export default function AdminApplicationDetailPage() {
                   {/* Actions */}
                   {isActive && (
                     <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={assign.isPending}
+                        onClick={() => assign.mutate(!app.assignedToName)}
+                      >
+                        {app.assignedToName ? `⊘ Unassign (${app.assignedToName})` : "Assign to me"}
+                      </Button>
                       {app.status === "submitted" && (
                         <Button
                           size="sm"
@@ -166,6 +255,19 @@ export default function AdminApplicationDetailPage() {
                           onClick={() => startReview.mutate()}
                         >
                           Start review
+                        </Button>
+                      )}
+                      {!app.interview && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setProposeError(null)
+                            setScheduleMin(new Date(Date.now() + 5 * 60_000).toISOString().slice(0, 16))
+                            setProposeOpen(true)
+                          }}
+                        >
+                          Propose slots
                         </Button>
                       )}
                       <Button
@@ -177,7 +279,7 @@ export default function AdminApplicationDetailPage() {
                           setScheduleOpen(true)
                         }}
                       >
-                        {app.interview ? "Reschedule interview" : "Schedule interview"}
+                        {app.interview ? "Reschedule interview" : "Schedule directly"}
                       </Button>
                       <Button
                         size="sm"
@@ -195,6 +297,20 @@ export default function AdminApplicationDetailPage() {
                     </div>
                   )}
                 </div>
+                {app.proposedSlots.length > 0 && !app.interview && (
+                  <div className="mt-3 rounded-lg border border-border/60 bg-muted/30 px-3 py-2.5">
+                    <p className="text-xs font-semibold">
+                      Waiting on the applicant to pick a slot
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {app.proposedSlots
+                        .map((s) =>
+                          new Date(s.at).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })
+                        )
+                        .join(" · ")}
+                    </p>
+                  </div>
+                )}
                 {actionError && (
                   <p className="text-xs text-destructive mt-2">{actionError}</p>
                 )}
@@ -275,6 +391,7 @@ export default function AdminApplicationDetailPage() {
                     <div className="space-y-1.5 pt-1 border-t border-border/50">
                       <LinkRow label="Portfolio" href={app.answers.portfolioUrl} />
                       <LinkRow label="Sample video" href={app.answers.sampleVideoUrl} />
+                      <LinkRow label="CV / credentials" href={app.answers.cvUrl} />
                       <LinkRow label="LinkedIn" href={app.answers.linkedin} />
                       <LinkRow label="Twitter / X" href={app.answers.twitter} />
                       <LinkRow label="Website" href={app.answers.website} />
@@ -285,6 +402,84 @@ export default function AdminApplicationDetailPage() {
 
               {/* Notes + timeline */}
               <div className="lg:col-span-2 space-y-4">
+                {/* Interview scorecard */}
+                {isActive && (
+                  <Card>
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-sm font-semibold">Interview scorecard</h2>
+                        {app.scorecard && (
+                          <span className="text-[10px] text-muted-foreground">
+                            {app.scorecard.byName}
+                          </span>
+                        )}
+                      </div>
+                      {(
+                        [
+                          ["Expertise depth", scDepth, setScDepth],
+                          ["Communication", scComms, setScComms],
+                          ["Production readiness", scProd, setScProd],
+                        ] as const
+                      ).map(([label, value, setter]) => (
+                        <div key={label} className="flex items-center justify-between gap-2">
+                          <span className="text-xs">{label}</span>
+                          <div className="flex items-center gap-1">
+                            {[1, 2, 3, 4, 5].map((n) => (
+                              <button
+                                key={n}
+                                type="button"
+                                onClick={() => setter(n)}
+                                className={`h-6 w-6 rounded-md text-[10px] font-semibold border transition-colors ${
+                                  value >= n
+                                    ? "bg-primary text-primary-foreground border-primary"
+                                    : "border-border/60 text-muted-foreground hover:bg-muted"
+                                }`}
+                              >
+                                {n}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                      <div className="flex items-center gap-1.5 pt-1">
+                        {(["approve", "unsure", "reject"] as const).map((r) => (
+                          <button
+                            key={r}
+                            type="button"
+                            onClick={() => setScRec(r)}
+                            className={`text-xs px-2.5 py-1 rounded-full border capitalize transition-colors ${
+                              scRec === r
+                                ? r === "approve"
+                                  ? "bg-emerald-600 text-white border-emerald-600"
+                                  : r === "reject"
+                                    ? "bg-destructive text-white border-destructive"
+                                    : "bg-foreground text-background border-foreground"
+                                : "border-border/60 text-muted-foreground hover:bg-muted"
+                            }`}
+                          >
+                            {r}
+                          </button>
+                        ))}
+                      </div>
+                      <Textarea
+                        value={scNotes}
+                        onChange={(e) => setScNotes(e.target.value)}
+                        placeholder="Interview impressions…"
+                        className="text-xs min-h-14"
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full"
+                        disabled={saveScorecard.isPending}
+                        onClick={() => saveScorecard.mutate()}
+                      >
+                        {saveScorecard.isPending ? "Saving…" : scSaved ? "Saved ✓" : "Save scorecard"}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
+
                 <Card>
                   <CardContent className="p-4">
                     <h2 className="text-sm font-semibold mb-2">Reviewer notes</h2>
@@ -389,6 +584,45 @@ export default function AdminApplicationDetailPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Propose slots dialog */}
+      <Dialog open={proposeOpen} onOpenChange={setProposeOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Propose interview slots</DialogTitle>
+            <DialogDescription>
+              Offer up to three times — {app?.applicantName} picks one from their status page
+              and the interview room is created automatically.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            {proposeSlots.map((v, i) => (
+              <Input
+                key={i}
+                type="datetime-local"
+                value={v}
+                min={scheduleMin}
+                onChange={(e) =>
+                  setProposeSlots((prev) => prev.map((p, j) => (j === i ? e.target.value : p)))
+                }
+              />
+            ))}
+          </div>
+          {proposeError && <p className="text-xs text-destructive">{proposeError}</p>}
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setProposeOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              disabled={propose.isPending || proposeSlots.every((s) => !s)}
+              onClick={() => propose.mutate()}
+            >
+              {propose.isPending ? "Sending…" : "Send to applicant"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Decision dialog */}
       <Dialog open={decisionDialog !== null} onOpenChange={(open) => !open && setDecisionDialog(null)}>
         <DialogContent>
@@ -399,16 +633,34 @@ export default function AdminApplicationDetailPage() {
             <DialogDescription>
               {decisionDialog === "approved"
                 ? `${app?.applicantName} becomes an INSTRUCTOR immediately — their instructor portal unlocks and their public profile is seeded from this application.`
-                : `${app?.applicantName} will be notified. They can apply again later.`}
+                : `${app?.applicantName} will be notified. They can apply again after 30 days.`}
             </DialogDescription>
           </DialogHeader>
+          {decisionDialog === "rejected" && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {REJECTION_REASONS.map((r) => (
+                <button
+                  key={r.value}
+                  type="button"
+                  onClick={() => setRejectionReason(r.value)}
+                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                    rejectionReason === r.value
+                      ? "bg-foreground text-background border-foreground"
+                      : "border-border/60 text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+          )}
           <Textarea
             value={decisionNote}
             onChange={(e) => setDecisionNote(e.target.value)}
             placeholder={
               decisionDialog === "approved"
                 ? "Optional welcome note (included in the email)…"
-                : "Reason (required — included in the email)…"
+                : "Reason details (required — included in the email)…"
             }
             className="text-xs min-h-20"
           />

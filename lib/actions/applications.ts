@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { Types } from "mongoose"
+import { Types, type HydratedDocument } from "mongoose"
 import connectDB from "@/lib/db"
 import {
   InstructorApplication,
@@ -15,11 +15,16 @@ import { getCurrentUser } from "@/lib/auth/actions"
 import { requireAdmin, syncRoleToClerk } from "@/lib/auth/admin"
 import { notifyUser, notifyAdmins } from "@/lib/notify"
 import { createMeeting as createRTKMeeting, addParticipant } from "@/lib/realtime"
+import { buildInterviewIcs } from "@/lib/ics"
 import {
   sendApplicationReceivedEmail,
   sendApplicationDecisionEmail,
   sendInterviewInviteEmail,
+  sendNewApplicationAdminEmail,
+  sendUnderReviewEmail,
+  sendSlotsProposedEmail,
 } from "@/lib/email"
+import type { IScorecard, RejectionReason } from "@/lib/db/models"
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://academy.worldstreetgold.com"
 const PAGE_SIZE = 20
@@ -37,7 +42,13 @@ export type ApplicationAnswersInput = {
   linkedin?: string
   website?: string
   sampleVideoUrl?: string
+  cvUrl?: string
+  /** Terms-of-teaching acceptance — required at submit, recorded with a timestamp. */
+  termsAccepted?: boolean
 }
+
+/** Days a rejected applicant must wait before re-applying. */
+const REAPPLY_COOLDOWN_DAYS = 30
 
 export type InterviewInfo = {
   meetingId: string
@@ -45,6 +56,8 @@ export type InterviewInfo = {
   /** Deep link into the meetings page waiting room. */
   joinPath: string
 }
+
+export type ProposedSlotView = { at: string; note?: string }
 
 export type MyApplication = {
   id: string
@@ -54,6 +67,8 @@ export type MyApplication = {
   history: { status: string; at: string; note?: string }[]
   createdAt: string
   interview: InterviewInfo | null
+  /** Interview slots the admin proposed — the applicant picks one. */
+  proposedSlots: ProposedSlotView[]
 }
 
 /* ═══════════════════════ Applicant side ═══════════════════════ */
@@ -90,6 +105,16 @@ export async function submitInstructorApplication(input: ApplicationAnswersInput
       return { success: false, error: "Tell us more about your experience (at least 50 characters)" }
     if (motivation.length < 50)
       return { success: false, error: "Tell us more about your motivation (at least 50 characters)" }
+    if (!input.termsAccepted) {
+      return { success: false, error: "Please accept the instructor terms to continue" }
+    }
+    // Minimum-profile check — reviewer sees a real name, and payments/KYC need one later.
+    if (!user.firstName?.trim() || !user.lastName?.trim()) {
+      return {
+        success: false,
+        error: "Add your first and last name to your profile before applying",
+      }
+    }
 
     const existing = await InstructorApplication.findOne({
       user: user.id,
@@ -97,6 +122,23 @@ export async function submitInstructorApplication(input: ApplicationAnswersInput
     })
     if (existing) {
       return { success: false, error: "You already have an application in review" }
+    }
+
+    // Re-apply cooldown after a rejection.
+    const lastRejected = await InstructorApplication.findOne({ user: user.id, status: "rejected" })
+      .sort({ decidedAt: -1 })
+      .select("decidedAt")
+      .lean()
+    if (lastRejected?.decidedAt) {
+      const eligibleAt = new Date(
+        new Date(lastRejected.decidedAt).getTime() + REAPPLY_COOLDOWN_DAYS * 24 * 3600 * 1000
+      )
+      if (eligibleAt.getTime() > Date.now()) {
+        return {
+          success: false,
+          error: `You can re-apply from ${eligibleAt.toLocaleDateString("en-US", { dateStyle: "medium" })}`,
+        }
+      }
     }
 
     const application = await InstructorApplication.create({
@@ -113,7 +155,9 @@ export async function submitInstructorApplication(input: ApplicationAnswersInput
         linkedin: sanitizeUrl(input.linkedin),
         website: sanitizeUrl(input.website),
         sampleVideoUrl: sanitizeUrl(input.sampleVideoUrl),
+        cvUrl: sanitizeUrl(input.cvUrl),
       },
+      termsAcceptedAt: new Date(),
       history: [
         {
           status: "submitted",
@@ -125,13 +169,29 @@ export async function submitInstructorApplication(input: ApplicationAnswersInput
 
     await User.findByIdAndUpdate(user.id, { $set: { instructorStatus: "applied" } })
 
-    // Fire-and-forget: bell for admins, email receipt for the applicant.
+    // Fire-and-forget: bell + email for admins, email receipt for the applicant.
     void notifyAdmins({
       type: "application",
       title: "New instructor application",
       body: `${user.firstName} ${user.lastName} applied: "${headline}"`,
       href: `/admin/applications/${application._id.toString()}`,
     })
+    void (async () => {
+      const admins = await User.find({ role: "ADMIN" }).select("email").lean()
+      const reviewUrl = `${APP_URL}/admin/applications/${application._id.toString()}`
+      await Promise.allSettled(
+        admins
+          .filter((a) => a.email && !a.email.endsWith("@users.noemail"))
+          .map((a) =>
+            sendNewApplicationAdminEmail(a.email, {
+              applicantName: `${user.firstName} ${user.lastName}`.trim(),
+              applicantAvatarUrl: user.avatarUrl ?? undefined,
+              headline,
+              reviewUrl,
+            })
+          )
+      )
+    })()
     void sendApplicationReceivedEmail(user.email, {
       applicantName: user.firstName || "there",
       applicantAvatarUrl: user.avatarUrl ?? undefined,
@@ -190,6 +250,7 @@ export async function getMyInstructorApplication(): Promise<MyApplication | null
         linkedin: app.answers.linkedin ?? undefined,
         website: app.answers.website ?? undefined,
         sampleVideoUrl: app.answers.sampleVideoUrl ?? undefined,
+        cvUrl: app.answers.cvUrl ?? undefined,
       },
       decisionNote: app.decisionNote ?? "",
       history: (app.history ?? []).map((h) => ({
@@ -199,6 +260,13 @@ export async function getMyInstructorApplication(): Promise<MyApplication | null
       })),
       createdAt: app.createdAt.toISOString(),
       interview,
+      proposedSlots:
+        // Slots are only actionable before an interview is locked in.
+        !interview && ACTIVE_APPLICATION_STATUSES.includes(app.status)
+          ? (app.proposedSlots ?? [])
+              .filter((s) => new Date(s.at).getTime() > Date.now())
+              .map((s) => ({ at: new Date(s.at).toISOString(), note: s.note }))
+          : [],
     }
   } catch (error) {
     console.error("Get my application error:", error)
@@ -248,11 +316,18 @@ export type AdminApplicationRow = {
   expertise: string[]
   status: ApplicationStatus
   createdAt: string
+  assignedToName: string
+  /** Waiting > 48h with nobody on it. */
+  overdue: boolean
 }
 
 export async function adminListApplications(filters?: {
   status?: ApplicationStatus | "all" | "active"
   page?: number
+  /** Only applications assigned to the calling admin. */
+  mine?: boolean
+  /** Case-insensitive match on expertise tags. */
+  expertise?: string
 }): Promise<{
   applications: AdminApplicationRow[]
   total: number
@@ -263,7 +338,7 @@ export async function adminListApplications(filters?: {
   const empty = { applications: [], total: 0, page: 1, pageCount: 1, counts: {} }
   try {
     await connectDB()
-    await requireAdmin()
+    const admin = await requireAdmin()
 
     const page = Math.max(1, filters?.page ?? 1)
     const query: Record<string, unknown> = {}
@@ -271,6 +346,13 @@ export async function adminListApplications(filters?: {
       query.status = { $in: ACTIVE_APPLICATION_STATUSES }
     } else if (filters?.status && filters.status !== "all") {
       query.status = filters.status
+    }
+    if (filters?.mine) query.assignedTo = admin.id
+    if (filters?.expertise?.trim()) {
+      query["answers.expertise"] = new RegExp(
+        filters.expertise.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+        "i"
+      )
     }
 
     const [rows, total, countsAgg] = await Promise.all([
@@ -308,6 +390,11 @@ export async function adminListApplications(filters?: {
           expertise: a.answers?.expertise ?? [],
           status: a.status,
           createdAt: a.createdAt.toISOString(),
+          assignedToName: a.assignedToName ?? "",
+          overdue:
+            a.status === "submitted" &&
+            !a.assignedTo &&
+            Date.now() - new Date(a.createdAt).getTime() > 48 * 3600 * 1000,
         }
       }),
       total,
@@ -321,15 +408,29 @@ export async function adminListApplications(filters?: {
   }
 }
 
+export type ScorecardView = {
+  expertiseDepth: number
+  communication: number
+  productionReadiness: number
+  recommendation: "approve" | "reject" | "unsure"
+  notes: string
+  byName: string
+  at: string
+}
+
 export type AdminApplicationDetail = AdminApplicationRow & {
   answers: ApplicationAnswersInput
   reviewerNotes: { byName: string; note: string; at: string }[]
   decisionNote: string
+  rejectionReason: string
   decidedAt: string | null
   history: { status: string; at: string; by?: string; note?: string }[]
   applicantJoinedAt: string | null
   applicantEnrollments: number
   interview: InterviewInfo | null
+  proposedSlots: ProposedSlotView[]
+  scorecard: ScorecardView | null
+  termsAcceptedAt: string | null
 }
 
 export async function adminGetApplication(applicationId: string): Promise<AdminApplicationDetail | null> {
@@ -382,6 +483,11 @@ export async function adminGetApplication(applicationId: string): Promise<AdminA
       expertise: a.answers?.expertise ?? [],
       status: a.status,
       createdAt: a.createdAt.toISOString(),
+      assignedToName: a.assignedToName ?? "",
+      overdue:
+        a.status === "submitted" &&
+        !a.assignedTo &&
+        Date.now() - new Date(a.createdAt).getTime() > 48 * 3600 * 1000,
       answers: {
         headline: a.answers.headline,
         expertise: a.answers.expertise ?? [],
@@ -393,11 +499,13 @@ export async function adminGetApplication(applicationId: string): Promise<AdminA
         linkedin: a.answers.linkedin ?? undefined,
         website: a.answers.website ?? undefined,
         sampleVideoUrl: a.answers.sampleVideoUrl ?? undefined,
+        cvUrl: a.answers.cvUrl ?? undefined,
       },
       reviewerNotes: (a.reviewerNotes ?? [])
         .map((n) => ({ byName: n.byName, note: n.note, at: new Date(n.at).toISOString() }))
         .reverse(),
       decisionNote: a.decisionNote ?? "",
+      rejectionReason: a.rejectionReason ?? "",
       decidedAt: a.decidedAt ? new Date(a.decidedAt).toISOString() : null,
       history: (a.history ?? []).map((h) => ({
         status: h.status,
@@ -408,6 +516,22 @@ export async function adminGetApplication(applicationId: string): Promise<AdminA
       applicantJoinedAt: applicant?.createdAt ? new Date(applicant.createdAt).toISOString() : null,
       applicantEnrollments,
       interview,
+      proposedSlots: (a.proposedSlots ?? []).map((s) => ({
+        at: new Date(s.at).toISOString(),
+        note: s.note,
+      })),
+      scorecard: a.scorecard
+        ? {
+            expertiseDepth: a.scorecard.expertiseDepth,
+            communication: a.scorecard.communication,
+            productionReadiness: a.scorecard.productionReadiness,
+            recommendation: a.scorecard.recommendation,
+            notes: a.scorecard.notes ?? "",
+            byName: a.scorecard.byName ?? "",
+            at: a.scorecard.at ? new Date(a.scorecard.at).toISOString() : "",
+          }
+        : null,
+      termsAcceptedAt: a.termsAcceptedAt ? new Date(a.termsAcceptedAt).toISOString() : null,
     }
   } catch (error) {
     console.error("Admin get application error:", error)
@@ -415,16 +539,145 @@ export async function adminGetApplication(applicationId: string): Promise<AdminA
   }
 }
 
+type InterviewHost = {
+  id: string
+  name: string
+  avatarUrl?: string | null
+}
+
 /**
- * Schedule (or reschedule) the interview call for an application.
+ * Shared interview-scheduling core — used by the admin's direct "Schedule
+ * interview" AND by the applicant picking one of the proposed slots.
  *
- * Creates a Meeting with status "scheduled" + a real waiting room
- * (requireApproval, no guest auto-admit) and the RTK room minted up front —
- * the admin's own join via the standard `?join=` deep link flips it live
- * (see joinMeeting's scheduled→active host path). The applicant is invited
- * via invites[] (shows on their meetings page), notified in-app, and emailed
- * the join link.
+ * Creates (or reschedules) a Meeting with status "scheduled" + a real waiting
+ * room and the RTK room minted up front — the host's join via the standard
+ * `?join=` deep link flips it live. The applicant is invited via invites[],
+ * notified in-app, and emailed the join link with an .ics calendar attachment.
  */
+async function scheduleInterviewCore(
+  app: HydratedDocument<import("@/lib/db/models").IInstructorApplication>,
+  host: InterviewHost,
+  scheduledAt: Date,
+  byName: string
+) {
+  const applicant = app.user as unknown as {
+    _id: Types.ObjectId
+    firstName?: string
+    lastName?: string
+    email?: string
+    avatarUrl?: string | null
+  }
+  const applicantName = `${applicant.firstName ?? ""} ${applicant.lastName ?? ""}`.trim() || "Applicant"
+
+  // Reschedule path: reuse the existing meeting if it hasn't ended.
+  let meetingDoc = app.interviewMeetingId
+    ? await Meeting.findOne({ _id: app.interviewMeetingId, status: { $ne: "ended" } })
+    : null
+  let rescheduled = false
+
+  if (meetingDoc) {
+    meetingDoc.scheduledAt = scheduledAt
+    // A moved interview needs fresh reminders.
+    meetingDoc.reminders = { h24SentAt: null, h1SentAt: null }
+    await meetingDoc.save()
+    rescheduled = true
+  } else {
+    // Mint the RTK room + host token up front, mirroring createMeeting.
+    const rtkMeetingId = await createRTKMeeting(`Interview: ${applicantName}`)
+    const hostParticipant = await addParticipant(rtkMeetingId, {
+      name: host.name,
+      customParticipantId: host.id,
+      presetName: "group_call_host",
+    })
+
+    meetingDoc = await Meeting.create({
+      title: `Instructor Interview — ${applicantName}`,
+      description: "Interview call for a WorldStreet Academy instructor application.",
+      hostId: new Types.ObjectId(host.id),
+      status: "scheduled",
+      scheduledAt,
+      meetingId: rtkMeetingId,
+      hostToken: hostParticipant.authToken,
+      applicationId: app._id,
+      participants: [
+        {
+          userId: new Types.ObjectId(host.id),
+          role: "host",
+          status: "admitted",
+          joinedAt: new Date(),
+        },
+      ],
+      invites: [
+        {
+          userId: applicant._id,
+          email: applicant.email ?? "",
+          status: "sent",
+          sentAt: new Date(),
+        } as IMeetingInvite,
+      ],
+      settings: {
+        allowScreenShare: true,
+        muteOnEntry: false,
+        requireApproval: true,
+        guestAccess: false, // real waiting room — the host admits the applicant
+        maxParticipants: 10,
+      },
+    })
+  }
+
+  // Application state: interview_scheduled + pointer + history; proposed slots
+  // are consumed by the pick (or superseded by a direct schedule).
+  app.interviewMeetingId = meetingDoc._id
+  app.proposedSlots = []
+  if (app.status !== "interview_scheduled") {
+    app.status = "interview_scheduled"
+  }
+  app.history.push({
+    status: "interview_scheduled",
+    at: new Date(),
+    by: byName,
+    note: `${rescheduled ? "Rescheduled" : "Scheduled"} for ${scheduledAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}`,
+  })
+  await app.save()
+  await User.findByIdAndUpdate(applicant._id, { $set: { instructorStatus: "interview" } })
+
+  const joinPath = `/dashboard/meetings?join=${meetingDoc._id.toString()}`
+
+  // Fire-and-forget: bell + email (with calendar attachment) to the applicant.
+  void notifyUser(applicant._id.toString(), {
+    type: "meeting",
+    title: rescheduled ? "Your interview was rescheduled" : "Interview scheduled 🎙️",
+    body: `${scheduledAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })} — with ${host.name}`,
+    href: "/dashboard/become-instructor",
+  })
+  if (applicant.email) {
+    const ics = buildInterviewIcs({
+      uid: meetingDoc._id.toString(),
+      title: "WorldStreet Academy — Instructor Interview",
+      description: `Interview with ${host.name} about your instructor application.`,
+      startsAt: scheduledAt,
+      durationMinutes: 30,
+      url: `${APP_URL}${joinPath}`,
+      organizerName: host.name,
+    })
+    void sendInterviewInviteEmail(
+      applicant.email,
+      {
+        applicantName: applicant.firstName || "there",
+        applicantAvatarUrl: applicant.avatarUrl ?? undefined,
+        hostName: host.name,
+        hostAvatarUrl: host.avatarUrl ?? undefined,
+        scheduledAt: scheduledAt.toISOString(),
+        joinUrl: `${APP_URL}${joinPath}`,
+      },
+      ics
+    )
+  }
+
+  return { meetingId: meetingDoc._id.toString(), joinPath, rescheduled }
+}
+
+/** Admin schedules (or reschedules) the interview directly at a specific time. */
 export async function adminScheduleInterview(applicationId: string, scheduledAtISO: string) {
   try {
     await connectDB()
@@ -445,115 +698,153 @@ export async function adminScheduleInterview(applicationId: string, scheduledAtI
       return { success: false, error: `Application is already ${app.status}` }
     }
 
+    const adminName = `${admin.firstName} ${admin.lastName}`.trim()
+    const result = await scheduleInterviewCore(
+      app,
+      { id: admin.id, name: adminName, avatarUrl: admin.avatarUrl },
+      scheduledAt,
+      adminName
+    )
+
+    revalidatePath(`/admin/applications/${applicationId}`)
+    revalidatePath("/admin/applications")
+    return { success: true, ...result }
+  } catch (error) {
+    console.error("Schedule interview error:", error)
+    return { success: false, error: "Failed to schedule interview" }
+  }
+}
+
+/**
+ * Admin proposes 2–3 interview slots; the applicant picks one from their
+ * status page. Proposing implies review has started.
+ */
+export async function adminProposeSlots(
+  applicationId: string,
+  slots: { at: string; note?: string }[]
+) {
+  try {
+    await connectDB()
+    const admin = await requireAdmin()
+
+    const parsed = (slots ?? [])
+      .map((s) => ({ at: new Date(s.at), note: s.note?.trim() || undefined }))
+      .filter((s) => !isNaN(s.at.getTime()) && s.at.getTime() > Date.now())
+      .sort((a, b) => a.at.getTime() - b.at.getTime())
+      .slice(0, 3)
+    if (parsed.length === 0) {
+      return { success: false, error: "Propose at least one future time slot" }
+    }
+
+    const app = await InstructorApplication.findById(applicationId).populate(
+      "user",
+      "firstName lastName email avatarUrl"
+    )
+    if (!app) return { success: false, error: "Application not found" }
+    if (!ACTIVE_APPLICATION_STATUSES.includes(app.status)) {
+      return { success: false, error: `Application is already ${app.status}` }
+    }
+
+    const adminName = `${admin.firstName} ${admin.lastName}`.trim()
+    app.proposedSlots = parsed as typeof app.proposedSlots
+    app.slotsProposedBy = admin.id as unknown as typeof app.slotsProposedBy
+    app.slotsProposedAt = new Date()
+    if (app.status === "submitted") app.status = "under_review"
+    app.history.push({
+      status: app.status,
+      at: new Date(),
+      by: adminName,
+      note: `Proposed ${parsed.length} interview slot${parsed.length === 1 ? "" : "s"}`,
+    })
+    await app.save()
+
     const applicant = app.user as unknown as {
       _id: Types.ObjectId
       firstName?: string
-      lastName?: string
       email?: string
       avatarUrl?: string | null
     }
-    const applicantName = `${applicant.firstName ?? ""} ${applicant.lastName ?? ""}`.trim() || "Applicant"
-    const adminName = `${admin.firstName} ${admin.lastName}`.trim()
 
-    // Reschedule path: reuse the existing meeting if it hasn't ended.
-    let meetingDoc = app.interviewMeetingId
-      ? await Meeting.findOne({ _id: app.interviewMeetingId, status: { $ne: "ended" } })
-      : null
-    let rescheduled = false
-
-    if (meetingDoc) {
-      meetingDoc.scheduledAt = scheduledAt
-      await meetingDoc.save()
-      rescheduled = true
-    } else {
-      // Mint the RTK room + host token up front, mirroring createMeeting.
-      const rtkMeetingId = await createRTKMeeting(`Interview: ${applicantName}`)
-      const hostParticipant = await addParticipant(rtkMeetingId, {
-        name: adminName,
-        customParticipantId: admin.id,
-        presetName: "group_call_host",
-      })
-
-      meetingDoc = await Meeting.create({
-        title: `Instructor Interview — ${applicantName}`,
-        description: "Interview call for a WorldStreet Academy instructor application.",
-        hostId: new Types.ObjectId(admin.id),
-        status: "scheduled",
-        scheduledAt,
-        meetingId: rtkMeetingId,
-        hostToken: hostParticipant.authToken,
-        applicationId: app._id,
-        participants: [
-          {
-            userId: new Types.ObjectId(admin.id),
-            role: "host",
-            status: "admitted",
-            joinedAt: new Date(),
-          },
-        ],
-        invites: [
-          {
-            userId: applicant._id,
-            email: applicant.email ?? "",
-            status: "sent",
-            sentAt: new Date(),
-          } as IMeetingInvite,
-        ],
-        settings: {
-          allowScreenShare: true,
-          muteOnEntry: false,
-          requireApproval: true,
-          guestAccess: false, // real waiting room — the admin admits the applicant
-          maxParticipants: 10,
-        },
-      })
-    }
-
-    // Application state: interview_scheduled + pointer + history.
-    app.interviewMeetingId = meetingDoc._id
-    if (app.status !== "interview_scheduled") {
-      app.status = "interview_scheduled"
-    }
-    app.history.push({
-      status: "interview_scheduled",
-      at: new Date(),
-      by: adminName,
-      note: `${rescheduled ? "Rescheduled" : "Scheduled"} for ${scheduledAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}`,
-    })
-    await app.save()
-    await User.findByIdAndUpdate(applicant._id, { $set: { instructorStatus: "interview" } })
-
-    const joinPath = `/dashboard/meetings?join=${meetingDoc._id.toString()}`
-
-    // Fire-and-forget: bell + email to the applicant.
     void notifyUser(applicant._id.toString(), {
-      type: "meeting",
-      title: rescheduled ? "Your interview was rescheduled" : "Interview scheduled 🎙️",
-      body: `${scheduledAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })} — with ${adminName}`,
+      type: "application",
+      title: "Pick your interview time 🎙️",
+      body: `${adminName} proposed ${parsed.length} time slot${parsed.length === 1 ? "" : "s"} — choose what works for you.`,
       href: "/dashboard/become-instructor",
     })
     if (applicant.email) {
-      void sendInterviewInviteEmail(applicant.email, {
+      void sendSlotsProposedEmail(applicant.email, {
         applicantName: applicant.firstName || "there",
         applicantAvatarUrl: applicant.avatarUrl ?? undefined,
         hostName: adminName,
-        hostAvatarUrl: admin.avatarUrl ?? undefined,
-        scheduledAt: scheduledAt.toISOString(),
-        joinUrl: `${APP_URL}${joinPath}`,
+        slots: parsed.map((s) => s.at.toISOString()),
+        pickUrl: `${APP_URL}/dashboard/become-instructor`,
       })
     }
 
     revalidatePath(`/admin/applications/${applicationId}`)
     revalidatePath("/admin/applications")
-    return {
-      success: true,
-      meetingId: meetingDoc._id.toString(),
-      joinPath,
-      rescheduled,
-    }
+    return { success: true }
   } catch (error) {
-    console.error("Schedule interview error:", error)
-    return { success: false, error: "Failed to schedule interview" }
+    console.error("Propose slots error:", error)
+    return { success: false, error: "Failed to propose slots" }
+  }
+}
+
+/** Applicant picks one of the proposed slots — schedules the interview for real. */
+export async function pickInterviewSlot(applicationId: string, slotAtISO: string) {
+  try {
+    await connectDB()
+    const user = await getCurrentUser()
+    if (!user) return { success: false, error: "Not authenticated" }
+
+    const app = await InstructorApplication.findOne({
+      _id: applicationId,
+      user: user.id,
+    }).populate("user", "firstName lastName email avatarUrl")
+    if (!app) return { success: false, error: "Application not found" }
+    if (!ACTIVE_APPLICATION_STATUSES.includes(app.status)) {
+      return { success: false, error: `Application is already ${app.status}` }
+    }
+
+    const picked = (app.proposedSlots ?? []).find(
+      (s) => new Date(s.at).getTime() === new Date(slotAtISO).getTime()
+    )
+    if (!picked) return { success: false, error: "That slot is no longer available" }
+    if (new Date(picked.at).getTime() < Date.now()) {
+      return { success: false, error: "That slot has passed — ask for new times" }
+    }
+
+    // Host = the admin who proposed the slots (fallback: any admin).
+    let host = app.slotsProposedBy
+      ? await User.findById(app.slotsProposedBy).select("firstName lastName avatarUrl").lean()
+      : null
+    if (!host) {
+      host = await User.findOne({ role: "ADMIN" }).select("firstName lastName avatarUrl").lean()
+    }
+    if (!host) return { success: false, error: "No reviewer available — contact support" }
+
+    const hostName = `${host.firstName ?? ""} ${host.lastName ?? ""}`.trim() || "WorldStreet Team"
+    const applicantName = `${user.firstName} ${user.lastName}`.trim()
+    const result = await scheduleInterviewCore(
+      app,
+      { id: host._id.toString(), name: hostName, avatarUrl: host.avatarUrl ?? null },
+      new Date(picked.at),
+      applicantName
+    )
+
+    // Tell the reviewer which slot won.
+    void notifyUser(host._id.toString(), {
+      type: "meeting",
+      title: "Interview slot confirmed",
+      body: `${applicantName} picked ${new Date(picked.at).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}`,
+      href: `/admin/applications/${app._id.toString()}`,
+    })
+
+    revalidatePath("/dashboard/become-instructor")
+    return { success: true, ...result }
+  } catch (error) {
+    console.error("Pick slot error:", error)
+    return { success: false, error: "Failed to confirm the slot" }
   }
 }
 
@@ -582,6 +873,16 @@ export async function adminStartApplicationReview(applicationId: string) {
       body: "An admin is reviewing your instructor application.",
       href: "/dashboard/become-instructor",
     })
+    void (async () => {
+      const applicant = await User.findById(app.user).select("email firstName avatarUrl").lean()
+      if (applicant?.email && !applicant.email.endsWith("@users.noemail")) {
+        await sendUnderReviewEmail(applicant.email, {
+          applicantName: applicant.firstName || "there",
+          applicantAvatarUrl: applicant.avatarUrl ?? undefined,
+          statusUrl: `${APP_URL}/dashboard/become-instructor`,
+        })
+      }
+    })()
 
     revalidatePath(`/admin/applications/${applicationId}`)
     revalidatePath("/admin/applications")
@@ -632,7 +933,8 @@ export async function adminAddApplicationNote(applicationId: string, note: strin
 export async function adminDecideApplication(
   applicationId: string,
   decision: "approved" | "rejected",
-  note?: string
+  note?: string,
+  rejectionReason?: RejectionReason
 ) {
   try {
     await connectDB()
@@ -654,6 +956,9 @@ export async function adminDecideApplication(
     app.decidedBy = admin.id as unknown as typeof app.decidedBy
     app.decidedAt = new Date()
     app.decisionNote = decisionNote
+    if (decision === "rejected" && rejectionReason) {
+      app.rejectionReason = rejectionReason
+    }
     app.history.push({ status: decision, at: new Date(), by: adminName, note: decisionNote })
     await app.save()
 
@@ -709,5 +1014,132 @@ export async function adminDecideApplication(
   } catch (error) {
     console.error("Decide application error:", error)
     return { success: false, error: "Failed to record decision" }
+  }
+}
+
+/* ═══════════════════ admin ops: assignment, scorecard, export ═══════════════════ */
+
+/** Assign the application to an admin (self-assign from the UI) or clear it. */
+export async function adminAssignApplication(applicationId: string, assign: boolean) {
+  try {
+    await connectDB()
+    const admin = await requireAdmin()
+
+    const app = await InstructorApplication.findById(applicationId)
+    if (!app) return { success: false, error: "Application not found" }
+
+    const adminName = `${admin.firstName} ${admin.lastName}`.trim()
+    if (assign) {
+      app.assignedTo = admin.id as unknown as typeof app.assignedTo
+      app.assignedToName = adminName
+    } else {
+      app.assignedTo = null
+      app.assignedToName = ""
+    }
+    await app.save()
+
+    revalidatePath(`/admin/applications/${applicationId}`)
+    revalidatePath("/admin/applications")
+    return { success: true, assignedToName: app.assignedToName }
+  } catch (error) {
+    console.error("Assign application error:", error)
+    return { success: false, error: "Failed to update assignment" }
+  }
+}
+
+/** Save (overwrite) the structured interview scorecard. */
+export async function adminSaveScorecard(
+  applicationId: string,
+  input: {
+    expertiseDepth: number
+    communication: number
+    productionReadiness: number
+    recommendation: "approve" | "reject" | "unsure"
+    notes?: string
+  }
+) {
+  try {
+    await connectDB()
+    const admin = await requireAdmin()
+
+    const clamp = (v: number) => Math.min(5, Math.max(1, Math.round(v)))
+    const scorecard: IScorecard = {
+      expertiseDepth: clamp(input.expertiseDepth),
+      communication: clamp(input.communication),
+      productionReadiness: clamp(input.productionReadiness),
+      recommendation: input.recommendation,
+      notes: input.notes?.trim() ?? "",
+      byName: `${admin.firstName} ${admin.lastName}`.trim(),
+      at: new Date(),
+    }
+
+    const app = await InstructorApplication.findByIdAndUpdate(
+      applicationId,
+      { $set: { scorecard } },
+      { new: true }
+    )
+    if (!app) return { success: false, error: "Application not found" }
+
+    revalidatePath(`/admin/applications/${applicationId}`)
+    return { success: true }
+  } catch (error) {
+    console.error("Save scorecard error:", error)
+    return { success: false, error: "Failed to save scorecard" }
+  }
+}
+
+/** CSV export of applications (most recent 1000) for offline review/reporting. */
+export async function adminExportApplicationsCsv(): Promise<
+  { success: true; csv: string } | { success: false; error: string }
+> {
+  try {
+    await connectDB()
+    await requireAdmin()
+
+    const rows = await InstructorApplication.find({})
+      .sort({ createdAt: -1 })
+      .limit(1000)
+      .populate("user", "firstName lastName email")
+      .lean()
+
+    const esc = (v: unknown) => {
+      const s = String(v ?? "")
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+    }
+    const header = [
+      "submitted_at",
+      "status",
+      "name",
+      "email",
+      "headline",
+      "expertise",
+      "experience_years",
+      "assigned_to",
+      "recommendation",
+      "decided_at",
+      "rejection_reason",
+    ].join(",")
+
+    const lines = rows.map((a) => {
+      const u = a.user as unknown as { firstName?: string; lastName?: string; email?: string } | null
+      return [
+        esc(a.createdAt.toISOString()),
+        esc(a.status),
+        esc(u ? `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() : ""),
+        esc(u?.email ?? ""),
+        esc(a.answers?.headline ?? ""),
+        esc((a.answers?.expertise ?? []).join("; ")),
+        esc(a.answers?.experienceYears ?? ""),
+        esc(a.assignedToName ?? ""),
+        esc(a.scorecard?.recommendation ?? ""),
+        esc(a.decidedAt ? new Date(a.decidedAt).toISOString() : ""),
+        esc(a.rejectionReason ?? ""),
+      ].join(",")
+    })
+
+    return { success: true, csv: [header, ...lines].join("\n") }
+  } catch (error) {
+    console.error("Export applications error:", error)
+    return { success: false, error: "Export failed" }
   }
 }

@@ -1,13 +1,18 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose"
 
 /**
- * CBT exam — one per course (v1). Built by the course's instructor, taken by
- * students after finishing all lessons. When `Course.examRequired` is true,
- * passing this exam gates course completion and the certificate — enforced at
- * the data layer on BOTH backends (web server actions + the Go mobile API).
+ * CBT exam — two flavors sharing one engine:
+ *
+ * - scope "final"  — one per course. Unlocks at 100% lesson progress; when
+ *   `Course.examRequired` is true, passing gates completion + certificate
+ *   (enforced at the data layer on BOTH backends — web + the Go mobile API).
+ * - scope "lesson" — an in-course knowledge check attached to one lesson.
+ *   Practice-only in v1: available to any enrolled student, never gates
+ *   completion, and is invisible to the mobile backend (additive fields).
  */
 
 export type ExamStatus = "draft" | "published"
+export type ExamScope = "final" | "lesson"
 
 export interface IExamSettings {
   durationMinutes: number
@@ -24,6 +29,9 @@ export interface IExamSettings {
 export interface IExam extends Document {
   _id: Types.ObjectId
   course: Types.ObjectId
+  /** "lesson" = in-course knowledge check bound to `lesson`. */
+  scope: ExamScope
+  lesson: Types.ObjectId | null
   instructor: Types.ObjectId
   title: string
   instructions: string
@@ -38,7 +46,9 @@ export interface IExam extends Document {
 
 const ExamSchema = new Schema<IExam>(
   {
-    course: { type: Schema.Types.ObjectId, ref: "Course", required: true, unique: true },
+    course: { type: Schema.Types.ObjectId, ref: "Course", required: true },
+    scope: { type: String, enum: ["final", "lesson"], default: "final" },
+    lesson: { type: Schema.Types.ObjectId, ref: "Lesson", default: null },
     instructor: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     title: { type: String, required: true, maxlength: 150 },
     instructions: { type: String, default: "", maxlength: 2000 },
@@ -56,5 +66,18 @@ const ExamSchema = new Schema<IExam>(
   },
   { timestamps: true }
 )
+
+// One FINAL exam per course; one knowledge check per lesson. Named indexes so
+// they never collide with the retired `course_1` unique index
+// (scripts/migrate-exam-indexes.mjs drops that one).
+ExamSchema.index(
+  { course: 1 },
+  { unique: true, partialFilterExpression: { scope: "final" }, name: "course_final_unique" }
+)
+ExamSchema.index(
+  { lesson: 1 },
+  { unique: true, partialFilterExpression: { scope: "lesson" }, name: "lesson_quiz_unique" }
+)
+ExamSchema.index({ course: 1, scope: 1 })
 
 export const Exam: Model<IExam> = mongoose.models.Exam || mongoose.model<IExam>("Exam", ExamSchema)

@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { useParams, useRouter } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Topbar } from "@/components/platform/topbar"
 import { Card, CardContent } from "@/components/ui/card"
@@ -220,8 +220,19 @@ function ExamRunner({
 /* ── Page ── */
 
 export default function CourseExamPage() {
+  return (
+    <React.Suspense fallback={null}>
+      <CourseExamPageInner />
+    </React.Suspense>
+  )
+}
+
+function CourseExamPageInner() {
   const params = useParams<{ courseId: string }>()
   const courseId = params.courseId
+  const search = useSearchParams()
+  // Lesson knowledge checks reuse this whole page via ?lesson=<id>.
+  const lessonId = search.get("lesson")
   const router = useRouter()
   const queryClient = useQueryClient()
 
@@ -230,13 +241,13 @@ export default function CourseExamPage() {
   const [startError, setStartError] = React.useState<string | null>(null)
 
   const { data: status, isLoading } = useQuery({
-    queryKey: queryKeys.examStatus(courseId),
-    queryFn: () => getStudentExamStatus(courseId),
+    queryKey: [...queryKeys.examStatus(courseId), lessonId ?? "final"],
+    queryFn: () => getStudentExamStatus(courseId, lessonId),
     enabled: !runner && !result,
   })
 
   const start = useMutation({
-    mutationFn: () => startExamAttempt(courseId),
+    mutationFn: () => startExamAttempt(courseId, lessonId),
     onSuccess: (res) => {
       if (res.success) {
         setStartError(null)
@@ -250,7 +261,7 @@ export default function CourseExamPage() {
   const finish = (r: ExamResult) => {
     setRunner(null)
     setResult(r)
-    queryClient.invalidateQueries({ queryKey: queryKeys.examStatus(courseId) })
+    queryClient.invalidateQueries({ queryKey: [...queryKeys.examStatus(courseId), lessonId ?? "final"] })
     queryClient.invalidateQueries({ queryKey: ["enrollments"] })
   }
 
@@ -288,15 +299,24 @@ export default function CourseExamPage() {
 
                 {result.passed ? (
                   <div className="space-y-2">
-                    {result.courseCompleted && (
+                    {!lessonId && result.courseCompleted && (
                       <p className="text-xs text-emerald-600 font-medium">
                         Course completed — your certificate is ready.
                       </p>
                     )}
                     <div className="flex items-center gap-2 justify-center">
-                      <Button size="sm" render={<Link href={`/dashboard/courses/${courseId}/certificate`} />}>
-                        View certificate
-                      </Button>
+                      {lessonId ? (
+                        <Button
+                          size="sm"
+                          render={<Link href={`/dashboard/courses/${courseId}/learn/${lessonId}`} />}
+                        >
+                          Back to lesson
+                        </Button>
+                      ) : (
+                        <Button size="sm" render={<Link href={`/dashboard/courses/${courseId}/certificate`} />}>
+                          View certificate
+                        </Button>
+                      )}
                       <Button size="sm" variant="outline" render={<Link href={`/dashboard/courses/${courseId}`} />}>
                         Back to course
                       </Button>
@@ -355,7 +375,11 @@ export default function CourseExamPage() {
               <CardContent className="p-6 space-y-4">
                 <div className="text-center">
                   <Badge variant="secondary" className="text-[10px] mb-2">
-                    {status.examRequired ? "Required for certificate" : "Optional assessment"}
+                    {lessonId
+                      ? "Knowledge check"
+                      : status.examRequired
+                        ? "Required for certificate"
+                        : "Optional assessment"}
                   </Badge>
                   <h1 className="text-lg font-semibold">{status.title}</h1>
                   {status.instructions && (

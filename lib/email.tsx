@@ -472,6 +472,199 @@ function InterviewInviteEmail({ data }: { data: InterviewEmailData }) {
   )
 }
 
+/* ─── Pipeline Emails (Phase 7) ─── */
+
+function SimplePipelineEmail({
+  preview,
+  title,
+  bodyText,
+  ctaLabel,
+  ctaUrl,
+  avatarUrl,
+  avatarName,
+  extra,
+}: {
+  preview: string
+  title: string
+  bodyText: string
+  ctaLabel: string
+  ctaUrl: string
+  avatarUrl?: string
+  avatarName?: string
+  extra?: React.ReactNode
+}) {
+  return (
+    <Html style={base}>
+      <Head />
+      <Preview>{preview}</Preview>
+      <Body style={body}>
+        <Container style={card}>
+          <Section style={contentPad}>
+            <AvatarStack hostAvatar={avatarUrl} hostName={avatarName} />
+            <Text style={heading}>{title}</Text>
+            <Text style={sub}>{bodyText}</Text>
+            {extra}
+            <Section style={{ marginTop: "28px" }}>
+              <Button href={ctaUrl} style={cta}>
+                {ctaLabel}
+              </Button>
+            </Section>
+            <Hr style={{ borderColor: "#f0f0f0", margin: "24px 0 16px" }} />
+            <Link href={ctaUrl} style={linkSmall}>
+              {ctaUrl}
+            </Link>
+          </Section>
+        </Container>
+        <Section style={footer}>
+          <Text style={footerText}>WorldStreet Academy</Text>
+        </Section>
+      </Body>
+    </Html>
+  )
+}
+
+/** New-application alert to admins. */
+export async function sendNewApplicationAdminEmail(
+  to: string,
+  data: { applicantName: string; applicantAvatarUrl?: string; headline: string; reviewUrl: string }
+) {
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to,
+      subject: `New instructor application — ${data.applicantName}`,
+      react: React.createElement(SimplePipelineEmail, {
+        preview: `${data.applicantName} applied to teach`,
+        title: "New instructor application",
+        bodyText: `${data.applicantName} applied: “${data.headline}”`,
+        ctaLabel: "Review application",
+        ctaUrl: data.reviewUrl,
+        avatarUrl: data.applicantAvatarUrl,
+        avatarName: data.applicantName,
+      }),
+    })
+    if (error) return { success: false, error: error.message }
+    return { success: true }
+  } catch (err) {
+    console.error("[Email] Admin new-application error:", err)
+    return { success: false, error: "Failed to send email" }
+  }
+}
+
+/** "Your application is now under review." */
+export async function sendUnderReviewEmail(
+  to: string,
+  data: { applicantName: string; applicantAvatarUrl?: string; statusUrl: string }
+) {
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to,
+      subject: "Your instructor application is under review",
+      react: React.createElement(SimplePipelineEmail, {
+        preview: "A reviewer picked up your application",
+        title: "Application under review",
+        bodyText: `${data.applicantName}, a member of our team is now reviewing your instructor application. Next step is usually a short interview call — watch your inbox.`,
+        ctaLabel: "Track your application",
+        ctaUrl: data.statusUrl,
+        avatarUrl: data.applicantAvatarUrl,
+        avatarName: data.applicantName,
+      }),
+    })
+    if (error) return { success: false, error: error.message }
+    return { success: true }
+  } catch (err) {
+    console.error("[Email] Under-review error:", err)
+    return { success: false, error: "Failed to send email" }
+  }
+}
+
+/** Interview slots proposed — applicant picks one. */
+export async function sendSlotsProposedEmail(
+  to: string,
+  data: {
+    applicantName: string
+    applicantAvatarUrl?: string
+    hostName: string
+    slots: string[]
+    pickUrl: string
+  }
+) {
+  const slotList = React.createElement(
+    Section,
+    { style: { marginTop: "14px" } },
+    ...data.slots.map((iso, i) =>
+      React.createElement(
+        Text,
+        { key: i, style: { ...muted, color: "#059669", fontWeight: 500, margin: "2px 0" } },
+        new Date(iso).toLocaleString("en-US", { dateStyle: "full", timeStyle: "short" })
+      )
+    )
+  )
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to,
+      subject: "Pick a time for your instructor interview",
+      react: React.createElement(SimplePipelineEmail, {
+        preview: `${data.hostName} proposed interview times`,
+        title: "Pick your interview time",
+        bodyText: `${data.applicantName}, ${data.hostName} proposed ${data.slots.length} time${data.slots.length === 1 ? "" : "s"} for your interview call. Choose whichever works best:`,
+        ctaLabel: "Choose a slot",
+        ctaUrl: data.pickUrl,
+        avatarUrl: data.applicantAvatarUrl,
+        avatarName: data.applicantName,
+        extra: slotList,
+      }),
+    })
+    if (error) return { success: false, error: error.message }
+    return { success: true }
+  } catch (err) {
+    console.error("[Email] Slots-proposed error:", err)
+    return { success: false, error: "Failed to send email" }
+  }
+}
+
+/** T-24h / T-1h interview reminder (sent by the cron route). */
+export async function sendInterviewReminderEmail(
+  to: string,
+  data: {
+    recipientName: string
+    counterpartName: string
+    scheduledAt: string
+    joinUrl: string
+    window: "24h" | "1h"
+  }
+) {
+  const when = new Date(data.scheduledAt).toLocaleString("en-US", {
+    dateStyle: "full",
+    timeStyle: "short",
+  })
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to,
+      subject:
+        data.window === "1h"
+          ? "Your interview starts in about an hour"
+          : "Reminder: your interview is tomorrow",
+      react: React.createElement(SimplePipelineEmail, {
+        preview: `Interview with ${data.counterpartName} — ${when}`,
+        title: data.window === "1h" ? "Starting soon 🎙️" : "Interview tomorrow",
+        bodyText: `${data.recipientName}, your interview with ${data.counterpartName} is scheduled for ${when}. Join a couple of minutes early — you'll be admitted from the waiting room.`,
+        ctaLabel: "Open interview room",
+        ctaUrl: data.joinUrl,
+        avatarName: data.recipientName,
+      }),
+    })
+    if (error) return { success: false, error: error.message }
+    return { success: true }
+  } catch (err) {
+    console.error("[Email] Interview reminder error:", err)
+    return { success: false, error: "Failed to send email" }
+  }
+}
+
 /* ─── Send Functions ─── */
 
 /**
@@ -528,14 +721,22 @@ export async function sendApplicationReceivedEmail(to: string, data: Application
 
 /**
  * Send the instructor-interview invitation (scheduled interview call).
+ * Pass `ics` to attach a calendar file.
  */
-export async function sendInterviewInviteEmail(to: string, data: InterviewEmailData) {
+export async function sendInterviewInviteEmail(to: string, data: InterviewEmailData, ics?: string) {
   try {
     const { error } = await resend.emails.send({
       from: FROM_EMAIL,
       to,
       subject: "Your instructor interview is scheduled",
       react: React.createElement(InterviewInviteEmail, { data }),
+      ...(ics
+        ? {
+            attachments: [
+              { filename: "interview.ics", content: Buffer.from(ics).toString("base64") },
+            ],
+          }
+        : {}),
     })
     if (error) {
       console.error("[Email] Interview invite failed:", error)

@@ -17,6 +17,8 @@ export interface IUser extends Document {
   role: "USER" | "INSTRUCTOR" | "ADMIN"
   /** Instructor application pipeline state — additive field, safe for the Go backend (unmapped bson is ignored there). */
   instructorStatus: InstructorStatus
+  /** Rev-share agreement acceptance (post-approval onboarding). */
+  instructorAgreement?: { acceptedAt: Date | null; version: string }
   verified: boolean
   walletBalance: number
   hasOnboarded: boolean
@@ -93,6 +95,10 @@ const UserSchema = new Schema<IUser>(
       type: String,
       enum: ["none", "applied", "interview", "approved", "rejected"],
       default: "none",
+    },
+    instructorAgreement: {
+      acceptedAt: { type: Date, default: null },
+      version: { type: String, default: "" },
     },
     verified: {
       type: Boolean,
