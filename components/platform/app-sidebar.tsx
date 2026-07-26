@@ -41,6 +41,7 @@ import {
   UserMultipleIcon,
   Video01Icon,
   Certificate01Icon,
+  Wallet01Icon,
 } from "@hugeicons/core-free-icons"
 import { useUser } from "@/components/providers/user-provider"
 import { LogoutConfirmDialog } from "@/components/shared/logout-confirm-dialog"
@@ -87,12 +88,27 @@ const mainItems: NavItem[] = [
     match: (p) => p === "/dashboard/certificates" || p.includes("/certificate"),
   },
   {
-    title: "Instructor Dashboard",
-    href: "/instructor",
-    icon: TeachingIcon,
-    match: (p) => p.startsWith("/instructor"),
+    title: "Wallet",
+    href: "/dashboard/wallet",
+    icon: Wallet01Icon,
+    match: (p) => p.startsWith("/dashboard/wallet"),
   },
 ]
+
+/** Role-aware teaching entry — instructors get their portal, students get the application flow. */
+const instructorNavItem: NavItem = {
+  title: "Instructor Dashboard",
+  href: "/instructor",
+  icon: TeachingIcon,
+  match: (p) => p.startsWith("/instructor"),
+}
+
+const becomeInstructorNavItem: NavItem = {
+  title: "Become an Instructor",
+  href: "/dashboard/become-instructor",
+  icon: TeachingIcon,
+  match: (p) => p === "/dashboard/become-instructor",
+}
 
 const connectItems: NavItem[] = [
   {
@@ -169,17 +185,21 @@ export function AppSidebar() {
 
   const userInitials = `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`.toUpperCase() || "U"
 
+  const isInstructor = user.role === "INSTRUCTOR" || user.role === "ADMIN"
+  const learnItems = [...mainItems, isInstructor ? instructorNavItem : becomeInstructorNavItem]
+
   // Prefetch all navigation routes on mount for faster transitions
   useEffect(() => {
     const allRoutes = [
-      ...mainItems.map((item) => item.href),
+      ...learnItems.map((item) => item.href),
       ...connectItems.map((item) => item.href),
       ...accountItems.map((item) => item.href),
     ]
     allRoutes.forEach((route) => {
       router.prefetch(route)
     })
-  }, [router])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router, isInstructor])
 
   return (
     <Sidebar collapsible="icon">
@@ -210,7 +230,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Learn</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainItems.map((item) => (
+              {learnItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     render={<Link href={item.href} />}

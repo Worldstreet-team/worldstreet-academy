@@ -41,24 +41,25 @@ function generateSlug(title: string): string {
     + "-" + Date.now().toString(36)
 }
 
-// ---- Get authenticated user (any user can be instructor) ----
+// ---- Get authenticated instructor (role-gated since the application flow shipped) ----
 async function getAuthenticatedInstructor() {
   const authUser = await getCurrentUser()
-  
+
   if (!authUser) {
     throw new Error("Not authenticated")
   }
-  
-  // Allow any authenticated user to be an instructor
-  // They can create and manage their own courses
-  
+
+  if (authUser.role !== "INSTRUCTOR" && authUser.role !== "ADMIN") {
+    throw new Error("Instructor access required — apply at /dashboard/become-instructor")
+  }
+
   await connectDB()
   const instructor = await User.findById(authUser.id)
-  
+
   if (!instructor) {
     throw new Error("User not found in database")
   }
-  
+
   return instructor
 }
 

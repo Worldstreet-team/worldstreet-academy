@@ -81,9 +81,16 @@ export function useSSEEvents(
     channel.subscribe("event", onMessage)
     console.log(`[Ably] Subscribed to channel: ${channelName}`)
 
+    // Enter the shared online-presence channel so mobile (which already reads
+    // presence:academy) sees this web user as online. Additive: nothing on web
+    // reads it yet, so this only publishes our presence.
+    const presence = ably.channels.get("presence:academy")
+    void presence.presence.enter({ at: Date.now() }).catch(() => {})
+
     return () => {
       console.log(`[Ably] Unsubscribing from channel: ${channelName}`)
       channel.unsubscribe("event", onMessage)
+      void presence.presence.leave().catch(() => {})
       ably.connection.off(onConnectionStateChange)
       channelRef.current = null
       // Don't close the Ably client — it's shared across hook instances

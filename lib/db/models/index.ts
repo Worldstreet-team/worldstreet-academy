@@ -1,4 +1,4 @@
-export { User, type IUser } from "./user"
+export { User, type IUser, type InstructorStatus } from "./user"
 export { Course, type ICourse, type CourseLevel, type CoursePricing, type CourseStatus } from "./course"
 export { Lesson, type ILesson, type LessonType } from "./lesson"
 export { Enrollment, type IEnrollment, type EnrollmentStatus } from "./enrollment"
@@ -13,3 +13,14 @@ export { ResourceDownload, type IResourceDownload } from "./resource-download"
 export { Order, type IOrder, type OrderStatus } from "./order"
 export { PaymentEvent, type IPaymentEvent } from "./payment-event"
 export { Earning, type IEarning, type EarningStatus, type EarningKind, INSTRUCTOR_REVENUE_SHARE, EARNINGS_CLEARING_DAYS } from "./earning"
+export { Notification, type INotification, type NotificationType } from "./notification"
+export {
+  InstructorApplication,
+  ACTIVE_APPLICATION_STATUSES,
+  type IInstructorApplication,
+  type IApplicationAnswers,
+  type ApplicationStatus,
+} from "./instructor-application"
+export { Exam, type IExam, type IExamSettings, type ExamStatus } from "./exam"
+export { Question, type IQuestion, type IQuestionOption, type QuestionType } from "./question"
+export { ExamAttempt, type IExamAttempt, type IAttemptAnswer, type AttemptStatus } from "./exam-attempt"

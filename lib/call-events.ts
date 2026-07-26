@@ -131,9 +131,28 @@ export type MessageEventPayload = {
   timestamp: string
 }
 
+// ── Notification event types ──
+// Additive event type — mobile ignores unknown types, so this is contract-safe.
+
+export type NotificationEventType = "notification:new"
+
+export type NotificationEventPayload = {
+  type: NotificationEventType
+  notificationId: string
+  notifType: "application" | "course" | "payment" | "meeting" | "system"
+  title: string
+  body: string
+  href?: string
+  createdAt: string
+}
+
 // ── Unified event type ──
 
-export type SSEEventPayload = CallEventPayload | MessageEventPayload | MeetingEventPayload
+export type SSEEventPayload =
+  | CallEventPayload
+  | MessageEventPayload
+  | MeetingEventPayload
+  | NotificationEventPayload
 
 // ── Ably REST client (server-side, lazy-initialized) ──
 
@@ -192,7 +211,12 @@ export async function createAblyToken(
   const ably = getAblyRest()
   const tokenRequest = await ably.auth.createTokenRequest({
     clientId: userId,
-    capability: { [`user:${userId}`]: ["subscribe"] },
+    capability: {
+      [`user:${userId}`]: ["subscribe"],
+      // Shared online-presence channel (matches the mobile client) so web and
+      // mobile users can see each other's online status.
+      "presence:academy": ["subscribe", "presence"],
+    },
     ttl: 60 * 60 * 1000, // 1 hour
   })
   // Exchange the token request for an actual token

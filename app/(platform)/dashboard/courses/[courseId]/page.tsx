@@ -26,6 +26,7 @@ import { LessonPreviewAccordion } from "@/components/courses/lesson-preview-acco
 import { AboutInstructor } from "@/components/courses/about-instructor"
 import { BookmarkButton } from "@/components/courses/bookmark-button"
 import { CourseResources } from "@/components/learn/course-resources"
+import { CourseExamCard } from "@/components/courses/course-exam-card"
 
 // Force dynamic rendering to show fresh instructor avatars
 export const revalidate = 0
@@ -206,6 +207,9 @@ export default async function CourseDetailPage({
           </div>
 
           <Separator />
+
+          {/* CBT exam — visible to enrolled students when the course has one */}
+          {isEnrolled && <CourseExamCard courseId={course.id} />}
 
           {/* Curriculum with thumbnails and previews */}
           <div className="space-y-3">

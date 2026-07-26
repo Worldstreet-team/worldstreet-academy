@@ -21,7 +21,11 @@ export const getCachedUser = cache(async (): Promise<LocalUser | null> => {
     if (!userId) return null
 
     await connectDB()
-    const user = await User.findOne({ authUserId: userId }).lean()
+    // Primary id or a linked one (mobile / alternate Clerk instance) — mirrors
+    // getLocalUserByAuthId and the Go backend's resolution.
+    const user = await User.findOne({
+      $or: [{ authUserId: userId }, { linkedAuthIds: userId }],
+    }).lean()
 
     if (user) {
       return {
@@ -35,6 +39,7 @@ export const getCachedUser = cache(async (): Promise<LocalUser | null> => {
         avatarUrl: (user.avatarUrl as string) ?? "",
         signatureUrl: (user.signatureUrl as string) ?? null,
         role: user.role as "USER" | "INSTRUCTOR" | "ADMIN",
+        instructorStatus: (user.instructorStatus as "none" | "applied" | "interview" | "approved" | "rejected") ?? "none",
         verified: user.verified as boolean,
         walletBalance: (user.walletBalance as number) ?? 0,
         hasOnboarded: (user.hasOnboarded as boolean) ?? false,

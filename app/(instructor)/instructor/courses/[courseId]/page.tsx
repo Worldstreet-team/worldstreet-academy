@@ -11,6 +11,7 @@ import {
   Edit01Icon,
   ArrowLeft01Icon,
   Delete01Icon,
+  Certificate01Icon,
 } from "@hugeicons/core-free-icons"
 import { deleteCourse, fetchCourseForEdit } from "@/lib/actions/instructor"
 import { ResourceManager } from "@/components/instructor/resource-manager"
@@ -231,6 +232,14 @@ export default async function InstructorCourseInfoPage({
                   >
                     <HugeiconsIcon icon={Edit01Icon} size={16} />
                     Edit Course
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    render={<Link href={`/instructor/courses/${course.id}/exam`} />}
+                  >
+                    <HugeiconsIcon icon={Certificate01Icon} size={16} />
+                    Exam (CBT)
                   </Button>
                   <form action={deleteCourse} className="w-full">
                     <input type="hidden" name="courseId" value={course.id} />

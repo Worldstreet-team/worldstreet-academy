@@ -43,6 +43,8 @@ export interface ICourse extends Document {
   targetAudience: string[]
   // Timestamps
   publishedAt: Date | null
+  /** When true, passing the course exam gates completion + certificate (enforced web + Go). */
+  examRequired: boolean
   createdAt: Date
   updatedAt: Date
 }
@@ -146,6 +148,10 @@ const CourseSchema = new Schema<ICourse>(
     whatYouWillLearn: [{ type: String }],
     requirements: [{ type: String }],
     targetAudience: [{ type: String }],
+    examRequired: {
+      type: Boolean,
+      default: false,
+    },
     publishedAt: {
       type: Date,
       default: null,

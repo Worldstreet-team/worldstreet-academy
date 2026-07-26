@@ -28,6 +28,8 @@ export interface IMeeting extends Document {
   participants: IMeetingParticipant[]
   /** If created from a course, links to course for thumbnail/notifications */
   courseId?: Types.ObjectId
+  /** Set when this meeting is an instructor-application interview. */
+  applicationId?: Types.ObjectId
   courseThumbnailUrl?: string
   /** Email invites sent for this meeting */
   invites: IMeetingInvite[]
@@ -76,6 +78,7 @@ const MeetingSchema = new Schema<IMeeting>(
     hostToken: { type: String, required: true },
     participants: [MeetingParticipantSchema],
     courseId: { type: Schema.Types.ObjectId, ref: "Course" },
+    applicationId: { type: Schema.Types.ObjectId, ref: "InstructorApplication" },
     courseThumbnailUrl: { type: String },
     invites: [MeetingInviteSchema],
     settings: {

@@ -48,6 +48,17 @@ const labelMap: Record<string, string> = {
   lessons: "Lessons",
   learn: "Learn",
   live: "Live Session",
+  admin: "Admin",
+  applications: "Applications",
+  users: "Users",
+  payments: "Payments",
+  reviews: "Reviews",
+  "become-instructor": "Become an Instructor",
+  wallet: "Wallet",
+  deposit: "Deposit",
+  withdraw: "Withdraw",
+  exam: "Exam",
+  exams: "Exams",
 }
 
 function buildCrumbs(pathname: string, overrides?: Record<string, string>) {
@@ -66,8 +77,8 @@ function buildCrumbs(pathname: string, overrides?: Record<string, string>) {
 
 type TopbarProps = {
   title?: string
-  /** "platform" = student portal, "instructor" = instructor portal */
-  variant?: "platform" | "instructor"
+  /** "platform" = student portal, "instructor" = instructor portal, "admin" = admin console */
+  variant?: "platform" | "instructor" | "admin"
   /** Override breadcrumb labels for specific path segments (e.g., { "courseId": "Course Title" }) */
   breadcrumbOverrides?: Record<string, string>
 }
@@ -177,6 +188,9 @@ export function Topbar({ title, variant = "platform", breadcrumbOverrides }: Top
             )}
           </LanguagePicker>
 
+          {/* Notifications */}
+          <NotificationBell />
+
           {/* Separator before avatar — visual breathing room */}
           <Separator orientation="vertical" className="h-4! hidden sm:block" />
 
@@ -207,7 +221,16 @@ export function Topbar({ title, variant = "platform", breadcrumbOverrides }: Top
                   <DropdownMenuSeparator />
                 </>
               )}
-              {variant === "instructor" && (
+              {variant !== "admin" && user.role === "ADMIN" && (
+                <>
+                  <DropdownMenuItem render={<Link href="/admin" />}>
+                    <HugeiconsIcon icon={Settings01Icon} size={16} />
+                    Admin Console
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              {(variant === "instructor" || variant === "admin") && (
                 <>
                   <DropdownMenuItem render={<Link href="/dashboard" />}>
                     <HugeiconsIcon icon={DashboardSpeed01Icon} size={16} />

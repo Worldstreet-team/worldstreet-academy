@@ -169,6 +169,13 @@ export async function joinMeeting(meetingId: string): Promise<{
 
     // Host already has access — use currentUser directly (skip DB lookup)
     if (meeting.hostId.toString() === currentUser.id) {
+      // A scheduled meeting (e.g. an interview) goes live the moment the host
+      // joins — no separate "start" step needed from the meetings page.
+      if (meeting.status === "scheduled") {
+        meeting.status = "active"
+        meeting.startedAt = new Date()
+        await meeting.save()
+      }
       return {
         success: true,
         authToken: meeting.hostToken,

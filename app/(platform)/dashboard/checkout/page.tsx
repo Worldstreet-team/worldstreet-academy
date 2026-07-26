@@ -59,6 +59,19 @@ export default function CheckoutPage() {
 
   function openFunding() {
     if (!wallet) return
+    // Internal wallet deposit page (default): navigate in-tab with the
+    // shortfall prefilled and a redirect straight back to this checkout.
+    if (wallet.fundingUrl.startsWith("/")) {
+      const returnTo =
+        typeof window !== "undefined"
+          ? `${window.location.pathname}${window.location.search}`
+          : `/dashboard/checkout?courseId=${courseId}`
+      const params = new URLSearchParams({ redirect: returnTo })
+      if (shortfallMinor && shortfallMinor > 0) params.set("suggestMinor", String(shortfallMinor))
+      router.push(`${wallet.fundingUrl}?${params.toString()}`)
+      return
+    }
+    // External override (central dashboard) — keep the legacy new-tab flow.
     const returnTo = typeof window !== "undefined" ? window.location.href : ""
     const url = `${wallet.fundingUrl}${wallet.fundingUrl.includes("?") ? "&" : "?"}redirect=${encodeURIComponent(returnTo)}`
     window.open(url, "_blank", "noopener")

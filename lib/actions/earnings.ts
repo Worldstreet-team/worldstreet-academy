@@ -12,8 +12,9 @@ import {
   walletEnabled,
 } from "@/lib/wallet"
 
-const WITHDRAW_URL =
-  process.env.NEXT_PUBLIC_WALLET_WITHDRAW_URL || "https://dashboard.worldstreetgold.com/withdraw"
+// Default: the in-academy wallet withdrawal page (Phase 4). The env override
+// remains for pointing back at the central dashboard if ever needed.
+const WITHDRAW_URL = process.env.NEXT_PUBLIC_WALLET_WITHDRAW_URL || "/dashboard/wallet/withdraw"
 
 export type EarningRow = {
   id: string

@@ -1,7 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server"
 import { NextResponse } from "next/server"
 
-const isProtectedRoute = createRouteMatcher(["/dashboard(.*)", "/instructor(.*)"])
+const isProtectedRoute = createRouteMatcher(["/dashboard(.*)", "/instructor(.*)", "/admin(.*)"])
 
 const isLocalDev = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_")
 

@@ -22,8 +22,11 @@ export default async function InstructorLayout({
     redirect(isLocalDev ? "/login" : "https://www.worldstreetgold.com/login")
   }
 
-  // Allow any authenticated user to access instructor dashboard
-  // They can create and manage their own courses
+  // Instructor portal is gated: only approved instructors (and admins) enter.
+  // Everyone else is routed to the application flow.
+  if (user.role !== "INSTRUCTOR" && user.role !== "ADMIN") {
+    redirect("/dashboard/become-instructor")
+  }
 
   return (
     <QueryProvider>

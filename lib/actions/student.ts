@@ -660,33 +660,44 @@ export async function getCompletedLessons(courseId: string): Promise<string[]> {
 /**
  * Mark a course as completed
  */
-export async function markCourseComplete(courseId: string): Promise<{ success: boolean }> {
+export async function markCourseComplete(
+  courseId: string
+): Promise<{ success: boolean; requiresExam?: boolean }> {
   "use server"
   try {
     await connectDB()
     const user = await getAuthenticatedUser()
-    const { Lesson } = await import("@/lib/db/models")
-    
+
+    // CBT gate: when the course requires an exam, completion only happens
+    // through a passing attempt (lib/actions/exams.ts) — never directly.
+    const course = await Course.findById(courseId).select("examRequired").lean()
+    const examRequired = !!course?.examRequired
+
     // Find or create enrollment
     let enrollment = await Enrollment.findOne({ user: user._id, course: courseId })
-    
+
     if (!enrollment) {
       enrollment = await Enrollment.create({
         user: user._id,
         course: courseId,
-        status: "completed",
+        status: examRequired ? "active" : "completed",
         progress: 100,
         completedLessons: [],
-        completedAt: new Date(),
+        completedAt: examRequired ? null : new Date(),
       })
+      if (examRequired) return { success: true, requiresExam: true }
     } else {
-      enrollment.status = "completed"
       enrollment.progress = 100
-      enrollment.completedAt = new Date()
       enrollment.lastAccessedAt = new Date()
+      if (examRequired && !enrollment.examPassed) {
+        await enrollment.save()
+        return { success: true, requiresExam: true }
+      }
+      enrollment.status = "completed"
+      enrollment.completedAt = new Date()
       await enrollment.save()
     }
-    
+
     return { success: true }
   } catch (error) {
     console.error("Mark course complete error:", error)

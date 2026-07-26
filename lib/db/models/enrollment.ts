@@ -20,6 +20,10 @@ export interface IEnrollment extends Document {
   lastAccessedLesson: Types.ObjectId | null
   lastAccessedAt: Date | null
   completedAt: Date | null
+  // CBT exam gate (additive — Go ignores unmapped fields until it opts in)
+  examPassed: boolean
+  examPassedAt: Date | null
+  bestScorePercent: number | null
   createdAt: Date
   updatedAt: Date
 }
@@ -86,6 +90,18 @@ const EnrollmentSchema = new Schema<IEnrollment>(
     },
     completedAt: {
       type: Date,
+      default: null,
+    },
+    examPassed: {
+      type: Boolean,
+      default: false,
+    },
+    examPassedAt: {
+      type: Date,
+      default: null,
+    },
+    bestScorePercent: {
+      type: Number,
       default: null,
     },
   },

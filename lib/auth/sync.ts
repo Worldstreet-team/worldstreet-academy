@@ -46,6 +46,7 @@ export type LocalUser = {
   avatarUrl: string | null
   signatureUrl: string | null
   role: "USER" | "INSTRUCTOR" | "ADMIN"
+  instructorStatus: "none" | "applied" | "interview" | "approved" | "rejected"
   verified: boolean
   walletBalance: number
   hasOnboarded: boolean
@@ -63,16 +64,29 @@ export type LocalUser = {
 export async function syncUserToLocal(authUser: AuthUser, updateNames = true): Promise<LocalUser> {
   await connectDB()
 
-  // Try to find existing user by authUserId
-  let user = await User.findOne({ authUserId: authUser.userId })
+  // Resolve by primary id OR a previously linked one (mobile/dev Clerk
+  // instances mint different ids for the same human — the Go backend has
+  // always resolved both; the web now matches it).
+  let user = await User.findOne({
+    $or: [{ authUserId: authUser.userId }, { linkedAuthIds: authUser.userId }],
+  })
 
   if (!user) {
     // Also check by email (in case user was created before auth sync)
     user = await User.findOne({ email: authUser.email.toLowerCase() })
 
     if (user) {
-      // Link existing user to auth service
-      user.authUserId = authUser.userId
+      // Same human, different Clerk identity (e.g. signing in against the dev
+      // instance, or the mobile app's instance). LINK it — never overwrite the
+      // primary authUserId: that id is the wallet subject and the production
+      // login key, and clobbering it orphans both.
+      if (user.authUserId && user.authUserId !== authUser.userId) {
+        if (!user.linkedAuthIds?.includes(authUser.userId)) {
+          user.linkedAuthIds = [...(user.linkedAuthIds ?? []), authUser.userId]
+        }
+      } else if (!user.authUserId) {
+        user.authUserId = authUser.userId
+      }
       // Only update names if provided from API (not fallbacks)
       if (authUser.firstName && authUser.firstName.length > 0) {
         user.firstName = authUser.firstName
@@ -81,7 +95,13 @@ export async function syncUserToLocal(authUser: AuthUser, updateNames = true): P
         user.lastName = authUser.lastName
       }
       user.verified = authUser.isVerified
-      user.role = mapRole(authUser.role)
+      // Role is NOT taken from Clerk for an existing account — the database is
+      // authoritative (roles are granted in the admin console). Only ever
+      // upgrade, never silently demote an admin/instructor to USER.
+      const claimedRole = mapRole(authUser.role)
+      if (claimedRole !== "USER" && user.role === "USER") {
+        user.role = claimedRole
+      }
       // Backfill avatar for existing users without one
       if (!user.avatarUrl) {
         user.avatarUrl = generateDefaultAvatarUrl(`${user.firstName} ${user.lastName}`.trim())
@@ -110,8 +130,13 @@ export async function syncUserToLocal(authUser: AuthUser, updateNames = true): P
     // Update existing user - only update names if we have real values (from login API, not JWT)
     user.email = authUser.email.toLowerCase()
     user.verified = authUser.isVerified
-    user.role = mapRole(authUser.role)
-    
+    // Database is authoritative for role (see the linking branch above) —
+    // upgrade from Clerk metadata if it grants more, never demote.
+    const claimedRole = mapRole(authUser.role)
+    if (claimedRole !== "USER" && user.role === "USER") {
+      user.role = claimedRole
+    }
+
     // Only update names if provided from API and updateNames is true
     if (updateNames && authUser.firstName && authUser.firstName.length > 0) {
       user.firstName = authUser.firstName
@@ -139,6 +164,7 @@ export async function syncUserToLocal(authUser: AuthUser, updateNames = true): P
     avatarUrl: user.avatarUrl,
     signatureUrl: user.signatureUrl ?? null,
     role: user.role,
+    instructorStatus: user.instructorStatus ?? "none",
     verified: user.verified,
     walletBalance: user.walletBalance,
     hasOnboarded: user.hasOnboarded ?? false,
@@ -154,7 +180,10 @@ export async function syncUserToLocal(authUser: AuthUser, updateNames = true): P
 export async function getLocalUserByAuthId(authUserId: string): Promise<LocalUser | null> {
   await connectDB()
 
-  const user = await User.findOne({ authUserId })
+  // Match the primary id or any linked one (mobile / alternate Clerk instance).
+  const user = await User.findOne({
+    $or: [{ authUserId }, { linkedAuthIds: authUserId }],
+  })
 
   if (!user) {
     return null
@@ -171,6 +200,7 @@ export async function getLocalUserByAuthId(authUserId: string): Promise<LocalUse
     avatarUrl: user.avatarUrl,
     signatureUrl: user.signatureUrl ?? null,
     role: user.role,
+    instructorStatus: user.instructorStatus ?? "none",
     verified: user.verified,
     walletBalance: user.walletBalance,
     hasOnboarded: user.hasOnboarded ?? false,
@@ -203,6 +233,7 @@ export async function getLocalUserById(id: string): Promise<LocalUser | null> {
     avatarUrl: user.avatarUrl,
     signatureUrl: user.signatureUrl ?? null,
     role: user.role,
+    instructorStatus: user.instructorStatus ?? "none",
     verified: user.verified,
     walletBalance: user.walletBalance,
     hasOnboarded: user.hasOnboarded ?? false,

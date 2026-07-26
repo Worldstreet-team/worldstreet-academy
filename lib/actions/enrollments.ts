@@ -388,10 +388,14 @@ export async function completeLesson(
       (enrollment.completedLessons.length / totalLessons) * 100
     )
 
-    // Check if course is completed
+    // Check if course is completed — when the course requires a CBT exam,
+    // completion (and thus the certificate) waits for a passing attempt.
     if (enrollment.progress >= 100) {
-      enrollment.status = "completed"
-      enrollment.completedAt = new Date()
+      const gatedCourse = await Course.findById(courseId).select("examRequired").lean()
+      if (!gatedCourse?.examRequired || enrollment.examPassed) {
+        enrollment.status = "completed"
+        enrollment.completedAt = new Date()
+      }
     }
 
     await enrollment.save()

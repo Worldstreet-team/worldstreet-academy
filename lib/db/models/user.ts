@@ -1,8 +1,12 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose"
 
+export type InstructorStatus = "none" | "applied" | "interview" | "approved" | "rejected"
+
 export interface IUser extends Document {
   _id: Types.ObjectId
   authUserId: string // Reference to central auth service userId
+  /** Additional Clerk ids linked to this account (written by the Go mobile backend — declared here so web writes never drop it). */
+  linkedAuthIds: string[]
   email: string
   username: string
   firstName: string
@@ -11,6 +15,8 @@ export interface IUser extends Document {
   avatarUrl: string | null
   signatureUrl: string | null
   role: "USER" | "INSTRUCTOR" | "ADMIN"
+  /** Instructor application pipeline state — additive field, safe for the Go backend (unmapped bson is ignored there). */
+  instructorStatus: InstructorStatus
   verified: boolean
   walletBalance: number
   hasOnboarded: boolean
@@ -40,6 +46,7 @@ const UserSchema = new Schema<IUser>(
       unique: true,
       index: true,
     },
+    linkedAuthIds: [{ type: String }],
     email: {
       type: String,
       required: true,
@@ -82,6 +89,11 @@ const UserSchema = new Schema<IUser>(
       enum: ["USER", "INSTRUCTOR", "ADMIN"],
       default: "USER",
     },
+    instructorStatus: {
+      type: String,
+      enum: ["none", "applied", "interview", "approved", "rejected"],
+      default: "none",
+    },
     verified: {
       type: Boolean,
       default: false,
@@ -115,6 +127,10 @@ const UserSchema = new Schema<IUser>(
     timestamps: true,
   }
 )
+
+// Alternate Clerk identities are resolved on every authenticated request
+// (see lib/auth/sync.ts) — keep that lookup indexed. Sparse: most users have none.
+UserSchema.index({ linkedAuthIds: 1 }, { sparse: true })
 
 // Virtual for full name
 UserSchema.virtual("fullName").get(function () {

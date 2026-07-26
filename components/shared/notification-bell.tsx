@@ -3,6 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import Image from "next/image"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -25,89 +26,59 @@ import {
   Award02Icon,
   UserMultipleIcon,
   AlertCircleIcon,
+  DollarCircleIcon,
+  MeetingRoomIcon,
 } from "@hugeicons/core-free-icons"
-
-/* ── Mock notifications ───────────────────────────────────── */
-type Notification = {
-  id: string
-  type: "course" | "achievement" | "social" | "system"
-  title: string
-  message: string
-  time: string
-  read: boolean
-  avatar?: string
-  href?: string
-}
-
-const MOCK_NOTIFICATIONS: Notification[] = [
-  {
-    id: "1",
-    type: "course",
-    title: "New lesson available",
-    message: "Bitcoin & Blockchain Fundamentals has a new lesson: 'Mining Explained'",
-    time: "2m ago",
-    read: false,
-    href: "/dashboard/courses/1",
-  },
-  {
-    id: "2",
-    type: "achievement",
-    title: "Achievement unlocked!",
-    message: "You completed your first course. Keep going!",
-    time: "1h ago",
-    read: false,
-  },
-  {
-    id: "3",
-    type: "social",
-    title: "Sarah Chen replied",
-    message: "Great question! The answer is...",
-    time: "3h ago",
-    read: true,
-    avatar: "/user/dashboard/course-empty-state.png",
-  },
-  {
-    id: "4",
-    type: "system",
-    title: "Platform update",
-    message: "We've added new features to improve your learning experience.",
-    time: "1d ago",
-    read: true,
-  },
-  {
-    id: "5",
-    type: "course",
-    title: "Course reminder",
-    message: "You haven't visited 'DeFi Yield Strategies' in 3 days.",
-    time: "2d ago",
-    read: true,
-    href: "/dashboard/courses/2",
-  },
-]
+import {
+  getMyNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  type NotificationItem,
+} from "@/lib/actions/notifications"
+import { queryKeys } from "@/lib/hooks/queries/keys"
+import type { SSEEventPayload } from "@/lib/call-events"
 
 const typeIcons = {
+  application: Award02Icon,
   course: BookOpen01Icon,
-  achievement: Award02Icon,
+  payment: DollarCircleIcon,
+  meeting: MeetingRoomIcon,
   social: UserMultipleIcon,
   system: AlertCircleIcon,
-}
+} as const
 
 const typeColors = {
+  application: "text-orange-500",
   course: "text-primary",
-  achievement: "text-orange-500",
+  payment: "text-emerald-600",
+  meeting: "text-blue-500",
   social: "text-blue-500",
   system: "text-muted-foreground",
+} as const
+
+function timeAgo(iso: string): string {
+  const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
+  if (seconds < 60) return "just now"
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  if (days < 7) return `${days}d ago`
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" })
 }
 
 /* ── Shared notification list ────────────────────────────── */
 function NotificationList({
   notifications,
+  isLoading,
   onMarkAllRead,
-  onClear,
+  onItemClick,
 }: {
-  notifications: Notification[]
+  notifications: NotificationItem[]
+  isLoading: boolean
   onMarkAllRead: () => void
-  onClear: () => void
+  onItemClick: (n: NotificationItem) => void
 }) {
   const unreadCount = notifications.filter((n) => !n.read).length
 
@@ -118,32 +89,33 @@ function NotificationList({
         <span className="text-xs text-muted-foreground">
           {unreadCount > 0 ? `${unreadCount} unread` : "All caught up"}
         </span>
-        <div className="flex items-center gap-1">
-          {unreadCount > 0 && (
-            <button
-              type="button"
-              onClick={onMarkAllRead}
-              className="text-[11px] text-primary hover:underline px-1.5 py-0.5 rounded-md hover:bg-muted transition-colors"
-            >
-              Mark all read
-            </button>
-          )}
-          {notifications.length > 0 && (
-            <button
-              type="button"
-              onClick={onClear}
-              className="text-[11px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded-md hover:bg-muted transition-colors"
-            >
-              Clear
-            </button>
-          )}
-        </div>
+        {unreadCount > 0 && (
+          <button
+            type="button"
+            onClick={onMarkAllRead}
+            className="text-[11px] text-primary hover:underline px-1.5 py-0.5 rounded-md hover:bg-muted transition-colors"
+          >
+            Mark all read
+          </button>
+        )}
       </div>
 
       <Separator />
 
       {/* Items */}
-      {notifications.length === 0 ? (
+      {isLoading ? (
+        <div className="py-8 space-y-3 px-4">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="flex items-start gap-3 animate-pulse">
+              <div className="h-5 w-5 rounded-full bg-muted shrink-0" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-2.5 w-2/3 rounded bg-muted" />
+                <div className="h-2 w-full rounded bg-muted" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : notifications.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-center px-4">
           <div className="relative w-28 h-28 mb-2">
             <Image
@@ -163,18 +135,16 @@ function NotificationList({
         <ScrollArea className="max-h-[360px]">
           <div className="py-1">
             {notifications.map((notification) => {
-              const Icon = typeIcons[notification.type]
-              const colorClasses = typeColors[notification.type]
+              const Icon = typeIcons[notification.type] ?? AlertCircleIcon
+              const colorClasses = typeColors[notification.type] ?? "text-muted-foreground"
 
               const content = (
                 <div
-                  className={`flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/50 ${
+                  className={`flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/50 cursor-pointer ${
                     !notification.read ? "bg-primary/[0.03]" : ""
                   }`}
                 >
-                  <div
-                    className={`shrink-0 ${colorClasses}`}
-                  >
+                  <div className={`shrink-0 ${colorClasses}`}>
                     <HugeiconsIcon icon={Icon} size={18} />
                   </div>
                   <div className="flex-1 min-w-0 space-y-0.5">
@@ -187,21 +157,28 @@ function NotificationList({
                       )}
                     </div>
                     <p className="text-[11px] text-muted-foreground leading-snug line-clamp-2">
-                      {notification.message}
+                      {notification.body}
                     </p>
                     <p className="text-[10px] text-muted-foreground/60">
-                      {notification.time}
+                      {timeAgo(notification.createdAt)}
                     </p>
                   </div>
                 </div>
               )
 
               return notification.href ? (
-                <Link key={notification.id} href={notification.href} className="block">
+                <Link
+                  key={notification.id}
+                  href={notification.href}
+                  className="block"
+                  onClick={() => onItemClick(notification)}
+                >
                   {content}
                 </Link>
               ) : (
-                <div key={notification.id}>{content}</div>
+                <div key={notification.id} onClick={() => onItemClick(notification)}>
+                  {content}
+                </div>
               )
             })}
           </div>
@@ -215,18 +192,47 @@ function NotificationList({
 export function NotificationBell() {
   const isMobile = useIsMobile()
   const [open, setOpen] = React.useState(false)
-  const [notifications, setNotifications] =
-    React.useState<Notification[]>(MOCK_NOTIFICATIONS)
+  const queryClient = useQueryClient()
 
-  const unreadCount = notifications.filter((n) => !n.read).length
+  const { data, isLoading } = useQuery({
+    queryKey: queryKeys.notifications,
+    queryFn: () => getMyNotifications(),
+    staleTime: 30_000,
+    refetchInterval: 120_000, // slow polling fallback; Ably invalidates live
+  })
 
-  const handleMarkAllRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
-  }
+  const notifications = React.useMemo(() => data?.notifications ?? [], [data])
+  const unreadCount = data?.unreadCount ?? 0
 
-  const handleClear = () => {
-    setNotifications([])
-  }
+  // Live updates: CallProvider re-dispatches every Ably event as a window
+  // CustomEvent("sse:event") — new notifications invalidate the query.
+  React.useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<SSEEventPayload>).detail
+      if (detail?.type === "notification:new") {
+        queryClient.invalidateQueries({ queryKey: queryKeys.notifications })
+      }
+    }
+    window.addEventListener("sse:event", handler)
+    return () => window.removeEventListener("sse:event", handler)
+  }, [queryClient])
+
+  const markAllMutation = useMutation({
+    mutationFn: () => markAllNotificationsRead(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.notifications }),
+  })
+
+  const handleItemClick = React.useCallback(
+    (n: NotificationItem) => {
+      setOpen(false)
+      if (!n.read) {
+        markNotificationRead(n.id).then(() =>
+          queryClient.invalidateQueries({ queryKey: queryKeys.notifications })
+        )
+      }
+    },
+    [queryClient]
+  )
 
   const triggerButton = (
     <button
@@ -237,7 +243,7 @@ export function NotificationBell() {
       <HugeiconsIcon icon={Notification03Icon} size={16} />
       {unreadCount > 0 && (
         <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground">
-          {unreadCount}
+          {unreadCount > 99 ? "99+" : unreadCount}
         </span>
       )}
     </button>
@@ -262,10 +268,7 @@ export function NotificationBell() {
               <SheetTitle className="text-base flex items-center gap-2">
                 Notifications
                 {unreadCount > 0 && (
-                  <Badge
-                    variant="secondary"
-                    className="text-[10px] px-1.5 py-0"
-                  >
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                     {unreadCount}
                   </Badge>
                 )}
@@ -273,8 +276,9 @@ export function NotificationBell() {
             </SheetHeader>
             <NotificationList
               notifications={notifications}
-              onMarkAllRead={handleMarkAllRead}
-              onClear={handleClear}
+              isLoading={isLoading}
+              onMarkAllRead={() => markAllMutation.mutate()}
+              onItemClick={handleItemClick}
             />
           </SheetContent>
         </Sheet>
@@ -285,10 +289,7 @@ export function NotificationBell() {
   /* ── Desktop: DropdownMenu as popover ── */
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger
-        className="focus:outline-none"
-        render={triggerButton}
-      />
+      <DropdownMenuTrigger className="focus:outline-none" render={triggerButton} />
       <DropdownMenuContent
         side="bottom"
         align="end"
@@ -300,10 +301,7 @@ export function NotificationBell() {
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold">Notifications</h3>
             {unreadCount > 0 && (
-              <Badge
-                variant="secondary"
-                className="text-[10px] px-1.5 py-0"
-              >
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                 {unreadCount}
               </Badge>
             )}
@@ -311,8 +309,9 @@ export function NotificationBell() {
         </div>
         <NotificationList
           notifications={notifications}
-          onMarkAllRead={handleMarkAllRead}
-          onClear={handleClear}
+          isLoading={isLoading}
+          onMarkAllRead={() => markAllMutation.mutate()}
+          onItemClick={handleItemClick}
         />
       </DropdownMenuContent>
     </DropdownMenu>
