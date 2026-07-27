@@ -161,12 +161,18 @@ export async function adminUpdateUserRole(
     const previousRole = user.role
     if (previousRole === role) return { success: true }
 
-    user.role = role
-    // Keep the instructor pipeline mirror coherent with manual grants.
-    if (role !== "USER" && user.instructorStatus !== "approved") {
-      user.instructorStatus = "approved"
-    }
-    await user.save()
+    // Targeted $set — doc.save() would trip full validation on legacy rows.
+    await User.updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          role,
+          ...(role !== "USER" && user.instructorStatus !== "approved"
+            ? { instructorStatus: "approved" }
+            : {}),
+        },
+      }
+    )
 
     await syncRoleToClerk(user.authUserId, role)
 

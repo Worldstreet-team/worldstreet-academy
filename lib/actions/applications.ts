@@ -962,28 +962,36 @@ export async function adminDecideApplication(
     app.history.push({ status: decision, at: new Date(), by: adminName, note: decisionNote })
     await app.save()
 
+    // Targeted $set updates — never doc.save(): legacy user rows that fail
+    // full-document validation (e.g. seed accounts without authUserId) must
+    // not abort the promotion/notification half of a decision.
     if (decision === "approved") {
-      // Promote (never demote an existing ADMIN).
-      if (user.role === "USER") user.role = "INSTRUCTOR"
-      user.instructorStatus = "approved"
-      // Seed the public instructor profile from the application.
-      user.instructorProfile = {
-        headline: app.answers.headline,
-        expertise: app.answers.expertise ?? [],
-        socialLinks: {
-          twitter: app.answers.twitter ?? undefined,
-          linkedin: app.answers.linkedin ?? undefined,
-          website: app.answers.website ?? app.answers.portfolioUrl ?? undefined,
-        },
-        totalStudents: user.instructorProfile?.totalStudents ?? 0,
-        totalCourses: user.instructorProfile?.totalCourses ?? 0,
-        totalEarnings: user.instructorProfile?.totalEarnings ?? 0,
-      }
-      await user.save()
-      await syncRoleToClerk(user.authUserId, user.role)
+      const newRole = user.role === "USER" ? "INSTRUCTOR" : user.role
+      await User.updateOne(
+        { _id: user._id },
+        {
+          $set: {
+            role: newRole,
+            instructorStatus: "approved",
+            instructorProfile: {
+              headline: app.answers.headline,
+              expertise: app.answers.expertise ?? [],
+              socialLinks: {
+                twitter: app.answers.twitter ?? undefined,
+                linkedin: app.answers.linkedin ?? undefined,
+                website: app.answers.website ?? app.answers.portfolioUrl ?? undefined,
+              },
+              totalStudents: user.instructorProfile?.totalStudents ?? 0,
+              totalCourses: user.instructorProfile?.totalCourses ?? 0,
+              totalEarnings: user.instructorProfile?.totalEarnings ?? 0,
+            },
+          },
+        }
+      )
+      user.role = newRole
+      if (user.authUserId) await syncRoleToClerk(user.authUserId, newRole)
     } else {
-      user.instructorStatus = "rejected"
-      await user.save()
+      await User.updateOne({ _id: user._id }, { $set: { instructorStatus: "rejected" } })
     }
 
     // Fire-and-forget notifications + email.
