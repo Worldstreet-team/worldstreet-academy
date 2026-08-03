@@ -1,20 +1,6 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  Call02Icon,
-  CallEnd01Icon,
-  Mic01Icon,
-  MicOff01Icon,
-  Video01Icon,
-  VideoOffIcon,
-  SpeakerIcon,
-  Speaker01Icon,
-  MinimizeScreenIcon,
-  WifiConnected01Icon,
-  Cancel01Icon,
-} from "@hugeicons/core-free-icons"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { rtkClient } from "@/lib/rtk-client"
@@ -29,6 +15,8 @@ import {
 import { useCallEvents } from "@/lib/hooks/use-call-events"
 import { useUser } from "@/components/providers/user-provider"
 import type { CallEventPayload } from "@/lib/call-events"
+import { MicIcon, MicOffIcon, MinimizeIcon, PhoneIcon, PhoneOffIcon, VideoIcon, VideoOffIcon, Volume2Icon, VolumeIcon, WifiIcon, XIcon } from "lucide-react"
+import { RenderIcon } from "@/components/shared/render-icon"
 
 type CallType = "video" | "audio"
 type CallState = "ringing" | "connecting" | "connected" | "ended" | "busy"
@@ -87,8 +75,8 @@ function GlassButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "rounded-full flex items-center justify-center transition-all duration-200",
-        "active:scale-95 disabled:opacity-50",
+        "rounded-full flex items-center justify-center transition-all duration-[var(--ws-motion-base)]",
+        " disabled:opacity-50",
         size === "large" ? "w-16 h-16" : "w-12 h-12",
         className
       )}
@@ -1059,8 +1047,8 @@ export function VideoCall({
   if (isMinimized) {
     if (callState === "ended") {
       return (
-        <div className="fixed bottom-24 right-4 z-[9999] animate-in slide-in-from-bottom-4 fade-in duration-200">
-          <div className="flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl border border-border/50 bg-background">
+        <div className="fixed bottom-24 right-4 z-[9999] animate-in slide-in-from-bottom-4 fade-in duration-[var(--ws-motion-base)]">
+          <div className="flex items-center gap-3 px-4 py-3 rounded-lg shadow-2xl border border-ws-hairline bg-background">
             <Avatar className="w-10 h-10">
               <AvatarImage src={callerAvatar} alt={callerName} />
               <AvatarFallback className="text-xs">
@@ -1077,7 +1065,7 @@ export function VideoCall({
               onClick={handleDismiss}
               className="ml-1 w-7 h-7 rounded-full flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
             >
-              <HugeiconsIcon icon={Cancel01Icon} size={14} />
+              <XIcon  size={14} />
             </button>
           </div>
         </div>
@@ -1086,11 +1074,11 @@ export function VideoCall({
 
     return (
       <div
-        className="fixed bottom-24 right-4 z-[9999] cursor-pointer animate-in slide-in-from-bottom-4 fade-in duration-200"
+        className="fixed bottom-24 right-4 z-[9999] cursor-pointer animate-in slide-in-from-bottom-4 fade-in duration-[var(--ws-motion-base)]"
         onClick={handleRestore}
       >
         {remoteAudioElement}
-        <div className="flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl border border-border/50 bg-background">
+        <div className="flex items-center gap-3 px-4 py-3 rounded-lg shadow-2xl border border-ws-hairline bg-background">
           <div className="relative">
             <Avatar className="w-10 h-10">
               <AvatarImage src={callerAvatar} alt={callerName} />
@@ -1099,8 +1087,8 @@ export function VideoCall({
               </AvatarFallback>
             </Avatar>
             {externalRemoteRejoined && (
-              <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-green-500 border-2 border-background flex items-center justify-center">
-                <HugeiconsIcon icon={WifiConnected01Icon} size={8} className="text-white" />
+              <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-ws-success border-2 border-background flex items-center justify-center">
+                <WifiIcon  size={8} className="text-white" />
               </div>
             )}
           </div>
@@ -1132,7 +1120,7 @@ export function VideoCall({
                   disabled={isAnswering}
                   className="w-9 h-9 rounded-full flex items-center justify-center bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50"
                 >
-                  <HugeiconsIcon icon={CallEnd01Icon} size={16} />
+                  <PhoneOffIcon  size={16} />
                 </button>
                 <button
                   onClick={(e) => {
@@ -1140,15 +1128,14 @@ export function VideoCall({
                     handleAnswer()
                   }}
                   disabled={isAnswering}
-                  className="w-9 h-9 rounded-full flex items-center justify-center bg-green-500 text-white hover:bg-green-600 transition-colors disabled:opacity-50"
+                  className="w-9 h-9 rounded-full flex items-center justify-center bg-ws-success text-white hover:bg-ws-success/90 transition-colors disabled:opacity-50"
                 >
                   {isAnswering ? (
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   ) : (
-                    <HugeiconsIcon
-                      icon={callType === "video" ? Video01Icon : Call02Icon}
-                      size={16}
-                    />
+                    <RenderIcon icon={callType === "video" ? VideoIcon : PhoneIcon}
+                      
+                      size={16} />
                   )}
                 </button>
               </>
@@ -1166,10 +1153,9 @@ export function VideoCall({
                       : "bg-muted hover:bg-muted/80"
                   )}
                 >
-                  <HugeiconsIcon
-                    icon={isMuted ? MicOff01Icon : Mic01Icon}
-                    size={14}
-                  />
+                  <RenderIcon icon={isMuted ? MicOffIcon : MicIcon}
+                    
+                    size={14} />
                 </button>
                 <button
                   onClick={(e) => {
@@ -1182,7 +1168,7 @@ export function VideoCall({
                   {isEnding ? (
                     <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   ) : (
-                    <HugeiconsIcon icon={CallEnd01Icon} size={14} />
+                    <PhoneOffIcon  size={14} />
                   )}
                 </button>
               </>
@@ -1199,12 +1185,12 @@ export function VideoCall({
       {remoteAudioElement}
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+        className="absolute inset-0 bg-black/80 animate-in fade-in duration-[var(--ws-motion-base)]"
         onClick={callState === "ended" || callState === "busy" ? handleDismiss : undefined}
       />
 
       <div
-        className="relative w-[95vw] h-[93vh] md:w-[90vw] md:h-[90vh] rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl bg-black animate-in fade-in zoom-in-95 duration-200"
+        className="relative w-[95vw] h-[93vh] md:w-[90vw] md:h-[90vh] rounded-lg md:rounded-lg overflow-hidden shadow-2xl bg-black animate-in fade-in zoom-in-95 duration-[var(--ws-motion-base)]"
         onClick={() =>
           callState === "connected" && setShowControls(!showControls)
         }
@@ -1215,9 +1201,9 @@ export function VideoCall({
             e.stopPropagation()
             handleDismiss()
           }}
-          className="absolute top-4 right-4 z-50 w-9 h-9 rounded-full flex items-center justify-center bg-black/40 backdrop-blur-sm hover:bg-black/60 text-white/70 hover:text-white transition-all"
+          className="absolute top-4 right-4 z-50 w-9 h-9 rounded-full flex items-center justify-center bg-black/40 hover:bg-black/60 text-white/70 hover:text-white transition-all"
         >
-          <HugeiconsIcon icon={Cancel01Icon} size={18} />
+          <XIcon  size={18} />
         </button>
         {/* Background — local camera preview during ringing/connecting */}
         {callType === "video" &&
@@ -1235,7 +1221,7 @@ export function VideoCall({
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <Avatar className="w-28 h-28 mb-5">
                 <AvatarImage src={callerAvatar} alt={callerName} />
-                <AvatarFallback className="text-3xl bg-zinc-800 text-white">
+                <AvatarFallback className="text-3xl bg-ws-raised text-ws-primary">
                   {getInitials(callerName)}
                 </AvatarFallback>
               </Avatar>
@@ -1247,13 +1233,6 @@ export function VideoCall({
                   (isIncoming ? "Incoming call..." : "Ringing...")}
                 {callState === "connecting" && "Connecting..."}
               </p>
-              {callState === "ringing" && (
-                <div className="mt-3 flex items-center justify-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-white/60 animate-pulse" style={{ animationDelay: "0ms" }} />
-                  <span className="w-2 h-2 rounded-full bg-white/60 animate-pulse" style={{ animationDelay: "300ms" }} />
-                  <span className="w-2 h-2 rounded-full bg-white/60 animate-pulse" style={{ animationDelay: "600ms" }} />
-                </div>
-              )}
             </div>
           </div>
         ) : callState === "connected" && callType === "video" && !isVideoOff ? (
@@ -1267,28 +1246,27 @@ export function VideoCall({
             />
             {/* Remote mute indicator (video call) */}
             {isRemoteMuted && (
-              <div className="absolute top-4 left-4 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/50 backdrop-blur-sm">
-                <HugeiconsIcon icon={MicOff01Icon} size={12} className="text-red-400" />
+              <div className="absolute top-4 left-4 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/50">
+                <MicOffIcon  size={12} className="text-ws-danger" />
                 <span className="text-xs text-white/80">Muted</span>
               </div>
             )}
           </>
         ) : (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-zinc-900 via-zinc-950 to-black">
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-ws-sunken">
             <Avatar className="w-28 h-28 mb-5">
               <AvatarImage src={callerAvatar} alt={callerName} />
-              <AvatarFallback className="text-3xl bg-zinc-800 text-white">
+              <AvatarFallback className="text-3xl bg-ws-raised text-ws-primary">
                 {getInitials(callerName)}
               </AvatarFallback>
             </Avatar>
             <div className="flex items-center gap-2">
               <h3 className="text-white font-semibold text-xl">{callerName}</h3>
               {externalRemoteRejoined && callState === "connected" && (
-                <HugeiconsIcon
-                  icon={WifiConnected01Icon}
+                <WifiIcon
+                  
                   size={16}
-                  className="text-green-400 animate-pulse"
-                />
+                  className="text-ws-success animate-pulse" />
               )}
             </div>
             <p className="text-white/50 text-sm mt-1">
@@ -1299,8 +1277,8 @@ export function VideoCall({
                 <>
                   <CallTimer startTime={callStartTime} />
                   {isRemoteMuted && (
-                    <span className="ml-2 inline-flex items-center gap-1 text-red-400">
-                      <HugeiconsIcon icon={MicOff01Icon} size={10} />
+                    <span className="ml-2 inline-flex items-center gap-1 text-ws-danger">
+                      <MicOffIcon  size={10} />
                       <span className="text-[10px]">Muted</span>
                     </span>
                   )}
@@ -1308,20 +1286,13 @@ export function VideoCall({
               )}
               {callState === "ended" && "Call ended"}
             </p>
-            {callState === "ringing" && (
-              <div className="mt-3 flex items-center justify-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-white/60 animate-pulse" style={{ animationDelay: "0ms" }} />
-                <span className="w-2 h-2 rounded-full bg-white/60 animate-pulse" style={{ animationDelay: "300ms" }} />
-                <span className="w-2 h-2 rounded-full bg-white/60 animate-pulse" style={{ animationDelay: "600ms" }} />
-              </div>
-            )}
           </div>
         )}
 
         {/* Local PIP (video calls when connected) */}
         {callState === "connected" && callType === "video" && !isVideoOff && (
           <div
-            className="absolute top-6 right-6 w-32 md:w-44 aspect-[3/4] rounded-2xl overflow-hidden shadow-lg border border-white/10"
+            className="absolute top-6 right-6 w-32 md:w-44 aspect-[3/4] rounded-lg overflow-hidden shadow-lg border border-white/10"
             style={{
               background: "rgba(0,0,0,0.3)",
               backdropFilter: "blur(4px)",
@@ -1342,7 +1313,7 @@ export function VideoCall({
         {callState === "connected" && callType === "video" && (
           <div
             className={cn(
-              "absolute top-0 left-0 right-0 flex items-center justify-between px-4 pt-4 pb-10 transition-all duration-300",
+              "absolute top-0 left-0 right-0 flex items-center justify-between px-4 pt-4 pb-10 transition-all duration-[var(--ws-motion-base)]",
               showControls
                 ? "opacity-100"
                 : "opacity-0 pointer-events-none"
@@ -1361,19 +1332,17 @@ export function VideoCall({
                 <CallTimer startTime={callStartTime} />
               </div>
               {externalRemoteRejoined && (
-                <HugeiconsIcon
-                  icon={WifiConnected01Icon}
+                <WifiIcon
+                  
                   size={16}
-                  className="text-green-400 animate-pulse"
-                />
+                  className="text-ws-success animate-pulse" />
               )}
             </div>
             <GlassButton onClick={handleMinimize}>
-              <HugeiconsIcon
-                icon={MinimizeScreenIcon}
+              <MinimizeIcon
+                
                 size={18}
-                className="text-white"
-              />
+                className="text-white" />
             </GlassButton>
           </div>
         )}
@@ -1395,11 +1364,10 @@ export function VideoCall({
                   onClick={handleDecline}
                   disabled={isAnswering}
                 >
-                  <HugeiconsIcon
-                    icon={CallEnd01Icon}
+                  <PhoneOffIcon
+                    
                     size={28}
-                    className="text-white"
-                  />
+                    className="text-white" />
                 </GlassButton>
                 <span className="text-white/60 text-xs">Decline</span>
               </div>
@@ -1413,11 +1381,10 @@ export function VideoCall({
                   {isAnswering ? (
                     <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   ) : (
-                    <HugeiconsIcon
-                      icon={callType === "video" ? Video01Icon : Call02Icon}
+                    <RenderIcon icon={callType === "video" ? VideoIcon : PhoneIcon}
+                      
                       size={28}
-                      className="text-white"
-                    />
+                      className="text-white" />
                   )}
                 </GlassButton>
                 <span className="text-white/60 text-xs">
@@ -1434,7 +1401,7 @@ export function VideoCall({
           (callState === "connecting" && !isIncoming)) && (
           <div
             className={cn(
-              "absolute bottom-0 left-0 right-0 pb-6 pt-6 px-6 transition-all duration-300",
+              "absolute bottom-0 left-0 right-0 pb-6 pt-6 px-6 transition-all duration-[var(--ws-motion-base)]",
               showControls || callState !== "connected"
                 ? "opacity-100 translate-y-0"
                 : "opacity-0 translate-y-4 pointer-events-none"
@@ -1451,11 +1418,10 @@ export function VideoCall({
                 className={isMuted ? "!bg-white/90" : ""}
                 size="default"
               >
-                <HugeiconsIcon
-                  icon={isMuted ? MicOff01Icon : Mic01Icon}
+                <RenderIcon icon={isMuted ? MicOffIcon : MicIcon}
+                  
                   size={18}
-                  className={isMuted ? "text-black" : "text-white"}
-                />
+                  className={isMuted ? "text-black" : "text-white"} />
               </GlassButton>
 
               {callType === "video" && (
@@ -1464,11 +1430,10 @@ export function VideoCall({
                   className={isVideoOff ? "!bg-white/90" : ""}
                   size="default"
                 >
-                  <HugeiconsIcon
-                    icon={isVideoOff ? VideoOffIcon : Video01Icon}
+                  <RenderIcon icon={isVideoOff ? VideoOffIcon : VideoIcon}
+                    
                     size={18}
-                    className={isVideoOff ? "text-black" : "text-white"}
-                  />
+                    className={isVideoOff ? "text-black" : "text-white"} />
                 </GlassButton>
               )}
 
@@ -1477,11 +1442,10 @@ export function VideoCall({
                 className={!isSpeakerOn ? "!bg-white/90" : ""}
                 size="default"
               >
-                <HugeiconsIcon
-                  icon={isSpeakerOn ? SpeakerIcon : Speaker01Icon}
+                <RenderIcon icon={isSpeakerOn ? Volume2Icon : VolumeIcon}
+                  
                   size={18}
-                  className={!isSpeakerOn ? "text-black" : "text-white"}
-                />
+                  className={!isSpeakerOn ? "text-black" : "text-white"} />
               </GlassButton>
 
               {callState === "connected" && (
@@ -1490,11 +1454,10 @@ export function VideoCall({
                   variant="transparent"
                   size="default"
                 >
-                  <HugeiconsIcon
-                    icon={MinimizeScreenIcon}
+                  <MinimizeIcon
+                    
                     size={16}
-                    className="text-white/70"
-                  />
+                    className="text-white/70" />
                 </GlassButton>
               )}
 
@@ -1507,11 +1470,10 @@ export function VideoCall({
                 {isEnding ? (
                   <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
-                  <HugeiconsIcon
-                    icon={CallEnd01Icon}
+                  <PhoneOffIcon
+                    
                     size={26}
-                    className="text-white"
-                  />
+                    className="text-white" />
                 )}
               </GlassButton>
             </div>
@@ -1520,20 +1482,19 @@ export function VideoCall({
 
         {/* Busy state — receiver is on another call */}
         {callState === "busy" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-zinc-900 via-zinc-950 to-black">
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-ws-sunken">
             <div className="flex flex-col items-center gap-3">
               <Avatar className="w-24 h-24 mb-3">
                 <AvatarImage src={callerAvatar} alt={callerName} />
-                <AvatarFallback className="text-2xl bg-zinc-800 text-white">
+                <AvatarFallback className="text-2xl bg-ws-raised text-ws-primary">
                   {getInitials(callerName)}
                 </AvatarFallback>
               </Avatar>
-              <div className="w-14 h-14 rounded-full flex items-center justify-center bg-orange-500/20 mb-1">
-                <HugeiconsIcon
-                  icon={Call02Icon}
+              <div className="w-14 h-14 rounded-full flex items-center justify-center bg-ws-warning/20 mb-1">
+                <PhoneIcon
+                  
                   size={24}
-                  className="text-orange-400"
-                />
+                  className="text-ws-warning" />
               </div>
               <h3 className="text-white font-semibold text-lg">{callerName}</h3>
               <p className="text-white/50 text-sm">On another call</p>
@@ -1549,14 +1510,13 @@ export function VideoCall({
 
         {/* Ended state — only show if we were connected or user explicitly ended */}
         {callState === "ended" && (isConnectedRef.current || isEndingRef.current) && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-zinc-900 via-zinc-950 to-black">
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-ws-sunken">
             <div className="flex flex-col items-center gap-3">
-              <div className="w-16 h-16 rounded-full flex items-center justify-center bg-red-500/20 mb-1">
-                <HugeiconsIcon
-                  icon={CallEnd01Icon}
+              <div className="w-16 h-16 rounded-full flex items-center justify-center bg-ws-danger/20 mb-1">
+                <PhoneOffIcon
+                  
                   size={28}
-                  className="text-red-400"
-                />
+                  className="text-ws-danger" />
               </div>
               <p className="text-white/50 text-sm">Call ended</p>
               <button

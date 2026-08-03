@@ -1,8 +1,7 @@
 "use client"
 
 import Image from "next/image"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { UserIcon } from "@hugeicons/core-free-icons"
+import { UserIcon } from "lucide-react"
 
 export function ProfileCard({ data }: { data: unknown }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -17,7 +16,7 @@ export function ProfileCard({ data }: { data: unknown }) {
             <Image src={p.avatarUrl} alt="" fill className="object-cover" sizes="64px" />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
-              <HugeiconsIcon icon={UserIcon} size={28} className="text-muted-foreground/50" />
+              <UserIcon  size={28} className="text-muted-foreground/50" />
             </div>
           )}
         </div>
@@ -30,11 +29,11 @@ export function ProfileCard({ data }: { data: unknown }) {
         )}
       </div>
       <div className="grid grid-cols-2 gap-2.5">
-        <div className="p-3.5 rounded-2xl bg-accent/15 border border-border/15 text-center">
+        <div className="p-3.5 rounded-lg bg-accent/15 border border-ws-hairline text-center">
           <p className="text-xl font-bold text-foreground tabular-nums">{p.activeEnrollments || 0}</p>
           <p className="text-[11px] text-muted-foreground mt-0.5">Active</p>
         </div>
-        <div className="p-3.5 rounded-2xl bg-accent/15 border border-border/15 text-center">
+        <div className="p-3.5 rounded-lg bg-accent/15 border border-ws-hairline text-center">
           <p className="text-xl font-bold text-foreground tabular-nums">{p.completedEnrollments || 0}</p>
           <p className="text-[11px] text-muted-foreground mt-0.5">Completed</p>
         </div>

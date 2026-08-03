@@ -20,26 +20,31 @@ import {
 } from "@/components/ui/sidebar"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { HugeiconsIcon } from "@hugeicons/react"
-import type { IconSvgElement } from "@hugeicons/react"
 import {
-  Home01Icon,
-  BookOpen01Icon,
-  Logout01Icon,
-  DashboardSpeed01Icon,
-  TeachingIcon,
-  UserMultipleIcon,
-  DollarCircleIcon,
-  StarIcon,
-  Certificate01Icon,
-} from "@hugeicons/core-free-icons"
+  BookOpen,
+  ClipboardCheck,
+  GraduationCap,
+  House,
+  Inbox,
+  LayoutDashboard,
+  LogOut,
+  Star,
+  Users,
+  Wallet,
+  type LucideIcon,
+} from "lucide-react"
 import { useUser } from "@/components/providers/user-provider"
 import { LogoutConfirmDialog } from "@/components/shared/logout-confirm-dialog"
+
+/**
+ * Admin rail — mirrors the platform sidebar recipe (app-sidebar.tsx): 40px
+ * pill rows, 20px Lucide glyphs, `bg/chip` active pill with a gold icon.
+ */
 
 type NavItem = {
   title: string
   href: string
-  icon: IconSvgElement
+  icon: LucideIcon
   match?: (pathname: string) => boolean
 }
 
@@ -47,43 +52,43 @@ const manageItems: NavItem[] = [
   {
     title: "Overview",
     href: "/admin",
-    icon: Home01Icon,
+    icon: House,
     match: (p) => p === "/admin",
   },
   {
     title: "Applications",
     href: "/admin/applications",
-    icon: TeachingIcon,
+    icon: Inbox,
     match: (p) => p.startsWith("/admin/applications"),
   },
   {
     title: "Users",
     href: "/admin/users",
-    icon: UserMultipleIcon,
+    icon: Users,
     match: (p) => p.startsWith("/admin/users"),
   },
   {
     title: "Payments",
     href: "/admin/payments",
-    icon: DollarCircleIcon,
+    icon: Wallet,
     match: (p) => p.startsWith("/admin/payments"),
   },
   {
     title: "Courses",
     href: "/admin/courses",
-    icon: BookOpen01Icon,
+    icon: BookOpen,
     match: (p) => p.startsWith("/admin/courses"),
   },
   {
     title: "Reviews",
     href: "/admin/reviews",
-    icon: StarIcon,
+    icon: Star,
     match: (p) => p.startsWith("/admin/reviews"),
   },
   {
     title: "Exams",
     href: "/admin/exams",
-    icon: Certificate01Icon,
+    icon: ClipboardCheck,
     match: (p) => p.startsWith("/admin/exams"),
   },
 ]
@@ -91,6 +96,29 @@ const manageItems: NavItem[] = [
 function isActive(item: NavItem, pathname: string) {
   if (item.match) return item.match(pathname)
   return pathname === item.href
+}
+
+function NavRow({ item, active }: { item: NavItem; active: boolean }) {
+  const Icon = item.icon
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        render={<Link href={item.href} />}
+        isActive={active}
+        /* `!` overrides are deliberate: SidebarMenuButton's base cva sets
+           `h-8` and `[&_svg]:size-4`; the system wants 40px hit targets and
+           20px rail icons. */
+        className="!h-10 gap-3 rounded-full px-3 text-[15px] font-medium transition-colors duration-[var(--ws-motion-fast)] data-[active=true]:bg-ws-chip data-[active=true]:font-semibold [&_svg]:!size-5"
+      >
+        <Icon
+          size={20}
+          strokeWidth={2}
+          className={active ? "text-ws-gold" : "text-ws-muted"}
+        />
+        <span className="truncate">{item.title}</span>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  )
 }
 
 export function AdminSidebar() {
@@ -111,19 +139,23 @@ export function AdminSidebar() {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" render={<Link href="/admin" />}>
+            <SidebarMenuButton
+              size="lg"
+              render={<Link href="/admin" />}
+              className="rounded-md transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-chip"
+            >
+              {/* Unified ecosystem lockup (05-screens): gold wsa-mark 26px +
+                  "WorldStreet" Poppins SemiBold 15 + gold app eyebrow. */}
               <Image
-                src="/worldstreet-logo/WorldStreet1x.png"
+                src="/brand/wsa-mark.png"
                 alt="WorldStreet Academy"
-                width={32}
-                height={32}
-                className="h-8 w-8 shrink-0 object-contain"
+                width={26}
+                height={26}
+                className="h-[26px] w-[26px] shrink-0 object-contain"
               />
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">WorldStreet</span>
-                <span className="truncate text-xs text-muted-foreground">
-                  Admin Console
-                </span>
+              <div className="grid flex-1 text-left leading-tight">
+                <span className="truncate font-display text-[15px] font-semibold">WorldStreet</span>
+                <span className="truncate font-sans text-[10px] font-semibold uppercase tracking-[2px] text-ws-gold">Admin</span>
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -136,15 +168,7 @@ export function AdminSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {manageItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    render={<Link href={item.href} />}
-                    isActive={isActive(item, pathname)}
-                  >
-                    <HugeiconsIcon icon={item.icon} size={18} />
-                    <span>{item.title}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                <NavRow key={item.title} item={item} active={isActive(item, pathname)} />
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
@@ -155,15 +179,21 @@ export function AdminSidebar() {
         <SidebarSeparator />
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton render={<Link href="/dashboard" />}>
-              <HugeiconsIcon icon={DashboardSpeed01Icon} size={18} />
-              <span>Student Dashboard</span>
+            <SidebarMenuButton
+              render={<Link href="/dashboard" />}
+              className="!h-10 gap-3 rounded-full px-3 text-[15px] font-medium transition-colors duration-[var(--ws-motion-fast)] [&_svg]:!size-5"
+            >
+              <LayoutDashboard size={20} strokeWidth={2} className="text-ws-muted" />
+              <span className="truncate">Student Dashboard</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton render={<Link href="/instructor" />}>
-              <HugeiconsIcon icon={TeachingIcon} size={18} />
-              <span>Instructor Portal</span>
+            <SidebarMenuButton
+              render={<Link href="/instructor" />}
+              className="!h-10 gap-3 rounded-full px-3 text-[15px] font-medium transition-colors duration-[var(--ws-motion-fast)] [&_svg]:!size-5"
+            >
+              <GraduationCap size={20} strokeWidth={2} className="text-ws-muted" />
+              <span className="truncate">Instructor Portal</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
@@ -171,15 +201,15 @@ export function AdminSidebar() {
               <div className="flex items-center gap-2 min-w-0">
                 <Avatar className="h-7 w-7 shrink-0">
                   {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.firstName} />}
-                  <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                  <AvatarFallback className="bg-ws-chip text-xs text-ws-primary">
                     {userInitials}
                   </AvatarFallback>
                 </Avatar>
-                <div className="grid flex-1 text-left text-sm leading-tight min-w-0">
-                  <span className="truncate font-medium text-xs">
+                <div className="grid flex-1 text-left leading-tight min-w-0">
+                  <span className="truncate text-xs font-medium text-ws-primary">
                     {user.firstName} {user.lastName}
                   </span>
-                  <span className="truncate text-[10px] text-muted-foreground">
+                  <span className="truncate text-[10px] text-ws-subtle">
                     {user.email}
                   </span>
                 </div>
@@ -190,9 +220,12 @@ export function AdminSidebar() {
           <SidebarMenuItem>
             <LogoutConfirmDialog>
               {(openLogout) => (
-                <SidebarMenuButton render={<button type="button" onClick={openLogout} />}>
-                  <HugeiconsIcon icon={Logout01Icon} size={18} />
-                  <span>Log out</span>
+                <SidebarMenuButton
+                  render={<button type="button" onClick={openLogout} />}
+                  className="!h-10 gap-3 rounded-full px-3 text-[15px] font-medium transition-colors duration-[var(--ws-motion-fast)] [&_svg]:!size-5"
+                >
+                  <LogOut size={20} strokeWidth={2} className="text-ws-muted" />
+                  <span className="truncate">Log out</span>
                 </SidebarMenuButton>
               )}
             </LogoutConfirmDialog>

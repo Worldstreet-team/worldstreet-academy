@@ -10,10 +10,11 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { EmptyState } from "@/components/shared/empty-state"
-import { TeachingIcon } from "@hugeicons/core-free-icons"
+import { PageHeader } from "@/components/shared/page-header"
 import { adminListApplications, adminExportApplicationsCsv } from "@/lib/actions/applications"
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import { formatDate, StatusBadge, FilterChips, Pagination } from "@/components/admin/shared"
+import { GraduationCapIcon } from "lucide-react"
 
 type StatusFilter = "active" | "all" | "submitted" | "under_review" | "approved" | "rejected"
 
@@ -61,13 +62,12 @@ export default function AdminApplicationsPage() {
   return (
     <>
       <Topbar variant="admin" />
-      <div className="p-4 sm:p-6 space-y-4 pb-24 md:pb-6">
-        <div>
-          <h1 className="text-lg font-semibold">Instructor applications</h1>
-          <p className="text-sm text-muted-foreground">
-            Review, interview and approve new instructors.
-          </p>
-        </div>
+      <div className="flex-1 px-6 pb-24 pt-8 md:px-8 md:pb-12 lg:px-12">
+        <div className="mx-auto w-full max-w-7xl space-y-8">
+        <PageHeader
+          title="Instructor applications"
+          subline="Review, interview and approve new instructors."
+        />
 
         <div className="flex items-center gap-3 flex-wrap">
           <FilterChips
@@ -94,8 +94,8 @@ export default function AdminApplicationsPage() {
               }}
               className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
                 mine
-                  ? "bg-foreground text-background border-foreground"
-                  : "border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted"
+                  ? "bg-ws-brand text-ws-brand-on border-transparent font-medium"
+                  : "border-ws-hairline text-ws-muted hover:bg-ws-raised hover:text-ws-primary"
               }`}
             >
               Assigned to me
@@ -107,7 +107,7 @@ export default function AdminApplicationsPage() {
                 setPage(1)
               }}
               placeholder="Filter by expertise…"
-              className="h-7 w-40 text-xs"
+              className="h-10 w-44 text-sm"
             />
             <Button
               size="xs"
@@ -123,12 +123,12 @@ export default function AdminApplicationsPage() {
         {isLoading ? (
           <div className="space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-16 rounded-xl" />
+              <Skeleton key={i} className="h-16 rounded-lg" />
             ))}
           </div>
         ) : !data || data.applications.length === 0 ? (
           <EmptyState
-            icon={TeachingIcon}
+            icon={GraduationCapIcon}
             title="No applications here"
             description={
               status === "active"
@@ -143,11 +143,11 @@ export default function AdminApplicationsPage() {
                 <Link
                   key={a.id}
                   href={`/admin/applications/${a.id}`}
-                  className="flex items-center gap-3 rounded-xl border border-border/60 bg-card px-3 py-3 hover:border-primary/30 hover:shadow-sm transition-all"
+                  className="flex items-center gap-3 rounded-lg border border-ws-hairline bg-ws-surface px-3 py-3 transition-colors hover:bg-ws-raised"
                 >
                   <Avatar className="h-9 w-9 shrink-0">
                     {a.applicantAvatar && <AvatarImage src={a.applicantAvatar} />}
-                    <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                    <AvatarFallback className="text-xs bg-ws-chip text-ws-primary">
                       {a.applicantName[0]?.toUpperCase() ?? "?"}
                     </AvatarFallback>
                   </Avatar>
@@ -185,6 +185,7 @@ export default function AdminApplicationsPage() {
             <Pagination page={data.page} pageCount={data.pageCount} onPageChange={setPage} />
           </>
         )}
+        </div>
       </div>
     </>
   )

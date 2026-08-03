@@ -2,21 +2,6 @@
 
 import { useRef, useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  PlayIcon,
-  PauseIcon,
-  VolumeHighIcon,
-  VolumeLowIcon,
-  VolumeMuteIcon,
-  FullScreenIcon,
-  MinimizeScreenIcon,
-  Forward01Icon,
-  Backward01Icon,
-  Settings01Icon,
-  Lamp01Icon,
-  PictureInPictureOnIcon,
-} from "@hugeicons/core-free-icons"
 import { cn } from "@/lib/utils"
 import { AnimatePresence, motion } from "motion/react"
 import { saveWatchProgress } from "@/lib/actions/watch-progress"
@@ -31,6 +16,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import { CheckIcon, FastForwardIcon, LightbulbIcon, MaximizeIcon, MinimizeIcon, PauseIcon, PictureInPicture2Icon, PlayIcon, RewindIcon, SettingsIcon, Volume1Icon, Volume2Icon, VolumeXIcon } from "lucide-react"
+import { RenderIcon } from "@/components/shared/render-icon"
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -147,12 +134,22 @@ export function VideoPlayer({
     }, 3000)
   }, [isPlaying])
 
+  // Arm the auto-hide timer whenever playback state changes. Controls are
+  // revealed by event handlers (togglePlay / onPlay / onPause / mouse move),
+  // so this effect only schedules the hide — no synchronous setState here.
   useEffect(() => {
-    resetHideTimer()
+    if (hideTimeout.current) clearTimeout(hideTimeout.current)
+    if (isPlaying) {
+      hideTimeout.current = setTimeout(() => {
+        setShowControls(false)
+        setShowVolumeSlider(false)
+        setShowSettings(false)
+      }, 3000)
+    }
     return () => {
       if (hideTimeout.current) clearTimeout(hideTimeout.current)
     }
-  }, [resetHideTimer])
+  }, [isPlaying])
 
   /* ---- Video event handlers ---- */
   const handleTimeUpdate = useCallback(() => {
@@ -178,8 +175,10 @@ export function VideoPlayer({
   /* ---- rAF progress sync (always running for smooth bar) ---- */
   const isPlayingRef = useRef(isPlaying)
   const isSeekingRef = useRef(isSeeking)
-  isPlayingRef.current = isPlaying
-  isSeekingRef.current = isSeeking
+  useEffect(() => {
+    isPlayingRef.current = isPlaying
+    isSeekingRef.current = isSeeking
+  }, [isPlaying, isSeeking])
 
   useEffect(() => {
     let raf: number
@@ -237,13 +236,15 @@ export function VideoPlayer({
       if (!video || !isFinite(video.duration)) return
       saveWatchProgress(courseId, lessonId, video.currentTime, video.duration)
     }
-    window.addEventListener("beforeunload", saveOnLeave)
-    document.addEventListener("visibilitychange", () => {
+    const onVisibilityChange = () => {
       if (document.visibilityState === "hidden") saveOnLeave()
-    })
+    }
+    window.addEventListener("beforeunload", saveOnLeave)
+    document.addEventListener("visibilitychange", onVisibilityChange)
     return () => {
       saveOnLeave()
       window.removeEventListener("beforeunload", saveOnLeave)
+      document.removeEventListener("visibilitychange", onVisibilityChange)
     }
   }, [courseId, lessonId])
 
@@ -486,7 +487,28 @@ export function VideoPlayer({
   /* ---- Keyboard shortcuts ---- */
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      // Ignore keystrokes aimed at form fields, editable content, or dialogs.
+      const target = e.target instanceof HTMLElement ? e.target : null
+      if (
+        target &&
+        (target instanceof HTMLInputElement ||
+          target instanceof HTMLTextAreaElement ||
+          target instanceof HTMLSelectElement ||
+          target.isContentEditable ||
+          target.closest('[contenteditable], [role="dialog"], select') !== null)
+      ) {
+        return
+      }
+      // Scope shortcuts to the player: act only when focus is on the page body
+      // (no other widget owns it) or somewhere inside the player container.
+      const active = document.activeElement
+      if (
+        active &&
+        active !== document.body &&
+        !containerRef.current?.contains(active)
+      ) {
+        return
+      }
       switch (e.key) {
         case " ":
         case "k":
@@ -550,10 +572,10 @@ export function VideoPlayer({
   const bufferProgress = duration > 0 ? (buffered / duration) * 100 : 0
   const VolumeIcon =
     isMuted || volume === 0
-      ? VolumeMuteIcon
+      ? VolumeXIcon
       : volume < 0.5
-        ? VolumeLowIcon
-        : VolumeHighIcon
+        ? Volume1Icon
+        : Volume2Icon
 
   /* ---------------------------------------------------------------- */
   /*  Render                                                           */
@@ -584,7 +606,7 @@ export function VideoPlayer({
         onClick={handleVideoTap}
         onWaiting={() => setIsBuffering(true)}
         onPlaying={() => { setIsBuffering(false); setIsPlaying(true) }}
-        onPause={() => setIsPlaying(false)}
+        onPause={() => { setIsPlaying(false); setShowControls(true) }}
         onPlay={() => { setIsPlaying(true); resetHideTimer() }}
         onCanPlay={() => setIsBuffering(false)}
         onSeeked={() => setIsBuffering(false)}
@@ -597,21 +619,20 @@ export function VideoPlayer({
         {seekIndicator && (
           <motion.div
             key={seekIndicator.key}
-            initial={{ opacity: 0.8, scale: 1 }}
-            animate={{ opacity: 0, scale: 1.5 }}
+            initial={{ opacity: 0.8 }}
+            animate={{ opacity: 0 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.5, ease: "easeOut" }}
+            transition={{ duration: 0.32, ease: [0.2, 0, 0, 1] }}
             className={cn(
               "absolute top-0 bottom-0 w-1/3 pointer-events-none flex items-center justify-center",
               seekIndicator.side === "left" ? "left-0 rounded-r-full" : "right-0 rounded-l-full"
             )}
           >
-            <div className="bg-white/20 backdrop-blur-sm rounded-full p-3">
-              <HugeiconsIcon
-                icon={seekIndicator.side === "left" ? Backward01Icon : Forward01Icon}
+            <div className="bg-black/55 rounded-full p-3">
+              <RenderIcon icon={seekIndicator.side === "left" ? RewindIcon : FastForwardIcon}
+                
                 size={24}
-                className="text-white"
-              />
+                className="text-white" />
             </div>
           </motion.div>
         )}
@@ -628,7 +649,7 @@ export function VideoPlayer({
             transition={{ duration: 0.2 }}
             className="absolute inset-0 flex items-center justify-center pointer-events-none z-20"
           >
-            <div className="flex h-12 w-12 md:h-14 md:w-14 items-center justify-center rounded-full bg-black/50 backdrop-blur-sm">
+            <div className="flex h-12 w-12 md:h-14 md:w-14 items-center justify-center rounded-full bg-black/50">
               <svg
                 className="animate-spin h-6 w-6 md:h-7 md:w-7 text-white"
                 xmlns="http://www.w3.org/2000/svg"
@@ -653,7 +674,7 @@ export function VideoPlayer({
             transition={{ duration: 0.15 }}
             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-30"
           >
-            <div className="bg-black/70 backdrop-blur-sm text-white text-lg font-semibold px-5 py-2.5 rounded-xl">
+            <div className="bg-black/70 text-white text-lg font-semibold px-5 py-2.5 rounded-lg">
               {osd}
             </div>
           </motion.div>
@@ -667,8 +688,8 @@ export function VideoPlayer({
           className="absolute inset-0 flex items-center justify-center bg-black/20 transition-opacity"
         >
           <div className="flex h-12 w-12 md:h-16 md:w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg">
-            <HugeiconsIcon icon={PlayIcon} size={22} className="md:hidden" />
-            <HugeiconsIcon icon={PlayIcon} size={28} className="hidden md:block" />
+            <PlayIcon  size={22} className="md:hidden" />
+            <PlayIcon  size={28} className="hidden md:block" />
           </div>
         </button>
       )}
@@ -676,7 +697,7 @@ export function VideoPlayer({
       {/* ---- Controls bar ---- */}
       <div
         className={cn(
-          "absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/80 to-transparent px-2.5 md:px-4 pb-2 md:pb-3 pt-8 md:pt-10 transition-opacity duration-300",
+          "absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/80 to-transparent px-2.5 md:px-4 pb-2 md:pb-3 pt-8 md:pt-10 transition-opacity duration-[var(--ws-motion-base)]",
           showControls && !showOverlay ? "opacity-100" : "opacity-0 pointer-events-none"
         )}
       >
@@ -690,7 +711,7 @@ export function VideoPlayer({
         >
           {/* Buffer bar */}
           <div
-            className="absolute top-0 left-0 h-full rounded-full bg-white/15 transition-[width] duration-300"
+            className="absolute top-0 left-0 h-full rounded-full bg-white/15 transition-[width] duration-[var(--ws-motion-base)]"
             style={{ width: `${bufferProgress}%` }}
           />
           {/* Played progress */}
@@ -716,19 +737,19 @@ export function VideoPlayer({
           {/* Left controls */}
           <div className="flex items-center gap-0.5 md:gap-1.5">
             <button onClick={togglePlay} className="text-white hover:text-primary transition-colors p-1">
-              <HugeiconsIcon icon={isPlaying ? PauseIcon : PlayIcon} size={18} />
+              <RenderIcon icon={isPlaying ? PauseIcon : PlayIcon}  size={18} />
             </button>
             <button
               onClick={() => { skip(-10); flashOsd("-10s") }}
               className="text-white/70 hover:text-white transition-colors p-1"
             >
-              <HugeiconsIcon icon={Backward01Icon} size={16} />
+              <RewindIcon  size={16} />
             </button>
             <button
               onClick={() => { skip(10); flashOsd("+10s") }}
               className="text-white/70 hover:text-white transition-colors p-1"
             >
-              <HugeiconsIcon icon={Forward01Icon} size={16} />
+              <FastForwardIcon  size={16} />
             </button>
 
             {/* Volume with hover slider — hidden on mobile */}
@@ -738,7 +759,7 @@ export function VideoPlayer({
               onMouseLeave={handleVolumeLeave}
             >
               <button onClick={toggleMute} className="text-white/70 hover:text-white transition-colors p-1">
-                <HugeiconsIcon icon={VolumeIcon} size={16} />
+                <VolumeIcon  size={16} />
               </button>
               <AnimatePresence>
                 {showVolumeSlider && (
@@ -793,13 +814,13 @@ export function VideoPlayer({
                   showSettings && "text-white"
                 )}
               >
-                <HugeiconsIcon icon={Settings01Icon} size={16} />
+                <SettingsIcon  size={16} />
               </PopoverTrigger>
               <PopoverContent
                 side="top"
                 align="end"
                 sideOffset={12}
-                className="bg-black/90 backdrop-blur-md border-white/10 min-w-44 overflow-hidden p-0"
+                className="bg-black/90 border-white/10 min-w-44 overflow-hidden p-0"
               >
                 {/* Speed section */}
                 <div className="px-3 py-2 border-b border-white/10">
@@ -821,7 +842,7 @@ export function VideoPlayer({
                     >
                       <span>{rate === 1 ? "Normal" : `${rate}x`}</span>
                       {rate === playbackRate && (
-                        <span className="text-primary text-xs">✓</span>
+                        <CheckIcon size={12} className="text-primary" />
                       )}
                     </button>
                   ))}
@@ -834,7 +855,7 @@ export function VideoPlayer({
               onClick={(e) => { e.stopPropagation(); setShowMobileSettings(true); resetHideTimer() }}
               className="md:hidden text-white/70 hover:text-white transition-colors p-1"
             >
-              <HugeiconsIcon icon={Settings01Icon} size={16} />
+              <SettingsIcon  size={16} />
             </button>
 
             {/* Lights Out — hidden on mobile */}
@@ -846,7 +867,7 @@ export function VideoPlayer({
               )}
               title="Lights Out (L)"
             >
-              <HugeiconsIcon icon={Lamp01Icon} size={16} />
+              <LightbulbIcon  size={16} />
             </button>
 
             {/* PiP — hidden on mobile */}
@@ -855,7 +876,7 @@ export function VideoPlayer({
               className="hidden md:inline-flex text-white/70 hover:text-white transition-colors p-1"
               title="Picture in Picture (P)"
             >
-              <HugeiconsIcon icon={PictureInPictureOnIcon} size={16} />
+              <PictureInPicture2Icon  size={16} />
             </button>
 
             {/* Fullscreen */}
@@ -864,7 +885,7 @@ export function VideoPlayer({
               className="text-white/70 hover:text-white transition-colors p-1"
               title="Fullscreen (F)"
             >
-              <HugeiconsIcon icon={isFullscreen ? MinimizeScreenIcon : FullScreenIcon} size={16} />
+              <RenderIcon icon={isFullscreen ? MinimizeIcon : MaximizeIcon}  size={16} />
             </button>
           </div>
         </div>
@@ -872,7 +893,7 @@ export function VideoPlayer({
 
       {/* ---- Mobile Settings Sheet (rendered outside video via portal) ---- */}
       <Sheet open={showMobileSettings} onOpenChange={setShowMobileSettings}>
-        <SheetContent side="bottom" showCloseButton={false} className="rounded-t-2xl p-0 max-h-[70svh] overflow-auto">
+        <SheetContent side="bottom" showCloseButton={false} className="rounded-t-lg p-0 max-h-[70svh] overflow-auto">
           {/* Drag handle */}
           <div className="flex justify-center pt-2.5 pb-1">
             <div className="h-1 w-8 rounded-full bg-muted-foreground/30" />
@@ -912,7 +933,7 @@ export function VideoPlayer({
                 className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
               >
                 <span className="flex items-center gap-2.5 text-sm">
-                  <HugeiconsIcon icon={Lamp01Icon} size={15} />
+                  <LightbulbIcon  size={15} />
                   Lights Out
                 </span>
                 <span className={cn("text-[10px] font-medium", lightsOut ? "text-primary" : "text-muted-foreground")}>
@@ -924,7 +945,7 @@ export function VideoPlayer({
                 className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
               >
                 <span className="flex items-center gap-2.5 text-sm">
-                  <HugeiconsIcon icon={PictureInPictureOnIcon} size={15} />
+                  <PictureInPicture2Icon  size={15} />
                   Picture in Picture
                 </span>
               </button>

@@ -13,6 +13,8 @@ export async function completeOnboarding() {
   await User.findByIdAndUpdate(currentUser.id, { hasOnboarded: true })
 
   revalidatePath("/")
+  // The onboarding modal is mounted from the (platform) layout off this flag.
+  revalidatePath("/dashboard", "layout")
 
   return { success: true }
 }

@@ -2,24 +2,13 @@
 
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  Video01Icon,
-  UserGroupIcon,
-  Loading03Icon,
-  Clock01Icon,
-  Delete02Icon,
-  ArrowRight01Icon,
-  ArrowDown01Icon,
-  Calendar03Icon,
-  Cancel01Icon,
-} from "@hugeicons/core-free-icons"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { MeetingTimer } from "@/components/meetings/meeting-timer"
 import type { MeetingWithDetails, MeetingHistoryEntry } from "@/lib/actions/meetings"
+import { CalendarDaysIcon, ChevronDownIcon, ChevronRightIcon, ClockIcon, LoaderCircleIcon, Trash2Icon, UsersIcon, VideoIcon, XIcon } from "lucide-react"
 
 /* ── Utility formatters ── */
 
@@ -89,16 +78,16 @@ export function CreateMeetingModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/40"
         onClick={() => onOpenChange(false)}
       />
       {/* Panel */}
-      <div className="relative w-full max-w-sm mx-4 bg-card border border-border/50 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-200">
+      <div className="relative w-full max-w-sm mx-4 bg-card border border-ws-hairline rounded-lg shadow-[var(--ws-shadow-sheet)] overflow-hidden animate-in fade-in-0 zoom-in-95 duration-[var(--ws-motion-base)]">
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-1">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-              <HugeiconsIcon icon={Video01Icon} size={17} className="text-emerald-500" />
+            <div className="w-9 h-9 rounded-lg bg-ws-success/10 flex items-center justify-center">
+              <VideoIcon  size={17} className="text-ws-success" />
             </div>
             <div>
               <h2 className="text-sm font-semibold text-foreground">New Meeting</h2>
@@ -109,7 +98,7 @@ export function CreateMeetingModal({
             onClick={() => onOpenChange(false)}
             className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted/80 transition-colors"
           >
-            <HugeiconsIcon icon={Cancel01Icon} size={16} className="text-muted-foreground" />
+            <XIcon  size={16} className="text-muted-foreground" />
           </button>
         </div>
         {/* Body */}
@@ -120,21 +109,21 @@ export function CreateMeetingModal({
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-            className="h-10 text-sm bg-muted/30 border-border/40 focus-visible:ring-1 focus-visible:ring-emerald-500/30"
+            className="h-10 text-sm bg-muted/30 border-ws-hairline focus-visible:ring-1 focus-visible:ring-ws-success/30"
           />
           <Button
             onClick={handleCreate}
             disabled={!newTitle.trim() || isCreating}
-            className="w-full gap-2 h-10 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-xl"
+            className="w-full gap-2 h-10 bg-ws-success hover:bg-ws-success/90 text-white text-sm font-medium rounded-lg"
           >
             {isCreating ? (
               <>
-                <HugeiconsIcon icon={Loading03Icon} size={15} className="animate-spin" />
+                <LoaderCircleIcon  size={15} className="animate-spin" />
                 Creating...
               </>
             ) : (
               <>
-                <HugeiconsIcon icon={Video01Icon} size={15} />
+                <VideoIcon  size={15} />
                 Create &amp; Join
               </>
             )}
@@ -173,7 +162,7 @@ export function MeetingQuickActions({
       {/* Start Meeting card */}
       <button
         onClick={onCreateNew}
-        className="group relative flex flex-col items-start justify-center p-4 h-[120px] sm:h-[130px] rounded-2xl bg-card border border-border/50 overflow-hidden transition-all hover:border-border/80 hover:shadow-sm active:scale-[0.99]"
+        className="group relative flex flex-col items-start justify-center p-4 h-[120px] sm:h-[130px] rounded-lg bg-card border border-ws-hairline overflow-hidden transition-all hover:border-ws-hairline"
       >
         {/* Illustration positioned at right middle */}
         <div className="absolute md:-right-8 -right-20 top-[54%] -translate-y-1/2 h-[102%] w-[65%] pointer-events-none">
@@ -186,8 +175,8 @@ export function MeetingQuickActions({
           />
         </div>
         <div className="relative z-10 text-left">
-          <div className="w-9 h-9 rounded-xl bg-muted/80 flex items-center justify-center mb-2">
-            <HugeiconsIcon icon={Video01Icon} size={17} className="text-foreground" />
+          <div className="w-9 h-9 rounded-lg bg-muted/80 flex items-center justify-center mb-2">
+            <VideoIcon  size={17} className="text-foreground" />
           </div>
           <h3 className="font-semibold text-sm text-foreground">Start Meeting</h3>
           <p className="text-muted-foreground text-[11px] mt-0.5">Start an instant meeting</p>
@@ -195,7 +184,7 @@ export function MeetingQuickActions({
       </button>
 
       {/* Join card */}
-      <div className="flex flex-col justify-between gap-3 p-4 rounded-2xl border border-border/50 bg-card">
+      <div className="flex flex-col justify-between gap-3 p-4 rounded-lg border border-ws-hairline bg-card">
         <div>
           <h3 className="font-semibold text-sm">Join Meeting</h3>
           <p className="text-[11px] text-muted-foreground mt-0.5">Enter a link or code</p>
@@ -220,7 +209,7 @@ export function MeetingQuickActions({
               className="h-9 px-4"
             >
               {isJoining ? (
-                <HugeiconsIcon icon={Loading03Icon} size={14} className="animate-spin" />
+                <LoaderCircleIcon  size={14} className="animate-spin" />
               ) : (
                 "Join"
               )}
@@ -250,7 +239,7 @@ export function ActiveMeetingsList({
     return (
       <div className="space-y-2">
         {[1, 2].map((i) => (
-          <div key={i} className="h-[72px] rounded-2xl bg-muted/40 animate-pulse" />
+          <div key={i} className="h-[72px] rounded-lg bg-muted/40 animate-pulse" />
         ))}
       </div>
     )
@@ -258,7 +247,7 @@ export function ActiveMeetingsList({
 
   if (meetings.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-border/50 p-8 text-center">
+      <div className="rounded-lg border border-dashed border-ws-hairline p-8 text-center">
         <div className="relative w-28 h-28 mx-auto mb-3">
           <Image
             src="/user/dashboard/no-meeting-yet.png"
@@ -287,18 +276,18 @@ export function ActiveMeetingsList({
         return (
           <button
             key={meeting.id}
-            className="w-full flex items-center gap-3 p-3 rounded-2xl border border-border/30 bg-card hover:bg-muted/30 transition-all text-left group active:scale-[0.99]"
+            className="w-full flex items-center gap-3 p-3 rounded-lg border border-ws-hairline bg-card hover:bg-muted/30 transition-all text-left group"
             onClick={() => onRejoin(meeting)}
           >
             {/* Thumbnail or icon */}
-            <div className="relative w-11 h-11 rounded-xl overflow-hidden bg-muted/40 shrink-0 flex items-center justify-center">
+            <div className="relative w-11 h-11 rounded-lg overflow-hidden bg-muted/40 shrink-0 flex items-center justify-center">
               {thumbnailUrl ? (
                 <Image src={thumbnailUrl} alt={meeting.title} fill className="object-cover" />
               ) : (
-                <HugeiconsIcon icon={Video01Icon} size={18} className="text-muted-foreground/50" />
+                <VideoIcon  size={18} className="text-muted-foreground/50" />
               )}
               {isActive && (
-                <div className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-card" />
+                <div className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-ws-success ring-2 ring-card" />
               )}
             </div>
             <div className="flex-1 min-w-0">
@@ -307,8 +296,7 @@ export function ActiveMeetingsList({
                 {isActive && (
                   <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-muted text-[10px] font-medium text-muted-foreground shrink-0">
                     <span className="relative flex h-1.5 w-1.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-ws-success" />
                     </span>
                     Active
                   </span>
@@ -337,7 +325,7 @@ export function ActiveMeetingsList({
                   </>
                 ) : (
                   <>
-                    <Avatar className="w-4 h-4 border border-border/50">
+                    <Avatar className="w-4 h-4 border border-ws-hairline">
                       {meeting.hostAvatar && (
                         <AvatarImage src={meeting.hostAvatar} alt={hostName} />
                       )}
@@ -351,7 +339,7 @@ export function ActiveMeetingsList({
                 <span className="truncate">{hostName}</span>
                 <span className="text-muted-foreground/30">&middot;</span>
                 <span className="flex items-center gap-0.5 shrink-0">
-                  <HugeiconsIcon icon={UserGroupIcon} size={10} />
+                  <UsersIcon  size={10} />
                   {meeting.participantCount}
                 </span>
               </div>
@@ -359,7 +347,7 @@ export function ActiveMeetingsList({
             <div className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
               <div className="flex items-center gap-1 text-[11px] font-medium text-foreground">
                 Rejoin
-                <HugeiconsIcon icon={ArrowRight01Icon} size={11} />
+                <ChevronRightIcon  size={11} />
               </div>
             </div>
           </button>
@@ -396,7 +384,7 @@ export function MeetingHistory({
     return (
       <div className="space-y-1">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="h-14 rounded-xl bg-muted/20 animate-pulse" />
+          <div key={i} className="h-14 rounded-lg bg-muted/20 animate-pulse" />
         ))}
       </div>
     )
@@ -406,7 +394,7 @@ export function MeetingHistory({
     return (
       <div className="py-10 text-center">
         <div className="w-10 h-10 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-3">
-          <HugeiconsIcon icon={Calendar03Icon} size={18} className="text-muted-foreground/40" />
+          <CalendarDaysIcon  size={18} className="text-muted-foreground/40" />
         </div>
         <p className="text-xs text-muted-foreground">No meeting history yet</p>
       </div>
@@ -421,7 +409,7 @@ export function MeetingHistory({
           <div key={entry.id}>
             <button
               onClick={() => setExpandedId(isExpanded ? null : entry.id)}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted/30 transition-colors text-left group"
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted/30 transition-colors text-left group"
             >
               {/* Stacked avatars (always visible) */}
               <div className="flex items-center -space-x-1.5 shrink-0">
@@ -445,7 +433,7 @@ export function MeetingHistory({
                   </>
                 ) : (
                   <div className="w-7 h-7 rounded-full bg-muted/40 flex items-center justify-center">
-                    <HugeiconsIcon icon={Video01Icon} size={12} className="text-muted-foreground/40" />
+                    <VideoIcon  size={12} className="text-muted-foreground/40" />
                   </div>
                 )}
               </div>
@@ -460,7 +448,7 @@ export function MeetingHistory({
                     <>
                       <span className="text-muted-foreground/20">&middot;</span>
                       <span className="text-[10px] text-muted-foreground/60 flex items-center gap-0.5">
-                        <HugeiconsIcon icon={Clock01Icon} size={9} />
+                        <ClockIcon  size={9} />
                         {formatDuration(entry.duration)}
                       </span>
                     </>
@@ -468,14 +456,13 @@ export function MeetingHistory({
                 </div>
               </div>
 
-              <HugeiconsIcon
-                icon={ArrowDown01Icon}
+              <ChevronDownIcon
+                
                 size={13}
                 className={cn(
-                  "text-muted-foreground/40 shrink-0 transition-transform duration-200",
+                  "text-muted-foreground/40 shrink-0 transition-transform duration-[var(--ws-motion-base)]",
                   isExpanded && "rotate-180"
-                )}
-              />
+                )} />
             </button>
 
             {/* Expanded content */}
@@ -510,9 +497,9 @@ export function MeetingHistory({
                   <button
                     onClick={(e) => handleDelete(e, entry.id)}
                     disabled={deletingId === entry.id}
-                    className="flex items-center gap-1.5 text-[11px] text-muted-foreground/40 hover:text-red-400 transition-colors pt-0.5"
+                    className="flex items-center gap-1.5 text-[11px] text-muted-foreground/40 hover:text-ws-danger transition-colors pt-0.5"
                   >
-                    <HugeiconsIcon icon={Delete02Icon} size={11} />
+                    <Trash2Icon  size={11} />
                     Remove
                   </button>
                 )}
@@ -542,23 +529,22 @@ export function ReturnToMeetingBanner({
     <div className="px-4 pt-2">
       <button
         onClick={onReturn}
-        className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl bg-emerald-500/8 border border-emerald-500/15 hover:bg-emerald-500/12 transition-all active:scale-[0.99]"
+        className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-ws-success/8 border border-ws-success/15 hover:bg-ws-success/12 transition-all"
       >
-        <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
-          <HugeiconsIcon icon={Video01Icon} size={17} className="text-emerald-500" />
+        <div className="w-10 h-10 rounded-lg bg-ws-success/10 flex items-center justify-center shrink-0">
+          <VideoIcon  size={17} className="text-ws-success" />
         </div>
         <div className="flex-1 text-left min-w-0">
           <span className="text-sm font-medium text-foreground truncate block">
             {meetingTitle}
           </span>
-          <span className="text-xs text-emerald-600 dark:text-emerald-400">
+          <span className="text-xs text-ws-success dark:text-ws-success">
             Tap to return to meeting
           </span>
         </div>
         <div className="flex items-center gap-2">
           <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-ws-success" />
           </span>
           <MeetingTimer startTime={meetingStartTime} />
         </div>

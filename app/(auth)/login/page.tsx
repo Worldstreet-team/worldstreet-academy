@@ -9,7 +9,7 @@ export default function LoginPage() {
         appearance={{
           elements: {
             rootBox: "mx-auto",
-            card: "shadow-lg border border-border rounded-2xl",
+            card: "shadow-lg border border-border rounded-lg",
             headerTitle: "text-foreground",
             headerSubtitle: "text-muted-foreground",
             socialButtonsBlockButton: "border-border",

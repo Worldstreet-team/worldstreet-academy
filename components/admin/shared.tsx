@@ -1,7 +1,5 @@
 "use client"
 
-import { Badge } from "@/components/ui/badge"
-
 /** Integer minor units (cents) → "$12.34" */
 export function money(minor: number, currency = "USD"): string {
   const sign = minor < 0 ? "-" : ""
@@ -27,41 +25,60 @@ export function formatDateTime(iso: string): string {
   })
 }
 
-const STATUS_VARIANTS: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+/**
+ * Explicit tone map — gold stays reserved for CTAs and the ADMIN role badge;
+ * everything else reads as success / neutral / danger at a glance.
+ */
+type BadgeTone = "success" | "neutral" | "danger" | "admin" | "subtle"
+
+const TONE_CLASSES: Record<BadgeTone, string> = {
+  success: "bg-ws-success/15 text-ws-success",
+  neutral: "bg-ws-chip text-ws-muted",
+  danger: "bg-ws-danger/15 text-ws-danger",
+  admin: "bg-ws-brand/15 text-ws-gold",
+  subtle: "bg-ws-chip text-ws-subtle",
+}
+
+const STATUS_TONES: Record<string, BadgeTone> = {
   // orders
-  enrolled: "default",
-  paid: "secondary",
-  pending: "outline",
-  payment_requested: "outline",
-  failed: "destructive",
-  cancelled: "outline",
-  refunded: "destructive",
+  enrolled: "success",
+  paid: "success",
+  pending: "neutral",
+  payment_requested: "neutral",
+  failed: "danger",
+  cancelled: "neutral",
+  refunded: "danger", // terminal — money left the platform
   // earnings
-  cleared: "default",
-  reversed: "destructive",
+  cleared: "success",
+  reversed: "danger",
   // applications
-  submitted: "secondary",
-  under_review: "default",
-  interview_scheduled: "default",
-  approved: "default",
-  rejected: "destructive",
-  withdrawn: "outline",
-  // courses
-  draft: "outline",
-  published: "default",
-  archived: "secondary",
+  submitted: "neutral",
+  under_review: "neutral",
+  interview_scheduled: "neutral",
+  approved: "success",
+  rejected: "danger",
+  withdrawn: "neutral",
+  // courses / exams
+  draft: "neutral",
+  published: "success",
+  archived: "neutral",
+  completed: "success",
+  passed: "success",
+  banned: "danger",
   // roles
-  USER: "outline",
-  INSTRUCTOR: "secondary",
-  ADMIN: "default",
+  USER: "subtle",
+  INSTRUCTOR: "neutral",
+  ADMIN: "admin",
 }
 
 export function StatusBadge({ status }: { status: string }) {
-  const variant = STATUS_VARIANTS[status] ?? "outline"
+  const tone = STATUS_TONES[status] ?? "neutral"
   return (
-    <Badge variant={variant} className="text-[10px] capitalize">
+    <span
+      className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${TONE_CLASSES[tone]}`}
+    >
       {status.replace(/_/g, " ")}
-    </Badge>
+    </span>
   )
 }
 
@@ -82,18 +99,18 @@ export function Pagination({
         type="button"
         disabled={page <= 1}
         onClick={() => onPageChange(page - 1)}
-        className="text-xs px-3 py-1.5 rounded-lg border border-border/60 hover:bg-muted disabled:opacity-40 disabled:pointer-events-none transition-colors"
+        className="text-xs px-3 py-1.5 rounded-sm border border-ws-hairline text-ws-muted hover:bg-ws-raised hover:text-ws-primary disabled:opacity-40 disabled:pointer-events-none transition-colors"
       >
         Previous
       </button>
-      <span className="text-xs text-muted-foreground">
+      <span className="text-xs text-ws-muted">
         Page {page} of {pageCount}
       </span>
       <button
         type="button"
         disabled={page >= pageCount}
         onClick={() => onPageChange(page + 1)}
-        className="text-xs px-3 py-1.5 rounded-lg border border-border/60 hover:bg-muted disabled:opacity-40 disabled:pointer-events-none transition-colors"
+        className="text-xs px-3 py-1.5 rounded-sm border border-ws-hairline text-ws-muted hover:bg-ws-raised hover:text-ws-primary disabled:opacity-40 disabled:pointer-events-none transition-colors"
       >
         Next
       </button>
@@ -120,8 +137,8 @@ export function FilterChips<T extends string>({
           onClick={() => onChange(opt.value)}
           className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
             value === opt.value
-              ? "bg-foreground text-background border-foreground"
-              : "border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted"
+              ? "bg-ws-brand text-ws-brand-on border-transparent font-medium"
+              : "border-ws-hairline text-ws-muted hover:bg-ws-raised hover:text-ws-primary"
           }`}
         >
           {opt.label}

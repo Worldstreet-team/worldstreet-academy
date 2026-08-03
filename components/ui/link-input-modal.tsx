@@ -11,8 +11,7 @@ import {
 } from "@/components/ui/responsive-modal"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { Delete01Icon } from "@hugeicons/core-free-icons"
+import { Trash2Icon } from "lucide-react"
 
 interface LinkInputModalProps {
   /** Current URL value */
@@ -101,7 +100,7 @@ export function LinkInputModal({
                 size="sm"
                 onClick={handleRemove}
               >
-                <HugeiconsIcon icon={Delete01Icon} size={14} />
+                <Trash2Icon  size={14} />
                 Remove
               </Button>
             )}

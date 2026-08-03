@@ -3,14 +3,11 @@
 import Image from "next/image"
 import { useState } from "react"
 import { motion } from "motion/react"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  ShoppingCart01Icon,
-  CheckmarkCircle02Icon,
-} from "@hugeicons/core-free-icons"
 import { useVivid } from "@/lib/vivid/provider"
 import type { OnDemandUI } from "@/lib/vivid/types"
 import { parseConfig } from "./helpers"
+import { CircleCheckBigIcon, ShoppingCartIcon } from "lucide-react"
+import { RenderIcon } from "@/components/shared/render-icon"
 
 export function CheckoutConfirmUI({ ui }: { ui: OnDemandUI }) {
   const vivid = useVivid()
@@ -24,7 +21,7 @@ export function CheckoutConfirmUI({ ui }: { ui: OnDemandUI }) {
   return (
     <div className="space-y-5">
       {/* Course preview */}
-      <div className="rounded-2xl overflow-hidden border border-border/30 bg-card/60">
+      <div className="rounded-lg overflow-hidden border border-ws-hairline bg-card/60">
         {config.thumbnailUrl && (
           <div className="relative w-full aspect-2/1 bg-muted">
             <Image
@@ -42,7 +39,7 @@ export function CheckoutConfirmUI({ ui }: { ui: OnDemandUI }) {
           </p>
 
           {/* Price breakdown */}
-          <div className="space-y-2 pt-2 border-t border-border/20">
+          <div className="space-y-2 pt-2 border-t border-ws-hairline">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Price</span>
               <span className="font-semibold text-foreground">${price.toFixed(2)}</span>
@@ -66,7 +63,7 @@ export function CheckoutConfirmUI({ ui }: { ui: OnDemandUI }) {
 
       {/* Insufficient balance warning */}
       {!canAfford && (
-        <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20">
+        <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
           <p className="text-xs text-destructive">
             Insufficient balance. You need ${(price - balance).toFixed(2)} more.
           </p>
@@ -76,16 +73,14 @@ export function CheckoutConfirmUI({ ui }: { ui: OnDemandUI }) {
       {/* Action buttons */}
       <div className="flex gap-2">
         <motion.button
-          whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={() => vivid.resolveUI({ confirmed: false })}
-          className="flex-1 py-3 px-4 rounded-xl text-sm font-medium bg-accent/40
+          className="flex-1 py-3 px-4 rounded-lg text-sm font-medium bg-accent/40
                      hover:bg-accent/60 transition-colors"
         >
           Cancel
         </motion.button>
         <motion.button
-          whileHover={canAfford ? { scale: 1.02 } : {}}
           whileTap={canAfford ? { scale: 0.98 } : {}}
           disabled={!canAfford || isPurchasing}
           onClick={async () => {
@@ -93,7 +88,7 @@ export function CheckoutConfirmUI({ ui }: { ui: OnDemandUI }) {
             vivid.resolveUI({ confirmed: true, courseId: config.courseId })
           }}
           className={`
-            flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-medium
+            flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg text-sm font-medium
             transition-colors disabled:opacity-40
             ${canAfford
               ? "bg-foreground text-background hover:bg-foreground/90"
@@ -104,7 +99,7 @@ export function CheckoutConfirmUI({ ui }: { ui: OnDemandUI }) {
           {isPurchasing ? (
             <span className="inline-block w-4 h-4 border-2 border-background/30 border-t-background rounded-full animate-spin" />
           ) : (
-            <HugeiconsIcon icon={canAfford ? ShoppingCart01Icon : CheckmarkCircle02Icon} size={16} />
+            <RenderIcon icon={canAfford ? ShoppingCartIcon : CircleCheckBigIcon}  size={16} />
           )}
           {isPurchasing ? "Processing…" : canAfford ? `Pay $${price.toFixed(2)}` : "Insufficient funds"}
         </motion.button>

@@ -1,13 +1,11 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
 import { Topbar } from "@/components/platform/topbar"
+import { PageHeader } from "@/components/shared/page-header"
 import { fetchCourseForEdit } from "@/lib/actions/instructor"
 import { LessonManager } from "@/components/instructor/lesson-manager"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { ArrowLeft01Icon, Edit01Icon } from "@hugeicons/core-free-icons"
+import { ArrowLeft, Pencil } from "lucide-react"
 
 export default async function CourseLessonsPage({
   params,
@@ -16,11 +14,11 @@ export default async function CourseLessonsPage({
 }) {
   const { courseId } = await params
   const data = await fetchCourseForEdit(courseId)
-  
+
   if (!data) notFound()
 
   const { course, lessons: rawLessons } = data
-  
+
   // Transform lessons to match expected format
   const lessons = rawLessons.map((l, idx) => ({
     id: l.id,
@@ -36,57 +34,43 @@ export default async function CourseLessonsPage({
     isFree: l.isFree,
   }))
 
+  const totalMinutes = lessons.reduce((s, l) => s + (l.duration ?? 0), 0)
+
   return (
     <>
-      <Topbar 
-        title="Manage Lessons" 
+      <Topbar
+        title="Manage Lessons"
         variant="instructor"
         breadcrumbOverrides={{ [courseId]: course.title }}
       />
-      <div className="p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            render={<Link href="/instructor/courses" />}
-          >
-            <HugeiconsIcon icon={ArrowLeft01Icon} size={16} />
-            Back
-          </Button>
-          <Separator orientation="vertical" className="!h-4" />
-          <div className="flex-1 min-w-0">
-            <h1 className="text-lg font-bold truncate">{course.title}</h1>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Badge
-                variant={
-                  course.status === "published" ? "default" : "secondary"
-                }
-                className="text-[10px] capitalize"
-              >
-                {course.status}
-              </Badge>
-              <span>{lessons.length} lessons</span>
-              <span>·</span>
-              <span>
-                {lessons.reduce((s, l) => s + (l.duration ?? 0), 0)} min total
-              </span>
-            </div>
+      <div className="flex-1 px-6 pb-24 pt-8 md:px-8 md:pb-12 lg:px-12">
+        <div className="mx-auto w-full max-w-7xl space-y-8">
+          <div className="">
+            <Link
+              href="/instructor/courses"
+              className="mb-2 inline-flex h-10 items-center gap-1.5 text-[13px] font-medium text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:text-ws-primary"
+            >
+              <ArrowLeft size={14} strokeWidth={2} />
+              Back to Courses
+            </Link>
+            <PageHeader
+              title={course.title}
+              subline={`${course.status === "published" ? "Published" : course.status === "archived" ? "Archived" : "Draft"} · ${lessons.length} ${lessons.length === 1 ? "lesson" : "lessons"} · ${totalMinutes} min total`}
+              action={
+                <Button
+                  variant="outline"
+                  render={<Link href={`/instructor/courses/${courseId}/edit`} />}
+                >
+                  <Pencil size={14} strokeWidth={2} />
+                  Edit Course
+                </Button>
+              }
+            />
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            render={<Link href={`/instructor/courses/${courseId}/edit`} />}
-          >
-            <HugeiconsIcon icon={Edit01Icon} size={14} />
-            Edit Course
-          </Button>
+
+          {/* Lesson Manager */}
+          <LessonManager courseId={courseId} lessons={lessons} />
         </div>
-
-        <Separator />
-
-        {/* Lesson Manager */}
-        <LessonManager courseId={courseId} lessons={lessons} />
       </div>
     </>
   )

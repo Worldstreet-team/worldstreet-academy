@@ -709,7 +709,7 @@ export async function submitExamAttempt(
         const isFinal = (exam.scope ?? "final") === "final"
         void notifyUser(user.id, {
           type: "course",
-          title: `You passed ${exam.title} 🎉`,
+          title: `You passed ${exam.title}`,
           body: isFinal
             ? `Score: ${graded.scorePercent}% — your certificate is unlocked.`
             : `Knowledge check score: ${graded.scorePercent}%. Keep going!`,

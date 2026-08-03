@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import Link from "next/link"
-import Image from "next/image"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { Badge } from "@/components/ui/badge"
@@ -19,16 +18,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
 } from "@/components/ui/dropdown-menu"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  Notification03Icon,
-  BookOpen01Icon,
-  Award02Icon,
-  UserMultipleIcon,
-  AlertCircleIcon,
-  DollarCircleIcon,
-  MeetingRoomIcon,
-} from "@hugeicons/core-free-icons"
+import { Bell } from "lucide-react"
 import {
   getMyNotifications,
   markAllNotificationsRead,
@@ -37,26 +27,27 @@ import {
 } from "@/lib/actions/notifications"
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import type { SSEEventPayload } from "@/lib/call-events"
+import { AwardIcon, BellIcon, BookOpenIcon, CircleAlertIcon, CircleDollarSignIcon, DoorOpenIcon, UsersIcon } from "lucide-react"
 
-const typeIcons = {
-  application: Award02Icon,
-  course: BookOpen01Icon,
-  payment: DollarCircleIcon,
-  meeting: MeetingRoomIcon,
-  social: UserMultipleIcon,
-  system: AlertCircleIcon,
+export const typeIcons = {
+  application: AwardIcon,
+  course: BookOpenIcon,
+  payment: CircleDollarSignIcon,
+  meeting: DoorOpenIcon,
+  social: UsersIcon,
+  system: CircleAlertIcon,
 } as const
 
-const typeColors = {
-  application: "text-orange-500",
+export const typeColors = {
+  application: "text-ws-warning",
   course: "text-primary",
-  payment: "text-emerald-600",
-  meeting: "text-blue-500",
-  social: "text-blue-500",
+  payment: "text-ws-success",
+  meeting: "text-ws-forex",
+  social: "text-ws-forex",
   system: "text-muted-foreground",
 } as const
 
-function timeAgo(iso: string): string {
+export function timeAgo(iso: string): string {
   const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
   if (seconds < 60) return "just now"
   const minutes = Math.floor(seconds / 60)
@@ -74,11 +65,13 @@ function NotificationList({
   isLoading,
   onMarkAllRead,
   onItemClick,
+  onViewAll,
 }: {
   notifications: NotificationItem[]
   isLoading: boolean
   onMarkAllRead: () => void
   onItemClick: (n: NotificationItem) => void
+  onViewAll: () => void
 }) {
   const unreadCount = notifications.filter((n) => !n.read).length
 
@@ -116,15 +109,9 @@ function NotificationList({
           ))}
         </div>
       ) : notifications.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 text-center px-4">
-          <div className="relative w-28 h-28 mb-2">
-            <Image
-              src="/user/dashboard/notification-bell-empty-state.png"
-              alt="No notifications"
-              fill
-              className="object-contain"
-              sizes="112px"
-            />
+        <div className="flex flex-col items-center justify-center py-10 text-center px-4">
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-ws-raised">
+            <Bell className="h-5 w-5 text-ws-muted" />
           </div>
           <p className="text-sm font-medium">No notifications</p>
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -135,7 +122,7 @@ function NotificationList({
         <ScrollArea className="max-h-[360px]">
           <div className="py-1">
             {notifications.map((notification) => {
-              const Icon = typeIcons[notification.type] ?? AlertCircleIcon
+              const Icon = typeIcons[notification.type] ?? CircleAlertIcon
               const colorClasses = typeColors[notification.type] ?? "text-muted-foreground"
 
               const content = (
@@ -145,7 +132,7 @@ function NotificationList({
                   }`}
                 >
                   <div className={`shrink-0 ${colorClasses}`}>
-                    <HugeiconsIcon icon={Icon} size={18} />
+                    <Icon  size={18} />
                   </div>
                   <div className="flex-1 min-w-0 space-y-0.5">
                     <div className="flex items-center gap-2">
@@ -184,6 +171,16 @@ function NotificationList({
           </div>
         </ScrollArea>
       )}
+
+      {/* Footer — full inbox */}
+      <Separator />
+      <Link
+        href="/dashboard/notifications"
+        onClick={onViewAll}
+        className="flex h-10 items-center justify-center text-xs font-medium text-primary transition-colors hover:bg-muted/50"
+      >
+        View all notifications
+      </Link>
     </div>
   )
 }
@@ -237,12 +234,12 @@ export function NotificationBell() {
   const triggerButton = (
     <button
       type="button"
-      className="relative flex h-8 w-8 items-center justify-center rounded-full border text-muted-foreground hover:bg-muted transition-colors"
+      className="relative flex h-10 w-10 items-center justify-center rounded-full text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-chip hover:text-ws-primary"
       aria-label="Notifications"
     >
-      <HugeiconsIcon icon={Notification03Icon} size={16} />
+      <BellIcon  size={18} />
       {unreadCount > 0 && (
-        <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground">
+        <span className="absolute top-0.5 right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground">
           {unreadCount > 99 ? "99+" : unreadCount}
         </span>
       )}
@@ -258,7 +255,7 @@ export function NotificationBell() {
           <SheetContent
             side="bottom"
             showCloseButton={false}
-            className="rounded-t-2xl p-0 max-h-[85svh]"
+            className="rounded-t-lg p-0 max-h-[85svh]"
           >
             {/* Drag handle */}
             <div className="flex justify-center pt-3 pb-1">
@@ -279,6 +276,7 @@ export function NotificationBell() {
               isLoading={isLoading}
               onMarkAllRead={() => markAllMutation.mutate()}
               onItemClick={handleItemClick}
+              onViewAll={() => setOpen(false)}
             />
           </SheetContent>
         </Sheet>
@@ -312,6 +310,7 @@ export function NotificationBell() {
           isLoading={isLoading}
           onMarkAllRead={() => markAllMutation.mutate()}
           onItemClick={handleItemClick}
+          onViewAll={() => setOpen(false)}
         />
       </DropdownMenuContent>
     </DropdownMenu>

@@ -13,13 +13,8 @@ import { useUser } from "@/components/providers/user-provider"
 import { SignatureCanvas } from "@/components/shared/signature-canvas"
 import { updateAvatar, updateProfile } from "@/lib/actions/profile"
 import { getImageUploadUrl } from "@/lib/actions/upload"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  Camera02Icon,
-  Tick02Icon,
-  PencilEdit02Icon,
-} from "@hugeicons/core-free-icons"
 import { cn } from "@/lib/utils"
+import { CameraIcon, CheckIcon, PencilLineIcon } from "lucide-react"
 
 export default function ProfilePage() {
   const user = useUser()
@@ -103,7 +98,7 @@ export default function ProfilePage() {
                 onClick={() => avatarInputRef.current?.click()}
                 disabled={isUploading}
               >
-                <Avatar className="h-20 w-20 ring-2 ring-neutral-100 dark:ring-neutral-800">
+                <Avatar className="h-20 w-20 ring-2 ring-ws-track">
                   {avatarPreview && (
                     <AvatarImage src={avatarPreview} alt={fullName} />
                   )}
@@ -141,11 +136,10 @@ export default function ProfilePage() {
                       />
                     </svg>
                   ) : (
-                    <HugeiconsIcon
-                      icon={Camera02Icon}
+                    <CameraIcon
+                      
                       size={18}
-                      className="text-white"
-                    />
+                      className="text-white" />
                   )}
                 </div>
 
@@ -252,8 +246,8 @@ export default function ProfilePage() {
                 )}
                 <div className="flex items-center justify-between">
                   {saved && (
-                    <p className="text-xs text-emerald-600 flex items-center gap-1">
-                      <HugeiconsIcon icon={Tick02Icon} size={14} />
+                    <p className="text-xs text-ws-success flex items-center gap-1">
+                      <CheckIcon  size={14} />
                       Profile updated
                     </p>
                   )}
@@ -263,7 +257,7 @@ export default function ProfilePage() {
                     className="ml-auto gap-1.5"
                     onClick={() => setIsEditing(true)}
                   >
-                    <HugeiconsIcon icon={PencilEdit02Icon} size={14} />
+                    <PencilLineIcon  size={14} />
                     Edit Profile
                   </Button>
                 </div>
@@ -284,7 +278,7 @@ export default function ProfilePage() {
 
             {signatureUrl && !showSignatureCanvas ? (
               <div className="flex items-center gap-4">
-                <div className="w-48 h-20 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-950 flex items-center justify-center overflow-hidden">
+                <div className="w-48 h-20 rounded-lg border border-ws-hairline bg-ws-sunken flex items-center justify-center overflow-hidden">
                   <img
                     src={signatureUrl}
                     alt="Your signature"
@@ -292,8 +286,8 @@ export default function ProfilePage() {
                   />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <p className="text-xs text-emerald-600 flex items-center gap-1">
-                    <HugeiconsIcon icon={Tick02Icon} size={14} />
+                  <p className="text-xs text-ws-success flex items-center gap-1">
+                    <CheckIcon  size={14} />
                     Signature saved
                   </p>
                   <button

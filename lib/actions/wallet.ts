@@ -311,7 +311,7 @@ export async function syncDollarDepositAction(txRef: string) {
       await connectDB()
       void notifyUser(user.id, {
         type: "payment",
-        title: "Deposit credited 🎉",
+        title: "Deposit credited",
         body: "Your USD deposit has landed in your Worldstreet balance.",
         href: "/dashboard/wallet",
       })

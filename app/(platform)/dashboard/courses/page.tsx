@@ -3,31 +3,22 @@
 import { useState, useMemo } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { Search01Icon, FilterIcon } from "@hugeicons/core-free-icons"
 import { Topbar } from "@/components/platform/topbar"
 import { CourseGrid } from "@/components/courses/course-grid"
 import { CourseGridSkeleton } from "@/components/skeletons/course-skeletons"
+import { ArtSearch } from "@/components/shared/illustrations"
+import { levelChipStyle } from "@/components/shared/level-badge"
 import { type BrowseCourse } from "@/lib/actions/student"
 import { useBrowseCourses } from "@/lib/hooks/queries"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { PlaceholdersAndVanishInput } from "@/components/ui/placeholders-and-vanish-input"
 import {
   Popover,
   PopoverTrigger,
   PopoverContent,
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
-
-const SEARCH_PLACEHOLDERS = [
-  "Learn about DeFi yield strategies…",
-  "How to read candlestick charts?",
-  "Introduction to blockchain consensus",
-  "Master technical analysis patterns",
-  "What is an NFT smart contract?",
-  "Risk management for crypto portfolios",
-]
+import { FilterIcon, SearchIcon } from "lucide-react"
 
 const LEVEL_TABS = ["All", "Beginner", "Intermediate", "Advanced"] as const
 type Level = (typeof LEVEL_TABS)[number]
@@ -71,29 +62,26 @@ export default function BrowseCoursesPage() {
             </p>
           </div>
 
-          {/* Search + Filter row */}
+          {/* Search + Filter row — DS SearchField: pill, chip fill, 16px
+              search glyph, static placeholder */}
           <div className="flex items-center gap-3">
             <div className="relative flex-1">
-              <HugeiconsIcon
-                icon={Search01Icon}
+              <SearchIcon
                 size={16}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none z-50"
-              />
-              <PlaceholdersAndVanishInput
-                placeholders={SEARCH_PLACEHOLDERS}
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-ws-subtle pointer-events-none" />
+              <input
+                type="search"
+                value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                onSubmit={(e) => e.preventDefault()}
-                className="max-w-none mx-0 rounded-lg h-10 bg-muted/40 border-border shadow-none"
-                inputClassName="pl-9 pr-3 rounded-lg"
-                placeholderClassName="pl-9"
-                hideSubmitButton
+                placeholder="Search courses"
+                className="h-10 w-full rounded-full bg-ws-chip pl-10 pr-4 text-sm text-ws-primary placeholder:text-ws-subtle outline-none border border-transparent transition-colors duration-[var(--ws-motion-fast)] focus:border-ws-brand"
               />
             </div>
             <Popover>
               <PopoverTrigger
                 className="shrink-0 h-10 px-3 rounded-lg border bg-background hover:bg-muted/50 transition-colors flex items-center gap-2 text-sm font-medium"
               >
-                <HugeiconsIcon icon={FilterIcon} size={16} className="text-muted-foreground" />
+                <FilterIcon  size={16} className="text-muted-foreground" />
                 Filters
                 {(activeLevel !== "All" || priceFilter !== "All") && (
                   <Badge className="h-4 w-4 p-0 text-[9px] flex items-center justify-center">
@@ -198,7 +186,11 @@ export default function BrowseCoursesPage() {
                       {course.instructorName} · {course.totalLessons} lessons · <span className="capitalize">{course.level}</span>
                     </p>
                   </div>
-                  <Badge variant="secondary" className="text-[10px] capitalize shrink-0">
+                  <Badge
+                    variant="secondary"
+                    className="text-[10px] capitalize shrink-0"
+                    style={levelChipStyle(course.level)}
+                  >
                     {course.level}
                   </Badge>
                 </Link>
@@ -215,6 +207,7 @@ export default function BrowseCoursesPage() {
           </div>
         ) : filtered.length === 0 && search.trim() ? (
           <div className="flex flex-col items-center justify-center py-16 text-sm text-muted-foreground">
+            <ArtSearch className="mb-4 w-40" />
             <p>No courses match &quot;{search}&quot;</p>
             <button
               type="button"

@@ -13,15 +13,7 @@ import {
   fetchInstructorPublicCourses,
   fetchEnrolledCoursesFromInstructor,
 } from "@/lib/actions/student"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  StarIcon,
-  BookOpen01Icon,
-  UserMultipleIcon,
-  ArrowLeft01Icon,
-  Calendar01Icon,
-  LinkSquare01Icon,
-} from "@hugeicons/core-free-icons"
+import { BookOpenIcon, CalendarIcon, ChevronLeftIcon, ExternalLinkIcon, StarIcon, UsersIcon } from "lucide-react"
 
 // Force dynamic rendering to show fresh instructor avatars
 export const revalidate = 0
@@ -66,7 +58,7 @@ export default async function InstructorProfilePage({
       />
       <div className="flex-1 pb-24 md:pb-8">
         {/* Header */}
-        <div className="relative bg-gradient-to-b from-primary/10 to-background pt-4 pb-8 px-4 md:px-6 lg:px-8">
+        <div className="relative bg-ws-surface border-b border-ws-hairline pt-4 pb-8 px-4 md:px-6 lg:px-8">
           {/* Back button */}
           <Button
             variant="ghost"
@@ -74,7 +66,7 @@ export default async function InstructorProfilePage({
             render={<Link href="/dashboard/courses" />}
             className="absolute top-3 left-3 md:left-6"
           >
-            <HugeiconsIcon icon={ArrowLeft01Icon} size={16} />
+            <ChevronLeftIcon  size={16} />
           </Button>
 
           <div className="flex flex-col items-center text-center pt-8 space-y-4">
@@ -100,11 +92,10 @@ export default async function InstructorProfilePage({
               <div className="flex items-center gap-6 text-sm">
                 {instructor.totalCourses > 0 && (
                   <div className="flex items-center gap-1.5">
-                    <HugeiconsIcon
-                      icon={BookOpen01Icon}
+                    <BookOpenIcon
+                      
                       size={16}
-                      className="text-primary"
-                    />
+                      className="text-primary" />
                     <span className="font-semibold">{instructor.totalCourses}</span>
                     <span className="text-muted-foreground">
                       {instructor.totalCourses === 1 ? 'Course' : 'Courses'}
@@ -113,11 +104,10 @@ export default async function InstructorProfilePage({
                 )}
                 {instructor.totalStudents > 0 && (
                   <div className="flex items-center gap-1.5">
-                    <HugeiconsIcon
-                      icon={UserMultipleIcon}
+                    <UsersIcon
+                      
                       size={16}
-                      className="text-primary"
-                    />
+                      className="text-primary" />
                     <span className="font-semibold">
                       {instructor.totalStudents.toLocaleString()}
                     </span>
@@ -160,7 +150,7 @@ export default async function InstructorProfilePage({
           {/* Member since & Social Links */}
           <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
             <div className="flex items-center gap-1.5">
-              <HugeiconsIcon icon={Calendar01Icon} size={14} />
+              <CalendarIcon  size={14} />
               <span>Member since {memberSince}</span>
             </div>
 
@@ -171,7 +161,7 @@ export default async function InstructorProfilePage({
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 hover:text-primary transition-colors"
               >
-                <HugeiconsIcon icon={LinkSquare01Icon} size={14} />
+                <ExternalLinkIcon  size={14} />
                 <span>Website</span>
               </a>
             )}
@@ -275,7 +265,7 @@ function CourseCard({
 }) {
   return (
     <Link href={`/dashboard/courses/${course.id}`}>
-      <Card className="overflow-hidden hover:shadow-md transition-shadow">
+      <Card className="overflow-hidden transition-shadow">
         {/* Thumbnail */}
         <div className="relative aspect-video bg-muted">
           {course.thumbnailUrl ? (
@@ -288,17 +278,16 @@ function CourseCard({
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center">
-              <HugeiconsIcon
-                icon={BookOpen01Icon}
+              <BookOpenIcon
+                
                 size={32}
-                className="text-muted-foreground"
-              />
+                className="text-muted-foreground" />
             </div>
           )}
 
           {/* Enrolled badge */}
           {enrolled && (
-            <Badge className="absolute top-2 left-2 text-[10px] bg-green-500 hover:bg-green-500">
+            <Badge className="absolute top-2 left-2 text-[10px] bg-ws-success hover:bg-ws-success/90">
               Enrolled
             </Badge>
           )}
@@ -324,19 +313,18 @@ function CourseCard({
 
             {course.rating && (
               <div className="flex items-center gap-1">
-                <HugeiconsIcon
-                  icon={StarIcon}
+                <StarIcon
+                  
                   size={12}
-                  className="text-orange-400"
-                  fill="currentColor"
-                />
+                  className="text-ws-rating"
+                  fill="currentColor" />
                 <span>{course.rating}</span>
               </div>
             )}
           </div>
 
           <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-            <HugeiconsIcon icon={UserMultipleIcon} size={12} />
+            <UsersIcon  size={12} />
             <span>{course.enrolledCount.toLocaleString()} students</span>
           </div>
         </CardContent>

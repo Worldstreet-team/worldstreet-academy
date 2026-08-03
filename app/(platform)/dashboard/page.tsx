@@ -2,58 +2,185 @@
 
 import * as React from "react"
 import Link from "next/link"
-import Image from "next/image"
+import { ArrowRight } from "lucide-react"
 import { Topbar } from "@/components/platform/topbar"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { RadialProgress } from "@/components/ui/radial-progress"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Skeleton } from "@/components/ui/skeleton"
+import { CourseCard, CourseCardSkeleton } from "@/components/platform/course-card"
+import { Mascot } from "@/components/platform/mascot"
+import type { StudentEnrollment } from "@/lib/actions/student"
+
 import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselPrevious,
-  CarouselNext,
-} from "@/components/ui/carousel"
-import { EmptyState } from "@/components/shared/empty-state"
-import { 
-  type StudentEnrollment,
-  type BrowseCourse,
-} from "@/lib/actions/student"
-import { useEnrollments, useBookmarks, useBookmarkedIds, useBrowseCourses, useToggleBookmark } from "@/lib/hooks/queries"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  ArrowRight01Icon,
-  StarIcon,
-  Bookmark01Icon,
-  Search01Icon,
-  Tick02Icon,
-  Certificate01Icon,
-} from "@hugeicons/core-free-icons"
+  useEnrollments,
+  useBookmarks,
+  useBookmarkedIds,
+  useBrowseCourses,
+  useToggleBookmark,
+} from "@/lib/hooks/queries"
 import { useUser } from "@/components/providers/user-provider"
 
-// Skeleton loader for course cards
-function CourseCardSkeleton() {
+function getGreeting(): string {
+  const hour = new Date().getHours()
+  if (hour < 12) return "Good morning"
+  if (hour < 17) return "Good afternoon"
+  return "Good evening"
+}
+
+/**
+ * Section header — title left, "See all" gold link right, per the Academy Home
+ * reference screen. Sections are separated by space, not by nested cards.
+ */
+function SectionHeader({
+  title,
+  href,
+  linkLabel = "See all",
+}: {
+  title: string
+  href?: string
+  linkLabel?: string
+}) {
   return (
-    <Card className="h-full">
-      <Skeleton className="aspect-video w-full" />
-      <CardContent className="p-4 space-y-3">
-        <Skeleton className="h-4 w-3/4" />
+    <div className="mb-4 flex items-baseline justify-between gap-4">
+      <h2 className="font-display text-xl font-semibold tracking-[-0.015em] text-ws-primary">
+        {title}
+      </h2>
+      {href && (
+        <Link
+          href={href}
+          className="group inline-flex items-center gap-1 text-[13px] font-medium text-ws-gold transition-opacity hover:opacity-80"
+        >
+          {linkLabel}
+          <ArrowRight
+            size={14}
+            strokeWidth={2}
+            aria-hidden
+            className="transition-transform duration-[var(--ws-motion-fast)] group-hover:translate-x-0.5"
+          />
+        </Link>
+      )}
+    </div>
+  )
+}
+
+/** 3-up grid, 24px gutters — the reference's course grid. */
+function CourseGrid({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      {children}
+    </div>
+  )
+}
+
+/**
+ * Compact empty state, sized to sit in the flow of a course section rather
+ * than dominate it. The shared `EmptyState` is a full-page block — at ~500px
+ * tall it made an empty dashboard read as a broken page instead of a new one.
+ */
+function SectionEmpty({
+  title,
+  description,
+  actionLabel,
+  actionHref,
+}: {
+  title: string
+  description: string
+  actionLabel?: string
+  actionHref?: string
+}) {
+  return (
+    <div className="flex flex-col items-start gap-3 rounded-lg border border-dashed border-ws-hairline bg-ws-surface/40 px-6 py-8 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p className="text-[15px] font-semibold text-ws-primary">{title}</p>
+        <p className="mt-1 text-[13px] text-ws-muted">{description}</p>
+      </div>
+      {actionLabel && actionHref && (
+        <Link
+          href={actionHref}
+          className="inline-flex h-11 shrink-0 items-center justify-center rounded-sm bg-ws-brand px-6 text-[15px] font-semibold text-ws-brand-on transition-opacity hover:opacity-90"
+        >
+          {actionLabel}
+        </Link>
+      )}
+    </div>
+  )
+}
+
+/**
+ * The learner's overall standing, shown inside the greeting pane: lessons
+ * completed across every enrollment, one gold bar for overall progress, and
+ * the in-progress / completed course split.
+ */
+function ProgressPane({
+  enrollments,
+  isLoading,
+}: {
+  enrollments: StudentEnrollment[]
+  isLoading: boolean
+}) {
+  const totalLessons = enrollments.reduce((s, e) => s + (e.totalLessons ?? 0), 0)
+  const completedLessons = enrollments.reduce(
+    (s, e) => s + Math.round(((e.progress ?? 0) / 100) * (e.totalLessons ?? 0)),
+    0
+  )
+  const overallPct = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0
+  const inProgress = enrollments.filter((e) => e.progress > 0 && e.progress < 100).length
+  const completedCourses = enrollments.filter((e) => e.progress === 100).length
+
+  if (isLoading) {
+    return (
+      <div className="w-full shrink-0 lg:w-80">
+        <div className="h-3 w-32 animate-pulse rounded-full bg-ws-raised" />
+        <div className="mt-3 h-1.5 w-full animate-pulse rounded-full bg-ws-track" />
+        <div className="mt-4 h-3 w-44 animate-pulse rounded-full bg-ws-raised" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="w-full shrink-0 lg:w-80">
+      <div className="flex items-baseline justify-between gap-4">
+        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-ws-muted">
+          Overall progress
+        </p>
+        <p className="text-[13px] tabular-nums text-ws-muted">
+          {totalLessons > 0 ? (
+            <>
+              <span className="font-semibold text-ws-primary">{completedLessons}</span>/
+              {totalLessons} lessons
+            </>
+          ) : (
+            "No lessons yet"
+          )}
+        </p>
+      </div>
+
+      <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-ws-track">
+        <div
+          className="h-full rounded-full bg-ws-brand"
+          style={{ width: `${Math.max(overallPct, totalLessons > 0 ? 2 : 0)}%` }}
+        />
+      </div>
+
+      <div className="mt-3.5 flex items-center justify-between gap-4">
+        <p className="tabular-nums">
+          <span className="font-display text-xl font-semibold text-ws-primary">{overallPct}%</span>{" "}
+          <span className="text-[13px] text-ws-muted">complete</span>
+        </p>
         <div className="flex items-center gap-2">
-          <Skeleton className="h-6 w-6 rounded-full" />
-          <Skeleton className="h-3 w-24" />
+          <span className="rounded-full bg-ws-chip px-2.5 py-1 text-[11px] font-medium text-ws-muted">
+            <span className="font-semibold tabular-nums text-ws-primary">{inProgress}</span> in
+            progress
+          </span>
+          <span className="rounded-full bg-ws-chip px-2.5 py-1 text-[11px] font-medium text-ws-muted">
+            <span className="font-semibold tabular-nums text-ws-primary">{completedCourses}</span>{" "}
+            completed
+          </span>
         </div>
-        <Skeleton className="h-3 w-16" />
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }
 
 export default function DashboardPage() {
   const user = useUser()
-  const [courseSearch, setCourseSearch] = React.useState("")
 
   const { data: enrollments = [], isLoading: isLoadingEnrollments } = useEnrollments()
   const { data: bookmarks = [], isLoading: isLoadingBookmarks } = useBookmarks()
@@ -61,519 +188,151 @@ export default function DashboardPage() {
   const bookmarkedIds = useBookmarkedIds()
   const toggleBookmark = useToggleBookmark()
 
-  const isLoading = isLoadingEnrollments || isLoadingBookmarks || isLoadingBrowse
-
-  const handleToggleBookmark = (courseId: string) => {
-    toggleBookmark.mutate(courseId)
-  }
-
-  const filteredEnrolled = React.useMemo(() => {
-    if (!courseSearch.trim()) return enrollments
-    const q = courseSearch.toLowerCase()
-    return enrollments.filter(
-      (e) =>
-        e.courseTitle.toLowerCase().includes(q) ||
-        e.instructorName.toLowerCase().includes(q)
-    )
-  }, [courseSearch, enrollments])
-
   return (
     <>
       <Topbar title="Dashboard" />
-      <div className="flex-1 p-4 md:p-6 lg:p-8 space-y-8 pb-24 md:pb-8">
-        {/* Welcome Section */}
-        <div>
-          <div className="flex items-center justify-between gap-4">
-            <div className="px-1 flex-1">
-              <h1 className="text-xl md:text-2xl font-bold tracking-tight">
-                Hello, {user.firstName}
-              </h1>
-              <p className="text-muted-foreground mt-1 text-sm">
-                Continue your learning journey.
-              </p>
-              <div className="w-12 h-px bg-border my-3" />
-              <div className="mt-4">
-                <p className="text-2xl md:text-3xl font-bold">${user.walletBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Wallet Balance</p>
-              </div>
-            </div>
-            <div className="relative w-44 h-44 md:w-56 md:h-56 shrink-0">
-              <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full" />
-              <div className="absolute -inset-8 md:inset-0">
-                <Image
-                  src="/user/dashboard/dashboard-welcome.png"
-                  alt="Welcome"
-                  fill
-                  className="object-contain relative z-10"
-                  sizes="(max-width: 768px) 240px, 224px"
+
+      <div className="flex-1 px-6 pb-24 pt-8 md:px-8 md:pb-12 lg:px-12">
+        <div className="mx-auto w-full max-w-7xl space-y-12">
+          {/* Greeting pane — mascot + greeting on the left, the learner's
+              overall standing on the right, on a quiet surface card. The
+              lesson tally is derived from each course's progress × lesson
+              count, which is exactly how `progress` itself is computed
+              server-side, so the two never disagree. */}
+          <header className="ws-animate-in relative overflow-hidden rounded-lg border border-ws-hairline bg-ws-surface">
+            <div className="relative flex flex-col gap-6 p-6 md:p-8 lg:flex-row lg:items-center lg:justify-between lg:gap-10">
+              <div className="flex min-w-0 items-center gap-6 md:gap-10">
+                <Mascot
+                  size={150}
+                  className="h-[110px] w-[110px] shrink-0 md:h-[150px] md:w-[150px]"
                 />
+                <div className="min-w-0">
+                  <h1 className="font-display text-[28px] font-semibold tracking-[-0.02em] text-ws-primary md:text-[34px]">
+                    {getGreeting()}, {user.firstName}
+                  </h1>
+                  <p className="mt-2 text-[15px] text-ws-muted">
+                    Pick up where you left off, or discover something new.
+                  </p>
+                </div>
               </div>
-            </div>
-          </div>
-        </div>
 
-        {/* My Courses Section */}
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <div className="min-w-0">
-              <h2 className="text-lg font-semibold">My Courses</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Continue your learning journey
-              </p>
-            </div>
-          </div>
-
-          {/* Search filter */}
-          {enrollments.length > 0 && (
-            <div className="relative mb-4">
-              <HugeiconsIcon icon={Search01Icon} size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-              <input
-                type="text"
-                value={courseSearch}
-                onChange={(e) => setCourseSearch(e.target.value)}
-                placeholder="Search your courses..."
-                className="w-full h-9 rounded-lg border bg-muted/40 pl-9 pr-3 text-sm outline-none placeholder:text-muted-foreground focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-colors"
+              <ProgressPane
+                enrollments={enrollments}
+                isLoading={isLoadingEnrollments}
               />
             </div>
-          )}
+          </header>
 
-          {isLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
-              {[1, 2, 3].map((i) => (
-                <CourseCardSkeleton key={i} />
-              ))}
-            </div>
-          ) : filteredEnrolled.length === 0 && courseSearch.trim() ? (
-            <div className="flex flex-col items-center justify-center py-12 text-sm text-muted-foreground">
-              <p>No courses match &quot;{courseSearch}&quot;</p>
-              <button
-                type="button"
-                onClick={() => setCourseSearch("")}
-                className="text-primary text-xs mt-1 hover:underline"
-              >
-                Clear search
-              </button>
-            </div>
-          ) : filteredEnrolled.length === 0 ? (
-            <EmptyState
-              illustration="/user/dashboard/course-empty-state.png"
-              title="No courses yet"
-              description="You haven't enrolled in any courses. Start exploring today!"
-              actionLabel="Browse Courses"
-              actionHref="/dashboard/courses"
-              actionVariant="outline"
+          {/* My courses */}
+          <section className="">
+            <SectionHeader
+              title="My courses"
+              href={enrollments.length > 0 ? "/dashboard/my-courses" : undefined}
             />
-          ) : (
-            <Carousel opts={{ align: "start", dragFree: true }} className="w-full">
-              <CarouselContent className="-ml-3">
-                {filteredEnrolled.map((enrollment) => (
-                  <CarouselItem
+            {isLoadingEnrollments ? (
+              <CourseGrid>
+                {[0, 1, 2].map((i) => (
+                  <CourseCardSkeleton key={i} />
+                ))}
+              </CourseGrid>
+            ) : enrollments.length === 0 ? (
+              <SectionEmpty
+                title="You're not enrolled in anything yet"
+                description="Pick a course below and it'll show up here with your progress."
+                actionLabel="Browse courses"
+                actionHref="/dashboard/courses"
+              />
+            ) : (
+              <CourseGrid>
+                {enrollments.slice(0, 3).map((enrollment) => (
+                  <CourseCard
                     key={enrollment.id}
-                    className="pl-3 basis-[85%] sm:basis-1/2 lg:basis-1/3 2xl:basis-1/4"
-                  >
-                    <Link
-                      href={`/dashboard/courses/${enrollment.courseId}/learn/${enrollment.firstLessonId ?? "first"}`}
-                      className="group block"
-                    >
-                      <Card className="h-full transition-all hover:shadow-md hover:border-primary/30">
-                        <div className="aspect-video w-full bg-muted relative overflow-hidden">
-                          {enrollment.courseThumbnail ? (
-                            <Image
-                              src={enrollment.courseThumbnail}
-                              alt={enrollment.courseTitle}
-                              fill
-                              className="object-cover group-hover:scale-105 transition-transform duration-300"
-                              sizes="(max-width: 640px) 85vw, (max-width: 1024px) 50vw, 33vw"
-                            />
-                          ) : (
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <span className="text-muted-foreground/40 text-xs">No thumbnail</span>
-                            </div>
-                          )}
-                          {/* Bookmark button */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              handleToggleBookmark(enrollment.courseId)
-                            }}
-                            className={`absolute top-2.5 right-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/30 backdrop-blur-md shadow-lg transition-all hover:bg-white/40 dark:border-white/20 ${
-                              bookmarkedIds.has(enrollment.courseId)
-                                ? "bg-primary/80 text-white"
-                                : "bg-white/20 text-white dark:bg-black/30"
-                            }`}
-                          >
-                            <HugeiconsIcon
-                              icon={Bookmark01Icon}
-                              size={14}
-                              fill={bookmarkedIds.has(enrollment.courseId) ? "currentColor" : "none"}
-                            />
-                          </button>
-                          {enrollment.progress === 100 && (
-                            <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1 text-[10px] bg-emerald-500/90 text-white rounded-full px-2 py-1 border-0">
-                              <HugeiconsIcon icon={Tick02Icon} size={12} />
-                              <span>Completed</span>
-                            </div>
-                          )}
-                        </div>
-
-                        <CardContent className="p-4">
-                          <div className="flex items-start gap-3">
-                            <div className="flex-1 min-w-0 space-y-2">
-                              <h3 className="font-semibold text-sm leading-snug line-clamp-2 group-hover:text-primary transition-colors">
-                                {enrollment.courseTitle}
-                              </h3>
-                              <div className="flex items-center gap-2">
-                                <Avatar size="sm">
-                                  {enrollment.instructorAvatarUrl && (
-                                    <AvatarImage
-                                      src={enrollment.instructorAvatarUrl}
-                                      alt={enrollment.instructorName}
-                                    />
-                                  )}
-                                  <AvatarFallback>
-                                    {enrollment.instructorName
-                                      .split(" ")
-                                      .map((n) => n[0])
-                                      .join("")}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <span className="text-xs text-muted-foreground truncate">
-                                  {enrollment.instructorName}
-                                </span>
-                              </div>
-                            </div>
-                            <RadialProgress
-                              value={enrollment.progress}
-                              size={52}
-                              strokeWidth={4}
-                              className="shrink-0"
-                            />
-                          </div>
-
-                          <div className="mt-3 pt-2.5 border-t flex items-center justify-between gap-2">
-                            <span className="text-xs font-medium text-primary group-hover:underline">
-                              {enrollment.progress === 100
-                                ? "Review course"
-                                : enrollment.progress > 0
-                                  ? "Continue learning"
-                                  : "Start course"}{" "}
-                              →
-                            </span>
-                            {enrollment.progress === 100 && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 px-2 text-xs gap-1"
-                                onClick={(e) => {
-                                  e.preventDefault()
-                                  window.location.href = `/dashboard/courses/${enrollment.courseId}/certificate`
-                                }}
-                              >
-                                <HugeiconsIcon icon={Certificate01Icon} size={12} />
-                                Certificate
-                              </Button>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </Link>
-                  </CarouselItem>
+                    href={`/dashboard/courses/${enrollment.courseId}/learn/${enrollment.resumeLessonId ?? enrollment.firstLessonId ?? "first"}`}
+                    title={enrollment.courseTitle}
+                    thumbnailUrl={enrollment.courseThumbnail}
+                    instructorName={enrollment.instructorName}
+                    instructorAvatarUrl={enrollment.instructorAvatarUrl}
+                    progress={enrollment.progress}
+                  />
                 ))}
-              </CarouselContent>
+              </CourseGrid>
+            )}
+          </section>
 
-              <div className="flex items-center justify-between mt-5">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  render={<Link href="/dashboard/my-courses" />}
-                >
-                  View all courses
-                  <HugeiconsIcon icon={ArrowRight01Icon} size={14} />
-                </Button>
-                <div className="flex items-center gap-1">
-                  <CarouselPrevious className="static translate-x-0 translate-y-0 h-7 w-7" />
-                  <CarouselNext className="static translate-x-0 translate-y-0 h-7 w-7" />
-                </div>
-              </div>
-            </Carousel>
-          )}
-        </section>
-
-        {/* Browse Courses Section */}
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <div className="min-w-0">
-              <h2 className="text-lg font-semibold">Browse Courses</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Discover new courses to learn
-              </p>
-            </div>
-          </div>
-
-          {isLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
-              {[1, 2, 3].map((i) => (
-                <CourseCardSkeleton key={i} />
-              ))}
-            </div>
-          ) : browseCourses.length === 0 ? (
-            <EmptyState
-              illustration="/user/dashboard/course-empty-state.png"
-              title="No courses available"
-              description="There are no published courses yet. Check back soon!"
-            />
-          ) : (
-            <Carousel opts={{ align: "start", dragFree: true }} className="w-full">
-              <CarouselContent className="-ml-3">
-                {browseCourses.slice(0, 8).map((course) => (
-                  <CarouselItem
+          {/* Browse courses */}
+          <section className="">
+            <SectionHeader title="Browse courses" href="/dashboard/courses" />
+            {isLoadingBrowse ? (
+              <CourseGrid>
+                {[0, 1, 2].map((i) => (
+                  <CourseCardSkeleton key={i} />
+                ))}
+              </CourseGrid>
+            ) : browseCourses.length === 0 ? (
+              <SectionEmpty
+                title="No courses published yet"
+                description="New courses will appear here as instructors publish them."
+              />
+            ) : (
+              <CourseGrid>
+                {browseCourses.slice(0, 3).map((course) => (
+                  <CourseCard
                     key={course.id}
-                    className="pl-3 basis-[85%] sm:basis-1/2 lg:basis-1/3 2xl:basis-1/4"
-                  >
-                    <Link
-                      href={`/dashboard/courses/${course.id}`}
-                      className="group block"
-                    >
-                      <Card className="h-full transition-all hover:shadow-md hover:border-primary/30">
-                        <div className="aspect-video w-full bg-muted relative overflow-hidden">
-                          {course.thumbnailUrl ? (
-                            <Image
-                              src={course.thumbnailUrl}
-                              alt={course.title}
-                              fill
-                              className="object-cover group-hover:scale-105 transition-transform duration-300"
-                              sizes="(max-width: 640px) 85vw, (max-width: 1024px) 50vw, 33vw"
-                            />
-                          ) : (
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <span className="text-muted-foreground/40 text-xs">No thumbnail</span>
-                            </div>
-                          )}
-                          {/* Price badge */}
-                          <Badge className="absolute top-2.5 left-2.5 text-[10px] z-10 border border-white/30 shadow-lg backdrop-blur-md bg-white/20 text-white dark:bg-black/30 dark:border-white/20">
-                            {course.pricing === "free" ? "Free" : `$${course.price}`}
-                          </Badge>
-                          {/* Bookmark button */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              handleToggleBookmark(course.id)
-                            }}
-                            className={`absolute top-2.5 right-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/30 backdrop-blur-md shadow-lg transition-all hover:bg-white/40 dark:border-white/20 ${
-                              bookmarkedIds.has(course.id)
-                                ? "bg-primary/80 text-white"
-                                : "bg-white/20 text-white dark:bg-black/30"
-                            }`}
-                          >
-                            <HugeiconsIcon
-                              icon={Bookmark01Icon}
-                              size={14}
-                              fill={bookmarkedIds.has(course.id) ? "currentColor" : "none"}
-                            />
-                          </button>
-                        </div>
-
-                        <CardContent className="p-4 space-y-2">
-                          <h3 className="font-semibold text-sm leading-snug line-clamp-2 group-hover:text-primary transition-colors">
-                            {course.title}
-                          </h3>
-                          <div className="flex items-center gap-2">
-                            <Avatar size="sm">
-                              {course.instructorAvatarUrl && (
-                                <AvatarImage
-                                  src={course.instructorAvatarUrl}
-                                  alt={course.instructorName}
-                                />
-                              )}
-                              <AvatarFallback>
-                                {course.instructorName
-                                  .split(" ")
-                                  .map((n) => n[0])
-                                  .join("")}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span className="text-xs text-muted-foreground truncate">
-                              {course.instructorName}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="secondary" className="text-[10px]">
-                              {course.level}
-                            </Badge>
-                            {course.rating && (
-                              <div className="inline-flex items-center gap-1 rounded-md bg-orange-50 dark:bg-orange-500/10 px-1.5 py-0.5">
-                                <HugeiconsIcon icon={StarIcon} size={11} className="text-orange-500" fill="currentColor" />
-                                <span className="text-[11px] font-medium text-orange-600 dark:text-orange-400">
-                                  {course.rating}
-                                </span>
-                              </div>
-                            )}
-                            {course.enrolledCount > 0 && (
-                              <span className="text-[10px] text-muted-foreground">
-                                {course.enrolledCount} enrolled
-                              </span>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </Link>
-                  </CarouselItem>
+                    href={`/dashboard/courses/${course.id}`}
+                    title={course.title}
+                    thumbnailUrl={course.thumbnailUrl}
+                    instructorName={course.instructorName}
+                    instructorAvatarUrl={course.instructorAvatarUrl}
+                    price={course.price}
+                    pricing={course.pricing}
+                    rating={course.rating}
+                    level={course.level}
+                    totalLessons={course.totalLessons}
+                    totalDuration={course.totalDuration}
+                    enrolledCount={course.enrolledCount}
+                    isBookmarked={bookmarkedIds.has(course.id)}
+                    onToggleBookmark={() => toggleBookmark.mutate(course.id)}
+                  />
                 ))}
-              </CarouselContent>
+              </CourseGrid>
+            )}
+          </section>
 
-              <div className="flex items-center justify-between mt-5">
-                <Button
-                  variant="default"
-                  size="sm"
-                  render={<Link href="/dashboard/courses" />}
-                >
-                  Browse all courses
-                  <HugeiconsIcon icon={ArrowRight01Icon} size={14} />
-                </Button>
-                <div className="flex items-center gap-1">
-                  <CarouselPrevious className="static translate-x-0 translate-y-0 h-7 w-7" />
-                  <CarouselNext className="static translate-x-0 translate-y-0 h-7 w-7" />
-                </div>
-              </div>
-            </Carousel>
-          )}
-        </section>
-
-        {/* Bookmarks Section */}
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <div className="min-w-0">
-              <h2 className="text-lg font-semibold">Bookmarks</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Courses you&apos;ve bookmarked
-              </p>
-            </div>
-          </div>
-
-          {isLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
-              {[1, 2, 3].map((i) => (
-                <CourseCardSkeleton key={i} />
-              ))}
-            </div>
-          ) : bookmarks.length === 0 ? (
-            <EmptyState
-              illustration="/user/dashboard/course-empty-state.png"
-              title="No bookmarks yet"
-              description="Browse courses and bookmark the ones you like to find them here."
-              actionLabel="Browse Courses"
-              actionHref="/dashboard/courses"
-              actionVariant="outline"
-            />
-          ) : (
-            <Carousel opts={{ align: "start", dragFree: true }} className="w-full">
-              <CarouselContent className="-ml-3">
-                {bookmarks.map((bookmark) => (
-                  <CarouselItem
-                    key={bookmark.id}
-                    className="pl-3 basis-[85%] sm:basis-1/2 lg:basis-1/3 2xl:basis-1/4"
-                  >
-                    <Link
+          {/* Bookmarks — only when there are any. An empty-state block for a
+              purely optional feature was pure vertical noise on the old page. */}
+          {(isLoadingBookmarks || bookmarks.length > 0) && (
+            <section className="">
+              <SectionHeader title="Bookmarks" href="/dashboard/bookmarks" />
+              {isLoadingBookmarks ? (
+                <CourseGrid>
+                  {[0, 1, 2].map((i) => (
+                    <CourseCardSkeleton key={i} />
+                  ))}
+                </CourseGrid>
+              ) : (
+                <CourseGrid>
+                  {bookmarks.slice(0, 3).map((bookmark) => (
+                    <CourseCard
+                      key={bookmark.id}
                       href={`/dashboard/courses/${bookmark.courseId}`}
-                      className="group block"
-                    >
-                      <Card className="h-full transition-all hover:shadow-md hover:border-primary/30">
-                        <div className="aspect-video w-full bg-muted relative overflow-hidden">
-                          {bookmark.courseThumbnail ? (
-                            <Image
-                              src={bookmark.courseThumbnail}
-                              alt={bookmark.courseTitle}
-                              fill
-                              className="object-cover group-hover:scale-105 transition-transform duration-300"
-                              sizes="(max-width: 640px) 85vw, (max-width: 1024px) 50vw, 33vw"
-                            />
-                          ) : (
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <span className="text-muted-foreground/40 text-xs">No thumbnail</span>
-                            </div>
-                          )}
-                          {/* Price badge */}
-                          <Badge className="absolute top-2.5 left-2.5 text-[10px] z-10 border border-white/30 shadow-lg backdrop-blur-md bg-white/20 text-white dark:bg-black/30 dark:border-white/20">
-                            {bookmark.pricing === "free" ? "Free" : `$${bookmark.price}`}
-                          </Badge>
-                          {/* Bookmark button */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              handleToggleBookmark(bookmark.courseId)
-                            }}
-                            className="absolute top-2.5 right-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/30 bg-primary/80 text-white backdrop-blur-md shadow-lg transition-all hover:bg-primary"
-                          >
-                            <HugeiconsIcon icon={Bookmark01Icon} size={14} fill="currentColor" />
-                          </button>
-                        </div>
-
-                        <CardContent className="p-4 space-y-2">
-                          <h3 className="font-semibold text-sm leading-snug line-clamp-2 group-hover:text-primary transition-colors">
-                            {bookmark.courseTitle}
-                          </h3>
-                          <div className="flex items-center gap-2">
-                            <Avatar size="sm">
-                              {bookmark.instructorAvatarUrl && (
-                                <AvatarImage
-                                  src={bookmark.instructorAvatarUrl}
-                                  alt={bookmark.instructorName}
-                                />
-                              )}
-                              <AvatarFallback>
-                                {bookmark.instructorName
-                                  .split(" ")
-                                  .map((n) => n[0])
-                                  .join("")}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span className="text-xs text-muted-foreground truncate">
-                              {bookmark.instructorName}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="secondary" className="text-[10px]">
-                              {bookmark.level}
-                            </Badge>
-                            {bookmark.rating && (
-                              <div className="inline-flex items-center gap-1 rounded-md bg-orange-50 dark:bg-orange-500/10 px-1.5 py-0.5">
-                                <HugeiconsIcon icon={StarIcon} size={11} className="text-orange-500" fill="currentColor" />
-                                <span className="text-[11px] font-medium text-orange-600 dark:text-orange-400">
-                                  {bookmark.rating}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </Link>
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
-
-              <div className="flex items-center justify-between mt-5">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  render={<Link href="/dashboard/bookmarks" />}
-                >
-                  View all bookmarks
-                  <HugeiconsIcon icon={ArrowRight01Icon} size={14} />
-                </Button>
-                <div className="flex items-center gap-1">
-                  <CarouselPrevious className="static translate-x-0 translate-y-0 h-7 w-7" />
-                  <CarouselNext className="static translate-x-0 translate-y-0 h-7 w-7" />
-                </div>
-              </div>
-            </Carousel>
+                      title={bookmark.courseTitle}
+                      thumbnailUrl={bookmark.courseThumbnail}
+                      instructorName={bookmark.instructorName}
+                      instructorAvatarUrl={bookmark.instructorAvatarUrl}
+                      price={bookmark.price}
+                      pricing={bookmark.pricing}
+                      rating={bookmark.rating}
+                      level={bookmark.level}
+                      enrolledCount={bookmark.enrolledCount}
+                      isBookmarked
+                      onToggleBookmark={() => toggleBookmark.mutate(bookmark.courseId)}
+                    />
+                  ))}
+                </CourseGrid>
+              )}
+            </section>
           )}
-        </section>
+        </div>
       </div>
     </>
   )

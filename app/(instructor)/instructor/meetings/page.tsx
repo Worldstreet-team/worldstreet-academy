@@ -3,11 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useSearchParams, useRouter } from "next/navigation"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  Link01Icon,
-  ArrowShrink02Icon,
-} from "@hugeicons/core-free-icons"
 import { Topbar } from "@/components/platform/topbar"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -70,6 +65,7 @@ import {
   MeetingHistory,
   ReturnToMeetingBanner,
 } from "@/components/meetings"
+import { LinkIcon, Minimize2Icon } from "lucide-react"
 import type { ActiveTab, ChatMessage, Poll, PollVoter } from "@/components/meetings"
 import { useMyMeetings, useMeetingHistory, useInstructorMeetingCourses, queryKeys } from "@/lib/hooks/queries"
 import {
@@ -1424,7 +1420,7 @@ export default function InstructorMeetingsPage() {
     const panelOpen = activeTab !== null
 
     return (
-      <div className="fixed inset-0 z-50 flex flex-col bg-neutral-100 dark:bg-zinc-950 overflow-hidden">
+      <div className="fixed inset-0 z-50 flex flex-col bg-ws-page overflow-hidden">
         <style>{"nav.safe-area-bottom { display: none !important; }"}</style>
 
         {/* Remote audio players */}
@@ -1461,10 +1457,10 @@ export default function InstructorMeetingsPage() {
                         key={i}
                         onClick={() => setGridPage(i)}
                         className={cn(
-                          "h-1.5 rounded-full transition-all duration-200",
+                          "h-1.5 rounded-full transition-all duration-[var(--ws-motion-base)]",
                           i === currentSlide
                             ? slide.type === "screenshare"
-                              ? "bg-emerald-400 w-4"
+                              ? "bg-ws-success w-4"
                               : "bg-foreground w-4"
                             : "bg-foreground/30 hover:bg-foreground/50 w-1.5"
                         )}
@@ -1485,9 +1481,9 @@ export default function InstructorMeetingsPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowInviteDialog(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-muted-foreground hover:text-foreground transition-colors border border-border/50"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-muted-foreground hover:text-foreground transition-colors border border-ws-hairline"
             >
-              <HugeiconsIcon icon={Link01Icon} size={12} />
+              <LinkIcon  size={12} />
               Invite
             </button>
             {activeMeeting && (
@@ -1503,7 +1499,7 @@ export default function InstructorMeetingsPage() {
               className="flex items-center justify-center w-8 h-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-white/10 transition-colors"
               title="Minimize meeting"
             >
-              <HugeiconsIcon icon={ArrowShrink02Icon} size={14} />
+              <Minimize2Icon  size={14} />
             </button>
           </div>
         </div>
@@ -1515,11 +1511,11 @@ export default function InstructorMeetingsPage() {
               {pendingRequests.map((req) => (
                 <div
                   key={req.userId}
-                  className="flex items-center gap-3 px-4 py-2 rounded-xl bg-amber-500/8 dark:bg-amber-500/6 border border-amber-500/15 animate-in fade-in slide-in-from-top-2 duration-200"
+                  className="flex items-center gap-3 px-4 py-2 rounded-lg bg-ws-warning/8 dark:bg-ws-warning/6 border border-ws-warning/15 animate-in fade-in slide-in-from-top-2 duration-[var(--ws-motion-base)]"
                 >
                   <Avatar className="w-7 h-7 shrink-0">
                     {req.avatar && <AvatarImage src={req.avatar} alt={req.name} />}
-                    <AvatarFallback className="text-[9px] bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                    <AvatarFallback className="text-[9px] bg-ws-warning/15 text-ws-warning dark:text-ws-warning">
                       {req.name
                         .split(" ")
                         .map((n) => n[0])
@@ -1535,7 +1531,7 @@ export default function InstructorMeetingsPage() {
                   <div className="flex items-center gap-1.5">
                     <button
                       onClick={() => handleAdmit(req.userId)}
-                      className="h-7 px-3 rounded-lg text-xs font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors"
+                      className="h-7 px-3 rounded-lg text-xs font-medium bg-ws-success text-white hover:bg-ws-success/90 transition-colors"
                     >
                       Admit
                     </button>
@@ -1561,14 +1557,14 @@ export default function InstructorMeetingsPage() {
                 <button
                   onClick={() => setGridPage(Math.max(0, currentSlide - 1))}
                   disabled={currentSlide === 0}
-                  className="md:hidden flex absolute left-0 top-1/2 -translate-y-1/2 z-20 h-8 w-8 items-center justify-center rounded-full bg-background/60 backdrop-blur-sm border border-border/30 text-muted-foreground hover:text-foreground hover:bg-background/80 transition-colors disabled:opacity-0 disabled:pointer-events-none"
+                  className="md:hidden flex absolute left-0 top-1/2 -translate-y-1/2 z-20 h-8 w-8 items-center justify-center rounded-full bg-ws-surface border border-ws-hairline text-muted-foreground hover:text-foreground hover:bg-background/80 transition-colors disabled:opacity-0 disabled:pointer-events-none"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
                 </button>
                 <button
                   onClick={() => setGridPage(Math.min(totalSlideCount - 1, currentSlide + 1))}
                   disabled={currentSlide === totalSlideCount - 1}
-                  className="md:hidden flex absolute right-0 top-1/2 -translate-y-1/2 z-20 h-8 w-8 items-center justify-center rounded-full bg-background/60 backdrop-blur-sm border border-border/30 text-muted-foreground hover:text-foreground hover:bg-background/80 transition-colors disabled:opacity-0 disabled:pointer-events-none"
+                  className="md:hidden flex absolute right-0 top-1/2 -translate-y-1/2 z-20 h-8 w-8 items-center justify-center rounded-full bg-ws-surface border border-ws-hairline text-muted-foreground hover:text-foreground hover:bg-background/80 transition-colors disabled:opacity-0 disabled:pointer-events-none"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
                 </button>
@@ -1632,10 +1628,10 @@ export default function InstructorMeetingsPage() {
                     key={i}
                     onClick={() => setGridPage(i)}
                     className={cn(
-                      "h-1.5 rounded-full transition-all duration-200",
+                      "h-1.5 rounded-full transition-all duration-[var(--ws-motion-base)]",
                       i === currentSlide
                         ? slide.type === "screenshare"
-                          ? "bg-emerald-400 w-4"
+                          ? "bg-ws-success w-4"
                           : "bg-foreground w-4"
                         : "bg-foreground/30 hover:bg-foreground/50 w-1.5"
                     )}
@@ -1646,7 +1642,7 @@ export default function InstructorMeetingsPage() {
 
             {/* Audience strip - shows guests watching */}
             {(audienceRemoteIds.length > 0 || !localIsOnStage) && (
-              <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl bg-muted/30 border border-border/30">
+              <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg bg-muted/30 border border-ws-hairline">
                 <span className="text-[10px] text-muted-foreground font-medium shrink-0">
                   {audienceRemoteIds.length + (localIsOnStage ? 0 : 1)} watching
                 </span>
@@ -1780,10 +1776,10 @@ export default function InstructorMeetingsPage() {
         />
       )}
       {tabConflict && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-          <div className="bg-card border border-border rounded-xl p-6 max-w-sm text-center space-y-4">
-            <div className="size-12 mx-auto rounded-full bg-amber-500/10 flex items-center justify-center">
-              <svg className="size-6 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ws-page/95">
+          <div className="bg-card border border-border rounded-lg p-6 max-w-sm text-center space-y-4">
+            <div className="size-12 mx-auto rounded-full bg-ws-warning/10 flex items-center justify-center">
+              <svg className="size-6 text-ws-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             </div>
@@ -1799,7 +1795,7 @@ export default function InstructorMeetingsPage() {
           </div>
         </div>
       )}
-      <Topbar title="Meetings" />
+      <Topbar title="Meetings" variant="instructor" />
 
       {activeMeeting && isJoined && meetingCtx.isMinimized && (
         <ReturnToMeetingBanner
@@ -1846,7 +1842,7 @@ export default function InstructorMeetingsPage() {
 
             {/* History - right */}
             <section className="lg:col-span-2 space-y-3">
-              <div className="rounded-2xl border border-border/40 bg-card overflow-hidden">
+              <div className="rounded-lg border border-ws-hairline bg-card overflow-hidden">
                 <div className="px-3 pt-3 pb-1">
                   <h2 className="text-sm font-semibold text-foreground">Recent History</h2>
                 </div>

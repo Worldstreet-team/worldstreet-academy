@@ -1,13 +1,7 @@
 "use client"
 
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  Call02Icon,
-  CallIncoming04Icon,
-  CallOutgoing04Icon,
-  Video01Icon,
-} from "@hugeicons/core-free-icons"
 import { cn } from "@/lib/utils"
+import { PhoneIcon, PhoneIncomingIcon, PhoneOutgoingIcon, VideoIcon } from "lucide-react"
 
 type CallEventProps = {
   content: string
@@ -87,8 +81,8 @@ export function CallEvent({ content, isOwn, timestamp, onCallback }: CallEventPr
   }
 
   const isNegative = isMissed || isDeclined || isFailed
-  const CallIcon = type === "video" ? Video01Icon : Call02Icon
-  const StatusIcon = isCaller ? CallOutgoing04Icon : CallIncoming04Icon
+  const CallIcon = type === "video" ? VideoIcon : PhoneIcon
+  const StatusIcon = isCaller ? PhoneOutgoingIcon : PhoneIncomingIcon
 
   const timeStr = new Date(timestamp).toLocaleTimeString([], {
     hour: "2-digit",
@@ -100,13 +94,13 @@ export function CallEvent({ content, isOwn, timestamp, onCallback }: CallEventPr
       <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-muted/50">
         {/* Call type icon */}
         <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-muted">
-          <HugeiconsIcon icon={CallIcon} size={12} className="text-muted-foreground" />
+          <CallIcon  size={12} className="text-muted-foreground" />
         </div>
 
         {/* Call info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1">
-            <HugeiconsIcon icon={StatusIcon} size={10} className={isNegative ? "text-destructive" : "text-muted-foreground"} />
+            <StatusIcon  size={10} className={isNegative ? "text-destructive" : "text-muted-foreground"} />
             <span className="text-xs font-medium">
               {type === "video" ? "Video" : "Voice"} call
             </span>
@@ -126,7 +120,7 @@ export function CallEvent({ content, isOwn, timestamp, onCallback }: CallEventPr
             className="w-6 h-6 rounded-full flex items-center justify-center hover:bg-muted transition-colors shrink-0"
             title={`Call back (${type})`}
           >
-            <HugeiconsIcon icon={CallIcon} size={12} className="text-primary" />
+            <CallIcon  size={12} className="text-primary" />
           </button>
         )}
       </div>

@@ -3,11 +3,11 @@
 import Link from "next/link"
 import Image from "next/image"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { AnimatePresence, motion } from "motion/react"
+import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import { cn } from "@/lib/utils"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { Tick02Icon, Video01Icon, Wifi01Icon, File01Icon } from "@hugeicons/core-free-icons"
 import type { LearnLesson } from "@/lib/actions/student"
+import { CheckIcon, FileIcon, VideoIcon, WifiIcon } from "lucide-react"
+import { RenderIcon } from "@/components/shared/render-icon"
 
 type LessonSidebarProps = {
   lessons: LearnLesson[]
@@ -19,36 +19,33 @@ type LessonSidebarProps = {
 }
 
 const typeIcons = {
-  video: Video01Icon,
-  live: Wifi01Icon,
-  text: File01Icon,
+  video: VideoIcon,
+  live: WifiIcon,
+  text: FileIcon,
 }
 
-/* ---- Equalizer bars animation (playing indicator) ---- */
+/* ---- Equalizer bars (now-playing live-state indicator) ----
+   Sanctioned live-state loop (06-motion): transform-only (scaleY), stilled
+   under prefers-reduced-motion. */
 function EqualizerIcon({ className }: { className?: string }) {
+  const reduceMotion = useReducedMotion()
   return (
     <div className={cn("flex items-end gap-[2px] h-3.5 w-3.5", className)}>
       {[0, 0.2, 0.4].map((delay, i) => (
         <motion.div
           key={i}
-          className="w-[3px] rounded-sm bg-primary"
-          animate={{ height: ["40%", "100%", "60%", "90%", "40%"] }}
-          transition={{ duration: 1.2, repeat: Infinity, delay, ease: "easeInOut" }}
+          className="w-[3px] h-full rounded-sm bg-primary origin-bottom"
+          animate={reduceMotion ? { scaleY: 0.7 } : { scaleY: [0.4, 1, 0.6, 0.9, 0.4] }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 1.2, repeat: Infinity, delay, ease: "easeInOut" }}
         />
       ))}
     </div>
   )
 }
 
-/* ---- Pulsing dot (up next indicator) ---- */
+/* ---- Up-next indicator dot (static — no perpetual attention motion) ---- */
 function NextDot() {
-  return (
-    <motion.div
-      className="h-2 w-2 rounded-full bg-primary/60"
-      animate={{ scale: [1, 1.3, 1], opacity: [0.6, 1, 0.6] }}
-      transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-    />
-  )
+  return <div className="h-2 w-2 rounded-full bg-primary/60" />
 }
 
 export function LessonSidebar({
@@ -85,9 +82,9 @@ export function LessonSidebar({
                   initial={false}
                   animate={{
                     backgroundColor: isCurrent
-                      ? "var(--color-primary-a10, oklch(0.62 0.1 170 / 0.1))"
+                      ? "color-mix(in srgb, var(--ws-brand-primary) 10%, transparent)"
                       : isUpNext
-                        ? "var(--color-accent-a60, oklch(0 0 0 / 0.03))"
+                        ? "var(--ws-bg-raised)"
                         : "transparent",
                   }}
                   transition={{ duration: 0.3, ease: "easeInOut" }}
@@ -108,11 +105,10 @@ export function LessonSidebar({
                         />
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center bg-muted">
-                          <HugeiconsIcon 
-                            icon={typeIcons[lesson.type] || Video01Icon} 
+                          <RenderIcon icon={typeIcons[lesson.type] || VideoIcon} 
+                             
                             size={16} 
-                            className="text-muted-foreground/50" 
-                          />
+                            className="text-muted-foreground/50" />
                         </div>
                       )}
                       {/* Small circle with number */}
@@ -120,7 +116,7 @@ export function LessonSidebar({
                         className={cn(
                           "absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold",
                           isCompleted && !isCurrent
-                            ? "bg-green-500 text-white"
+                            ? "bg-ws-success text-white"
                             : isCurrent
                               ? "bg-primary text-primary-foreground"
                               : "bg-black/70 text-white"
@@ -129,7 +125,7 @@ export function LessonSidebar({
                         transition={{ duration: 0.3 }}
                       >
                         {isCompleted && !isCurrent ? (
-                          <HugeiconsIcon icon={Tick02Icon} size={12} className="text-white" />
+                          <CheckIcon  size={12} className="text-white" />
                         ) : (
                           index + 1
                         )}
@@ -148,7 +144,7 @@ export function LessonSidebar({
                       {watchPercent > 0 && !isCompleted && (
                         <div className="mt-1 h-1 w-full rounded-full bg-muted overflow-hidden">
                           <div
-                            className="h-full rounded-full bg-primary transition-all duration-300"
+                            className="h-full rounded-full bg-primary transition-all duration-[var(--ws-motion-base)]"
                             style={{ width: `${watchPercent}%` }}
                           />
                         </div>

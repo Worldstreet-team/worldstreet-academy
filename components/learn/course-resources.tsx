@@ -2,29 +2,20 @@
 
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  File01Icon,
-  Book02Icon,
-  Download04Icon,
-  Link01Icon,
-  LockIcon,
-  Loading03Icon,
-  Task01Icon,
-  PresentationBarChart01Icon,
-} from "@hugeicons/core-free-icons"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { listCourseResources, getResourceDownloadUrl } from "@/lib/actions/resources"
 import type { ResourceKind } from "@/lib/db/models/resource"
+import { BookIcon, ClipboardListIcon, DownloadIcon, FileIcon, LinkIcon, LoaderCircleIcon, LockIcon, PresentationIcon } from "lucide-react"
+import { RenderIcon } from "@/components/shared/render-icon"
 
-const KIND_ICON: Record<ResourceKind, typeof File01Icon> = {
-  pdf: File01Icon,
-  ebook: Book02Icon,
-  worksheet: Task01Icon,
-  template: File01Icon,
-  slides: PresentationBarChart01Icon,
-  link: Link01Icon,
+const KIND_ICON: Record<ResourceKind, typeof FileIcon> = {
+  pdf: FileIcon,
+  ebook: BookIcon,
+  worksheet: ClipboardListIcon,
+  template: FileIcon,
+  slides: PresentationIcon,
+  link: LinkIcon,
 }
 
 const KIND_LABEL: Record<ResourceKind, string> = {
@@ -62,7 +53,7 @@ export function CourseResources({ courseId, lessonId }: { courseId: string; less
   if (isLoading) {
     return (
       <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
-        <HugeiconsIcon icon={Loading03Icon} size={14} className="animate-spin" />
+        <LoaderCircleIcon  size={14} className="animate-spin" />
         Loading resources…
       </div>
     )
@@ -87,25 +78,24 @@ export function CourseResources({ courseId, lessonId }: { courseId: string; less
       <h3 className="text-sm font-semibold">Resources</h3>
 
       {error && (
-        <div className="rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2">
-          <p className="text-xs text-red-500">{error}</p>
+        <div className="rounded-lg bg-ws-danger/10 border border-ws-danger/20 px-3 py-2">
+          <p className="text-xs text-ws-danger">{error}</p>
         </div>
       )}
 
       <div className="space-y-2">
         {visible.map((r) => {
-          const Icon = KIND_ICON[r.kind] ?? File01Icon
+          const Icon = KIND_ICON[r.kind] ?? FileIcon
           return (
             <div
               key={r.id}
-              className="flex items-center gap-3 rounded-xl border border-border/50 bg-card px-3 py-2.5"
+              className="flex items-center gap-3 rounded-lg border border-ws-hairline bg-card px-3 py-2.5"
             >
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-                <HugeiconsIcon
-                  icon={r.locked ? LockIcon : Icon}
+                <RenderIcon icon={r.locked ? LockIcon : Icon}
+                  
                   size={16}
-                  className={r.locked ? "text-muted-foreground/50" : "text-foreground"}
-                />
+                  className={r.locked ? "text-muted-foreground/50" : "text-foreground"} />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
@@ -130,9 +120,9 @@ export function CourseResources({ courseId, lessonId }: { courseId: string; less
                 className="shrink-0 gap-1.5 text-xs"
               >
                 {busyId === r.id ? (
-                  <HugeiconsIcon icon={Loading03Icon} size={13} className="animate-spin" />
+                  <LoaderCircleIcon  size={13} className="animate-spin" />
                 ) : (
-                  <HugeiconsIcon icon={r.locked ? LockIcon : Download04Icon} size={13} />
+                  <RenderIcon icon={r.locked ? LockIcon : DownloadIcon}  size={13} />
                 )}
                 {r.locked ? "Locked" : r.kind === "link" ? "Open" : "Download"}
               </Button>

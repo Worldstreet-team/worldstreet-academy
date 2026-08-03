@@ -4,12 +4,11 @@ import Link from "next/link"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { CheckmarkCircle02Icon } from "@hugeicons/core-free-icons"
 import {
   getInstructorOnboarding,
   acceptInstructorAgreement,
 } from "@/lib/actions/instructor-onboarding"
+import { CircleCheckBigIcon } from "lucide-react"
 
 function Item({
   done,
@@ -27,11 +26,11 @@ function Item({
       <span
         className={`h-5 w-5 rounded-full flex items-center justify-center shrink-0 border ${
           done
-            ? "bg-emerald-500 border-emerald-500 text-white"
+            ? "bg-ws-success border-ws-success text-white"
             : "border-muted-foreground/30"
         }`}
       >
-        {done && <HugeiconsIcon icon={CheckmarkCircle02Icon} size={12} />}
+        {done && <CircleCheckBigIcon  size={12} />}
       </span>
       <span className={`text-xs flex-1 ${done ? "text-muted-foreground line-through" : "font-medium"}`}>
         {label}

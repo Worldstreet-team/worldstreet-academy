@@ -72,7 +72,7 @@ export function MessageBubbleSkeleton({
       )}>
         {/* Message bubble */}
         <div className={cn(
-          "rounded-2xl px-3 py-2",
+          "rounded-lg px-3 py-2",
           isOwn 
             ? "bg-primary/20 rounded-br-md" 
             : "bg-muted/60 rounded-bl-md"
@@ -91,7 +91,7 @@ export function MessageBubbleSkeleton({
           )}
           
           {variant === "image" && (
-            <Skeleton className="h-40 w-48 rounded-xl" />
+            <Skeleton className="h-40 w-48 rounded-lg" />
           )}
           
           {variant === "audio" && (

@@ -2,10 +2,9 @@
 
 import { useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { Upload03Icon, Tick02Icon, Delete02Icon } from "@hugeicons/core-free-icons"
 import { saveSignature } from "@/lib/actions/signature"
 import { getImageUploadUrl } from "@/lib/actions/upload"
+import { CheckIcon, Trash2Icon, UploadIcon } from "lucide-react"
 
 export function InstructorSignatureUpload({
   currentSignatureUrl,
@@ -58,7 +57,7 @@ export function InstructorSignatureUpload({
     <div className="space-y-3">
       {preview ? (
         <div className="flex items-center gap-4">
-          <div className="w-48 h-20 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-950 flex items-center justify-center overflow-hidden">
+          <div className="w-48 h-20 rounded-lg border border-ws-hairline bg-ws-sunken flex items-center justify-center overflow-hidden">
             <img
               src={preview}
               alt="Your signature"
@@ -73,7 +72,7 @@ export function InstructorSignatureUpload({
               onClick={() => inputRef.current?.click()}
               className="gap-1.5"
             >
-              <HugeiconsIcon icon={Upload03Icon} size={14} />
+              <UploadIcon  size={14} />
               Change
             </Button>
             <Button
@@ -82,7 +81,7 @@ export function InstructorSignatureUpload({
               onClick={handleRemove}
               className="gap-1.5 text-destructive hover:text-destructive"
             >
-              <HugeiconsIcon icon={Delete02Icon} size={14} />
+              <Trash2Icon  size={14} />
               Remove
             </Button>
           </div>
@@ -91,7 +90,7 @@ export function InstructorSignatureUpload({
         <button
           onClick={() => inputRef.current?.click()}
           disabled={isUploading}
-          className="w-48 h-20 rounded-lg border-2 border-dashed border-neutral-300 dark:border-neutral-700 hover:border-primary/50 transition-colors flex flex-col items-center justify-center gap-1.5 text-muted-foreground hover:text-primary"
+          className="w-48 h-20 rounded-lg border-2 border-dashed border-ws-track hover:border-primary/50 transition-colors flex flex-col items-center justify-center gap-1.5 text-muted-foreground hover:text-primary"
         >
           {isUploading ? (
             <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
@@ -100,7 +99,7 @@ export function InstructorSignatureUpload({
             </svg>
           ) : (
             <>
-              <HugeiconsIcon icon={Upload03Icon} size={20} />
+              <UploadIcon  size={20} />
               <span className="text-xs font-medium">Upload Signature</span>
             </>
           )}
@@ -108,8 +107,8 @@ export function InstructorSignatureUpload({
       )}
 
       {saved && (
-        <p className="text-xs text-emerald-600 flex items-center gap-1">
-          <HugeiconsIcon icon={Tick02Icon} size={14} />
+        <p className="text-xs text-ws-success flex items-center gap-1">
+          <CheckIcon  size={14} />
           Signature saved — it will appear on student certificates
         </p>
       )}

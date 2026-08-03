@@ -2,91 +2,49 @@
 
 import * as React from "react"
 import Link from "next/link"
-import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
 import { Topbar } from "@/components/platform/topbar"
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-} from "@/components/ui/carousel"
-import { type InstructorCourseItem } from "@/lib/actions/instructor"
+import { PageHeader } from "@/components/shared/page-header"
+import { StatTile } from "@/components/shared/stat-tile"
+import { EmptyState } from "@/components/shared/empty-state"
+import { ArtCourses, ArtSearch } from "@/components/shared/illustrations"
+import { InstructorCourseCard } from "@/components/instructor/instructor-course-card"
+import { CourseCardSkeleton } from "@/components/platform/course-card"
 import { useInstructorCourses } from "@/lib/hooks/queries"
 import { useQuery } from "@tanstack/react-query"
 import { getMyInstructorEarnings } from "@/lib/actions/earnings"
-import { HugeiconsIcon } from "@hugeicons/react"
 import {
-  BookOpen01Icon,
-  UserMultipleIcon,
-  DollarCircleIcon,
-  StarIcon,
-  Add01Icon,
-  BarChartIcon,
-  Search01Icon,
-} from "@hugeicons/core-free-icons"
-import { Skeleton } from "@/components/ui/skeleton"
+  BookOpen,
+  ChartLine,
+  DollarSign,
+  Plus,
+  Search,
+  Star,
+  Users,
+} from "lucide-react"
 import { useUser } from "@/components/providers/user-provider"
 import { OnboardingChecklist } from "@/components/instructor/onboarding-checklist"
 
-/* ── Reusable grid course card ────────────────────────────── */
-function CourseCard({
-  course,
-  badge,
-}: {
-  course: InstructorCourseItem
-  badge: { label: string; variant: "default" | "secondary" | "outline" }
-}) {
-  return (
-    <Link href={`/instructor/courses/${course.id}`}>
-      <Card className="group overflow-hidden hover:shadow-md hover:border-primary/30 transition-all h-full">
-        <div className="aspect-video w-full bg-muted relative overflow-hidden">
-          {course.thumbnailUrl ? (
-            <Image
-              src={course.thumbnailUrl}
-              alt={course.title}
-              fill
-              className="object-cover group-hover:scale-105 transition-transform duration-300"
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-            />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-muted-foreground/40 text-xs">No thumbnail</span>
-            </div>
-          )}
-          <Badge className="absolute top-2 left-2 text-[10px] shadow-sm" variant={badge.variant}>
-            {badge.label}
-          </Badge>
-        </div>
-        <CardContent className="p-3.5 space-y-1.5">
-          <h3 className="text-sm font-semibold truncate group-hover:text-primary transition-colors">
-            {course.title}
-          </h3>
-          <div className="flex items-center gap-2 text-[11px] text-muted-foreground flex-wrap">
-            <span>{course.totalLessons} lessons</span>
-            <span>·</span>
-            <span>{course.enrolledCount.toLocaleString()} students</span>
-            <span>·</span>
-            <span className="font-medium text-foreground">
-              {course.pricing === "free" ? "Free" : `$${course.price}`}
-            </span>
-            {course.rating && (
-              <>
-                <span>·</span>
-                <span className="inline-flex items-center gap-0.5">
-                  <HugeiconsIcon icon={StarIcon} size={11} className="text-orange-500" fill="currentColor" />
-                  {course.rating}
-                </span>
-              </>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
-  )
-}
+const quickActions = [
+  {
+    title: "Create Course",
+    caption: "Add a new course",
+    href: "/instructor/courses/new",
+    icon: Plus,
+  },
+  {
+    title: "Manage Courses",
+    caption: "Edit & publish",
+    href: "/instructor/courses",
+    icon: BookOpen,
+  },
+  {
+    title: "Analytics",
+    caption: "View performance",
+    href: "/instructor/analytics",
+    icon: ChartLine,
+  },
+]
 
 export default function InstructorDashboard() {
   const user = useUser()
@@ -98,214 +56,182 @@ export default function InstructorDashboard() {
   })
 
   const totalStudents = myCourses.reduce((s, c) => s + c.enrolledCount, 0)
-  const totalRevenue = myCourses.reduce(
-    (s, c) => s + (c.pricing === "paid" ? (c.price ?? 0) * c.enrolledCount * 0.85 : 0),
-    0
-  )
   const ratedCourses = myCourses.filter((c) => c.rating != null)
   const avgRating =
     ratedCourses.length > 0
       ? (ratedCourses.reduce((s, c) => s + (c.rating ?? 0), 0) / ratedCourses.length).toFixed(1)
       : "—"
 
-  const stats = [
-    { label: "Total Courses", value: myCourses.length, icon: BookOpen01Icon },
-    { label: "Total Students", value: totalStudents.toLocaleString(), icon: UserMultipleIcon },
-    {
-      label: earnings ? "Earnings (net)" : "Revenue (est.)",
-      value: earnings
-        ? `$${(earnings.lifetimeNetMinor / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
-        : `$${totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
-      icon: DollarCircleIcon,
-    },
-    { label: "Avg. Rating", value: avgRating, icon: StarIcon, iconColor: "text-orange-500" },
-  ]
+  // Plain derivation — the React Compiler memoizes this automatically.
+  const q = courseSearch.toLowerCase()
+  const filtered = courseSearch.trim()
+    ? myCourses.filter(
+        (c) =>
+          c.title.toLowerCase().includes(q) ||
+          c.status.toLowerCase().includes(q)
+      )
+    : myCourses
 
-  const sections = React.useMemo(() => {
-    const q = courseSearch.toLowerCase()
-    const filtered = courseSearch.trim()
-      ? myCourses.filter(
-          (c) =>
-            c.title.toLowerCase().includes(q) ||
-            c.status.toLowerCase().includes(q)
-        )
-      : myCourses
-
-    return [
-      { key: "draft", title: "Drafts", courses: filtered.filter((c) => c.status === "draft"), badge: { label: "Draft", variant: "secondary" as const } },
-      { key: "published", title: "Published", courses: filtered.filter((c) => c.status === "published"), badge: { label: "Published", variant: "default" as const } },
-      { key: "archived", title: "Archived", courses: filtered.filter((c) => c.status === "archived"), badge: { label: "Archived", variant: "outline" as const } },
-    ].filter((s) => s.courses.length > 0)
-  }, [myCourses, courseSearch])
+  const sections = [
+    { key: "draft", title: "Drafts", courses: filtered.filter((c) => c.status === "draft") },
+    { key: "published", title: "Published", courses: filtered.filter((c) => c.status === "published") },
+    { key: "archived", title: "Archived", courses: filtered.filter((c) => c.status === "archived") },
+  ].filter((s) => s.courses.length > 0)
 
   return (
     <>
       <Topbar title="Instructor Dashboard" variant="instructor" />
-      <div className="p-4 md:p-6 space-y-8 pb-24 md:pb-8">
-        {/* Welcome */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold">Welcome back, {user.firstName}</h1>
-            <p className="text-sm text-muted-foreground">
-              Here&apos;s an overview of your teaching activity.
-            </p>
-          </div>
-          <Button render={<Link href="/instructor/courses/new" />} className="hidden md:inline-flex">
-            <HugeiconsIcon icon={Add01Icon} size={16} />
-            New Course
-          </Button>
-        </div>
-
-        {/* Post-approval onboarding (hides itself when complete) */}
-        <OnboardingChecklist />
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {stats.map((stat) => (
-            <Card key={stat.label}>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">{stat.label}</p>
-                    <p className="text-xl font-bold">{stat.value}</p>
-                  </div>
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                    <HugeiconsIcon
-                      icon={stat.icon}
-                      size={18}
-                      className={("iconColor" in stat && stat.iconColor) ? stat.iconColor : "text-primary"}
-                      {...(stat.icon === StarIcon ? { fill: "currentColor" } : {})}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Course search */}
-        <div className="relative">
-          <HugeiconsIcon icon={Search01Icon} size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-          <input
-            type="text"
-            value={courseSearch}
-            onChange={(e) => setCourseSearch(e.target.value)}
-            placeholder="Search your courses..."
-            className="w-full h-9 rounded-lg border bg-muted/40 pl-9 pr-3 text-sm outline-none placeholder:text-muted-foreground focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-colors"
+      <div className="flex-1 px-6 pb-24 pt-8 md:px-8 md:pb-12 lg:px-12">
+        <div className="mx-auto w-full max-w-7xl space-y-8">
+          <PageHeader
+            title={`Welcome back, ${user.firstName}`}
+            subline="Here's an overview of your teaching activity."
+            action={
+              <Button
+                render={<Link href="/instructor/courses/new" />}
+                className="hidden bg-ws-brand text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:bg-ws-brand hover:opacity-90 md:inline-flex"
+              >
+                <Plus size={16} strokeWidth={2} />
+                New Course
+              </Button>
+            }
           />
-        </div>
 
-        {/* Course Sections — Carousel on mobile, Grid on desktop */}
-        {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1, 2, 3].map((i) => (
-              <Card key={i} className="overflow-hidden">
-                <Skeleton className="aspect-video w-full" />
-                <CardContent className="p-3.5 space-y-2">
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-3 w-1/2" />
-                </CardContent>
-              </Card>
-            ))}
+          {/* Post-approval onboarding (hides itself when complete) */}
+          <OnboardingChecklist />
+
+          {/* Stats */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatTile
+              label="Total Courses"
+              value={myCourses.length}
+              icon={<BookOpen size={18} strokeWidth={2} />}
+            />
+            <StatTile
+              label="Total Students"
+              value={totalStudents.toLocaleString()}
+              icon={<Users size={18} strokeWidth={2} />}
+            />
+            {/* Money comes from the earnings ledger, never price × enrollments */}
+            <StatTile
+              label="Earnings (net)"
+              value={
+                earnings
+                  ? `$${(earnings.lifetimeNetMinor / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                  : "—"
+              }
+              context={
+                earnings
+                  ? `$${(earnings.clearedMinor / 100).toFixed(2)} in wallet · $${(earnings.pendingMinor / 100).toFixed(2)} clearing`
+                  : "lifetime"
+              }
+              icon={<DollarSign size={18} strokeWidth={2} />}
+              tone="gold"
+            />
+            <StatTile
+              label="Avg. Rating"
+              value={avgRating}
+              context={ratedCourses.length > 0 ? `${ratedCourses.length} rated course${ratedCourses.length === 1 ? "" : "s"}` : undefined}
+              icon={<Star size={18} strokeWidth={2} />}
+              tone="gold"
+            />
           </div>
-        ) : sections.length === 0 && courseSearch.trim() ? (
-          <div className="flex flex-col items-center justify-center py-12 text-sm text-muted-foreground">
-            <p>No courses match &quot;{courseSearch}&quot;</p>
-            <button
-              type="button"
-              onClick={() => setCourseSearch("")}
-              className="text-primary text-xs mt-1 hover:underline"
-            >
-              Clear search
-            </button>
+
+          {/* Course search */}
+          <div className="relative">
+            <Search
+              size={16}
+              strokeWidth={2}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ws-muted"
+            />
+            <input
+              type="text"
+              value={courseSearch}
+              onChange={(e) => setCourseSearch(e.target.value)}
+              placeholder="Search your courses..."
+              className="h-10 w-full rounded-md border border-ws-hairline bg-ws-surface pl-9 pr-3 text-sm text-ws-primary outline-none transition-colors duration-[var(--ws-motion-fast)] placeholder:text-ws-muted focus:border-ws-muted/40"
+            />
           </div>
-        ) : sections.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <HugeiconsIcon icon={BookOpen01Icon} size={48} className="text-muted-foreground/30 mb-4" />
-            <h3 className="font-semibold text-lg mb-1">No courses yet</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Create your first course to start teaching.
-            </p>
-            <Button render={<Link href="/instructor/courses/new" />}>
-              <HugeiconsIcon icon={Add01Icon} size={16} />
-              Create Course
-            </Button>
-          </div>
-        ) : (
-          sections.map((section, idx) => (
-            <section key={section.key}>
-              {idx > 0 && <Separator className="mb-8" />}
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <h2 className="font-semibold text-sm">{section.title}</h2>
-                  <Badge variant="secondary" className="text-[10px]">{section.courses.length}</Badge>
+
+          {/* Course sections */}
+          {isLoading ? (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {[1, 2, 3].map((i) => (
+                <CourseCardSkeleton key={i} />
+              ))}
+            </div>
+          ) : sections.length === 0 && courseSearch.trim() ? (
+            <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
+              <ArtSearch className="mb-4 w-40" />
+              <p className="text-sm text-ws-muted">
+                No courses match &quot;{courseSearch}&quot;
+              </p>
+              <button
+                type="button"
+                onClick={() => setCourseSearch("")}
+                className="mt-2 text-xs font-medium text-ws-gold transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-80"
+              >
+                Clear search
+              </button>
+            </div>
+          ) : sections.length === 0 ? (
+            <EmptyState
+              art={<ArtCourses />}
+              title="No courses yet"
+              description="Create your first course to start teaching."
+              actionLabel="Create Course"
+              actionHref="/instructor/courses/new"
+            />
+          ) : (
+            sections.map((section) => (
+              <section key={section.key} className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-semibold text-ws-primary">{section.title}</h2>
+                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-ws-chip px-1.5 text-[10px] font-semibold tabular-nums text-ws-muted">
+                      {section.courses.length}
+                    </span>
+                  </div>
+                  <Link
+                    href="/instructor/courses"
+                    className="text-[13px] font-medium text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:text-ws-primary"
+                  >
+                    View all
+                  </Link>
                 </div>
-                <Button variant="ghost" size="sm" render={<Link href="/instructor/courses" />}>
-                  View all
-                </Button>
-              </div>
 
-              {/* Mobile: Carousel */}
-              <div className="md:hidden">
-                <Carousel opts={{ align: "start", dragFree: true }} className="w-full">
-                  <CarouselContent className="-ml-3">
-                    {section.courses.map((course) => (
-                      <CarouselItem key={course.id} className="pl-3 basis-[85%] sm:basis-1/2">
-                        <CourseCard course={course} badge={section.badge} />
-                      </CarouselItem>
-                    ))}
-                  </CarouselContent>
-                </Carousel>
-              </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {section.courses.map((course) => (
+                    <InstructorCourseCard key={course.id} course={course} />
+                  ))}
+                </div>
+              </section>
+            ))
+          )}
 
-              {/* Desktop: Grid */}
-              <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {section.courses.map((course) => (
-                  <CourseCard key={course.id} course={course} badge={section.badge} />
-                ))}
-              </div>
-            </section>
-          ))
-        )}
-
-        {/* Quick Actions */}
-        <Separator />
-        <div className="space-y-3">
-          <h2 className="font-semibold text-sm">Quick Actions</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <Link href="/instructor/courses/new">
-              <Card className="hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer">
-                <CardContent className="p-4 flex items-center gap-3">
-                  <HugeiconsIcon icon={Add01Icon} size={18} className="shrink-0 text-primary" />
-                  <div>
-                    <p className="text-sm font-medium">Create Course</p>
-                    <p className="text-[11px] text-muted-foreground">Add a new course</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-            <Link href="/instructor/courses">
-              <Card className="hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer">
-                <CardContent className="p-4 flex items-center gap-3">
-                  <HugeiconsIcon icon={BookOpen01Icon} size={18} className="shrink-0 text-primary" />
-                  <div>
-                    <p className="text-sm font-medium">Manage Courses</p>
-                    <p className="text-[11px] text-muted-foreground">Edit & publish</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-            <Link href="/instructor/analytics">
-              <Card className="hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer">
-                <CardContent className="p-4 flex items-center gap-3">
-                  <HugeiconsIcon icon={BarChartIcon} size={18} className="shrink-0 text-primary" />
-                  <div>
-                    <p className="text-sm font-medium">Analytics</p>
-                    <p className="text-[11px] text-muted-foreground">View performance</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
+          {/* Quick Actions */}
+          <div className="space-y-3 border-t border-ws-hairline pt-8">
+            <h2 className="text-sm font-semibold text-ws-primary">Quick Actions</h2>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {quickActions.map((qa) => {
+                const Icon = qa.icon
+                return (
+                  <Link
+                    key={qa.title}
+                    href={qa.href}
+                    className="flex items-center gap-3 rounded-lg border border-ws-hairline bg-ws-surface p-4 transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-raised"
+                  >
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ws-raised text-ws-gold">
+                      <Icon size={18} strokeWidth={2} />
+                    </span>
+                    <span>
+                      <span className="block text-sm font-medium text-ws-primary">{qa.title}</span>
+                      <span className="block text-[11px] text-ws-muted">{qa.caption}</span>
+                    </span>
+                  </Link>
+                )
+              })}
+            </div>
           </div>
         </div>
       </div>

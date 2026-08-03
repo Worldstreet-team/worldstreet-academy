@@ -1,11 +1,10 @@
 "use client"
 
 import { useRef, useEffect } from "react"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { MicOff01Icon, ComputerScreenShareIcon } from "@hugeicons/core-free-icons"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { rtkClient } from "@/lib/rtk-client"
+import { HandIcon, MicOffIcon, ScreenShareIcon } from "lucide-react"
 
 const REACTIONS = [
   { id: "👏", emoji: "👏", label: "Clap" },
@@ -63,8 +62,8 @@ export function ParticipantTile({
   return (
     <div
       className={cn(
-        "relative rounded-2xl overflow-hidden flex items-center justify-center transition-all duration-150",
-        "bg-neutral-200/60 dark:bg-zinc-900/70",
+        "relative rounded-lg overflow-hidden flex items-center justify-center transition-all duration-[var(--ws-motion-fast)]",
+        "bg-ws-raised/70",
         cls,
       )}
       style={isSpeaking ? {
@@ -98,26 +97,26 @@ export function ParticipantTile({
           {reactionId && (() => {
             const r = REACTIONS.find((rx) => rx.id === reactionId)
             return r ? (
-              <div className="w-8 h-8 rounded-full bg-background/70 backdrop-blur-sm flex items-center justify-center animate-bounce">
+              <div className="w-8 h-8 rounded-full bg-ws-surface flex items-center justify-center">
                 <span className="text-base leading-none">{r.emoji}</span>
               </div>
             ) : null
           })()}
           {handRaised && (
-            <div className="w-8 h-8 rounded-full bg-amber-500/20 backdrop-blur-sm flex items-center justify-center animate-bounce">
-              <span className="text-base leading-none">✋</span>
+            <div className="w-8 h-8 rounded-full bg-ws-warning/20 flex items-center justify-center">
+              <HandIcon size={14} className="text-ws-warning" />
             </div>
           )}
         </div>
       )}
 
       <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between pointer-events-none">
-        <span className="px-2.5 py-0.5 rounded-full border border-white/30 dark:border-white/20 text-[11px] font-medium text-white truncate max-w-[70%] backdrop-blur-sm">
+        <span className="px-2.5 py-0.5 rounded-full border border-white/30 dark:border-white/20 text-[11px] font-medium text-white truncate max-w-[70%]">
           {isLocal ? "You" : name}
         </span>
         {isMuted && (
-          <div className="w-6 h-6 rounded-full border border-red-400/50 flex items-center justify-center backdrop-blur-sm">
-            <HugeiconsIcon icon={MicOff01Icon} size={11} className="text-red-400" />
+          <div className="w-6 h-6 rounded-full border border-ws-danger/50 flex items-center justify-center">
+            <MicOffIcon  size={11} className="text-ws-danger" />
           </div>
         )}
       </div>
@@ -273,7 +272,7 @@ export function ScreenShareView({
   }, [participantId, isLocal])
 
   return (
-    <div className="relative flex-1 rounded-2xl overflow-hidden flex items-center justify-center min-h-0 bg-black/90">
+    <div className="relative flex-1 rounded-lg overflow-hidden flex items-center justify-center min-h-0 bg-black/90">
       <video
         ref={videoRef}
         autoPlay
@@ -281,8 +280,8 @@ export function ScreenShareView({
         muted
         className="w-full h-full object-contain"
       />
-      <div className="absolute bottom-2 left-2 flex items-center gap-2 px-3 py-1 rounded-full border border-white/20 backdrop-blur-sm">
-        <HugeiconsIcon icon={ComputerScreenShareIcon} size={12} className="text-emerald-400" />
+      <div className="absolute bottom-2 left-2 flex items-center gap-2 px-3 py-1 rounded-full border border-white/20">
+        <ScreenShareIcon  size={12} className="text-ws-success" />
         <span className="text-[11px] font-medium text-white">
           {isLocal ? "You are sharing" : `${participantName}'s screen`}
         </span>

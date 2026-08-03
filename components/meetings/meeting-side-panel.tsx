@@ -2,24 +2,11 @@
 
 import { useRef, useEffect, useState } from "react"
 import Image from "next/image"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  Cancel01Icon,
-  MicOff01Icon,
-  VideoOffIcon,
-  ComputerScreenShareIcon,
-  BubbleChatIcon,
-  ChartColumnIcon,
-  ArrowRight01Icon,
-  Add01Icon,
-  UserGroupIcon,
-  SentIcon,
-  Tick02Icon,
-  ArrowDown01Icon,
-} from "@hugeicons/core-free-icons"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
+import { ChartColumnIcon, HandIcon, CheckIcon, ChevronDownIcon, ChevronRightIcon, MessageCircleIcon, MicOffIcon, PlusIcon, ScreenShareIcon, SendIcon, UsersIcon, VideoOffIcon, XIcon } from "lucide-react"
+import { RenderIcon } from "@/components/shared/render-icon"
 
 export type ActiveTab = "people" | "chat" | "polls"
 
@@ -135,7 +122,6 @@ function PeopleTab({
         <div className="px-4 py-3">
           <div className="flex items-center gap-2 mb-2.5">
             <span className="relative flex h-1.5 w-1.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-foreground/40 opacity-75" />
               <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-foreground/60" />
             </span>
             <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
@@ -156,7 +142,7 @@ function PeopleTab({
                   Accept
                 </button>
                 <button onClick={() => onDeclineStageRequest(req.userId)} className="h-7 w-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors">
-                  <HugeiconsIcon icon={Cancel01Icon} size={13} />
+                  <XIcon  size={13} />
                 </button>
               </div>
             ))}
@@ -188,8 +174,8 @@ function PeopleTab({
                 {isHost && <span className="text-[10px] text-muted-foreground/60">Host</span>}
               </div>
               <div className="flex items-center gap-1">
-                {myHandRaised && <span className="text-xs">✋</span>}
-                {isMuted && <HugeiconsIcon icon={MicOff01Icon} size={13} className="text-red-400/80" />}
+                {myHandRaised && <HandIcon size={12} className="text-ws-warning" />}
+                {isMuted && <MicOffIcon  size={13} className="text-ws-danger/80" />}
               </div>
             </div>
           )}
@@ -211,29 +197,29 @@ function PeopleTab({
                   {isParticipantHost && <span className="text-[10px] text-muted-foreground/60">Host</span>}
                 </div>
                 <div className="flex items-center gap-1">
-                  {raisedHands.has(pUid) && <span className="text-xs">✋</span>}
-                  {!audioEnabled && <HugeiconsIcon icon={MicOff01Icon} size={13} className="text-red-400/80" />}
+                  {raisedHands.has(pUid) && <HandIcon size={12} className="text-ws-warning" />}
+                  {!audioEnabled && <MicOffIcon  size={13} className="text-ws-danger/80" />}
                 </div>
                 {isHost && !isParticipantHost && (
                   <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                     {audioEnabled && (
                       <button onClick={() => onMuteParticipant(pUid, "audio")} title="Mute audio" className="w-6 h-6 rounded-md flex items-center justify-center hover:bg-muted/80 transition-colors">
-                        <HugeiconsIcon icon={MicOff01Icon} size={13} className="text-muted-foreground" />
+                        <MicOffIcon  size={13} className="text-muted-foreground" />
                       </button>
                     )}
                     {videoEnabled && (
                       <button onClick={() => onMuteParticipant(pUid, "video")} title="Mute video" className="w-6 h-6 rounded-md flex items-center justify-center hover:bg-muted/80 transition-colors">
-                        <HugeiconsIcon icon={VideoOffIcon} size={13} className="text-muted-foreground" />
+                        <VideoOffIcon  size={13} className="text-muted-foreground" />
                       </button>
                     )}
                     <button onClick={() => onToggleScreenSharePerm(pUid)} title="Screen share" className="w-6 h-6 rounded-md flex items-center justify-center hover:bg-muted/80 transition-colors">
-                      <HugeiconsIcon icon={ComputerScreenShareIcon} size={13} className={screenSharePermissions.get(pUid) === false ? "text-red-400/80" : "text-muted-foreground"} />
+                      <ScreenShareIcon  size={13} className={screenSharePermissions.get(pUid) === false ? "text-ws-danger/80" : "text-muted-foreground"} />
                     </button>
                     <button onClick={() => onRemoveFromStage(pUid)} title="Move to audience" className="w-6 h-6 rounded-md flex items-center justify-center hover:bg-muted/80 transition-colors">
-                      <HugeiconsIcon icon={ArrowRight01Icon} size={13} className="text-muted-foreground rotate-90" />
+                      <ChevronRightIcon  size={13} className="text-muted-foreground rotate-90" />
                     </button>
-                    <button onClick={() => onKick(pUid)} title="Remove" className="w-6 h-6 rounded-md flex items-center justify-center hover:bg-red-500/10 transition-colors">
-                      <HugeiconsIcon icon={Cancel01Icon} size={13} className="text-red-400/70" />
+                    <button onClick={() => onKick(pUid)} title="Remove" className="w-6 h-6 rounded-md flex items-center justify-center hover:bg-ws-danger/10 transition-colors">
+                      <XIcon  size={13} className="text-ws-danger/70" />
                     </button>
                   </div>
                 )}
@@ -281,14 +267,14 @@ function PeopleTab({
                     </AvatarFallback>
                   </Avatar>
                   <span className="text-[13px] text-foreground truncate flex-1">{name}</span>
-                  {raisedHands.has(pUid) && <span className="text-xs">✋</span>}
+                  {raisedHands.has(pUid) && <HandIcon size={12} className="text-ws-warning" />}
                   {isHost && (
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => onInviteToStage(pUid)} title="Add to stage" className="h-6 px-2.5 rounded-md text-[10px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors">
                         Add
                       </button>
-                      <button onClick={() => onKick(pUid)} title="Remove" className="w-6 h-6 rounded-md flex items-center justify-center hover:bg-red-500/10 transition-colors">
-                        <HugeiconsIcon icon={Cancel01Icon} size={12} className="text-red-400/70" />
+                      <button onClick={() => onKick(pUid)} title="Remove" className="w-6 h-6 rounded-md flex items-center justify-center hover:bg-ws-danger/10 transition-colors">
+                        <XIcon  size={12} className="text-ws-danger/70" />
                       </button>
                     </div>
                   )}
@@ -347,7 +333,7 @@ function ChatTab({
       <div className="flex-1 overflow-y-auto px-4 py-3">
         {chatMessages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground/30">
-            <HugeiconsIcon icon={BubbleChatIcon} size={28} />
+            <MessageCircleIcon  size={28} />
             <div className="text-center">
               <p className="text-[13px] font-medium text-muted-foreground/60">No messages yet</p>
               <p className="text-xs text-muted-foreground/40">Be the first to say hello</p>
@@ -372,7 +358,7 @@ function ChatTab({
                   </div>
                   {msg.message && (
                     <div className={cn(
-                      "px-3 py-2 rounded-xl text-sm leading-relaxed",
+                      "px-3 py-2 rounded-lg text-sm leading-relaxed",
                       isMe
                         ? "bg-foreground text-background rounded-br-md"
                         : "bg-muted/70 text-foreground rounded-bl-md",
@@ -381,9 +367,9 @@ function ChatTab({
                     </div>
                   )}
                   {msg.imageUrl && (
-                    <Image src={msg.imageUrl} alt="" width={200} height={150} className="mt-1.5 rounded-xl object-cover" />
+                    <Image src={msg.imageUrl} alt="" width={200} height={150} className="mt-1.5 rounded-lg object-cover" />
                   )}
-                  {msg.videoUrl && <video src={msg.videoUrl} controls className="mt-1.5 rounded-xl max-w-full max-h-40" />}
+                  {msg.videoUrl && <video src={msg.videoUrl} controls className="mt-1.5 rounded-lg max-w-full max-h-40" />}
                 </div>
               </div>
             )
@@ -407,7 +393,7 @@ function ChatTab({
             disabled={!chatInput.trim()}
             className="w-8 h-8 rounded-md bg-foreground text-background flex items-center justify-center disabled:opacity-30 transition-opacity"
           >
-            <HugeiconsIcon icon={SentIcon} size={14} />
+            <SendIcon  size={14} />
           </button>
         </div>
       </div>
@@ -465,7 +451,7 @@ function PollsTab({
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
         {polls.length === 0 && !showCreatePoll && (
           <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground/30">
-            <HugeiconsIcon icon={ChartColumnIcon} size={28} />
+            <ChartColumnIcon  size={28} />
             <div className="text-center">
               <p className="text-[13px] font-medium text-muted-foreground/60">No polls yet</p>
               {isHost && <p className="text-xs text-muted-foreground/40">Create one to engage participants</p>}
@@ -479,12 +465,12 @@ function PollsTab({
           const showResults = hasVoted || isHost
           const isExpanded = expandedPolls.has(poll.id)
           return (
-            <div key={poll.id} className="rounded-xl bg-muted/20 p-3.5 space-y-2.5">
+            <div key={poll.id} className="rounded-lg bg-muted/20 p-3.5 space-y-2.5">
               <div className="flex items-start justify-between gap-2">
                 <p className="text-[13px] font-semibold text-foreground leading-snug">{poll.question}</p>
                 {hasVoted && (
                   <div className="shrink-0 w-5 h-5 rounded-full bg-muted/60 flex items-center justify-center">
-                    <HugeiconsIcon icon={Tick02Icon} size={12} className="text-foreground/70" />
+                    <CheckIcon  size={12} className="text-foreground/70" />
                   </div>
                 )}
               </div>
@@ -506,7 +492,7 @@ function PollsTab({
                         )}
                       >
                         {showResults && (
-                          <div className="absolute inset-y-0 left-0 bg-foreground/8 transition-all duration-500 ease-out" style={{ width: `${pct}%` }} />
+                          <div className="absolute inset-y-0 left-0 bg-foreground/8 transition-all duration-[var(--ws-motion-slow)] ease-out" style={{ width: `${pct}%` }} />
                         )}
                         <div className="relative flex items-center justify-between">
                           <span className="text-sm text-foreground">{opt}</span>
@@ -547,11 +533,10 @@ function PollsTab({
                       className="flex items-center gap-1 text-[10px] text-foreground/60 hover:text-foreground transition-colors"
                     >
                       <span>{isExpanded ? "Hide" : "View"} Details</span>
-                      <HugeiconsIcon
-                        icon={ArrowDown01Icon}
+                      <ChevronDownIcon
+                        
                         size={10}
-                        className={cn("transition-transform", isExpanded && "rotate-180")}
-                      />
+                        className={cn("transition-transform", isExpanded && "rotate-180")} />
                     </button>
                   )}
                 </div>
@@ -561,7 +546,7 @@ function PollsTab({
         })}
         
         {showCreatePoll && (
-          <div className="rounded-xl bg-muted/20 p-3.5 space-y-3">
+          <div className="rounded-lg bg-muted/20 p-3.5 space-y-3">
             <Input
               value={pollQuestion}
               onChange={(e) => onPollQuestionChange(e.target.value)}
@@ -580,7 +565,7 @@ function PollsTab({
                   />
                   {pollOptions.length > 2 && (
                     <button onClick={() => onRemovePollOption(i)} className="w-8 h-8 rounded-md flex items-center justify-center hover:bg-muted/60 transition-colors">
-                      <HugeiconsIcon icon={Cancel01Icon} size={12} className="text-muted-foreground" />
+                      <XIcon  size={12} className="text-muted-foreground" />
                     </button>
                   )}
                 </div>
@@ -610,7 +595,7 @@ function PollsTab({
       {isHost && !showCreatePoll && polls.length > 0 && (
         <div className="p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-3">
           <button onClick={() => onSetShowCreatePoll(true)} className="w-full h-9 rounded-lg bg-muted/40 text-[13px] font-medium text-muted-foreground hover:text-foreground flex items-center justify-center gap-1.5 transition-colors">
-            <HugeiconsIcon icon={Add01Icon} size={13} />
+            <PlusIcon  size={13} />
             New Poll
           </button>
         </div>
@@ -618,7 +603,7 @@ function PollsTab({
       {isHost && !showCreatePoll && polls.length === 0 && (
         <div className="p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-3">
           <button onClick={() => onSetShowCreatePoll(true)} className="w-full h-9 rounded-lg bg-foreground text-background text-[13px] font-medium flex items-center justify-center gap-1.5 hover:opacity-90 transition-opacity">
-            <HugeiconsIcon icon={Add01Icon} size={13} />
+            <PlusIcon  size={13} />
             Create Poll
           </button>
         </div>
@@ -718,13 +703,13 @@ export function MeetingSidePanel({
   const stageRequestCount = stageRequests.length
   
   const TAB_ICONS = {
-    people: UserGroupIcon,
-    chat: BubbleChatIcon,
+    people: UsersIcon,
+    chat: MessageCircleIcon,
     polls: ChartColumnIcon,
   } as const
   
   return (
-    <div className="fixed md:absolute inset-0 md:inset-auto md:top-12 md:right-3 md:bottom-24 z-40 md:w-85 md:rounded-xl flex flex-col overflow-hidden animate-in slide-in-from-right-4 fade-in duration-200 bg-background/98 backdrop-blur-2xl border border-border/20 shadow-xl shadow-black/5">
+    <div className="fixed md:absolute inset-0 md:inset-auto md:top-12 md:right-3 md:bottom-24 z-40 md:w-85 md:rounded-lg flex flex-col overflow-hidden animate-in slide-in-from-right-4 fade-in duration-[var(--ws-motion-base)] bg-ws-surface border border-ws-hairline shadow-[var(--ws-shadow-nav)]">
       {/* Header with tabs */}
       <div className="flex items-center justify-between px-1 pt-[max(0.5rem,env(safe-area-inset-top))] md:pt-1.5 pb-0">
         <div className="flex-1 flex">
@@ -739,7 +724,7 @@ export function MeetingSidePanel({
                   : "text-muted-foreground/70 hover:text-muted-foreground",
               )}
             >
-              <HugeiconsIcon icon={TAB_ICONS[tab]} size={14} className={activeTab === tab ? "text-foreground" : ""} />
+              <RenderIcon icon={TAB_ICONS[tab]}  size={14} className={activeTab === tab ? "text-foreground" : ""} />
               <span className="hidden xs:inline">{tab}</span>
               
               {/* Badge */}
@@ -762,7 +747,7 @@ export function MeetingSidePanel({
           ))}
         </div>
         <button onClick={() => onTabChange(null)} className="w-9 h-9 rounded-lg flex items-center justify-center mr-1 hover:bg-muted/60 transition-colors">
-          <HugeiconsIcon icon={Cancel01Icon} size={16} className="text-muted-foreground" />
+          <XIcon  size={16} className="text-muted-foreground" />
         </button>
       </div>
 

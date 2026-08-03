@@ -2,8 +2,7 @@
 
 import Image from "next/image"
 import { motion } from "motion/react"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { UserIcon } from "@hugeicons/core-free-icons"
+import { UserIcon } from "lucide-react"
 
 export interface ConvoItem {
   conversationId?: string
@@ -40,14 +39,14 @@ export function MessageList({ data }: { data: unknown }) {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: i * 0.04 }}
-          className="flex items-center gap-3 p-3 rounded-2xl bg-card/50 border border-border/20
-                     hover:border-foreground/10 hover:bg-card/70 transition-all duration-200"
+          className="flex items-center gap-3 p-3 rounded-lg bg-card/50 border border-ws-hairline
+                     hover:border-foreground/10 hover:bg-card/70 transition-all duration-[var(--ws-motion-base)]"
         >
           <div className="relative w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center overflow-hidden shrink-0 ring-1 ring-border/20">
             {c.userAvatar ? (
               <Image src={c.userAvatar} alt="" fill className="object-cover" sizes="36px" />
             ) : (
-              <HugeiconsIcon icon={UserIcon} size={20} className="text-muted-foreground" />
+              <UserIcon  size={20} className="text-muted-foreground" />
             )}
           </div>
           <div className="flex-1 min-w-0">

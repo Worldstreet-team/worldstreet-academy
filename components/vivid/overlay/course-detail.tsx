@@ -1,14 +1,7 @@
 "use client"
 
 import Image from "next/image"
-import { motion } from "motion/react"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  TeachingIcon,
-  StarIcon,
-  UserGroupIcon,
-  BookOpen01Icon,
-} from "@hugeicons/core-free-icons"
+import { BookOpenIcon, GraduationCapIcon, StarIcon, UsersIcon } from "lucide-react"
 
 export function CourseDetail({ data }: { data: unknown }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -19,12 +12,12 @@ export function CourseDetail({ data }: { data: unknown }) {
     <div className="space-y-5">
       {/* Thumbnail */}
       {course.thumbnailUrl && (
-        <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-muted">
+        <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-muted">
           <Image src={course.thumbnailUrl} alt={course.title} fill className="object-cover" sizes="420px" />
           {/* Price overlay */}
           {(course.pricing === "free" || course.price) && (
             <div className="absolute bottom-3 right-3">
-              <span className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-background/80 text-foreground backdrop-blur-sm border border-border/30">
+              <span className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-background/80 text-foreground border border-ws-hairline">
                 {course.pricing === "free" ? "Free" : `$${course.price}`}
               </span>
             </div>
@@ -68,12 +61,11 @@ export function CourseDetail({ data }: { data: unknown }) {
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1">
             {[1, 2, 3, 4, 5].map((s) => (
-              <HugeiconsIcon
+              <StarIcon
                 key={s}
-                icon={StarIcon}
+                
                 size={14}
-                className={s <= Math.round(course.rating || 0) ? "text-amber-400 fill-amber-400" : "text-muted-foreground/20"}
-              />
+                className={s <= Math.round(course.rating || 0) ? "text-ws-rating fill-ws-rating" : "text-muted-foreground/20"} />
             ))}
           </div>
           <span className="text-xs text-muted-foreground">
@@ -84,16 +76,15 @@ export function CourseDetail({ data }: { data: unknown }) {
 
       {/* Enrolled progress */}
       {course.isEnrolled && (
-        <div className="p-3.5 rounded-xl bg-accent/15 border border-border/20 space-y-2">
+        <div className="p-3.5 rounded-lg bg-accent/15 border border-ws-hairline space-y-2">
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Your progress</span>
             <span className="font-semibold text-foreground tabular-nums">{course.enrollmentProgress || 0}%</span>
           </div>
           <div className="h-1.5 rounded-full bg-accent/30 overflow-hidden">
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: `${course.enrollmentProgress || 0}%` }}
-              transition={{ duration: 0.8, ease: "circOut" }}
+            {/* Static fill — 06-motion bans layout (width) animation */}
+            <div
+              style={{ width: `${course.enrollmentProgress || 0}%` }}
               className="h-full rounded-full bg-foreground/60"
             />
           </div>
@@ -104,12 +95,12 @@ export function CourseDetail({ data }: { data: unknown }) {
       <div className="flex flex-wrap gap-2">
         {course.totalLessons > 0 && (
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/20 text-xs text-foreground/70">
-            <HugeiconsIcon icon={BookOpen01Icon} size={12} /> {course.totalLessons} lessons
+            <BookOpenIcon  size={12} /> {course.totalLessons} lessons
           </span>
         )}
         {course.enrolledCount > 0 && (
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/20 text-xs text-foreground/70">
-            <HugeiconsIcon icon={UserGroupIcon} size={12} /> {course.enrolledCount} students
+            <UsersIcon  size={12} /> {course.enrolledCount} students
           </span>
         )}
         {course.level && (

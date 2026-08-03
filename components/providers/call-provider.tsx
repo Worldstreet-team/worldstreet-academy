@@ -9,13 +9,6 @@ import {
   useEffect,
   ReactNode,
 } from "react"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  Call02Icon,
-  CallEnd01Icon,
-  Video01Icon,
-  WifiConnected01Icon,
-} from "@hugeicons/core-free-icons"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { VideoCall } from "@/components/messages/video-call"
 import {
@@ -30,6 +23,8 @@ import { useUser } from "@/components/providers/user-provider"
 import { callSounds } from "@/lib/call-sounds"
 import { rtkClient, preloadRTKSDK } from "@/lib/rtk-client"
 import type { CallEventPayload, SSEEventPayload } from "@/lib/call-events"
+import { PhoneIcon, PhoneOffIcon, VideoIcon, WifiIcon } from "lucide-react"
+import { RenderIcon } from "@/components/shared/render-icon"
 
 type CallType = "video" | "audio"
 type CallState =
@@ -722,8 +717,8 @@ function ReconnectionBanner({
   }
 
   return (
-    <div className="fixed bottom-24 right-4 z-[9999] animate-in slide-in-from-bottom-4 fade-in duration-200">
-      <div className="flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl border border-border/50 bg-background">
+    <div className="fixed bottom-24 right-4 z-[9999] animate-in slide-in-from-bottom-4 fade-in duration-[var(--ws-motion-base)]">
+      <div className="flex items-center gap-3 px-4 py-3 rounded-lg shadow-2xl border border-ws-hairline bg-background">
         <div className="relative">
           <Avatar className="w-10 h-10">
             <AvatarImage
@@ -735,12 +730,11 @@ function ReconnectionBanner({
             </AvatarFallback>
           </Avatar>
           {remoteRejoined && (
-            <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-green-500 border-2 border-background flex items-center justify-center">
-              <HugeiconsIcon
-                icon={WifiConnected01Icon}
+            <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-ws-success border-2 border-background flex items-center justify-center">
+              <WifiIcon
+                
                 size={8}
-                className="text-white"
-              />
+                className="text-white" />
             </div>
           )}
         </div>
@@ -760,23 +754,20 @@ function ReconnectionBanner({
             disabled={isRejoining}
             className="w-9 h-9 rounded-full flex items-center justify-center bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50"
           >
-            <HugeiconsIcon icon={CallEnd01Icon} size={16} />
+            <PhoneOffIcon  size={16} />
           </button>
           <button
             onClick={handleRejoin}
             disabled={isRejoining}
-            className="h-9 px-3 rounded-full flex items-center justify-center gap-1.5 bg-green-500 text-white hover:bg-green-600 transition-colors disabled:opacity-50 text-xs font-medium"
+            className="h-9 px-3 rounded-full flex items-center justify-center gap-1.5 bg-ws-success text-white hover:bg-ws-success/90 transition-colors disabled:opacity-50 text-xs font-medium"
           >
             {isRejoining ? (
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : (
               <>
-                <HugeiconsIcon
-                  icon={
-                    callInfo.callType === "video" ? Video01Icon : Call02Icon
-                  }
-                  size={14}
-                />
+                <RenderIcon icon={callInfo.callType === "video" ? VideoIcon : PhoneIcon}
+                  
+                  size={14} />
                 Rejoin
               </>
             )}

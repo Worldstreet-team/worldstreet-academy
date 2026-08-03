@@ -17,8 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { Clock01Icon, CheckmarkCircle02Icon, Cancel01Icon } from "@hugeicons/core-free-icons"
+import { LoaderCircle } from "lucide-react"
 import {
   getStudentExamStatus,
   startExamAttempt,
@@ -28,6 +27,8 @@ import {
   type ExamResult,
 } from "@/lib/actions/exams"
 import { queryKeys } from "@/lib/hooks/queries/keys"
+import { CircleCheckBigIcon, ClockIcon, XIcon } from "lucide-react"
+import { RenderIcon } from "@/components/shared/render-icon"
 
 function fmtClock(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000))
@@ -46,6 +47,7 @@ function ExamRunner({
   onFinished: (result: ExamResult) => void
 }) {
   const [answers, setAnswers] = React.useState<Record<string, string[]>>(runner.savedAnswers)
+  const [currentQ, setCurrentQ] = React.useState(0)
   const [timeLeft, setTimeLeft] = React.useState(() => new Date(runner.deadlineAt).getTime() - Date.now())
   const [confirmOpen, setConfirmOpen] = React.useState(false)
   const [submitting, setSubmitting] = React.useState(false)
@@ -110,13 +112,20 @@ function ExamRunner({
   const answeredCount = runner.questions.filter((q) => (answers[q.id] ?? []).length > 0).length
   const urgent = timeLeft < 120_000
 
+  const jumpToQuestion = (qi: number) => {
+    setCurrentQ(qi)
+    document
+      .getElementById(`exam-question-${qi}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }
+
   return (
     <div className="max-w-2xl mx-auto space-y-4">
-      {/* Sticky timer */}
-      <div className="sticky top-12 z-30 -mx-1 px-1">
+      {/* Sticky timer + question navigator (topbar is h-16) */}
+      <div className="sticky top-16 z-30 -mx-1 px-1 space-y-2">
         <div
-          className={`flex items-center justify-between rounded-xl border px-4 py-2.5 backdrop-blur-lg ${
-            urgent ? "border-destructive/40 bg-destructive/10" : "border-border/60 bg-background/90"
+          className={`flex items-center justify-between rounded-lg border px-4 py-2.5 ${
+            urgent ? "border-destructive/40 bg-destructive/10" : "border-ws-hairline bg-ws-surface"
           }`}
         >
           <span className="text-xs font-medium">
@@ -127,9 +136,32 @@ function ExamRunner({
               urgent ? "text-destructive" : ""
             }`}
           >
-            <HugeiconsIcon icon={Clock01Icon} size={15} />
+            <ClockIcon  size={15} />
             {fmtClock(timeLeft)}
           </span>
+        </div>
+
+        {/* Question navigator — answered = gold, unanswered = chip, current = ring */}
+        <div className="flex flex-wrap gap-1.5 rounded-lg border border-ws-hairline bg-ws-surface px-3 py-2">
+          {runner.questions.map((q, qi) => {
+            const answered = (answers[q.id] ?? []).length > 0
+            const isCurrent = qi === currentQ
+            return (
+              <button
+                key={q.id}
+                type="button"
+                aria-label={`Go to question ${qi + 1}${answered ? " (answered)" : ""}`}
+                onClick={() => jumpToQuestion(qi)}
+                className={`h-7 w-7 rounded-sm text-[11px] font-semibold tabular-nums transition-colors duration-[var(--ws-motion-fast)] ${
+                  answered
+                    ? "bg-ws-brand text-ws-brand-on"
+                    : "bg-ws-chip text-ws-muted hover:text-ws-primary"
+                } ${isCurrent ? "ring-2 ring-ws-brand" : ""}`}
+              >
+                {qi + 1}
+              </button>
+            )
+          })}
         </div>
       </div>
 
@@ -137,7 +169,7 @@ function ExamRunner({
       {runner.questions.map((q, qi) => {
         const chosen = answers[q.id] ?? []
         return (
-          <Card key={q.id}>
+          <Card key={q.id} id={`exam-question-${qi}`} className="scroll-mt-40">
             <CardContent className="p-4 space-y-3">
               <div className="flex items-start justify-between gap-3">
                 <p className="text-sm font-medium leading-relaxed">
@@ -156,11 +188,14 @@ function ExamRunner({
                     <button
                       key={opt.id}
                       type="button"
-                      onClick={() => setAnswer(q.id, q.type, opt.id)}
+                      onClick={() => {
+                        setAnswer(q.id, q.type, opt.id)
+                        setCurrentQ(qi)
+                      }}
                       className={`w-full flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left text-xs transition-colors ${
                         selected
                           ? "border-primary bg-primary/5 font-medium"
-                          : "border-border/60 hover:bg-muted/50"
+                          : "border-ws-hairline hover:bg-muted/50"
                       }`}
                     >
                       <span
@@ -221,7 +256,13 @@ function ExamRunner({
 
 export default function CourseExamPage() {
   return (
-    <React.Suspense fallback={null}>
+    <React.Suspense
+      fallback={
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <LoaderCircle className="h-5 w-5 animate-spin text-ws-muted" aria-label="Loading exam" />
+        </div>
+      }
+    >
       <CourseExamPageInner />
     </React.Suspense>
   )
@@ -278,17 +319,16 @@ function CourseExamPageInner() {
               <CardContent className="p-6 text-center space-y-4">
                 <div
                   className={`mx-auto h-14 w-14 rounded-full flex items-center justify-center ${
-                    result.passed ? "bg-emerald-500/10 text-emerald-600" : "bg-destructive/10 text-destructive"
+                    result.passed ? "bg-ws-success/10 text-ws-success" : "bg-destructive/10 text-destructive"
                   }`}
                 >
-                  <HugeiconsIcon
-                    icon={result.passed ? CheckmarkCircle02Icon : Cancel01Icon}
-                    size={28}
-                  />
+                  <RenderIcon icon={result.passed ? CircleCheckBigIcon : XIcon}
+                    
+                    size={28} />
                 </div>
                 <div>
                   <h1 className="text-lg font-semibold">
-                    {result.passed ? "You passed! 🎉" : "Not this time"}
+                    {result.passed ? "You passed!" : "Not this time"}
                   </h1>
                   <p className="text-3xl font-bold mt-2">{result.scorePercent}%</p>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -300,7 +340,7 @@ function CourseExamPageInner() {
                 {result.passed ? (
                   <div className="space-y-2">
                     {!lessonId && result.courseCompleted && (
-                      <p className="text-xs text-emerald-600 font-medium">
+                      <p className="text-xs text-ws-success font-medium">
                         Course completed — your certificate is ready.
                       </p>
                     )}
@@ -354,7 +394,7 @@ function CourseExamPageInner() {
           </div>
         ) : isLoading ? (
           <div className="max-w-md mx-auto pt-8 space-y-3">
-            <Skeleton className="h-48 rounded-xl" />
+            <Skeleton className="h-48 rounded-lg" />
           </div>
         ) : !status || !status.hasExam ? (
           /* ── No exam ── */
@@ -405,8 +445,8 @@ function CourseExamPageInner() {
                 </div>
 
                 {status.examPassed && (
-                  <p className="text-xs text-emerald-600 text-center font-medium">
-                    ✓ Already passed{status.bestScorePercent != null ? ` — best score ${status.bestScorePercent}%` : ""}
+                  <p className="text-xs text-ws-success text-center font-medium">
+                    Already passed{status.bestScorePercent != null ? ` — best score ${status.bestScorePercent}%` : ""}
                   </p>
                 )}
 

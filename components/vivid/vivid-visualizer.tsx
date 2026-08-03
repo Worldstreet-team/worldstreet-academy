@@ -6,9 +6,8 @@
 
 import { useRef, useEffect } from "react"
 import { motion } from "motion/react"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { Mic01Icon, MicOff01Icon } from "@hugeicons/core-free-icons"
 import { useVivid } from "@/lib/vivid/provider"
+import { MicIcon, MicOffIcon } from "lucide-react"
 
 const BAR_COUNT = 40
 
@@ -51,7 +50,7 @@ export function LiveOrb() {
         const x = startX + i * (barW + gap)
         const alpha = 0.35 + val * 0.65
 
-        ctx.fillStyle = `rgba(160,160,160,${alpha})`
+        ctx.fillStyle = `rgba(255,204,41,${alpha})`
         ctx.beginPath()
         ctx.roundRect(x, midY - h, barW, h, 1.5)
         ctx.fill()
@@ -61,7 +60,7 @@ export function LiveOrb() {
       }
 
       // center line
-      ctx.fillStyle = "rgba(160,160,160,0.15)"
+      ctx.fillStyle = "rgba(255,204,41,0.2)"
       ctx.fillRect(startX, midY - 0.5, totalW, 1)
 
       animRef.current = requestAnimationFrame(update)
@@ -81,17 +80,16 @@ export function LiveOrb() {
 
       {/* Mic button */}
       <motion.button
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
+        whileTap={{ scale: 0.98 }}
         onClick={() => vivid.isConnected ? vivid.endSession() : vivid.startSession()}
         className="flex items-center justify-center
                    w-12 h-12 rounded-full bg-foreground/5
                    cursor-pointer"
       >
         {vivid.isConnected ? (
-          <HugeiconsIcon icon={MicOff01Icon} size={20} className="text-foreground/80" />
+          <MicOffIcon  size={20} className="text-foreground/80" />
         ) : (
-          <HugeiconsIcon icon={Mic01Icon} size={20} className="text-foreground/80" />
+          <MicIcon  size={20} className="text-foreground/80" />
         )}
       </motion.button>
     </div>

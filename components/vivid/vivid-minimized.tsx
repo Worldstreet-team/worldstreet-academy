@@ -12,13 +12,8 @@
 
 import { useRef, useEffect, useState } from "react"
 import { motion } from "motion/react"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  ArrowExpand02Icon,
-  Cancel01Icon,
-  Mic01Icon,
-} from "@hugeicons/core-free-icons"
 import { useVivid } from "@/lib/vivid/provider"
+import { Maximize2Icon, MicIcon, XIcon } from "lucide-react"
 
 const MINI_BARS = 16
 
@@ -61,7 +56,7 @@ export function MinimizedBar() {
         const x = startX + i * (barW + gap)
         const alpha = 0.4 + val * 0.6
 
-        ctx.fillStyle = `rgba(160,160,160,${alpha})`
+        ctx.fillStyle = `rgba(255,204,41,${alpha})`
         ctx.beginPath()
         ctx.roundRect(x, midY - h, barW, h, 1)
         ctx.fill()
@@ -96,36 +91,35 @@ export function MinimizedBar() {
         initial={{ y: 80, opacity: 0, scale: 0.9 }}
         animate={{ y: 0, opacity: 1, scale: 1 }}
         exit={{ y: 80, opacity: 0, scale: 0.9 }}
-        transition={{ type: "spring", stiffness: 260, damping: 28 }}
+        transition={{ duration: 0.32, ease: [0.2, 0, 0, 1] }}
         className="fixed bottom-6 left-1/2 -translate-x-1/2 z-999 touch-none"
       >
         <motion.div
           layoutId="vivid-surface"
           className="flex items-center gap-3 px-4 py-2.5
-                     bg-background/80 backdrop-blur-2xl border border-border/30
-                     shadow-[0_8px_32px_rgba(0,0,0,0.12),0_2px_8px_rgba(0,0,0,0.08)]
+                     bg-ws-raised border border-ws-hairline
+                     shadow-[var(--ws-shadow-nav)]
                      max-w-md cursor-grab active:cursor-grabbing select-none"
-          style={{ borderRadius: 16 }}
+          style={{ borderRadius: 13 }}
           onClick={() => {
             if (!isDragging) vivid.setViewMode("expanded")
           }}
-          whileHover={{ scale: 1.01, y: -1 }}
-          whileTap={{ scale: 0.99 }}
         >
-        {/* Pulsing indicator */}
+        {/* Live-state indicator — opacity-only loop while mic/voice is active
+            (sanctioned live-state exception, 06-motion) */}
         <div className="relative flex items-center justify-center w-8 h-8 shrink-0">
           <motion.div
             animate={{
-              scale: vivid.isSpeaking ? [1, 1.2, 1] : vivid.isListening ? [1, 1.15, 1] : 1,
-              opacity: vivid.isConnected ? 1 : 0.4,
+              opacity: vivid.isSpeaking || vivid.isListening ? [0.4, 1, 0.4] : vivid.isConnected ? 1 : 0.4,
             }}
             transition={{
               repeat: vivid.isSpeaking || vivid.isListening ? Infinity : 0,
-              duration: vivid.isSpeaking ? 0.8 : 1.2,
+              duration: 1.2,
+              ease: "easeInOut",
             }}
-            className="absolute inset-0 rounded-full bg-foreground/5"
+            className="absolute inset-0 rounded-full bg-ws-brand/15"
           />
-          <HugeiconsIcon icon={Mic01Icon} size={14} className="text-foreground/70 relative z-10" />
+          <MicIcon  size={14} className="text-foreground/70 relative z-10" />
         </div>
 
         {/* Mini waveform */}
@@ -142,22 +136,18 @@ export function MinimizedBar() {
         {/* Controls */}
         <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
           <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
             onClick={() => vivid.setViewMode("expanded")}
             className="p-1.5 rounded-lg hover:bg-accent/50 transition-colors text-muted-foreground"
             aria-label="Expand"
           >
-            <HugeiconsIcon icon={ArrowExpand02Icon} size={14} />
+            <Maximize2Icon  size={14} />
           </motion.button>
           <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
             onClick={() => vivid.endSession()}
             className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive"
             aria-label="End session"
           >
-            <HugeiconsIcon icon={Cancel01Icon} size={14} />
+            <XIcon  size={14} />
           </motion.button>
         </div>
       </motion.div>

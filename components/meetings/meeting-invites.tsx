@@ -2,17 +2,12 @@
 
 import { useState, useEffect } from "react"
 import Image from "next/image"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  Video01Icon,
-  UserIcon,
-  ArrowRight01Icon,
-} from "@hugeicons/core-free-icons"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   getMyMeetingInvites,
   type MeetingInviteItem,
 } from "@/lib/actions/meetings"
+import { ChevronRightIcon, UserIcon, VideoIcon } from "lucide-react"
 
 /* ═══════════════════════════════════════════════════════════
    MEETING INVITES LIST
@@ -45,7 +40,7 @@ export function MeetingInvitesList({
         <h2 className="text-sm font-semibold text-foreground">Course Sessions</h2>
         <div className="space-y-1.5">
           {[1, 2].map((i) => (
-            <div key={i} className="h-[56px] rounded-xl bg-muted/30 animate-pulse" />
+            <div key={i} className="h-[56px] rounded-lg bg-muted/30 animate-pulse" />
           ))}
         </div>
       </div>
@@ -68,7 +63,7 @@ export function MeetingInvitesList({
           <button
             key={invite.meetingId}
             onClick={() => onJoin(invite.meetingId)}
-            className="group w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-muted/30 transition-colors text-left"
+            className="group w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-muted/30 transition-colors text-left"
           >
             {/* Thumbnail / icon */}
             <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-muted/30 shrink-0 flex items-center justify-center">
@@ -80,9 +75,9 @@ export function MeetingInvitesList({
                   className="object-cover"
                 />
               ) : (
-                <HugeiconsIcon icon={Video01Icon} size={16} className="text-muted-foreground/40" />
+                <VideoIcon  size={16} className="text-muted-foreground/40" />
               )}
-              <div className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500 ring-[1.5px] ring-card" />
+              <div className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-ws-success ring-[1.5px] ring-card" />
             </div>
 
             {/* Info */}
@@ -98,7 +93,7 @@ export function MeetingInvitesList({
                   </Avatar>
                 ) : (
                   <div className="w-3.5 h-3.5 rounded-full bg-muted flex items-center justify-center">
-                    <HugeiconsIcon icon={UserIcon} size={7} className="text-muted-foreground" />
+                    <UserIcon  size={7} className="text-muted-foreground" />
                   </div>
                 )}
                 <span className="text-[11px] text-muted-foreground truncate">
@@ -119,7 +114,7 @@ export function MeetingInvitesList({
             <div className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
               <div className="flex items-center gap-0.5 text-[11px] font-medium text-foreground">
                 Join
-                <HugeiconsIcon icon={ArrowRight01Icon} size={10} />
+                <ChevronRightIcon  size={10} />
               </div>
             </div>
           </button>

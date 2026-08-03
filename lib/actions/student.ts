@@ -35,9 +35,12 @@ export type StudentEnrollment = {
   instructorName: string
   instructorAvatarUrl: string | null
   progress: number
+  totalLessons: number
   lastAccessedAt: string
   status: string
   firstLessonId: string | null
+  /** Lesson to resume at — last accessed lesson, falling back to the first. */
+  resumeLessonId: string | null
 }
 
 export type StudentBookmark = {
@@ -176,6 +179,9 @@ export type PublicCourse = {
   totalDuration: number
   enrolledCount: number
   rating: number | null
+  whatYouWillLearn: string[]
+  requirements: string[]
+  targetAudience: string[]
   lessons: PublicCourseLesson[]
 }
 
@@ -234,6 +240,9 @@ export async function fetchPublicCourse(courseId: string): Promise<PublicCourse 
       totalDuration: course.totalDuration || 0,
       enrolledCount: course.enrolledCount || 0,
       rating: course.rating?.average || null,
+      whatYouWillLearn: course.whatYouWillLearn || [],
+      requirements: course.requirements || [],
+      targetAudience: course.targetAudience || [],
       lessons: lessons.map((l) => ({
         id: l._id.toString(),
         title: l.title,
@@ -273,6 +282,7 @@ export type LearnLesson = {
 export type LearnCourse = {
   id: string
   title: string
+  instructorId: string
   instructorName: string
   instructorAvatarUrl: string | null
   rating: number | null
@@ -322,6 +332,7 @@ export async function fetchCourseForLearning(courseId: string): Promise<LearnCou
     }
 
     const instructor = course.instructor as unknown as {
+      _id: { toString(): string }
       firstName: string
       lastName: string
       avatarUrl: string
@@ -334,6 +345,7 @@ export async function fetchCourseForLearning(courseId: string): Promise<LearnCou
     return {
       id: course._id.toString(),
       title: course.title,
+      instructorId: instructor._id.toString(),
       instructorName: `${instructor.firstName} ${instructor.lastName}`,
       instructorAvatarUrl: instructor.avatarUrl,
       rating: course.rating?.average || null,
@@ -425,7 +437,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
     const enrollments = await Enrollment.find({ user: user._id })
       .populate({
         path: "course",
-        select: "title thumbnailUrl instructor",
+        select: "title thumbnailUrl instructor totalLessons",
         populate: {
           path: "instructor",
           select: "firstName lastName avatarUrl",
@@ -441,6 +453,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
           _id: { toString(): string }
           title: string
           thumbnailUrl: string
+          totalLessons?: number
           instructor: { firstName: string; lastName: string; avatarUrl: string | null }
         }
         
@@ -457,9 +470,14 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
           instructorName: `${course.instructor.firstName} ${course.instructor.lastName}`,
           instructorAvatarUrl: course.instructor.avatarUrl,
           progress: enrollment.progress,
+          totalLessons: course.totalLessons || 0,
           lastAccessedAt: enrollment.lastAccessedAt?.toISOString() || new Date().toISOString(),
           status: enrollment.status,
           firstLessonId: firstLesson?._id.toString() || null,
+          resumeLessonId:
+            enrollment.lastAccessedLesson?.toString() ??
+            firstLesson?._id.toString() ??
+            null,
         }
       })
     )

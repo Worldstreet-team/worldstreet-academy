@@ -2,21 +2,6 @@
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import dynamic from "next/dynamic"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  MailSend01Icon,
-  Add01Icon,
-  Mic01Icon,
-  Image02Icon,
-  Video01Icon,
-  FileEditIcon,
-  Cancel01Icon,
-  StopIcon,
-  PlayIcon,
-  Delete02Icon,
-  PauseIcon,
-  SmileIcon,
-} from "@hugeicons/core-free-icons"
 import { cn } from "@/lib/utils"
 import {
   Popover,
@@ -24,6 +9,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import type { EmojiClickData } from "emoji-picker-react"
+import { FilePenIcon, ImageIcon, MicIcon, PauseIcon, PlayIcon, PlusIcon, SendIcon, SmileIcon, SquareIcon, Trash2Icon, VideoIcon, XIcon } from "lucide-react"
+import { RenderIcon } from "@/components/shared/render-icon"
 
 // Dynamically import emoji picker to avoid SSR issues
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false })
@@ -416,7 +403,7 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
             className="h-7 w-7 rounded-full flex items-center justify-center text-destructive/80 hover:text-destructive hover:bg-destructive/10 transition-colors"
             onClick={cancelRecording}
           >
-            <HugeiconsIcon icon={Delete02Icon} size={16} />
+            <Trash2Icon  size={16} />
           </button>
 
           {/* Recording/Preview area */}
@@ -429,7 +416,7 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
                   {audioLevels.map((height, i) => (
                     <div
                       key={i}
-                      className="w-[1.5px] bg-muted-foreground/40 rounded-full transition-all duration-75"
+                      className="w-[1.5px] bg-muted-foreground/40 rounded-full transition-all duration-[var(--ws-motion-fast)]"
                       style={{ height: `${Math.min(height, 20)}px` }}
                     />
                   ))}
@@ -441,7 +428,7 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
                   className="h-6 w-6 rounded-full flex items-center justify-center hover:bg-muted transition-colors"
                   onClick={togglePreview}
                 >
-                  <HugeiconsIcon icon={isPlayingPreview ? PauseIcon : PlayIcon} size={12} />
+                  <RenderIcon icon={isPlayingPreview ? PauseIcon : PlayIcon}  size={12} />
                 </button>
                 <div className="flex-1 flex items-center gap-[1.5px] h-5 overflow-hidden">
                   {waveformData.length > 0 ? (
@@ -451,7 +438,7 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
                         <div
                           key={i}
                           className={cn(
-                            "w-[1.5px] rounded-full transition-colors duration-75",
+                            "w-[1.5px] rounded-full transition-colors duration-[var(--ws-motion-fast)]",
                             isPast ? "bg-muted-foreground" : "bg-muted-foreground/25"
                           )}
                           style={{ height: `${Math.max(3, level * 20)}px` }}
@@ -475,10 +462,10 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
 
           {/* Stop/Send button */}
           <button
-            className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center transition-all active:scale-95 hover:bg-primary/90"
+            className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center transition-all hover:bg-primary/90"
             onClick={isRecording ? stopRecording : handleSend}
           >
-            <HugeiconsIcon icon={isRecording ? StopIcon : MailSend01Icon} size={16} />
+            <RenderIcon icon={isRecording ? SquareIcon : SendIcon}  size={16} />
           </button>
         </div>
       </div>
@@ -505,7 +492,7 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
                 {imageCount > 0 && (
                   <div className="relative">
                     <div className={cn(
-                      "grid gap-1 rounded-xl overflow-hidden",
+                      "grid gap-1 rounded-lg overflow-hidden",
                       imageCount === 1 ? "grid-cols-1" : "grid-cols-2"
                     )}>
                       {images.slice(0, 2).map((attachment, index) => {
@@ -523,9 +510,9 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
                             />
                             <button
                               onClick={() => removeAttachment(originalIndex)}
-                              className="absolute top-1.5 right-1.5 h-6 w-6 rounded-full bg-black/40 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/60 transition-colors"
+                              className="absolute top-1.5 right-1.5 h-6 w-6 rounded-full bg-black/40 text-white flex items-center justify-center hover:bg-black/60 transition-colors"
                             >
-                              <HugeiconsIcon icon={Cancel01Icon} size={12} />
+                              <XIcon  size={12} />
                             </button>
                             {/* Show +N badge on second image if more than 2 */}
                             {index === 1 && imageCount > 2 && (
@@ -541,9 +528,9 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
                     {canAddMore && (
                       <button
                         onClick={addMoreImages}
-                        className="absolute bottom-2 left-2 h-7 px-2.5 rounded-full bg-black/40 backdrop-blur-sm text-white text-xs flex items-center gap-1 hover:bg-black/60 transition-colors"
+                        className="absolute bottom-2 left-2 h-7 px-2.5 rounded-full bg-black/40 text-white text-xs flex items-center gap-1 hover:bg-black/60 transition-colors"
                       >
-                        <HugeiconsIcon icon={Add01Icon} size={12} />
+                        <PlusIcon  size={12} />
                         Add
                       </button>
                     )}
@@ -554,18 +541,18 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
                 {videos.map((attachment) => {
                   const originalIndex = attachments.indexOf(attachment)
                   return (
-                    <div key={originalIndex} className="relative rounded-xl overflow-hidden bg-black aspect-video">
+                    <div key={originalIndex} className="relative rounded-lg overflow-hidden bg-black aspect-video">
                       <video src={attachment.preview} className="h-full w-full object-cover" />
                       <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                        <div className="h-10 w-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/10">
-                          <HugeiconsIcon icon={Video01Icon} size={18} className="text-white" />
+                        <div className="h-10 w-10 rounded-full bg-black/55 flex items-center justify-center border border-white/10">
+                          <VideoIcon  size={18} className="text-white" />
                         </div>
                       </div>
                       <button
                         onClick={() => removeAttachment(originalIndex)}
-                        className="absolute top-1.5 right-1.5 h-6 w-6 rounded-full bg-black/40 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/60 transition-colors"
+                        className="absolute top-1.5 right-1.5 h-6 w-6 rounded-full bg-black/40 text-white flex items-center justify-center hover:bg-black/60 transition-colors"
                       >
-                        <HugeiconsIcon icon={Cancel01Icon} size={12} />
+                        <XIcon  size={12} />
                       </button>
                     </div>
                   )
@@ -576,13 +563,13 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
                   const originalIndex = attachments.indexOf(attachment)
                   return (
                     <div key={originalIndex} className="relative flex items-center gap-2 px-3 py-2 rounded-lg bg-muted">
-                      <HugeiconsIcon icon={FileEditIcon} size={14} className="text-muted-foreground" />
+                      <FilePenIcon  size={14} className="text-muted-foreground" />
                       <span className="text-[11px] truncate flex-1">{attachment.file.name}</span>
                       <button
                         onClick={() => removeAttachment(originalIndex)}
                         className="h-5 w-5 rounded-full bg-black/10 flex items-center justify-center hover:bg-black/20 transition-colors"
                       >
-                        <HugeiconsIcon icon={Cancel01Icon} size={10} />
+                        <XIcon  size={10} />
                       </button>
                     </div>
                   )
@@ -597,7 +584,7 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
       <div className="flex items-center gap-1.5 max-w-3xl mx-auto bg-muted/50 rounded-full p-1 pl-1.5">
         {/* Attachment Button */}
         <div className={cn(
-          "transition-all duration-150",
+          "transition-all duration-[var(--ws-motion-fast)]",
           hasContent ? "w-0 opacity-0 overflow-hidden" : "w-auto opacity-100"
         )}>
           <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
@@ -607,18 +594,18 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
                   className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
                   disabled={disabled}
                 >
-                  <HugeiconsIcon icon={Add01Icon} size={18} />
+                  <PlusIcon  size={18} />
                 </button>
               }
             />
-            <PopoverContent side="top" align="start" className="w-auto p-1 rounded-xl border-muted">
+            <PopoverContent side="top" align="start" className="w-auto p-1 rounded-lg border-muted">
               <div className="flex gap-0.5">
                 <button
                   onClick={() => handleFileSelect("image/*", "image")}
                   className="flex flex-col items-center gap-0.5 p-2 rounded-lg hover:bg-muted transition-colors"
                 >
                   <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
-                    <HugeiconsIcon icon={Image02Icon} size={16} />
+                    <ImageIcon  size={16} />
                   </div>
                   <span className="text-[10px] text-muted-foreground">Photo</span>
                 </button>
@@ -627,7 +614,7 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
                   className="flex flex-col items-center gap-0.5 p-2 rounded-lg hover:bg-muted transition-colors"
                 >
                   <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
-                    <HugeiconsIcon icon={Video01Icon} size={16} />
+                    <VideoIcon  size={16} />
                   </div>
                   <span className="text-[10px] text-muted-foreground">Video</span>
                 </button>
@@ -656,7 +643,7 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
                 className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
                 disabled={disabled}
               >
-                <HugeiconsIcon icon={SmileIcon} size={18} />
+                <SmileIcon  size={18} />
               </button>
             }
           />
@@ -674,11 +661,11 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
         {/* Voice / Send Button */}
         {hasContent ? (
           <button
-            className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center transition-all active:scale-95 hover:bg-primary/90"
+            className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center transition-all hover:bg-primary/90"
             onClick={handleSend}
             disabled={disabled}
           >
-            <HugeiconsIcon icon={MailSend01Icon} size={16} />
+            <SendIcon  size={16} />
           </button>
         ) : (
           <button
@@ -686,7 +673,7 @@ export function MessageInput({ onSendMessage, disabled }: MessageInputProps) {
             onClick={startRecording}
             disabled={disabled}
           >
-            <HugeiconsIcon icon={Mic01Icon} size={18} />
+            <MicIcon  size={18} />
           </button>
         )}
       </div>

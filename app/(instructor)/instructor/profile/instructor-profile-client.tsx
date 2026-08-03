@@ -10,13 +10,9 @@ import { Label } from "@/components/ui/label"
 import { SignatureCanvas } from "@/components/shared/signature-canvas"
 import { updateAvatar, updateProfile } from "@/lib/actions/profile"
 import { getImageUploadUrl } from "@/lib/actions/upload"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  Camera02Icon,
-  Tick02Icon,
-} from "@hugeicons/core-free-icons"
 import { cn } from "@/lib/utils"
 import type { LocalUser } from "@/lib/auth/sync"
+import { CameraIcon, CheckIcon } from "lucide-react"
 
 export function InstructorProfileClient({
   user,
@@ -94,7 +90,7 @@ export function InstructorProfileClient({
               onClick={() => avatarInputRef.current?.click()}
               disabled={isUploading}
             >
-              <Avatar className="h-24 w-24 ring-4 ring-neutral-100 dark:ring-neutral-800">
+              <Avatar className="h-24 w-24 ring-4 ring-ws-track">
                 {avatarPreview && (
                   <AvatarImage src={avatarPreview} alt={fullName} />
                 )}
@@ -131,11 +127,10 @@ export function InstructorProfileClient({
                     />
                   </svg>
                 ) : (
-                  <HugeiconsIcon
-                    icon={Camera02Icon}
+                  <CameraIcon
+                    
                     size={20}
-                    className="text-white"
-                  />
+                    className="text-white" />
                 )}
               </div>
               <input
@@ -159,7 +154,7 @@ export function InstructorProfileClient({
             </div>
           </div>
 
-          <div className="h-px bg-neutral-100 dark:bg-neutral-800" />
+          <div className="h-px bg-ws-track" />
 
           {/* Editable fields */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -196,8 +191,8 @@ export function InstructorProfileClient({
               {isPending ? "Saving…" : "Save Profile"}
             </Button>
             {saved && (
-              <p className="text-xs text-emerald-600 flex items-center gap-1">
-                <HugeiconsIcon icon={Tick02Icon} size={14} />
+              <p className="text-xs text-ws-success flex items-center gap-1">
+                <CheckIcon  size={14} />
                 Profile updated
               </p>
             )}
@@ -218,7 +213,7 @@ export function InstructorProfileClient({
 
           {signatureUrl && !showSignatureCanvas ? (
             <div className="flex items-center gap-4">
-              <div className="w-56 h-24 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-950 flex items-center justify-center overflow-hidden">
+              <div className="w-56 h-24 rounded-lg border border-ws-hairline bg-ws-sunken flex items-center justify-center overflow-hidden">
                 <img
                   src={signatureUrl}
                   alt="Your signature"
@@ -226,8 +221,8 @@ export function InstructorProfileClient({
                 />
               </div>
               <div className="flex flex-col gap-2">
-                <p className="text-xs text-emerald-600 flex items-center gap-1">
-                  <HugeiconsIcon icon={Tick02Icon} size={14} />
+                <p className="text-xs text-ws-success flex items-center gap-1">
+                  <CheckIcon  size={14} />
                   Signature saved
                 </p>
                 <button

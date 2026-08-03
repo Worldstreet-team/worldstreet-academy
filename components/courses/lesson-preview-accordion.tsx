@@ -2,22 +2,15 @@
 
 import { useState } from "react"
 import Image from "next/image"
-import { Badge } from "@/components/ui/badge"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  PlayIcon,
-  TextIcon,
-  Video01Icon,
-  LockIcon,
-  ArrowDown01Icon,
-} from "@hugeicons/core-free-icons"
 import type { PublicCourseLesson } from "@/lib/actions/student"
 import { PreviewVideoPlayer } from "./preview-video-player"
+import { ChevronDownIcon, LockIcon, PlayIcon, TypeIcon, VideoIcon } from "lucide-react"
+import { RenderIcon } from "@/components/shared/render-icon"
 
 interface LessonPreviewAccordionProps {
   lessons: PublicCourseLesson[]
@@ -59,9 +52,9 @@ export function LessonPreviewAccordion({
   const getLessonTypeIcon = (type: "video" | "live" | "text") => {
     switch (type) {
       case "video":
-        return Video01Icon
+        return VideoIcon
       case "text":
-        return TextIcon
+        return TypeIcon
       default:
         return PlayIcon
     }
@@ -82,7 +75,7 @@ export function LessonPreviewAccordion({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="rounded-lg border border-ws-hairline bg-ws-surface divide-y divide-ws-hairline overflow-hidden">
       {lessons.map((lesson, index) => {
         const canPreview = lesson.isFree
         const isOpen = openLessonId === lesson.id
@@ -93,14 +86,11 @@ export function LessonPreviewAccordion({
         // Non-free lessons - no accordion
         if (!canPreview) {
           return (
-            <div
-              key={lesson.id}
-              className="rounded-lg border overflow-hidden bg-background"
-            >
-              <div className="w-full p-3 flex items-center gap-3">
+            <div key={lesson.id}>
+              <div className="w-full min-h-14 px-3 py-2 flex items-center gap-3">
                 {/* Thumbnail or Number */}
                 {lesson.thumbnailUrl ? (
-                  <div className="relative w-16 h-10 shrink-0 rounded-md bg-muted overflow-hidden">
+                  <div className="relative w-16 h-10 shrink-0 rounded-sm bg-ws-raised overflow-hidden">
                     <Image
                       src={lesson.thumbnailUrl}
                       alt={lesson.title}
@@ -111,41 +101,38 @@ export function LessonPreviewAccordion({
                     {lesson.type === "video" && (
                       <div className="absolute inset-0 flex items-center justify-center bg-black/30">
                         <div className="w-5 h-5 rounded-full bg-white/90 flex items-center justify-center">
-                          <HugeiconsIcon
-                            icon={PlayIcon}
+                          <PlayIcon
+                            
                             size={10}
-                            className="text-black ml-0.5"
-                          />
+                            className="text-black ml-0.5" />
                         </div>
                       </div>
                     )}
                   </div>
                 ) : (
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-sm font-medium text-primary">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm bg-ws-raised text-sm font-medium tabular-nums text-ws-muted">
                     {index + 1}
                   </span>
                 )}
 
                 {/* Lesson Info */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{lesson.title}</p>
+                  <p className="text-sm font-medium text-ws-primary truncate">{lesson.title}</p>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <HugeiconsIcon
-                      icon={getLessonTypeIcon(lesson.type)}
+                    <RenderIcon icon={getLessonTypeIcon(lesson.type)}
+                      
                       size={12}
-                      className="text-muted-foreground shrink-0"
-                    />
-                    <span className="text-[11px] text-muted-foreground">
+                      className="text-ws-muted shrink-0" />
+                    <span className="text-[11px] text-ws-muted">
                       {getLessonDurationLabel(lesson)}
                     </span>
                   </div>
                 </div>
 
-                <HugeiconsIcon
-                  icon={LockIcon}
+                <LockIcon
+                  
                   size={14}
-                  className="text-muted-foreground shrink-0"
-                />
+                  className="text-ws-subtle shrink-0" />
               </div>
             </div>
           )
@@ -158,11 +145,11 @@ export function LessonPreviewAccordion({
             open={isOpen}
             onOpenChange={(open) => setOpenLessonId(open ? lesson.id : null)}
           >
-            <div className="rounded-lg border overflow-hidden bg-background hover:bg-muted/30 transition-colors">
-              <CollapsibleTrigger className="w-full p-3 flex items-center gap-3 text-left">
+            <div className="hover:bg-ws-raised transition-colors">
+              <CollapsibleTrigger className="w-full min-h-14 px-3 py-2 flex items-center gap-3 text-left">
                 {/* Thumbnail or Number */}
                 {lesson.thumbnailUrl ? (
-                  <div className="relative w-16 h-10 shrink-0 rounded-md bg-muted overflow-hidden">
+                  <div className="relative w-16 h-10 shrink-0 rounded-sm bg-ws-raised overflow-hidden">
                     <Image
                       src={lesson.thumbnailUrl}
                       alt={lesson.title}
@@ -173,48 +160,46 @@ export function LessonPreviewAccordion({
                     {lesson.type === "video" && (
                       <div className="absolute inset-0 flex items-center justify-center bg-black/30">
                         <div className="w-5 h-5 rounded-full bg-white/90 flex items-center justify-center">
-                          <HugeiconsIcon
-                            icon={PlayIcon}
+                          <PlayIcon
+                            
                             size={10}
-                            className="text-black ml-0.5"
-                          />
+                            className="text-black ml-0.5" />
                         </div>
                       </div>
                     )}
                   </div>
                 ) : (
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-sm font-medium text-primary">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm bg-ws-raised text-sm font-medium tabular-nums text-ws-muted">
                     {index + 1}
                   </span>
                 )}
 
                 {/* Lesson Info */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{lesson.title}</p>
+                  <p className="text-sm font-medium text-ws-primary truncate">{lesson.title}</p>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <HugeiconsIcon
-                      icon={getLessonTypeIcon(lesson.type)}
+                    <RenderIcon icon={getLessonTypeIcon(lesson.type)}
+                      
                       size={12}
-                      className="text-muted-foreground shrink-0"
-                    />
-                    <span className="text-[11px] text-muted-foreground">
+                      className="text-ws-muted shrink-0" />
+                    <span className="text-[11px] text-ws-muted">
                       {getLessonDurationLabel(lesson)}
                     </span>
                   </div>
                 </div>
 
-                {/* Right side: Badge + Arrow */}
+                {/* Right side: Preview marker + Arrow */}
                 <div className="flex items-center gap-2 shrink-0">
-                  <Badge variant="secondary" className="text-[10px]">
+                  <span className="flex items-center gap-1.5 text-xs font-medium text-ws-gold">
+                    <PlayIcon  size={13} fill="currentColor" />
                     Preview
-                  </Badge>
-                  <HugeiconsIcon
-                    icon={ArrowDown01Icon}
+                  </span>
+                  <ChevronDownIcon
+                    
                     size={16}
-                    className={`text-muted-foreground transition-transform duration-200 ${
+                    className={`text-ws-muted transition-transform duration-[var(--ws-motion-base)] ${
                       isOpen ? "rotate-180" : ""
-                    }`}
-                  />
+                    }`} />
                 </div>
               </CollapsibleTrigger>
 
@@ -223,7 +208,7 @@ export function LessonPreviewAccordion({
                 <div className="px-3 pb-3 space-y-3">
                   {/* Description */}
                   {lesson.description && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-ws-muted">
                       {lesson.description}
                     </p>
                   )}
@@ -242,7 +227,7 @@ export function LessonPreviewAccordion({
                   {/* Text Content Preview */}
                   {lesson.type === "text" && lesson.content && (
                     <div
-                      className="prose prose-sm dark:prose-invert max-w-none text-sm text-muted-foreground [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
+                      className="prose prose-sm dark:prose-invert max-w-none text-sm text-ws-muted [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
                       dangerouslySetInnerHTML={{
                         __html: lesson.content,
                       }}
@@ -251,7 +236,7 @@ export function LessonPreviewAccordion({
 
                   {/* No content available */}
                   {!hasContent && (
-                    <p className="text-xs text-muted-foreground italic">
+                    <p className="text-xs text-ws-muted italic">
                       Preview content not available
                     </p>
                   )}

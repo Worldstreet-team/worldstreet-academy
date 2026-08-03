@@ -1,8 +1,7 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { Tick02Icon } from "@hugeicons/core-free-icons"
+import { CheckIcon } from "lucide-react"
 
 type RadialProgressProps = {
   value: number
@@ -28,12 +27,11 @@ export function RadialProgress({
         className={cn("inline-flex items-center justify-center", className)}
         style={{ width: size, height: size }}
       >
-        <HugeiconsIcon
-          icon={Tick02Icon}
+        <CheckIcon
+          
           size={size * 0.55}
           strokeWidth={2.5}
-          className="text-emerald-500"
-        />
+          className="text-ws-success" />
       </div>
     )
   }
@@ -65,7 +63,7 @@ export function RadialProgress({
           strokeDasharray={circumference}
           strokeDashoffset={offset}
           strokeLinecap="round"
-          className="transition-all duration-500 ease-out text-primary"
+          className="transition-all duration-[var(--ws-motion-slow)] ease-out text-primary"
         />
       </svg>
       <span className="absolute text-xs font-semibold tabular-nums text-foreground">

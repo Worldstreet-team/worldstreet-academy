@@ -3,16 +3,6 @@
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  BookOpen01Icon,
-  Clock01Icon,
-  UserMultipleIcon,
-  Loading03Icon,
-  CheckmarkCircle01Icon,
-  ArrowLeft01Icon,
-  SecurityCheckIcon,
-} from "@hugeicons/core-free-icons"
 import { Topbar } from "@/components/platform/topbar"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -20,6 +10,7 @@ import { useUser } from "@/components/providers/user-provider"
 import { purchaseCourse, checkEnrollment } from "@/lib/actions/enrollments"
 import { getMyWalletBalance, type MyWalletBalance } from "@/lib/actions/wallet"
 import { fetchPublicCourse, type PublicCourse } from "@/lib/actions/student"
+import { BookOpenIcon, ChevronLeftIcon, CircleCheckIcon, ClockIcon, LoaderCircleIcon, ShieldCheckIcon, UsersIcon } from "lucide-react"
 
 export default function CheckoutPage() {
   const router = useRouter()
@@ -114,7 +105,7 @@ export default function CheckoutPage() {
       <>
         <Topbar title="Checkout" />
         <div className="flex-1 flex items-center justify-center">
-          <HugeiconsIcon icon={Loading03Icon} size={24} className="animate-spin text-muted-foreground" />
+          <LoaderCircleIcon  size={24} className="animate-spin text-muted-foreground" />
         </div>
       </>
     )
@@ -151,12 +142,12 @@ export default function CheckoutPage() {
             onClick={() => router.back()}
             className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
-            <HugeiconsIcon icon={ArrowLeft01Icon} size={14} />
+            <ChevronLeftIcon  size={14} />
             Back to course
           </button>
 
           {/* Course Summary Card */}
-          <div className="rounded-2xl border border-border/50 bg-card overflow-hidden">
+          <div className="rounded-lg border border-ws-hairline bg-card overflow-hidden">
             {/* Thumbnail */}
             <div className="relative aspect-[21/9] bg-muted">
               {course.thumbnailUrl ? (
@@ -168,7 +159,7 @@ export default function CheckoutPage() {
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <HugeiconsIcon icon={BookOpen01Icon} size={32} className="text-muted-foreground/30" />
+                  <BookOpenIcon  size={32} className="text-muted-foreground/30" />
                 </div>
               )}
             </div>
@@ -183,15 +174,15 @@ export default function CheckoutPage() {
 
               <div className="flex items-center gap-4 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
-                  <HugeiconsIcon icon={BookOpen01Icon} size={12} />
+                  <BookOpenIcon  size={12} />
                   {course.totalLessons} lessons
                 </span>
                 <span className="flex items-center gap-1">
-                  <HugeiconsIcon icon={Clock01Icon} size={12} />
+                  <ClockIcon  size={12} />
                   {durationLabel}
                 </span>
                 <span className="flex items-center gap-1">
-                  <HugeiconsIcon icon={UserMultipleIcon} size={12} />
+                  <UsersIcon  size={12} />
                   {course.enrolledCount.toLocaleString()} students
                 </span>
               </div>
@@ -199,7 +190,7 @@ export default function CheckoutPage() {
           </div>
 
           {/* Order Summary */}
-          <div className="rounded-2xl border border-border/50 bg-card p-4 space-y-4">
+          <div className="rounded-lg border border-ws-hairline bg-card p-4 space-y-4">
             <h2 className="text-sm font-semibold">Order Summary</h2>
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
@@ -212,7 +203,7 @@ export default function CheckoutPage() {
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Worldstreet balance</span>
                   <span
-                    className={`font-medium ${wallet.usdAvailable >= price ? "" : "text-red-500"}`}
+                    className={`font-medium ${wallet.usdAvailable >= price ? "" : "text-ws-danger"}`}
                   >
                     ${wallet.usdAvailable.toFixed(2)}
                   </span>
@@ -230,7 +221,7 @@ export default function CheckoutPage() {
 
           {/* Secure checkout note */}
           <div className="flex items-center gap-2 justify-center text-xs text-muted-foreground/60">
-            <HugeiconsIcon icon={SecurityCheckIcon} size={13} />
+            <ShieldCheckIcon  size={13} />
             <span>
               {price === 0
                 ? "Secure checkout"
@@ -240,8 +231,8 @@ export default function CheckoutPage() {
 
           {/* Insufficient funds */}
           {shortfallMinor !== null && (
-            <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 px-4 py-3 space-y-2">
-              <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
+            <div className="rounded-lg bg-ws-warning/10 border border-ws-warning/20 px-4 py-3 space-y-2">
+              <p className="text-sm font-medium text-ws-warning dark:text-ws-warning">
                 Insufficient balance
               </p>
               <p className="text-xs text-muted-foreground">
@@ -257,8 +248,8 @@ export default function CheckoutPage() {
 
           {/* Error */}
           {error && (
-            <div className="rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-3">
-              <p className="text-sm text-red-500">{error}</p>
+            <div className="rounded-lg bg-ws-danger/10 border border-ws-danger/20 px-4 py-3">
+              <p className="text-sm text-ws-danger">{error}</p>
             </div>
           )}
 
@@ -271,17 +262,17 @@ export default function CheckoutPage() {
           >
             {isSuccess ? (
               <>
-                <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} />
+                <CircleCheckIcon  size={16} />
                 Enrolled! Redirecting...
               </>
             ) : isProcessing ? (
               <>
-                <HugeiconsIcon icon={Loading03Icon} size={16} className="animate-spin" />
+                <LoaderCircleIcon  size={16} className="animate-spin" />
                 Processing...
               </>
             ) : (
               <>
-                <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} />
+                <CircleCheckIcon  size={16} />
                 {price === 0 ? "Enroll for Free" : `Pay $${price.toFixed(2)}`}
               </>
             )}

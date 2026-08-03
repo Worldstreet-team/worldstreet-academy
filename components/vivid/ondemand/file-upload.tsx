@@ -1,9 +1,8 @@
 "use client"
 
 import { useRef, useState, useCallback } from "react"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { Upload04Icon } from "@hugeicons/core-free-icons"
 import { useVivid } from "@/lib/vivid/provider"
+import { UploadIcon } from "lucide-react"
 
 export function FileUploadUI() {
   const vivid = useVivid()
@@ -30,16 +29,16 @@ export function FileUploadUI() {
       }}
       onClick={() => inputRef.current?.click()}
       className={`
-        flex flex-col items-center justify-center gap-3 p-8 rounded-2xl
-        border-2 border-dashed cursor-pointer transition-all duration-200
+        flex flex-col items-center justify-center gap-3 p-8 rounded-lg
+        border-2 border-dashed cursor-pointer transition-all duration-[var(--ws-motion-base)]
         ${isDragging
           ? "border-foreground/40 bg-accent/30"
-          : "border-border/50 hover:border-foreground/25 hover:bg-accent/10"
+          : "border-ws-hairline hover:border-foreground/25 hover:bg-accent/10"
         }
       `}
     >
-      <div className="p-3 rounded-xl bg-accent/40">
-        <HugeiconsIcon icon={Upload04Icon} size={24} className="text-foreground/60" />
+      <div className="p-3 rounded-lg bg-accent/40">
+        <UploadIcon  size={24} className="text-foreground/60" />
       </div>
       <p className="text-sm text-muted-foreground text-center">
         {isDragging ? "Drop it here" : "Click or drag a file"}

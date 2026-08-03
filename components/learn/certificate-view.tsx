@@ -3,16 +3,11 @@
 import { useCallback, useState } from "react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  ArrowLeft01Icon,
-  Download01Icon,
-  Tick02Icon,
-} from "@hugeicons/core-free-icons"
 import Link from "next/link"
 import type { CertificateData } from "@/lib/actions/certificates"
 import { SignatureCanvas } from "@/components/shared/signature-canvas"
 import { useTheme } from "next-themes"
+import { CheckIcon, ChevronLeftIcon, DownloadIcon } from "lucide-react"
 
 // ── Helper: fetch image as base64 data URL ───────────────────────────────────
 
@@ -83,23 +78,26 @@ function CertificatePreview({
   })
 
   return (
+    /* Print artifact: always paper — scope the light token mode locally so
+       ws-* classes resolve to ink-on-paper regardless of the app theme. */
     <div
-      className="relative w-full aspect-[1.414/1] bg-white text-black overflow-hidden"
+      data-ws-theme="platform-light"
+      className="relative w-full aspect-[1.414/1] bg-ws-surface text-ws-primary overflow-hidden"
       id="certificate-preview"
     >
       {/* ── Decorative borders ─────────────────────────────────── */}
       {/* Outer thick border */}
-      <div className="absolute inset-3 sm:inset-4 md:inset-6 border-2 border-neutral-800" />
+      <div className="absolute inset-3 sm:inset-4 md:inset-6 border-2 border-ws-primary" />
       {/* Inner thin border */}
-      <div className="absolute inset-4 sm:inset-5 md:inset-7 border border-neutral-300" />
+      <div className="absolute inset-4 sm:inset-5 md:inset-7 border border-ws-track" />
       {/* Third decorative border */}
-      <div className="absolute inset-5 sm:inset-6 md:inset-8 border border-neutral-200" />
+      <div className="absolute inset-5 sm:inset-6 md:inset-8 border border-ws-hairline" />
 
       {/* ── Corner ornaments ───────────────────────────────────── */}
-      <CornerOrnament className="absolute top-4 left-4 sm:top-5 sm:left-5 md:top-7 md:left-7 w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 text-neutral-800" />
-      <CornerOrnament className="absolute top-4 right-4 sm:top-5 sm:right-5 md:top-7 md:right-7 w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 text-neutral-800 rotate-90" />
-      <CornerOrnament className="absolute bottom-4 left-4 sm:bottom-5 sm:left-5 md:bottom-7 md:left-7 w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 text-neutral-800 -rotate-90" />
-      <CornerOrnament className="absolute bottom-4 right-4 sm:bottom-5 sm:right-5 md:bottom-7 md:right-7 w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 text-neutral-800 rotate-180" />
+      <CornerOrnament className="absolute top-4 left-4 sm:top-5 sm:left-5 md:top-7 md:left-7 w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 text-ws-primary" />
+      <CornerOrnament className="absolute top-4 right-4 sm:top-5 sm:right-5 md:top-7 md:right-7 w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 text-ws-primary rotate-90" />
+      <CornerOrnament className="absolute bottom-4 left-4 sm:bottom-5 sm:left-5 md:bottom-7 md:left-7 w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 text-ws-primary -rotate-90" />
+      <CornerOrnament className="absolute bottom-4 right-4 sm:bottom-5 sm:right-5 md:bottom-7 md:right-7 w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 text-ws-primary rotate-180" />
 
       {/* ── Center watermark — theme-based logo monochrome ─────────── */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -115,12 +113,12 @@ function CertificatePreview({
 
       {/* ── Unsigned overlay (prevents screenshots) ────────────── */}
       {!data.instructorSignatureUrl && (
-        <div className="absolute inset-0 bg-white/80 dark:bg-neutral-950/80 backdrop-blur-sm flex items-center justify-center pointer-events-none z-10">
+        <div className="absolute inset-0 bg-ws-surface/90 flex items-center justify-center pointer-events-none z-10">
           <div className="text-center space-y-2">
-            <p className="text-lg sm:text-xl md:text-2xl font-semibold text-neutral-800 dark:text-neutral-200">
+            <p className="text-lg sm:text-xl md:text-2xl font-semibold text-ws-primary">
               Pending Instructor Signature
             </p>
-            <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400">
+            <p className="text-xs sm:text-sm text-ws-muted">
               This certificate will be available once your instructor signs it
             </p>
           </div>
@@ -139,43 +137,43 @@ function CertificatePreview({
             className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 object-contain"
           />
           <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
-            <div className="h-px w-8 sm:w-12 md:w-20 bg-neutral-300" />
-            <p className="text-[9px] sm:text-[10px] md:text-xs tracking-[0.35em] uppercase text-neutral-400 font-medium">
+            <div className="h-px w-8 sm:w-12 md:w-20 bg-ws-track" />
+            <p className="text-[9px] sm:text-[10px] md:text-xs tracking-[0.35em] uppercase text-ws-subtle font-medium">
               WorldStreet Academy
             </p>
-            <div className="h-px w-8 sm:w-12 md:w-20 bg-neutral-300" />
+            <div className="h-px w-8 sm:w-12 md:w-20 bg-ws-track" />
           </div>
         </div>
 
         {/* Title */}
         <div className="text-center space-y-1 sm:space-y-1.5">
-          <h1 className="text-xl sm:text-3xl md:text-[42px] font-extralight tracking-[0.2em] sm:tracking-[0.25em] uppercase text-neutral-800 leading-none">
+          <h1 className="text-xl sm:text-3xl md:text-[42px] font-extralight tracking-[0.2em] sm:tracking-[0.25em] uppercase text-ws-primary leading-none">
             Certificate
           </h1>
-          <p className="text-[8px] sm:text-[9px] md:text-[11px] tracking-[0.3em] uppercase text-neutral-400 font-light">
+          <p className="text-[8px] sm:text-[9px] md:text-[11px] tracking-[0.3em] uppercase text-ws-subtle font-light">
             of Completion
           </p>
         </div>
 
         {/* Presented to */}
         <div className="text-center space-y-2 sm:space-y-3">
-          <p className="text-[8px] sm:text-[9px] md:text-[10px] tracking-[0.2em] uppercase text-neutral-400">
+          <p className="text-[8px] sm:text-[9px] md:text-[10px] tracking-[0.2em] uppercase text-ws-subtle">
             This is proudly presented to
           </p>
           <div className="relative">
-            <p className="text-2xl sm:text-4xl md:text-[48px] text-neutral-900 leading-tight font-cursive">
+            <p className="text-2xl sm:text-4xl md:text-[48px] text-ws-primary leading-tight font-cursive">
               {data.studentName}
             </p>
-            <div className="mt-2 sm:mt-3 mx-auto w-28 sm:w-40 md:w-56 h-px bg-neutral-200" />
+            <div className="mt-2 sm:mt-3 mx-auto w-28 sm:w-40 md:w-56 h-px bg-ws-hairline" />
           </div>
         </div>
 
         {/* Course info */}
         <div className="text-center max-w-[70%]">
-          <p className="text-[8px] sm:text-[9px] md:text-[10px] text-neutral-400 mb-1.5 sm:mb-2">
+          <p className="text-[8px] sm:text-[9px] md:text-[10px] text-ws-subtle mb-1.5 sm:mb-2">
             for successfully completing the course
           </p>
-          <p className="text-xs sm:text-sm md:text-lg font-semibold text-neutral-800 leading-snug">
+          <p className="text-xs sm:text-sm md:text-lg font-semibold text-ws-primary leading-snug">
             {data.courseTitle}
           </p>
         </div>
@@ -191,11 +189,11 @@ function CertificatePreview({
                 className="h-6 sm:h-8 md:h-10 w-auto object-contain mb-0.5"
               />
             )}
-            <div className="w-full max-w-[120px] sm:max-w-[140px] md:max-w-[160px] h-px bg-neutral-300" />
-            <p className="text-[7px] sm:text-[8px] md:text-[9px] text-neutral-400 uppercase tracking-widest mt-0.5">
+            <div className="w-full max-w-[120px] sm:max-w-[140px] md:max-w-[160px] h-px bg-ws-track" />
+            <p className="text-[7px] sm:text-[8px] md:text-[9px] text-ws-subtle uppercase tracking-widest mt-0.5">
               Student
             </p>
-            <p className="text-[8px] sm:text-[9px] md:text-[10px] text-neutral-600 font-medium">
+            <p className="text-[8px] sm:text-[9px] md:text-[10px] text-ws-muted font-medium">
               {completedDate}
             </p>
           </div>
@@ -209,7 +207,7 @@ function CertificatePreview({
               height={64}
               className="w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 object-contain"
             />
-            <p className="text-[6px] sm:text-[7px] md:text-[8px] text-neutral-300 tracking-widest uppercase mt-1">
+            <p className="text-[6px] sm:text-[7px] md:text-[8px] text-ws-subtle tracking-widest uppercase mt-1">
               Verified
             </p>
           </div>
@@ -223,18 +221,18 @@ function CertificatePreview({
                 className="h-6 sm:h-8 md:h-10 w-auto object-contain mb-0.5"
               />
             )}
-            <div className="w-full max-w-[120px] sm:max-w-[140px] md:max-w-[160px] h-px bg-neutral-300" />
-            <p className="text-[7px] sm:text-[8px] md:text-[9px] text-neutral-400 uppercase tracking-widest mt-0.5">
+            <div className="w-full max-w-[120px] sm:max-w-[140px] md:max-w-[160px] h-px bg-ws-track" />
+            <p className="text-[7px] sm:text-[8px] md:text-[9px] text-ws-subtle uppercase tracking-widest mt-0.5">
               Instructor
             </p>
-            <p className="text-[8px] sm:text-[9px] md:text-[10px] text-neutral-600 font-medium">
+            <p className="text-[8px] sm:text-[9px] md:text-[10px] text-ws-muted font-medium">
               {data.instructorName}
             </p>
           </div>
         </div>
 
         {/* Certificate ID */}
-        <p className="absolute bottom-3 sm:bottom-4 md:bottom-5 left-0 right-0 text-center text-[6px] sm:text-[7px] md:text-[8px] text-neutral-300 tracking-wider">
+        <p className="absolute bottom-3 sm:bottom-4 md:bottom-5 left-0 right-0 text-center text-[6px] sm:text-[7px] md:text-[8px] text-ws-subtle tracking-wider">
           WSA-{data.id.slice(-8).toUpperCase()}
         </p>
       </div>
@@ -481,7 +479,7 @@ export function CertificateClient({ data }: { data: CertificateData }) {
   }, [data, studentSig, logoPath])
 
   return (
-    <div className="min-h-screen flex flex-col items-center bg-neutral-50 dark:bg-neutral-950">
+    <div className="min-h-screen flex flex-col items-center bg-ws-page">
       {/* Top bar */}
       <div className="w-full max-w-5xl px-4 py-4 flex items-center justify-between">
         <Button
@@ -490,7 +488,7 @@ export function CertificateClient({ data }: { data: CertificateData }) {
           render={<Link href="/dashboard/certificates" />}
           className="gap-1.5"
         >
-          <HugeiconsIcon icon={ArrowLeft01Icon} size={16} />
+          <ChevronLeftIcon  size={16} />
           My Certificates
         </Button>
 
@@ -500,21 +498,21 @@ export function CertificateClient({ data }: { data: CertificateData }) {
           disabled={!data.instructorSignatureUrl}
           className="gap-1.5"
         >
-          <HugeiconsIcon icon={Download01Icon} size={16} />
+          <DownloadIcon  size={16} />
           {data.instructorSignatureUrl ? "Download PDF" : "Awaiting Signature"}
         </Button>
       </div>
 
       {/* Certificate */}
       <div className="w-full max-w-4xl px-4 pb-6">
-        <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 shadow-2xl overflow-hidden">
+        <div className="rounded-lg border border-ws-hairline overflow-hidden">
           <CertificatePreview data={data} studentSignature={studentSig} />
         </div>
       </div>
 
       {/* Signature section */}
       <div className="w-full max-w-4xl px-4 pb-12">
-        <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6">
+        <div className="rounded-lg border border-ws-hairline bg-ws-surface p-6">
           <div className="flex flex-col items-center gap-6">
             {/* Student signature area */}
             <div className="flex flex-col items-center gap-3 w-full">
@@ -524,7 +522,7 @@ export function CertificateClient({ data }: { data: CertificateData }) {
 
               {studentSig && !showCanvas ? (
                 <div className="flex flex-col items-center gap-3">
-                  <div className="w-48 h-20 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-950 flex items-center justify-center overflow-hidden">
+                  <div className="w-48 h-20 rounded-lg border border-ws-hairline bg-ws-sunken flex items-center justify-center overflow-hidden">
                     <img
                       src={studentSig}
                       alt="Your signature"
@@ -532,13 +530,13 @@ export function CertificateClient({ data }: { data: CertificateData }) {
                     />
                   </div>
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1 text-emerald-600">
-                      <HugeiconsIcon icon={Tick02Icon} size={12} />
+                    <div className="flex items-center gap-1 text-ws-success">
+                      <CheckIcon  size={12} />
                       <span className="text-[10px] font-medium">Signed</span>
                     </div>
                     <button
                       onClick={() => setShowCanvas(true)}
-                      className="text-[10px] text-neutral-500 hover:text-primary transition-colors underline underline-offset-2"
+                      className="text-[10px] text-ws-muted hover:text-primary transition-colors underline underline-offset-2"
                     >
                       Change signature
                     </button>
@@ -565,16 +563,16 @@ export function CertificateClient({ data }: { data: CertificateData }) {
             {/* Status message for unsigned certificates */}
             {!data.instructorSignatureUrl && (
               <div className="w-full text-center py-2">
-                <p className="text-xs text-amber-600 dark:text-amber-400">
-                  ⏳ Your instructor needs to sign this certificate before you can download it
+                <p className="text-xs text-ws-warning">
+                  Your instructor needs to sign this certificate before you can download it
                 </p>
               </div>
             )}
           </div>
 
           {isSigned && (
-            <p className="text-center text-xs text-emerald-600 mt-4 flex items-center justify-center gap-1">
-              <HugeiconsIcon icon={Tick02Icon} size={14} />
+            <p className="text-center text-xs text-ws-success mt-4 flex items-center justify-center gap-1">
+              <CheckIcon  size={14} />
               Your signature has been added to the certificate
             </p>
           )}

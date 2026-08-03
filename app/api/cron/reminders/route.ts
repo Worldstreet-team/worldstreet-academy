@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       : []
 
     const title =
-      window === "1h" ? "Starting in ~1 hour 🎙️" : "Reminder: scheduled for tomorrow"
+      window === "1h" ? "Starting in ~1 hour" : "Reminder: scheduled for tomorrow"
     const bodyLine = `${meeting.title} — ${when.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}`
 
     const jobs: Promise<unknown>[] = []

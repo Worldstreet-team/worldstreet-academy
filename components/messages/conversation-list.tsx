@@ -1,13 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { Search01Icon, Image02Icon, Video01Icon, Mic01Icon, Attachment01Icon, Call02Icon } from "@hugeicons/core-free-icons"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence, LayoutGroup } from "motion/react"
+import { ImageIcon, MicIcon, PaperclipIcon, PhoneIcon, SearchIcon, VideoIcon } from "lucide-react"
+import { RenderIcon } from "@/components/shared/render-icon"
 
 export type Conversation = {
   id: string
@@ -65,11 +65,11 @@ export function ConversationList({
     const type = c.lastMessageType || "text"
     const prefix = c.isOwnLastMessage ? "You: " : ""
     
-    const typeConfig: Record<string, { icon: typeof Image02Icon; label: string }> = {
-      audio: { icon: Mic01Icon, label: "Voice note" },
-      image: { icon: Image02Icon, label: "Photo" },
-      video: { icon: Video01Icon, label: "Video" },
-      file: { icon: Attachment01Icon, label: "File" },
+    const typeConfig: Record<string, { icon: typeof ImageIcon; label: string }> = {
+      audio: { icon: MicIcon, label: "Voice note" },
+      image: { icon: ImageIcon, label: "Photo" },
+      video: { icon: VideoIcon, label: "Video" },
+      file: { icon: PaperclipIcon, label: "File" },
     }
 
     if (type !== "text" && typeConfig[type]) {
@@ -77,7 +77,7 @@ export function ConversationList({
       return (
         <span className="flex items-center gap-1">
           {prefix && <span>{prefix}</span>}
-          <HugeiconsIcon icon={config.icon} size={12} className="shrink-0 opacity-60" />
+          <RenderIcon icon={config.icon}  size={12} className="shrink-0 opacity-60" />
           <span>{c.lastMessage ? `${config.label} · ${c.lastMessage}` : config.label}</span>
         </span>
       )
@@ -89,7 +89,7 @@ export function ConversationList({
       const callType = parts[1] === "video" ? "video" : "audio"
       const status = parts[2] || "completed"
       const durationStr = parts[3] || "0"
-      const icon = callType === "video" ? Video01Icon : Call02Icon
+      const icon = callType === "video" ? VideoIcon : PhoneIcon
       const label = callType === "video" ? "Video call" : "Voice call"
       let statusText = ""
       if (status === "completed" && durationStr !== "0") statusText = ` · ${durationStr}`
@@ -99,7 +99,7 @@ export function ConversationList({
       return (
         <span className="flex items-center gap-1">
           {prefix && <span>{prefix}</span>}
-          <HugeiconsIcon icon={icon} size={12} className="shrink-0 opacity-60" />
+          <RenderIcon icon={icon}  size={12} className="shrink-0 opacity-60" />
           <span>{label}{statusText}</span>
         </span>
       )
@@ -108,12 +108,12 @@ export function ConversationList({
     // Handle legacy emoji call format
     if (c.lastMessage.startsWith("📹") || c.lastMessage.startsWith("📞")) {
       const isVideo = c.lastMessage.startsWith("📹")
-      const icon = isVideo ? Video01Icon : Call02Icon
+      const icon = isVideo ? VideoIcon : PhoneIcon
       const text = c.lastMessage.replace(/^📹\s*/, "").replace(/^📞\s*/, "")
       return (
         <span className="flex items-center gap-1">
           {prefix && <span>{prefix}</span>}
-          <HugeiconsIcon icon={icon} size={12} className="shrink-0 opacity-60" />
+          <RenderIcon icon={icon}  size={12} className="shrink-0 opacity-60" />
           <span>{text}</span>
         </span>
       )
@@ -127,11 +127,10 @@ export function ConversationList({
       {/* Search */}
       <div className="p-3 border-b">
         <div className="relative">
-          <HugeiconsIcon
-            icon={Search01Icon}
+          <SearchIcon
+            
             size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-          />
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder={searchPlaceholder}
             value={search}
@@ -156,13 +155,13 @@ export function ConversationList({
                     key={c.id}
                     layout
                     layoutId={c.id}
-                    initial={{ opacity: 0, scale: 0.95 }}
+                    initial={{ opacity: 0, scale: 0.98 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
                     transition={{
-                      layout: { type: "spring", stiffness: 500, damping: 35 },
-                      opacity: { duration: 0.15 },
-                      scale: { duration: 0.15 },
+                      layout: { duration: 0.2, ease: [0.2, 0, 0, 1] },
+                      opacity: { duration: 0.12, ease: [0.2, 0, 0, 1] },
+                      scale: { duration: 0.12, ease: [0.2, 0, 0, 1] },
                     }}
                     onClick={() => onSelect(c.id)}
                     className={cn(
@@ -176,11 +175,11 @@ export function ConversationList({
                     <AvatarFallback>{c.name[0]?.toUpperCase()}</AvatarFallback>
                   </Avatar>
                   {activeCallConversationId === c.id ? (
-                    <div className="absolute -bottom-0.5 -right-0.5 flex items-center justify-center h-4 w-4 bg-emerald-500 rounded-full border-2 border-background">
-                      <HugeiconsIcon icon={Call02Icon} size={8} className="text-white" />
+                    <div className="absolute -bottom-0.5 -right-0.5 flex items-center justify-center h-4 w-4 bg-ws-success rounded-full border-2 border-background">
+                      <PhoneIcon  size={8} className="text-white" />
                     </div>
                   ) : c.isOnline ? (
-                    <div className="absolute bottom-0 right-0 h-3 w-3 bg-green-500 rounded-full border-2 border-background" />
+                    <div className="absolute bottom-0 right-0 h-3 w-3 bg-ws-success rounded-full border-2 border-background" />
                   ) : null}
                 </div>
 

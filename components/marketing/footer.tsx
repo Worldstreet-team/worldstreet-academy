@@ -1,4 +1,5 @@
 import Link from "next/link"
+import Image from "next/image"
 
 export function Footer() {
   return (
@@ -6,11 +7,20 @@ export function Footer() {
       <div className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
           <div className="col-span-2 md:col-span-1">
+            {/* Unified ecosystem lockup (05-screens): gold wsa-mark 26px +
+                "WorldStreet" Poppins SemiBold 15 + gold app eyebrow. */}
             <Link href="/" className="flex items-center gap-2 mb-4">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold text-sm">
-                W
-              </div>
-              <span className="text-lg font-bold tracking-tight">WorldStreet</span>
+              <Image
+                src="/brand/wsa-mark.png"
+                alt=""
+                width={26}
+                height={26}
+                className="h-[26px] w-[26px] object-contain"
+              />
+              <span className="grid text-left leading-tight">
+                <span className="font-display text-[15px] font-semibold tracking-tight">WorldStreet</span>
+                <span className="font-sans text-[10px] font-semibold uppercase tracking-[2px] text-ws-gold">Academy</span>
+              </span>
             </Link>
             <p className="text-sm text-muted-foreground">
               Learn, trade, and grow with the WorldStreet ecosystem.

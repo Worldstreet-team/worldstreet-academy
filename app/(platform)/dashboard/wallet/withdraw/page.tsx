@@ -3,7 +3,6 @@
 import * as React from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Topbar } from "@/components/platform/topbar"
-import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -15,8 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { BankIcon, SecurityCheckIcon, Delete02Icon } from "@hugeicons/core-free-icons"
+import { Landmark, ShieldCheck, Trash2, Plus } from "lucide-react"
 import {
   getMyWalletOverview,
   getNgnBanks,
@@ -167,138 +165,172 @@ export default function WithdrawPage() {
   return (
     <>
       <Topbar />
-      <div className="p-4 sm:p-6 space-y-5 pb-24 md:pb-6 max-w-2xl">
-        <div>
-          <h1 className="text-lg font-semibold">Withdraw</h1>
-          <p className="text-sm text-muted-foreground">
-            Send your NGN balance to any Nigerian bank account.
-          </p>
-        </div>
+      <div className="flex-1 px-6 pb-24 pt-8 md:px-8 md:pb-12 lg:px-12">
+        <div className="mx-auto w-full max-w-md space-y-8">
+          <div className="">
+            <h1 className="font-display text-[28px] font-semibold tracking-[-0.02em] text-ws-primary">
+              Withdraw
+            </h1>
+            <p className="mt-1 text-[15px] text-ws-muted">
+              Send your NGN balance to any Nigerian bank account.
+            </p>
+          </div>
 
-        {isLoading ? (
-          <Skeleton className="h-24 rounded-xl" />
-        ) : (
-          <Card>
-            <CardContent className="p-4 flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Available to withdraw</p>
-                <p className="text-2xl font-semibold">{fmtMoney(overview?.ngn?.availableMinor ?? 0, "NGN")}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-[11px] text-muted-foreground">USD balance</p>
-                <p className="text-sm font-medium">{fmtMoney(overview?.usd?.availableMinor ?? 0, "USD")}</p>
-                <p className="text-[10px] text-muted-foreground/70">USD payouts: coming soon</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* KYC gate */}
-        {kycBlocked && (
-          <Card className="border-orange-500/30 bg-orange-500/5">
-            <CardContent className="p-4 space-y-2">
-              <div className="flex items-center gap-2">
-                <HugeiconsIcon icon={SecurityCheckIcon} size={16} className="text-orange-600" />
-                <p className="text-xs font-semibold">Identity verification required for withdrawals</p>
-              </div>
-              <p className="text-[11px] text-muted-foreground">
-                One-time check with a government ID (~2 minutes), powered by Didit.
+          {isLoading ? (
+            <Skeleton className="h-36 rounded-lg" />
+          ) : (
+            <section className="rounded-lg border border-ws-hairline bg-ws-surface p-6">
+              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-ws-muted">
+                Available to withdraw
               </p>
-              {kycMsg && <p className="text-[11px] text-orange-600">{kycMsg}</p>}
-              <div className="flex items-center gap-2 pt-1">
-                <Button size="sm" variant="outline" disabled={startKyc.isPending} onClick={() => startKyc.mutate()}>
+              <p className="mt-2 font-display text-4xl font-semibold tabular-nums tracking-[-0.02em] text-ws-primary">
+                {fmtMoney(overview?.ngn?.availableMinor ?? 0, "NGN")}
+              </p>
+              <div className="mt-5 flex items-center justify-between gap-4 border-t border-ws-hairline pt-4 text-[13px]">
+                <span className="text-ws-muted">USD balance · payouts coming soon</span>
+                <span className="font-semibold tabular-nums text-ws-primary">
+                  {fmtMoney(overview?.usd?.availableMinor ?? 0, "USD")}
+                </span>
+              </div>
+            </section>
+          )}
+
+          {/* KYC gate */}
+          {kycBlocked && (
+            <section className="rounded-lg border border-ws-hairline bg-ws-surface p-5">
+              <div className="flex items-center gap-3.5">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ws-raised">
+                  <ShieldCheck size={18} strokeWidth={2} className="text-ws-gold" aria-hidden />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[14px] font-medium text-ws-primary">
+                    Identity verification required for withdrawals
+                  </p>
+                  <p className="text-[13px] text-ws-muted">
+                    One-time check with a government ID (~2 minutes), powered by Didit.
+                  </p>
+                </div>
+              </div>
+              {kycMsg && <p className="mt-2 text-[13px] text-ws-gold">{kycMsg}</p>}
+              <div className="mt-4 flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={startKyc.isPending}
+                  onClick={() => startKyc.mutate()}
+                  className="h-9 rounded-sm border border-ws-hairline px-4 text-[13px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-raised disabled:pointer-events-none disabled:opacity-50"
+                >
                   {startKyc.isPending ? "Starting…" : kyc?.status === "in_progress" ? "Resume verification" : "Verify identity"}
-                </Button>
+                </button>
                 {kycSessionId && (
-                  <Button size="sm" variant="ghost" disabled={syncKyc.isPending} onClick={() => syncKyc.mutate()}>
+                  <button
+                    type="button"
+                    disabled={syncKyc.isPending}
+                    onClick={() => syncKyc.mutate()}
+                    className="h-9 rounded-sm px-4 text-[13px] font-medium text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-raised hover:text-ws-primary disabled:pointer-events-none disabled:opacity-50"
+                  >
                     {syncKyc.isPending ? "Checking…" : "I've finished — check status"}
-                  </Button>
+                  </button>
                 )}
               </div>
-            </CardContent>
-          </Card>
-        )}
+            </section>
+          )}
 
-        {/* Banks */}
-        <Card>
-          <CardContent className="p-4 space-y-3">
+          {/* Banks */}
+          <section className="rounded-lg border border-ws-hairline bg-ws-surface p-5">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold">Destination bank</h2>
-              <Button size="xs" variant="outline" onClick={() => setAddOpen(true)}>
+              <h2 className="text-[15px] font-semibold text-ws-primary">Destination bank</h2>
+              <button
+                type="button"
+                onClick={() => setAddOpen(true)}
+                className="inline-flex h-8 items-center gap-1.5 rounded-full border border-ws-hairline px-3 text-xs font-medium text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-raised hover:text-ws-primary"
+              >
+                <Plus size={13} strokeWidth={2} aria-hidden />
                 Add bank
-              </Button>
+              </button>
             </div>
             {banksLoading ? (
-              <Skeleton className="h-14 rounded-lg" />
+              <Skeleton className="mt-3 h-14 rounded-md" />
             ) : savedBanks.length === 0 ? (
-              <p className="text-xs text-muted-foreground py-3 text-center">
+              <p className="py-8 text-center text-[13px] text-ws-muted">
                 No saved banks yet — add the account you want to receive payouts on.
               </p>
             ) : (
-              <div className="space-y-1.5">
+              <div className="mt-3 space-y-2">
                 {savedBanks.map((b) => (
                   <div
                     key={b.id}
-                    className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 cursor-pointer transition-colors ${
+                    className={`flex min-h-14 cursor-pointer items-center gap-3.5 rounded-md border px-3.5 py-2.5 transition-colors duration-[var(--ws-motion-fast)] ${
                       selectedBankId === b.id
-                        ? "border-primary bg-primary/5"
-                        : "border-border/60 hover:bg-muted/40"
+                        ? "border-ws-brand bg-ws-brand/5"
+                        : "border-ws-hairline hover:bg-ws-raised/60"
                     }`}
                     onClick={() => setSelectedBankId(b.id)}
                   >
-                    <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                      <HugeiconsIcon icon={BankIcon} size={15} className="text-muted-foreground" />
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ws-raised">
+                      <Landmark size={17} strokeWidth={2} className="text-ws-muted" aria-hidden />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium truncate">{b.accountName}</p>
-                      <p className="text-[11px] text-muted-foreground">
+                      <p className="truncate text-[14px] font-medium text-ws-primary">{b.accountName}</p>
+                      <p className="text-[13px] tabular-nums text-ws-muted">
                         {b.bankName} · ····{b.accountNumber.slice(-4)}
                       </p>
                     </div>
                     <button
                       type="button"
                       aria-label="Remove bank"
-                      className="text-muted-foreground/60 hover:text-destructive transition-colors"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ws-subtle transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-raised hover:text-ws-danger"
                       onClick={(e) => {
                         e.stopPropagation()
                         removeBank.mutate(b.id)
                       }}
                     >
-                      <HugeiconsIcon icon={Delete02Icon} size={14} />
+                      <Trash2 size={14} strokeWidth={2} aria-hidden />
                     </button>
                   </div>
                 ))}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </section>
 
-        {/* Amount + submit */}
-        <Card>
-          <CardContent className="p-4 space-y-3">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium">Amount (NGN)</label>
-              <Input
-                inputMode="numeric"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))}
-                placeholder="10000"
-              />
-              <p className="text-[10px] text-muted-foreground">
+          {/* Amount + submit */}
+          <section className="space-y-5 rounded-lg border border-ws-hairline bg-ws-surface p-6">
+            <div className="space-y-4">
+              <label
+                htmlFor="withdraw-amount"
+                className="block text-center text-[11px] font-medium uppercase tracking-[0.08em] text-ws-muted"
+              >
+                Amount (NGN)
+              </label>
+              <div className="flex items-baseline justify-center gap-1">
+                <span className="font-display text-2xl font-medium text-ws-muted">₦</span>
+                <input
+                  id="withdraw-amount"
+                  inputMode="numeric"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))}
+                  placeholder="0"
+                  size={Math.max(amount.length, 4)}
+                  className="min-w-0 bg-transparent text-center font-display text-4xl font-semibold tabular-nums text-ws-primary outline-none [field-sizing:content] placeholder:text-ws-subtle"
+                />
+              </div>
+              <p className="text-center text-xs text-ws-subtle">
                 The recipient gets the full amount; the bank transfer fee is charged on top of it.
               </p>
             </div>
-            {error && error !== "kyc_required" && <p className="text-xs text-destructive">{error}</p>}
-            {successMsg && <p className="text-xs text-emerald-600">{successMsg}</p>}
-            <Button
-              className="w-full"
+            {error && error !== "kyc_required" && (
+              <p className="text-center text-[13px] text-ws-danger">{error}</p>
+            )}
+            {successMsg && <p className="text-center text-[13px] text-ws-success">{successMsg}</p>}
+            <button
+              type="button"
               disabled={!amount || !selectedBankId || withdraw.isPending}
               onClick={() => withdraw.mutate()}
+              className="h-[52px] w-full rounded-sm bg-ws-brand text-[15px] font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90 disabled:pointer-events-none disabled:opacity-50"
             >
               {withdraw.isPending ? "Sending…" : "Withdraw"}
-            </Button>
-          </CardContent>
-        </Card>
+            </button>
+          </section>
+        </div>
       </div>
 
       {/* Add bank dialog */}
@@ -311,13 +343,13 @@ export default function WithdrawPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3">
+          <div className="space-y-4">
             {/* Bank picker */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium">Bank</label>
+              <label className="text-[13px] font-medium text-ws-primary">Bank</label>
               {chosenBank ? (
-                <div className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2">
-                  <span className="text-xs font-medium">{chosenBank.name}</span>
+                <div className="flex items-center justify-between rounded-md border border-ws-hairline px-3.5 py-2.5">
+                  <span className="text-[13px] font-medium text-ws-primary">{chosenBank.name}</span>
                   <Button size="xs" variant="ghost" onClick={() => { setChosenBank(null); setVerifiedName(null) }}>
                     Change
                   </Button>
@@ -329,19 +361,19 @@ export default function WithdrawPage() {
                     onChange={(e) => setBankSearch(e.target.value)}
                     placeholder="Search banks…"
                   />
-                  <div className="max-h-40 overflow-y-auto rounded-lg border border-border/60 divide-y divide-border/40">
+                  <div className="max-h-40 divide-y divide-ws-hairline overflow-y-auto rounded-md border border-ws-hairline">
                     {filteredDirectory.slice(0, 40).map((b) => (
                       <button
                         key={`${b.code}-${b.name}`}
                         type="button"
-                        className="w-full text-left px-3 py-2 text-xs hover:bg-muted/60 transition-colors"
+                        className="w-full px-3.5 py-2.5 text-left text-[13px] text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-raised"
                         onClick={() => setChosenBank({ code: b.code, name: b.name })}
                       >
                         {b.name}
                       </button>
                     ))}
                     {filteredDirectory.length === 0 && (
-                      <p className="px-3 py-4 text-center text-xs text-muted-foreground">
+                      <p className="px-3 py-4 text-center text-[13px] text-ws-muted">
                         {directory.length === 0 ? "Loading banks…" : "No match"}
                       </p>
                     )}
@@ -352,7 +384,7 @@ export default function WithdrawPage() {
 
             {/* Account number */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium">Account number</label>
+              <label className="text-[13px] font-medium text-ws-primary">Account number</label>
               <Input
                 inputMode="numeric"
                 maxLength={10}
@@ -362,16 +394,17 @@ export default function WithdrawPage() {
                   setVerifiedName(null)
                 }}
                 placeholder="0123456789"
+                className="tabular-nums"
               />
             </div>
 
             {verifiedName && (
-              <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/25 px-3 py-2">
-                <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">{verifiedName}</p>
-                <p className="text-[10px] text-muted-foreground">Account name confirmed by the bank</p>
+              <div className="rounded-md border border-ws-success/25 bg-ws-success/10 px-3.5 py-2.5">
+                <p className="text-[13px] font-semibold text-ws-success">{verifiedName}</p>
+                <p className="text-xs text-ws-muted">Account name confirmed by the bank</p>
               </div>
             )}
-            {addError && <p className="text-xs text-destructive">{addError}</p>}
+            {addError && <p className="text-[13px] text-ws-danger">{addError}</p>}
           </div>
 
           <DialogFooter>

@@ -2,9 +2,9 @@
 
 import * as React from "react"
 import { Badge } from "@/components/ui/badge"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { Copy01Icon, Tick02Icon } from "@hugeicons/core-free-icons"
 import type { WalletTxStatus } from "@/lib/actions/wallet"
+import { CheckIcon, CopyIcon } from "lucide-react"
+import { RenderIcon } from "@/components/shared/render-icon"
 
 /** Minor units → formatted money. USD cents → "$12.34", NGN kobo → "₦1,500.00" */
 export function fmtMoney(minor: number, currency: "USD" | "NGN"): string {
@@ -44,7 +44,7 @@ export function CopyButton({ value, label }: { value: string; label?: string }) 
       }}
       className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
     >
-      <HugeiconsIcon icon={copied ? Tick02Icon : Copy01Icon} size={13} />
+      <RenderIcon icon={copied ? CheckIcon : CopyIcon}  size={13} />
     </button>
   )
 }

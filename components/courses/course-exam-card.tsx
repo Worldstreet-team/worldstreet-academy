@@ -5,10 +5,9 @@ import { useQuery } from "@tanstack/react-query"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { Clock01Icon, Certificate01Icon } from "@hugeicons/core-free-icons"
 import { getStudentExamStatus } from "@/lib/actions/exams"
 import { queryKeys } from "@/lib/hooks/queries/keys"
+import { ClockIcon, FileBadgeIcon } from "lucide-react"
 
 /**
  * Exam entry card on the course detail page — renders only for enrolled
@@ -24,15 +23,15 @@ export function CourseExamCard({ courseId }: { courseId: string }) {
   if (!status?.hasExam) return null
 
   return (
-    <Card className={status.examPassed ? "border-emerald-500/30" : "border-primary/25"}>
+    <Card className={status.examPassed ? "border-ws-success/30" : "border-primary/25"}>
       <CardContent className="p-4 flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3 min-w-0">
           <div
-            className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ${
-              status.examPassed ? "bg-emerald-500/10 text-emerald-600" : "bg-primary/10 text-primary"
+            className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${
+              status.examPassed ? "bg-ws-success/10 text-ws-success" : "bg-primary/10 text-primary"
             }`}
           >
-            <HugeiconsIcon icon={Certificate01Icon} size={18} />
+            <FileBadgeIcon  size={18} />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
@@ -41,13 +40,13 @@ export function CourseExamCard({ courseId }: { courseId: string }) {
                 <Badge variant="secondary" className="text-[9px]">required for certificate</Badge>
               )}
               {status.examPassed && (
-                <Badge className="text-[9px] bg-emerald-600 hover:bg-emerald-600">
+                <Badge className="text-[9px] bg-ws-success hover:bg-ws-success/90">
                   passed{status.bestScorePercent != null ? ` · ${status.bestScorePercent}%` : ""}
                 </Badge>
               )}
             </div>
             <p className="text-[11px] text-muted-foreground mt-0.5 inline-flex items-center gap-1">
-              <HugeiconsIcon icon={Clock01Icon} size={11} />
+              <ClockIcon  size={11} />
               {status.questionCount} questions · {status.durationMinutes} min · pass at{" "}
               {status.passMarkPercent}%
               {!status.eligible ? ` · unlocks at 100% progress (you're at ${status.progress}%)` : ""}

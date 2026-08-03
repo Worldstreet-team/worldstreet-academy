@@ -30,10 +30,15 @@ export type MeetingEmailData = {
   scheduledAt?: string
 }
 
-/* ─── Shared Styles ─── */
+/* ─── Shared Styles ───
+   Email HTML can't read CSS variables, so the brand's platform-light values
+   are inlined as literals (design-tokens/tokens.css, platform-light mode):
+   page #FAFAFA · surface #FFFFFF · raised #F4F4F6 · hairline #E4E4E9 ·
+   ink #18181B · muted #6E6E78 · subtle #9A9AA3 · gold #FFCC29 on ink #0B0B0F ·
+   success #059669. Keep these in sync with the token file. */
 
 const base = {
-  fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+  fontFamily: "'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
 }
 
 const body: React.CSSProperties = {
@@ -44,11 +49,11 @@ const body: React.CSSProperties = {
 
 const card: React.CSSProperties = {
   backgroundColor: "#ffffff",
-  borderRadius: "16px",
+  borderRadius: "13px",
   maxWidth: "460px",
   margin: "0 auto",
   overflow: "hidden",
-  border: "1px solid #f0f0f0",
+  border: "1px solid #E4E4E9",
 }
 
 const contentPad: React.CSSProperties = {
@@ -57,40 +62,41 @@ const contentPad: React.CSSProperties = {
 }
 
 const heading: React.CSSProperties = {
+  fontFamily: "'Poppins', 'Public Sans', -apple-system, 'Segoe UI', Roboto, sans-serif",
   fontSize: "20px",
   fontWeight: 600,
-  color: "#111827",
+  color: "#18181B",
   margin: "0 0 6px",
   lineHeight: "1.35",
 }
 
 const sub: React.CSSProperties = {
   fontSize: "13px",
-  color: "#6b7280",
+  color: "#6E6E78",
   margin: "0",
   lineHeight: "1.5",
 }
 
 const muted: React.CSSProperties = {
   fontSize: "12px",
-  color: "#9ca3af",
+  color: "#9A9AA3",
   margin: "4px 0 0",
 }
 
 const cta: React.CSSProperties = {
   display: "inline-block",
-  backgroundColor: "#111827",
-  color: "#ffffff",
-  borderRadius: "10px",
+  backgroundColor: "#FFCC29", // brand/primary
+  color: "#0B0B0F", // brand/on-primary
+  borderRadius: "7px",
   padding: "11px 36px",
-  fontWeight: 500,
+  fontWeight: 600,
   fontSize: "14px",
   textDecoration: "none",
 }
 
 const linkSmall: React.CSSProperties = {
   fontSize: "11px",
-  color: "#c4c4c4",
+  color: "#9A9AA3",
   textDecoration: "underline",
   wordBreak: "break-all" as const,
 }
@@ -102,7 +108,7 @@ const footer: React.CSSProperties = {
 
 const footerText: React.CSSProperties = {
   fontSize: "11px",
-  color: "#b0b0b0",
+  color: "#9A9AA3",
   margin: 0,
 }
 
@@ -134,13 +140,13 @@ function AvatarCircle({ src, initial, offset }: { src?: string; initial: string;
     <div
       style={{
         ...base,
-        backgroundColor: offset ? "#f3f4f6" : "#e5e7eb",
+        backgroundColor: offset ? "#F4F4F6" : "#E4E4E9",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         fontSize: "18px",
         fontWeight: 700,
-        color: offset ? "#9ca3af" : "#6b7280",
+        color: offset ? "#9A9AA3" : "#6E6E78",
       }}
     >
       {initial}
@@ -215,7 +221,7 @@ function MeetingNotificationEmail({ data }: { data: MeetingEmailData }) {
             {data.courseName && <Text style={muted}>{data.courseName}</Text>}
 
             {data.scheduledAt ? (
-              <Text style={{ ...muted, color: "#6b7280" }}>
+              <Text style={{ ...muted, color: "#6E6E78" }}>
                 Scheduled for{" "}
                 {new Date(data.scheduledAt).toLocaleString("en-US", {
                   dateStyle: "medium",
@@ -234,7 +240,7 @@ function MeetingNotificationEmail({ data }: { data: MeetingEmailData }) {
               </Button>
             </Section>
 
-            <Hr style={{ borderColor: "#f0f0f0", margin: "24px 0 16px" }} />
+            <Hr style={{ borderColor: "#E4E4E9", margin: "24px 0 16px" }} />
 
             <Link href={data.meetingLink} style={linkSmall}>
               {data.meetingLink}
@@ -285,7 +291,7 @@ function MeetingInviteEmail({
               </Button>
             </Section>
 
-            <Hr style={{ borderColor: "#f0f0f0", margin: "24px 0 16px" }} />
+            <Hr style={{ borderColor: "#E4E4E9", margin: "24px 0 16px" }} />
 
             <Link href={data.meetingLink} style={linkSmall}>
               {data.meetingLink}
@@ -338,7 +344,7 @@ function ApplicationReceivedEmail({ data }: { data: ApplicationEmailData }) {
               </Button>
             </Section>
 
-            <Hr style={{ borderColor: "#f0f0f0", margin: "24px 0 16px" }} />
+            <Hr style={{ borderColor: "#E4E4E9", margin: "24px 0 16px" }} />
 
             <Link href={data.statusUrl} style={linkSmall}>
               {data.statusUrl}
@@ -372,7 +378,7 @@ function ApplicationDecisionEmail({ data }: { data: ApplicationEmailData }) {
               hostName={data.applicantName}
             />
             <Text style={heading}>
-              {approved ? "Welcome aboard 🎉" : "Application update"}
+              {approved ? "Welcome aboard" : "Application update"}
             </Text>
             <Text style={sub}>
               {approved
@@ -381,7 +387,7 @@ function ApplicationDecisionEmail({ data }: { data: ApplicationEmailData }) {
             </Text>
 
             {data.decisionNote && (
-              <Text style={{ ...muted, color: "#6b7280", marginTop: "10px" }}>
+              <Text style={{ ...muted, color: "#6E6E78", marginTop: "10px" }}>
                 “{data.decisionNote}”
               </Text>
             )}
@@ -392,7 +398,7 @@ function ApplicationDecisionEmail({ data }: { data: ApplicationEmailData }) {
               </Button>
             </Section>
 
-            <Hr style={{ borderColor: "#f0f0f0", margin: "24px 0 16px" }} />
+            <Hr style={{ borderColor: "#E4E4E9", margin: "24px 0 16px" }} />
 
             <Link href={data.statusUrl} style={linkSmall}>
               {data.statusUrl}
@@ -456,7 +462,7 @@ function InterviewInviteEmail({ data }: { data: InterviewEmailData }) {
               </Button>
             </Section>
 
-            <Hr style={{ borderColor: "#f0f0f0", margin: "24px 0 16px" }} />
+            <Hr style={{ borderColor: "#E4E4E9", margin: "24px 0 16px" }} />
 
             <Link href={data.joinUrl} style={linkSmall}>
               {data.joinUrl}
@@ -509,7 +515,7 @@ function SimplePipelineEmail({
                 {ctaLabel}
               </Button>
             </Section>
-            <Hr style={{ borderColor: "#f0f0f0", margin: "24px 0 16px" }} />
+            <Hr style={{ borderColor: "#E4E4E9", margin: "24px 0 16px" }} />
             <Link href={ctaUrl} style={linkSmall}>
               {ctaUrl}
             </Link>
@@ -650,7 +656,7 @@ export async function sendInterviewReminderEmail(
           : "Reminder: your interview is tomorrow",
       react: React.createElement(SimplePipelineEmail, {
         preview: `Interview with ${data.counterpartName} — ${when}`,
-        title: data.window === "1h" ? "Starting soon 🎙️" : "Interview tomorrow",
+        title: data.window === "1h" ? "Starting soon" : "Interview tomorrow",
         bodyText: `${data.recipientName}, your interview with ${data.counterpartName} is scheduled for ${when}. Join a couple of minutes early — you'll be admitted from the waiting room.`,
         ctaLabel: "Open interview room",
         ctaUrl: data.joinUrl,

@@ -1,22 +1,17 @@
 "use client"
 
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  Loading03Icon,
-  CallEnd01Icon,
-  ArrowRight01Icon,
-  Video01Icon,
-} from "@hugeicons/core-free-icons"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { ChevronRightIcon, LoaderCircleIcon, PhoneOffIcon, VideoIcon } from "lucide-react"
+import { RenderIcon } from "@/components/shared/render-icon"
 
 /* ── Setup overlay (loading spinner) ── */
 
 export function SetupOverlay({ message }: { message: string }) {
   return (
     <div className="absolute inset-0 z-50 bg-background/95 flex flex-col items-center justify-center gap-5 rounded-inherit">
-      <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-muted border border-border">
-        <HugeiconsIcon icon={Loading03Icon} size={28} className="text-muted-foreground animate-spin" />
+      <div className="w-16 h-16 rounded-lg flex items-center justify-center bg-muted border border-border">
+        <LoaderCircleIcon  size={28} className="text-muted-foreground animate-spin" />
       </div>
       <p className="text-muted-foreground text-sm font-medium">{message}</p>
     </div>
@@ -36,9 +31,8 @@ export function WaitingRoom({
     <div className="absolute inset-0 z-50 bg-background flex flex-col items-center justify-center rounded-inherit">
       <div className="relative z-10 flex flex-col items-center gap-8">
         <div className="relative">
-          <div className="absolute inset-0 w-24 h-24 rounded-full bg-emerald-500/10 animate-ping" />
           <div className="w-24 h-24 rounded-full flex items-center justify-center bg-muted border border-border">
-            <HugeiconsIcon icon={Loading03Icon} size={32} className="text-muted-foreground animate-spin" />
+            <LoaderCircleIcon  size={32} className="text-muted-foreground animate-spin" />
           </div>
         </div>
         <div className="text-center space-y-2">
@@ -77,13 +71,12 @@ export function MeetingEndedScreen({
     <div className="fixed inset-0 z-60 bg-background flex flex-col items-center justify-center gap-6">
       <div className={cn(
         "w-20 h-20 rounded-full border-2 flex items-center justify-center",
-        reason === "left" ? "border-muted-foreground/30" : "border-red-400/30"
+        reason === "left" ? "border-muted-foreground/30" : "border-ws-danger/30"
       )}>
-        <HugeiconsIcon
-          icon={reason === "left" ? ArrowRight01Icon : CallEnd01Icon}
+        <RenderIcon icon={reason === "left" ? ChevronRightIcon : PhoneOffIcon}
+          
           size={32}
-          className={reason === "left" ? "text-muted-foreground" : "text-red-400"}
-        />
+          className={reason === "left" ? "text-muted-foreground" : "text-ws-danger"} />
       </div>
       <div className="text-center space-y-1.5">
         <h2 className="text-xl font-semibold text-foreground">{headings[reason]}</h2>
@@ -93,7 +86,7 @@ export function MeetingEndedScreen({
         )}
       </div>
       <Button onClick={onReturn} size="sm" className="gap-2 mt-2">
-        <HugeiconsIcon icon={ArrowRight01Icon} size={14} />
+        <ChevronRightIcon  size={14} />
         Back to Meetings
       </Button>
     </div>

@@ -2,8 +2,6 @@
 
 import { useState } from "react"
 import { useClerk } from "@clerk/nextjs"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { Logout01Icon } from "@hugeicons/core-free-icons"
 import {
   AlertDialog,
   AlertDialogContent,
@@ -15,6 +13,7 @@ import {
   AlertDialogAction,
   AlertDialogMedia,
 } from "@/components/ui/alert-dialog"
+import { LogOutIcon } from "lucide-react"
 
 const LOGOUT_URL = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_")
   ? "/login"
@@ -65,7 +64,7 @@ export function LogoutConfirmDialog({ children, open: controlledOpen, onOpenChan
         <AlertDialogContent size="sm">
           <AlertDialogHeader>
             <AlertDialogMedia>
-              <HugeiconsIcon icon={Logout01Icon} size={22} />
+              <LogOutIcon  size={22} />
             </AlertDialogMedia>
             <AlertDialogTitle>Log out?</AlertDialogTitle>
             <AlertDialogDescription>

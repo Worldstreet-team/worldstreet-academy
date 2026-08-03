@@ -19,12 +19,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  Search01Icon,
-  Cancel01Icon,
-  Tick01Icon,
-} from "@hugeicons/core-free-icons"
+import { CheckIcon, SearchIcon, XIcon } from "lucide-react"
 
 type LanguagePickerProps = {
   defaultLanguage?: string | null
@@ -114,11 +109,10 @@ export function LanguagePicker({ defaultLanguage, children }: LanguagePickerProp
       {/* Search */}
       <div className="px-3 pt-3 pb-2">
         <div className="relative">
-          <HugeiconsIcon
-            icon={Search01Icon}
+          <SearchIcon
+            
             size={14}
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
-          />
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
             ref={searchInputRef}
             value={search}
@@ -132,7 +126,7 @@ export function LanguagePicker({ defaultLanguage, children }: LanguagePickerProp
               onClick={() => setSearch("")}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
-              <HugeiconsIcon icon={Cancel01Icon} size={12} />
+              <XIcon  size={12} />
             </button>
           )}
         </div>
@@ -159,7 +153,7 @@ export function LanguagePicker({ defaultLanguage, children }: LanguagePickerProp
                   />
                 ))}
               </div>
-              <div className="my-2 mx-2 border-t border-border/50" />
+              <div className="my-2 mx-2 border-t border-ws-hairline" />
               <div className="px-2 pb-1.5">
                 <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
                   All languages
@@ -196,7 +190,7 @@ export function LanguagePicker({ defaultLanguage, children }: LanguagePickerProp
         {isTranslating ? (
           <div className="h-3.5 w-3.5 shrink-0 rounded-full border-2 border-muted-foreground/30 border-t-foreground animate-spin" />
         ) : (
-          <span className="text-base leading-none notranslate shrink-0" translate="no">{currentLanguage.flag}</span>
+          <span className="inline-flex h-4 shrink-0 items-center rounded-xs bg-ws-chip px-1 text-[9px] font-semibold uppercase tracking-wide text-ws-muted notranslate" translate="no">{currentLanguage.code}</span>
         )}
         <span className="text-xs text-muted-foreground truncate notranslate" translate="no">
           {isTranslating ? "Applying…" : currentLanguage.name}
@@ -210,9 +204,10 @@ export function LanguagePicker({ defaultLanguage, children }: LanguagePickerProp
     : (
         <button
           type="button"
-          className="flex h-8 w-8 items-center justify-center rounded-full border text-muted-foreground hover:bg-muted transition-colors"
+          className="flex h-10 w-10 items-center justify-center rounded-full text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-chip hover:text-ws-primary"
         >
-          <span className="text-sm leading-none notranslate" translate="no">{currentLanguage.flag}</span>
+          {/* ISO code chip, not a flag emoji — the DS bans emoji as icons. */}
+          <span className="text-[10px] font-semibold uppercase tracking-wide notranslate" translate="no">{currentLanguage.code}</span>
         </button>
       )
 
@@ -222,7 +217,7 @@ export function LanguagePicker({ defaultLanguage, children }: LanguagePickerProp
         <SheetTrigger render={<div className="w-full" />}>
           {triggerButton}
         </SheetTrigger>
-        <SheetContent side="bottom" showCloseButton={false} className="px-0 pb-0 rounded-t-2xl">
+        <SheetContent side="bottom" showCloseButton={false} className="px-0 pb-0 rounded-t-lg">
           <SheetHeader className="px-4 pb-0">
             <div className="flex items-center justify-between">
               <SheetTitle className="text-sm font-semibold">Language</SheetTitle>
@@ -232,7 +227,7 @@ export function LanguagePicker({ defaultLanguage, children }: LanguagePickerProp
                 disabled={isTranslating}
                 className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-muted text-muted-foreground disabled:opacity-40"
               >
-                <HugeiconsIcon icon={Cancel01Icon} size={14} />
+                <XIcon  size={14} />
               </button>
             </div>
           </SheetHeader>
@@ -283,8 +278,8 @@ function LanguageItem({
           : "text-foreground/80 hover:bg-muted/60 hover:text-foreground"
       )}
     >
-      <span className="text-lg leading-none notranslate shrink-0" translate="no">
-        {lang.flag}
+      <span className="inline-flex h-5 w-9 shrink-0 items-center justify-center rounded-xs bg-ws-chip text-[9px] font-semibold uppercase tracking-wide text-ws-muted notranslate" translate="no">
+        {lang.code}
       </span>
       <div className="flex-1 min-w-0">
         <span className="text-[13px] font-medium truncate block notranslate" translate="no">
@@ -295,12 +290,11 @@ function LanguageItem({
         </span>
       </div>
       {isSelected && (
-        <HugeiconsIcon
-          icon={Tick01Icon}
+        <CheckIcon
+          
           size={14}
           className="text-foreground/50 shrink-0"
-          strokeWidth={2.5}
-        />
+          strokeWidth={2.5} />
       )}
     </button>
   )

@@ -1,3 +1,4 @@
+import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 import { AdminSidebar } from "@/components/admin/admin-sidebar"
@@ -29,6 +30,10 @@ export default async function AdminLayout({
 
   // Same provider chrome as the student/instructor dashboards — calls,
   // meetings (interview rooms) and the Vivid assistant all work in here.
+  // The sidebar writes `sidebar_state` when toggled, but nothing read it
+  // back — so a collapsed rail sprang open again on every navigation.
+  const sidebarOpen = (await cookies()).get("sidebar_state")?.value !== "false"
+
   return (
     <QueryProvider>
       <UserProvider user={user}>
@@ -44,7 +49,7 @@ export default async function AdminLayout({
                 avatarUrl: user.avatarUrl,
               }}
             >
-              <SidebarProvider>
+              <SidebarProvider defaultOpen={sidebarOpen}>
                 <AdminSidebar />
                 <SidebarInset>{children}</SidebarInset>
                 <AdminBottomNav />

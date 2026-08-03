@@ -6,17 +6,9 @@ import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  ArrowRight01Icon,
-  StarIcon,
-  BookOpen01Icon,
-  UserMultiple02Icon,
-  CheckmarkBadge01Icon,
-  Message01Icon,
-} from "@hugeicons/core-free-icons"
 import { getOrCreateConversation } from "@/lib/actions/messages"
 import type { InstructorCourse } from "@/lib/actions/student"
+import { BadgeCheckIcon, BookOpenIcon, ChevronRightIcon, MessageSquareIcon, StarIcon, UsersIcon } from "lucide-react"
 
 interface AboutInstructorProps {
   instructorId: string
@@ -70,7 +62,7 @@ export function AboutInstructor({
     return (
       <div className="space-y-5">
         <h2 className="text-base font-semibold">Instructor</h2>
-        <div className="rounded-2xl bg-muted/30 p-5">
+        <div className="rounded-lg bg-muted/30 p-5">
           <div className="flex items-center gap-4">
             <Avatar className="h-12 w-12 shrink-0 ring-2 ring-background shadow-sm">
               {instructorAvatarUrl && (
@@ -98,7 +90,7 @@ export function AboutInstructor({
                   onClick={handleMessage}
                   disabled={isPending}
                 >
-                  <HugeiconsIcon icon={Message01Icon} size={12} />
+                  <MessageSquareIcon  size={12} />
                   Message
                 </Button>
               </div>
@@ -114,7 +106,7 @@ export function AboutInstructor({
       <h2 className="text-base font-semibold">About the Instructor</h2>
 
       {/* Instructor card — soft container, no harsh borders */}
-      <div className="rounded-2xl bg-muted/30 p-5 space-y-4">
+      <div className="rounded-lg bg-muted/30 p-5 space-y-4">
         {/* Top row: avatar + info + stats */}
         <div className="flex items-start gap-4">
           <Avatar className="h-14 w-14 shrink-0 ring-2 ring-background shadow-sm">
@@ -129,11 +121,10 @@ export function AboutInstructor({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
               <h3 className="font-semibold text-[15px] truncate">{instructorName}</h3>
-              <HugeiconsIcon
-                icon={CheckmarkBadge01Icon}
+              <BadgeCheckIcon
+                
                 size={15}
-                className="text-primary shrink-0"
-              />
+                className="text-primary shrink-0" />
             </div>
             {instructorHeadline && (
               <p className="text-[13px] text-muted-foreground mt-0.5 line-clamp-1">
@@ -146,19 +137,19 @@ export function AboutInstructor({
               <div className="flex items-center gap-3 mt-2 flex-wrap">
                 {totalCourses > 0 && (
                   <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                    <HugeiconsIcon icon={BookOpen01Icon} size={12} className="text-primary" />
+                    <BookOpenIcon  size={12} className="text-primary" />
                     <span className="font-medium text-foreground">{totalCourses}</span> {totalCourses === 1 ? 'course' : 'courses'}
                   </span>
                 )}
                 {totalStudents != null && totalStudents > 0 && (
                   <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                    <HugeiconsIcon icon={UserMultiple02Icon} size={12} className="text-primary" />
+                    <UsersIcon  size={12} className="text-primary" />
                     <span className="font-medium text-foreground">{totalStudents.toLocaleString()}</span> {totalStudents === 1 ? 'student' : 'students'}
                   </span>
                 )}
                 {averageRating != null && averageRating > 0 && (
                   <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                    <HugeiconsIcon icon={StarIcon} size={12} className="text-orange-400" fill="currentColor" />
+                    <StarIcon  size={12} className="text-ws-rating" fill="currentColor" />
                     <span className="font-medium text-foreground">{averageRating.toFixed(1)}</span>
                   </span>
                 )}
@@ -182,7 +173,7 @@ export function AboutInstructor({
             render={<Link href={`/dashboard/instructor/${instructorId}`} />}
           >
             View full profile
-            <HugeiconsIcon icon={ArrowRight01Icon} size={13} />
+            <ChevronRightIcon  size={13} />
           </Button>
           <Button
             variant="outline"
@@ -191,7 +182,7 @@ export function AboutInstructor({
             onClick={handleMessage}
             disabled={isPending}
           >
-            <HugeiconsIcon icon={Message01Icon} size={14} />
+            <MessageSquareIcon  size={14} />
             Message
           </Button>
         </div>
@@ -228,7 +219,7 @@ function CourseCard({ course }: { course: InstructorCourse }) {
   return (
     <Link
       href={`/dashboard/courses/${course.id}`}
-      className="flex items-center gap-3 px-2 py-2 -mx-2 rounded-xl hover:bg-muted/50 transition-colors group"
+      className="flex items-center gap-3 px-2 py-2 -mx-2 rounded-lg hover:bg-muted/50 transition-colors group"
     >
       {/* Thumbnail */}
       <div className="relative w-14 h-9 shrink-0 rounded-lg bg-muted overflow-hidden">
@@ -242,11 +233,10 @@ function CourseCard({ course }: { course: InstructorCourse }) {
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
-            <HugeiconsIcon
-              icon={BookOpen01Icon}
+            <BookOpenIcon
+              
               size={14}
-              className="text-muted-foreground/40"
-            />
+              className="text-muted-foreground/40" />
           </div>
         )}
       </div>
@@ -264,12 +254,11 @@ function CourseCard({ course }: { course: InstructorCourse }) {
             <>
               <span className="text-muted-foreground/30">·</span>
               <div className="flex items-center gap-0.5">
-                <HugeiconsIcon
-                  icon={StarIcon}
+                <StarIcon
+                  
                   size={10}
-                  className="text-orange-400"
-                  fill="currentColor"
-                />
+                  className="text-ws-rating"
+                  fill="currentColor" />
                 <span className="text-[11px] text-muted-foreground">
                   {course.rating}
                 </span>

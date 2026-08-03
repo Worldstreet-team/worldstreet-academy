@@ -6,9 +6,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
 import {
   Select,
   SelectContent,
@@ -25,14 +22,27 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog"
-import { HugeiconsIcon } from "@hugeicons/react"
 import {
-  Add01Icon,
-  Delete01Icon,
-  Video01Icon,
-  TextIcon,
-  DragDropIcon,
-} from "@hugeicons/core-free-icons"
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { EmptyState } from "@/components/shared/empty-state"
+import { ArtCourses } from "@/components/shared/illustrations"
+import {
+  FileText,
+  GripVertical,
+  Plus,
+  Trash2,
+  Video,
+  type LucideIcon,
+} from "lucide-react"
 import type { Lesson } from "@/lib/types"
 import {
   addLesson,
@@ -46,9 +56,55 @@ const initialState: CourseFormState = {
   fieldErrors: {},
 }
 
-const typeIcons: Record<string, typeof Video01Icon> = {
-  video: Video01Icon,
-  text: TextIcon,
+const typeIcons: Record<string, LucideIcon> = {
+  video: Video,
+  text: FileText,
+}
+
+/** Simple confirm before the (unchanged) deleteLesson server action fires. */
+function DeleteLessonButton({
+  courseId,
+  lessonId,
+  lessonTitle,
+}: {
+  courseId: string
+  lessonId: string
+  lessonTitle: string
+}) {
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger
+        render={
+          <button
+            type="button"
+            aria-label={`Delete lesson “${lessonTitle}”`}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-raised hover:text-ws-danger"
+          />
+        }
+      >
+        <Trash2 size={14} strokeWidth={2} />
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete lesson?</AlertDialogTitle>
+          <AlertDialogDescription>
+            “{lessonTitle}” will be permanently removed from this course. This
+            cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <form action={deleteLesson}>
+            <input type="hidden" name="courseId" value={courseId} />
+            <input type="hidden" name="lessonId" value={lessonId} />
+            <AlertDialogAction type="submit" variant="destructive">
+              Delete lesson
+            </AlertDialogAction>
+          </form>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
 }
 
 export function LessonManager({
@@ -66,85 +122,69 @@ export function LessonManager({
     <div className="space-y-4">
       {/* Lesson List */}
       {lessons.length === 0 ? (
-        <Card>
-          <CardContent className="p-8 text-center space-y-2">
-            <p className="text-sm text-muted-foreground">
-              No lessons yet. Add your first lesson to get started.
-            </p>
-          </CardContent>
-        </Card>
+        <div className="rounded-lg border border-ws-hairline bg-ws-surface">
+          <EmptyState
+            art={<ArtCourses />}
+            title="No lessons yet"
+            description="Add your first lesson below to get started."
+          />
+        </div>
       ) : (
         <div className="space-y-2">
           {lessons
             .sort((a, b) => a.order - b.order)
-            .map((lesson, index) => (
-              <Card key={lesson.id}>
-                <CardContent className="p-3">
+            .map((lesson, index) => {
+              const TypeIcon = typeIcons[lesson.type] ?? FileText
+              return (
+                <div
+                  key={lesson.id}
+                  className="rounded-lg border border-ws-hairline bg-ws-surface p-3 transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-raised"
+                >
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 shrink-0 text-muted-foreground">
-                      <HugeiconsIcon icon={DragDropIcon} size={14} />
-                      <span className="text-xs font-mono w-5 text-center">
+                    <div className="flex shrink-0 items-center gap-2 text-ws-subtle">
+                      <GripVertical size={14} strokeWidth={2} />
+                      <span className="w-5 text-center tabular-nums text-xs tabular-nums">
                         {index + 1}
                       </span>
                     </div>
-                    <div className="h-7 w-7 rounded-md bg-muted flex items-center justify-center shrink-0">
-                      <HugeiconsIcon
-                        icon={typeIcons[lesson.type]}
-                        size={14}
-                        className="text-muted-foreground"
-                      />
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-ws-raised">
+                      <TypeIcon size={14} strokeWidth={2} className="text-ws-muted" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-ws-primary">
                         {lesson.title}
                       </p>
-                      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                        <Badge
-                          variant="secondary"
-                          className="text-[9px] capitalize px-1 py-0"
-                        >
+                      <div className="flex items-center gap-2 text-[11px] text-ws-muted">
+                        <span className="rounded-full bg-ws-chip px-1.5 py-px text-[9px] font-medium capitalize">
                           {lesson.type}
-                        </Badge>
-                        {lesson.duration && (
-                          <span>{lesson.duration} min</span>
-                        )}
+                        </span>
+                        {lesson.duration && <span className="tabular-nums">{lesson.duration} min</span>}
                         {lesson.isFree && (
-                          <Badge variant="outline" className="text-[9px] px-1 py-0">
+                          <span className="rounded-full border border-ws-hairline px-1.5 py-px text-[9px] font-medium">
                             Free Preview
-                          </Badge>
+                          </span>
                         )}
                       </div>
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-7 text-xs px-2"
+                      className="h-7 px-2 text-xs"
                       render={
                         <Link href={`/instructor/courses/${courseId}/exam?lesson=${lesson.id}`} />
                       }
                     >
                       Quiz
                     </Button>
-                    <form action={deleteLesson}>
-                      <input type="hidden" name="courseId" value={courseId} />
-                      <input
-                        type="hidden"
-                        name="lessonId"
-                        value={lesson.id}
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        type="submit"
-                        className="text-destructive hover:text-destructive h-7 w-7 p-0"
-                      >
-                        <HugeiconsIcon icon={Delete01Icon} size={14} />
-                      </Button>
-                    </form>
+                    <DeleteLessonButton
+                      courseId={courseId}
+                      lessonId={lesson.id}
+                      lessonTitle={lesson.title}
+                    />
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+                </div>
+              )
+            })}
         </div>
       )}
 
@@ -155,7 +195,7 @@ export function LessonManager({
             <Button variant="outline" className="w-full border-dashed" />
           }
         >
-          <HugeiconsIcon icon={Add01Icon} size={16} />
+          <Plus size={16} strokeWidth={2} />
           Add Lesson
         </DialogTrigger>
         <DialogContent className="sm:max-w-lg">
@@ -174,7 +214,7 @@ export function LessonManager({
                 required
               />
               {state.fieldErrors.title && (
-                <p className="text-xs text-destructive">
+                <p className="text-xs text-ws-danger">
                   {state.fieldErrors.title}
                 </p>
               )}
@@ -229,7 +269,7 @@ export function LessonManager({
                   placeholder="https://..."
                 />
                 {state.fieldErrors.videoUrl && (
-                  <p className="text-xs text-destructive">
+                  <p className="text-xs text-ws-danger">
                     {state.fieldErrors.videoUrl}
                   </p>
                 )}
@@ -249,13 +289,17 @@ export function LessonManager({
               </Label>
             </div>
 
-            <Separator />
+            <div className="h-px bg-ws-hairline" />
 
             <DialogFooter>
               <DialogClose render={<Button variant="outline" />}>
                 Cancel
               </DialogClose>
-              <Button type="submit" disabled={isPending}>
+              <Button
+                type="submit"
+                disabled={isPending}
+                className="bg-ws-brand text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:bg-ws-brand hover:opacity-90"
+              >
                 {isPending ? "Adding..." : "Add Lesson"}
               </Button>
             </DialogFooter>

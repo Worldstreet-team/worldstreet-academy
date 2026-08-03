@@ -14,8 +14,16 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { BookOpen01Icon, StarIcon, MoreHorizontalIcon } from "@hugeicons/core-free-icons"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { MoreHorizontal } from "lucide-react"
+import { PageHeader } from "@/components/shared/page-header"
 import {
   adminListCourses,
   adminSetCourseStatus,
@@ -27,6 +35,7 @@ import {
   FilterChips,
   Pagination,
 } from "@/components/admin/shared"
+import { BookOpenIcon, StarIcon } from "lucide-react"
 
 export default function AdminCoursesPage() {
   const queryClient = useQueryClient()
@@ -35,6 +44,7 @@ export default function AdminCoursesPage() {
   const [debouncedSearch, setDebouncedSearch] = React.useState("")
   const [page, setPage] = React.useState(1)
   const [actionError, setActionError] = React.useState<string | null>(null)
+  const [archiveTarget, setArchiveTarget] = React.useState<{ id: string; title: string } | null>(null)
 
   React.useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 350)
@@ -51,8 +61,9 @@ export default function AdminCoursesPage() {
   const setCourseStatus = useMutation({
     mutationFn: ({ courseId, newStatus }: { courseId: string; newStatus: "draft" | "published" | "archived" }) =>
       adminSetCourseStatus(courseId, newStatus),
-    onSuccess: (res) => {
+    onSuccess: (res, vars) => {
       setActionError(res.success ? null : (res.error ?? "Failed"))
+      if (res.success && vars.newStatus === "archived") setArchiveTarget(null)
       queryClient.invalidateQueries({ queryKey: ["admin", "courses"] })
     },
   })
@@ -60,13 +71,12 @@ export default function AdminCoursesPage() {
   return (
     <>
       <Topbar variant="admin" />
-      <div className="p-4 sm:p-6 space-y-4 pb-24 md:pb-6">
-        <div>
-          <h1 className="text-lg font-semibold">Courses</h1>
-          <p className="text-sm text-muted-foreground">
-            {data ? `${data.total.toLocaleString()} courses` : "Course catalog moderation."}
-          </p>
-        </div>
+      <div className="flex-1 px-6 pb-24 pt-8 md:px-8 md:pb-12 lg:px-12">
+        <div className="mx-auto w-full max-w-7xl space-y-8">
+        <PageHeader
+          title="Courses"
+          subline={data ? `${data.total.toLocaleString()} courses` : "Course catalog moderation."}
+        />
 
         <div className="flex items-center gap-3 flex-wrap">
           <Input
@@ -76,7 +86,7 @@ export default function AdminCoursesPage() {
               setPage(1)
             }}
             placeholder="Search titles…"
-            className="max-w-xs h-8 text-xs"
+            className="max-w-xs h-10 text-sm"
           />
           <FilterChips
             value={status}
@@ -93,17 +103,17 @@ export default function AdminCoursesPage() {
           />
         </div>
 
-        {actionError && <p className="text-xs text-destructive">{actionError}</p>}
+        {actionError && <p className="text-xs text-ws-danger">{actionError}</p>}
 
         {isLoading ? (
           <div className="space-y-2">
             {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-16 rounded-xl" />
+              <Skeleton key={i} className="h-16 rounded-lg" />
             ))}
           </div>
         ) : !data || data.courses.length === 0 ? (
           <EmptyState
-            icon={BookOpen01Icon}
+            icon={BookOpenIcon}
             title="No courses"
             description="No courses match this filter."
           />
@@ -113,9 +123,9 @@ export default function AdminCoursesPage() {
               {data.courses.map((c) => (
                 <div
                   key={c.id}
-                  className="flex items-center gap-3 rounded-xl border border-border/60 bg-card px-3 py-2.5"
+                  className="flex items-center gap-3 rounded-lg border border-ws-hairline bg-ws-surface px-3 py-2.5"
                 >
-                  <div className="relative h-12 w-20 rounded-lg overflow-hidden bg-muted shrink-0 hidden sm:block">
+                  <div className="relative h-12 w-20 rounded-sm overflow-hidden bg-ws-raised shrink-0 hidden sm:block">
                     {c.thumbnailUrl ? (
                       <Image
                         src={c.thumbnailUrl}
@@ -126,7 +136,7 @@ export default function AdminCoursesPage() {
                       />
                     ) : (
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <HugeiconsIcon icon={BookOpen01Icon} size={16} className="text-muted-foreground/40" />
+                        <BookOpenIcon  size={16} className="text-muted-foreground/40" />
                       </div>
                     )}
                   </div>
@@ -139,7 +149,7 @@ export default function AdminCoursesPage() {
                       {c.instructorName} · {c.totalLessons} lessons · {c.enrolledCount} students
                       {c.ratingAverage ? (
                         <span className="inline-flex items-center gap-0.5 ml-1">
-                          · <HugeiconsIcon icon={StarIcon} size={10} className="text-orange-500" />
+                          · <StarIcon  size={10} className="text-ws-rating" />
                           {c.ratingAverage.toFixed(1)}
                         </span>
                       ) : null}
@@ -155,7 +165,7 @@ export default function AdminCoursesPage() {
                         <Button variant="ghost" size="icon-sm" aria-label="Course actions" />
                       }
                     >
-                      <HugeiconsIcon icon={MoreHorizontalIcon} size={16} />
+                      <MoreHorizontal size={16} strokeWidth={2} />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-44">
                       {c.status !== "published" && (
@@ -179,9 +189,7 @@ export default function AdminCoursesPage() {
                       {c.status !== "archived" && (
                         <DropdownMenuItem
                           variant="destructive"
-                          onClick={() =>
-                            setCourseStatus.mutate({ courseId: c.id, newStatus: "archived" })
-                          }
+                          onClick={() => setArchiveTarget({ id: c.id, title: c.title })}
                         >
                           Archive
                         </DropdownMenuItem>
@@ -194,7 +202,40 @@ export default function AdminCoursesPage() {
             <Pagination page={data.page} pageCount={data.pageCount} onPageChange={setPage} />
           </>
         )}
+        </div>
       </div>
+
+      {/* Archive confirm — archiving pulls a course out of the catalog, so it
+          gets the same explicit confirmation as role changes and refunds. */}
+      <Dialog open={!!archiveTarget} onOpenChange={(open) => !open && setArchiveTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Archive “{archiveTarget?.title}”?</DialogTitle>
+            <DialogDescription>
+              The course disappears from the public catalog and can no longer be
+              purchased. Existing students keep access to their content. You can
+              re-publish it later from this page.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setArchiveTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              disabled={setCourseStatus.isPending}
+              onClick={() => {
+                if (archiveTarget) {
+                  setCourseStatus.mutate({ courseId: archiveTarget.id, newStatus: "archived" })
+                }
+              }}
+            >
+              {setCourseStatus.isPending ? "Archiving…" : "Archive course"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

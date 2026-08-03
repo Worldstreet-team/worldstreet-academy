@@ -2,14 +2,6 @@
 
 import { useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  File01Icon,
-  Upload04Icon,
-  Delete01Icon,
-  Loading03Icon,
-  Link01Icon,
-} from "@hugeicons/core-free-icons"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -20,6 +12,8 @@ import {
   addResource,
   deleteResource,
 } from "@/lib/actions/resources"
+import { FileIcon, LinkIcon, LoaderCircleIcon, Trash2Icon, UploadIcon } from "lucide-react"
+import { RenderIcon } from "@/components/shared/render-icon"
 
 function formatSize(bytes: number) {
   if (!bytes) return ""
@@ -135,13 +129,12 @@ export function ResourceManager({ courseId }: { courseId: string }) {
           {resources.map((r) => (
             <div
               key={r.id}
-              className="flex items-center gap-3 rounded-lg border border-border/50 bg-card px-3 py-2"
+              className="flex items-center gap-3 rounded-lg border border-ws-hairline bg-card px-3 py-2"
             >
-              <HugeiconsIcon
-                icon={r.kind === "link" ? Link01Icon : File01Icon}
+              <RenderIcon icon={r.kind === "link" ? LinkIcon : FileIcon}
+                
                 size={15}
-                className="shrink-0 text-muted-foreground"
-              />
+                className="shrink-0 text-muted-foreground" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
                   <p className="truncate text-sm font-medium">{r.title}</p>
@@ -163,7 +156,7 @@ export function ResourceManager({ courseId }: { courseId: string }) {
                 onClick={() => handleDelete(r.id)}
                 aria-label={`Delete ${r.title}`}
               >
-                <HugeiconsIcon icon={Delete01Icon} size={14} className="text-red-500" />
+                <Trash2Icon  size={14} className="text-ws-danger" />
               </Button>
             </div>
           ))}
@@ -171,12 +164,12 @@ export function ResourceManager({ courseId }: { courseId: string }) {
       )}
 
       {error && (
-        <div className="rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2">
-          <p className="text-xs text-red-500">{error}</p>
+        <div className="rounded-lg bg-ws-danger/10 border border-ws-danger/20 px-3 py-2">
+          <p className="text-xs text-ws-danger">{error}</p>
         </div>
       )}
 
-      <div className="space-y-3 rounded-xl border border-dashed border-border p-3">
+      <div className="space-y-3 rounded-lg border border-dashed border-border p-3">
         <div className="space-y-1.5">
           <Label htmlFor="resourceTitle" className="text-xs">
             Title (optional — defaults to the filename)
@@ -219,9 +212,9 @@ export function ResourceManager({ courseId }: { courseId: string }) {
             className="gap-1.5 text-xs"
           >
             {busy ? (
-              <HugeiconsIcon icon={Loading03Icon} size={13} className="animate-spin" />
+              <LoaderCircleIcon  size={13} className="animate-spin" />
             ) : (
-              <HugeiconsIcon icon={Upload04Icon} size={13} />
+              <UploadIcon  size={13} />
             )}
             Upload file
           </Button>

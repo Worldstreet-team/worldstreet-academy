@@ -40,14 +40,14 @@ export function CourseCarousel({ courses, title }: { courses: BrowseCourse[]; ti
           {courses.map((course) => (
             <CarouselItem key={course.id} className="pl-3 basis-[80%] sm:basis-1/2 lg:basis-1/3 xl:basis-1/4">
               <Link href={`/dashboard/courses/${course.id}`}>
-                <Card className="group h-full transition-all hover:shadow-md hover:border-primary/30 overflow-hidden">
+                <Card className="group h-full transition-all hover:border-primary/30 overflow-hidden">
                   <div className="aspect-video w-full bg-muted relative overflow-hidden">
                     {course.thumbnailUrl ? (
                       <Image
                         src={course.thumbnailUrl}
                         alt={course.title}
                         fill
-                        className="object-cover group-hover:scale-105 transition-transform duration-300"
+                        className="object-cover transition-transform duration-[var(--ws-motion-base)]"
                         sizes="280px"
                       />
                     ) : (

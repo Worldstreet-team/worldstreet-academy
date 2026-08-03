@@ -4,21 +4,15 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useRef, useEffect } from "react"
 import { cn } from "@/lib/utils"
-import { HugeiconsIcon } from "@hugeicons/react"
-import type { IconSvgElement } from "@hugeicons/react"
-import {
-  Home01Icon,
-  BookOpen01Icon,
-  Mic01Icon,
-  Bookmark01Icon,
-  UserIcon,
-} from "@hugeicons/core-free-icons"
 import { useVivid } from "@/lib/vivid/provider"
+import { BookOpenIcon, BookmarkIcon, HouseIcon, MicIcon, UserIcon } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
+import { RenderIcon } from "@/components/shared/render-icon"
 
 type BottomNavItem = {
   title: string
   href: string
-  icon: IconSvgElement
+  icon: LucideIcon
   match?: (pathname: string) => boolean
 }
 
@@ -26,19 +20,19 @@ const navItems: BottomNavItem[] = [
   {
     title: "Home",
     href: "/dashboard",
-    icon: Home01Icon,
+    icon: HouseIcon,
     match: (p: string) => p === "/dashboard",
   },
   {
     title: "My Courses",
     href: "/dashboard/my-courses",
-    icon: BookOpen01Icon,
+    icon: BookOpenIcon,
     match: (p: string) => p === "/dashboard/my-courses",
   },
   {
     title: "Bookmarks",
     href: "/dashboard/bookmarks",
-    icon: Bookmark01Icon,
+    icon: BookmarkIcon,
     match: (p: string) => p === "/dashboard/bookmarks",
   },
   {
@@ -59,7 +53,7 @@ export function PlatformBottomNav() {
 
   const isConnecting = vivid.state === "connecting"
 
-  // Mini orb glow animation — green blob
+  // Mini orb glow animation — Academy accent blob
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -68,6 +62,16 @@ export function PlatformBottomNav() {
     const size = 64
     canvas.width = size * 2
     canvas.height = size * 2
+
+    // Canvas can't resolve CSS variables — read the Academy accent token once
+    // per mount so the orb tracks the design system, not a hardcoded green.
+    const accent = getComputedStyle(document.documentElement)
+      .getPropertyValue("--ws-accent-academy")
+      .trim() || "#10B981"
+    const r0 = parseInt(accent.slice(1, 3), 16)
+    const g0 = parseInt(accent.slice(3, 5), 16)
+    const b0 = parseInt(accent.slice(5, 7), 16)
+    const rgba = (a: number) => `rgba(${r0},${g0},${b0},${a})`
 
     const draw = () => {
       ctx.clearRect(0, 0, size * 2, size * 2)
@@ -83,15 +87,15 @@ export function PlatformBottomNav() {
       const gradient = ctx.createRadialGradient(size, size, baseR * 0.2, size, size, baseR * 1.6)
 
       if (isConnecting) {
-        gradient.addColorStop(0, `rgba(34,197,94,0.95)`)
-        gradient.addColorStop(0.35, `rgba(22,163,74,0.7)`)
-        gradient.addColorStop(0.7, `rgba(16,130,60,0.35)`)
-        gradient.addColorStop(1, "rgba(16,130,60,0)")
+        gradient.addColorStop(0, rgba(0.95))
+        gradient.addColorStop(0.35, rgba(0.7))
+        gradient.addColorStop(0.7, rgba(0.35))
+        gradient.addColorStop(1, rgba(0))
       } else {
-        gradient.addColorStop(0, `rgba(34,197,94,${0.85 + avg * 0.15})`)
-        gradient.addColorStop(0.35, `rgba(22,163,74,${0.5 + avg * 0.3})`)
-        gradient.addColorStop(0.7, `rgba(16,130,60,${0.2 + avg * 0.15})`)
-        gradient.addColorStop(1, "rgba(16,130,60,0)")
+        gradient.addColorStop(0, rgba(0.85 + avg * 0.15))
+        gradient.addColorStop(0.35, rgba(0.5 + avg * 0.3))
+        gradient.addColorStop(0.7, rgba(0.2 + avg * 0.15))
+        gradient.addColorStop(1, rgba(0))
       }
 
       ctx.fillStyle = gradient
@@ -119,7 +123,7 @@ export function PlatformBottomNav() {
   const right = navItems.slice(2)
 
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-50 border-t bg-background/95 backdrop-blur-md md:hidden safe-area-bottom">
+    <nav className="fixed bottom-0 inset-x-0 z-50 border-t bg-ws-surface md:hidden safe-area-bottom">
       <div className="flex items-end justify-around px-2 pt-1 pb-2">
         {left.map((item) => {
           const active = item.match?.(pathname) ?? pathname === item.href
@@ -134,7 +138,7 @@ export function PlatformBottomNav() {
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <HugeiconsIcon icon={item.icon} size={20} />
+              <RenderIcon icon={item.icon}  size={20} />
               <span>{item.title}</span>
             </Link>
           )
@@ -163,14 +167,13 @@ export function PlatformBottomNav() {
                 <div className="w-5 h-5 border-2 border-foreground/30 border-t-foreground/80 rounded-full animate-spin" />
               </div>
             ) : (
-              <HugeiconsIcon
-                icon={Mic01Icon}
+              <MicIcon
+                
                 size={22}
-                className="relative z-10 text-foreground/80 transition-colors"
-              />
+                className="relative z-10 text-foreground/80 transition-colors" />
             )}
             {isSessionActive && !isConnecting && (
-              <div className="absolute top-0.5 right-0.5 w-2.5 h-2.5 rounded-full bg-green-400 border-2 border-background z-10" />
+              <div className="absolute top-0.5 right-0.5 w-2.5 h-2.5 rounded-full bg-ws-success border-2 border-background z-10" />
             )}
           </div>
           <span className="text-[10px] font-medium text-foreground mt-0.5">
@@ -191,7 +194,7 @@ export function PlatformBottomNav() {
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <HugeiconsIcon icon={item.icon} size={20} />
+              <RenderIcon icon={item.icon}  size={20} />
               <span>{item.title}</span>
             </Link>
           )

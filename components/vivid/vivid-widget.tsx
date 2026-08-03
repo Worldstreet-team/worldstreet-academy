@@ -47,10 +47,10 @@ export function VividWidget() {
         {viewMode === "minimized" && !isSessionActive && (
           <motion.div
             key="orb-trigger"
-            initial={{ scale: 0, opacity: 0 }}
+            initial={{ scale: 0.98, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 400, damping: 25 }}
+            exit={{ scale: 0.98, opacity: 0 }}
+            transition={{ duration: 0.2, ease: [0.2, 0, 0, 1] }}
             className="fixed bottom-6 right-6 z-999 hidden md:block"
           >
             <OrbButton />
@@ -63,10 +63,10 @@ export function VividWidget() {
         {state === "connecting" && viewMode === "minimized" && (
           <motion.div
             key="orb-connecting"
-            initial={{ scale: 0, opacity: 0 }}
+            initial={{ scale: 0.98, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 400, damping: 25 }}
+            exit={{ scale: 0.98, opacity: 0 }}
+            transition={{ duration: 0.2, ease: [0.2, 0, 0, 1] }}
             className="fixed bottom-6 right-6 z-999 hidden md:block"
           >
             <OrbButton />
@@ -110,16 +110,10 @@ function FullPageExperience() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ type: "spring", stiffness: 300, damping: 30 }}
-      className="fixed inset-0 z-998 flex flex-col bg-background/80 backdrop-blur-2xl"
+      transition={{ duration: 0.32, ease: [0.2, 0, 0, 1] }}
+      className="fixed inset-0 z-998 flex flex-col bg-ws-page"
       style={{ borderRadius: 0 }}
     >
-      {/* Background gradient mesh */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-150 h-150 rounded-full bg-white/2 blur-[120px]" />
-        <div className="absolute bottom-0 right-1/4 w-125 h-125 rounded-full bg-white/2 blur-[100px]" />
-      </div>
-
       {/* Top bar */}
       <TopBar />
 
@@ -144,17 +138,17 @@ function FullPageExperience() {
           {hasPanel && (
             <motion.div
               key={panelKey}
-              initial={{ opacity: 0, x: 40 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 40 }}
-              transition={{ type: "spring", stiffness: 300, damping: 28 }}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.32, ease: [0.2, 0, 0, 1] }}
               className={[
                 // Desktop: full-height side panel
-                "md:w-105 md:border-l md:border-border/20",
+                "md:w-105 md:border-l md:border-ws-hairline",
                 // Mobile: bottom card
-                "max-md:mx-4 max-md:mb-4 max-md:rounded-2xl max-md:border max-md:border-border/30 max-md:max-h-[60vh]",
+                "max-md:mx-4 max-md:mb-4 max-md:rounded-lg max-md:border max-md:border-ws-hairline max-md:max-h-[60vh]",
                 // Shared
-                "bg-background/60 backdrop-blur-xl overflow-y-auto",
+                "bg-ws-surface overflow-y-auto",
                 "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden!",
               ].join(" ")}
             >

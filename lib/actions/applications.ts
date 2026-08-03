@@ -646,7 +646,7 @@ async function scheduleInterviewCore(
   // Fire-and-forget: bell + email (with calendar attachment) to the applicant.
   void notifyUser(applicant._id.toString(), {
     type: "meeting",
-    title: rescheduled ? "Your interview was rescheduled" : "Interview scheduled 🎙️",
+    title: rescheduled ? "Your interview was rescheduled" : "Interview scheduled",
     body: `${scheduledAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })} — with ${host.name}`,
     href: "/dashboard/become-instructor",
   })
@@ -767,7 +767,7 @@ export async function adminProposeSlots(
 
     void notifyUser(applicant._id.toString(), {
       type: "application",
-      title: "Pick your interview time 🎙️",
+      title: "Pick your interview time",
       body: `${adminName} proposed ${parsed.length} time slot${parsed.length === 1 ? "" : "s"} — choose what works for you.`,
       href: "/dashboard/become-instructor",
     })
@@ -997,7 +997,7 @@ export async function adminDecideApplication(
     // Fire-and-forget notifications + email.
     void notifyUser(user._id.toString(), {
       type: "application",
-      title: decision === "approved" ? "You're an instructor now 🎉" : "Application update",
+      title: decision === "approved" ? "You're an instructor now" : "Application update",
       body:
         decision === "approved"
           ? "Your instructor application was approved. Your instructor portal is ready."

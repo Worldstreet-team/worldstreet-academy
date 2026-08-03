@@ -1,6 +1,20 @@
 import type { NextConfig } from "next";
 
+// MOCK_AUTH=1 (set by `pnpm dev:mock`) swaps Clerk for a local stub so the app
+// runs without a Clerk instance. Off by default — production is untouched.
+const mockAuth = process.env.MOCK_AUTH === "1";
+
 const nextConfig: NextConfig = {
+  ...(mockAuth
+    ? {
+        turbopack: {
+          resolveAlias: {
+            "@clerk/nextjs": "./mocks/clerk/index.tsx",
+            "@clerk/nextjs/server": "./mocks/clerk/server.ts",
+          },
+        },
+      }
+    : {}),
   reactStrictMode: false,
   images: {
     dangerouslyAllowSVG: true,

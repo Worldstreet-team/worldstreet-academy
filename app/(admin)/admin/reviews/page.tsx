@@ -7,14 +7,14 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { EmptyState } from "@/components/shared/empty-state"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { StarIcon } from "@hugeicons/core-free-icons"
+import { PageHeader } from "@/components/shared/page-header"
 import {
   adminListReviews,
   adminSetReviewModeration,
 } from "@/lib/actions/admin-courses"
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import { formatDate, FilterChips, Pagination } from "@/components/admin/shared"
+import { StarIcon } from "lucide-react"
 
 type Filter = "all" | "reported" | "hidden"
 
@@ -22,12 +22,11 @@ function Stars({ rating }: { rating: number }) {
   return (
     <span className="inline-flex items-center gap-0.5">
       {Array.from({ length: 5 }).map((_, i) => (
-        <HugeiconsIcon
+        <StarIcon
           key={i}
-          icon={StarIcon}
+          
           size={11}
-          className={i < rating ? "text-orange-500" : "text-muted-foreground/25"}
-        />
+          className={i < rating ? "text-ws-rating" : "text-ws-subtle"} />
       ))}
     </span>
   )
@@ -37,6 +36,9 @@ export default function AdminReviewsPage() {
   const queryClient = useQueryClient()
   const [filter, setFilter] = React.useState<Filter>("reported")
   const [page, setPage] = React.useState(1)
+  // Per-row pending + error so one moderation doesn't lock (or blame) the rest.
+  const [actingId, setActingId] = React.useState<string | null>(null)
+  const [rowError, setRowError] = React.useState<{ id: string; message: string } | null>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: queryKeys.adminReviews({ filter, page }),
@@ -51,19 +53,34 @@ export default function AdminReviewsPage() {
       reviewId: string
       changes: { isHidden?: boolean; isApproved?: boolean }
     }) => adminSetReviewModeration(reviewId, changes),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "reviews"] }),
+    onMutate: ({ reviewId }) => {
+      setActingId(reviewId)
+      setRowError(null)
+    },
+    onSuccess: (res, vars) => {
+      if (!res.success) {
+        setRowError({
+          id: vars.reviewId,
+          message: ("error" in res && res.error) || "Moderation failed",
+        })
+      }
+      queryClient.invalidateQueries({ queryKey: ["admin", "reviews"] })
+    },
+    onError: (_err, vars) => {
+      setRowError({ id: vars.reviewId, message: "Moderation failed — try again." })
+    },
+    onSettled: () => setActingId(null),
   })
 
   return (
     <>
       <Topbar variant="admin" />
-      <div className="p-4 sm:p-6 space-y-4 pb-24 md:pb-6">
-        <div>
-          <h1 className="text-lg font-semibold">Reviews</h1>
-          <p className="text-sm text-muted-foreground">
-            Moderate reported or problematic course reviews.
-          </p>
-        </div>
+      <div className="flex-1 px-6 pb-24 pt-8 md:px-8 md:pb-12 lg:px-12">
+        <div className="mx-auto w-full max-w-7xl space-y-8">
+        <PageHeader
+          title="Reviews"
+          subline="Moderate reported or problematic course reviews."
+        />
 
         <FilterChips
           value={filter}
@@ -81,7 +98,7 @@ export default function AdminReviewsPage() {
         {isLoading ? (
           <div className="space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-20 rounded-xl" />
+              <Skeleton key={i} className="h-20 rounded-lg" />
             ))}
           </div>
         ) : !data || data.reviews.length === 0 ? (
@@ -100,7 +117,7 @@ export default function AdminReviewsPage() {
               {data.reviews.map((r) => (
                 <div
                   key={r.id}
-                  className="rounded-xl border border-border/60 bg-card px-3 py-3 space-y-1.5"
+                  className="rounded-lg border border-ws-hairline bg-ws-surface px-3 py-3 space-y-1.5"
                 >
                   <div className="flex items-center gap-2 flex-wrap">
                     <Stars rating={r.rating} />
@@ -133,7 +150,7 @@ export default function AdminReviewsPage() {
                       <Button
                         size="xs"
                         variant="outline"
-                        disabled={moderate.isPending}
+                        disabled={actingId === r.id}
                         onClick={() =>
                           moderate.mutate({
                             reviewId: r.id,
@@ -141,12 +158,12 @@ export default function AdminReviewsPage() {
                           })
                         }
                       >
-                        {r.isHidden ? "Unhide" : "Hide"}
+                        {actingId === r.id ? "Saving…" : r.isHidden ? "Unhide" : "Hide"}
                       </Button>
                       <Button
                         size="xs"
                         variant="outline"
-                        disabled={moderate.isPending}
+                        disabled={actingId === r.id}
                         onClick={() =>
                           moderate.mutate({
                             reviewId: r.id,
@@ -158,12 +175,16 @@ export default function AdminReviewsPage() {
                       </Button>
                     </div>
                   </div>
+                  {rowError?.id === r.id && (
+                    <p className="text-xs text-ws-danger">{rowError.message}</p>
+                  )}
                 </div>
               ))}
             </div>
             <Pagination page={data.page} pageCount={data.pageCount} onPageChange={setPage} />
           </>
         )}
+        </div>
       </div>
     </>
   )

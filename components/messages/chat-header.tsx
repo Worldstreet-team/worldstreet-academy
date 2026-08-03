@@ -1,13 +1,8 @@
 "use client"
 
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  Video01Icon,
-  Call02Icon,
-  ArrowLeft01Icon,
-} from "@hugeicons/core-free-icons"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import { ChevronLeftIcon, PhoneIcon, VideoIcon } from "lucide-react"
 
 type ChatHeaderProps = {
   name: string
@@ -35,7 +30,7 @@ export function ChatHeader({
       <div className="flex items-center gap-2 max-w-4xl mx-auto">
         {showBackButton && (
           <Button size="icon" variant="ghost" className="h-9 w-9 md:hidden" onClick={onBack}>
-            <HugeiconsIcon icon={ArrowLeft01Icon} size={20} />
+            <ChevronLeftIcon  size={20} />
           </Button>
         )}
 
@@ -45,7 +40,7 @@ export function ChatHeader({
             <AvatarFallback>{name[0]?.toUpperCase()}</AvatarFallback>
           </Avatar>
           {isOnline && (
-            <div className="absolute bottom-0 right-0 h-2.5 w-2.5 bg-green-500 rounded-full border-2 border-background" />
+            <div className="absolute bottom-0 right-0 h-2.5 w-2.5 bg-ws-success rounded-full border-2 border-background" />
           )}
         </div>
 
@@ -58,10 +53,10 @@ export function ChatHeader({
 
         <div className="flex items-center border rounded-lg overflow-hidden divide-x">
           <Button size="icon" variant="ghost" className="h-9 w-9 rounded-none border-0" onClick={onAudioCall}>
-            <HugeiconsIcon icon={Call02Icon} size={18} />
+            <PhoneIcon  size={18} />
           </Button>
           <Button size="icon" variant="ghost" className="h-9 w-9 rounded-none border-0" onClick={onVideoCall}>
-            <HugeiconsIcon icon={Video01Icon} size={18} />
+            <VideoIcon  size={18} />
           </Button>
         </div>
       </div>

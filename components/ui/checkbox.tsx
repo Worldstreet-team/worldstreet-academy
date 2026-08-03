@@ -4,8 +4,7 @@ import * as React from "react"
 import { Checkbox as CheckboxPrimitive } from "@base-ui/react/checkbox"
 
 import { cn } from "@/lib/utils"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { Tick02Icon } from "@hugeicons/core-free-icons"
+import { CheckIcon } from "lucide-react"
 
 function Checkbox({
   className,
@@ -24,7 +23,7 @@ function Checkbox({
         data-slot="checkbox-indicator"
         className="flex items-center justify-center text-current"
       >
-        <HugeiconsIcon icon={Tick02Icon} size={12} strokeWidth={3} />
+        <CheckIcon  size={12} strokeWidth={3} />
       </CheckboxPrimitive.Indicator>
     </CheckboxPrimitive.Root>
   )

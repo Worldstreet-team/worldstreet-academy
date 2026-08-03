@@ -1,19 +1,10 @@
 "use client"
 
 import { useState, useRef, useEffect, useMemo } from "react"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  Cancel01Icon,
-  Tick01Icon,
-  CropIcon,
-  RotateRight01Icon,
-  BlurIcon,
-  Sun03Icon,
-  Infinity01Icon,
-  UndoIcon,
-} from "@hugeicons/core-free-icons"
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { CheckIcon, CropIcon, DropletsIcon, InfinityIcon, RotateCwIcon, SunIcon, Undo2Icon, XIcon } from "lucide-react"
+import { RenderIcon } from "@/components/shared/render-icon"
 
 type MediaEditorProps = {
   open: boolean
@@ -37,7 +28,7 @@ function CircularDial({
   min: number
   max: number
   label: string
-  icon: typeof BlurIcon
+  icon: typeof DropletsIcon
 }) {
   const dialRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef(false)
@@ -124,7 +115,7 @@ function CircularDial({
           }}
         />
         <div className="absolute inset-0 flex items-center justify-center">
-          <HugeiconsIcon icon={icon} size={18} className="text-white/80" />
+          <RenderIcon icon={icon}  size={18} className="text-white/80" />
         </div>
       </div>
       <div className="text-center">
@@ -232,7 +223,7 @@ export function MediaEditor({ open, onClose, file, type, onSave }: MediaEditorPr
             <img
               src={preview}
               alt="Preview"
-              className="w-full h-full object-contain transition-all duration-300"
+              className="w-full h-full object-contain transition-all duration-[var(--ws-motion-base)]"
               style={{
                 transform: `rotate(${rotation}deg)`,
                 filter: `blur(${blur}px) brightness(${brightness}%) contrast(${contrast}%)`,
@@ -252,7 +243,7 @@ export function MediaEditor({ open, onClose, file, type, onSave }: MediaEditorPr
           {/* Glassmorphic Top Bar */}
           <div
             className={cn(
-              "absolute top-0 left-0 right-0 flex items-center justify-between px-4 py-4 transition-all duration-300",
+              "absolute top-0 left-0 right-0 flex items-center justify-between px-4 py-4 transition-all duration-[var(--ws-motion-base)]",
               showControls ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4 pointer-events-none"
             )}
             style={{
@@ -267,7 +258,7 @@ export function MediaEditor({ open, onClose, file, type, onSave }: MediaEditorPr
                 backdropFilter: "blur(12px)",
               }}
             >
-              <HugeiconsIcon icon={Cancel01Icon} size={20} className="text-white" />
+              <XIcon  size={20} className="text-white" />
             </button>
 
             <div className="flex items-center gap-3">
@@ -280,7 +271,7 @@ export function MediaEditor({ open, onClose, file, type, onSave }: MediaEditorPr
                     backdropFilter: "blur(12px)",
                   }}
                 >
-                  <HugeiconsIcon icon={UndoIcon} size={18} className="text-white" />
+                  <Undo2Icon  size={18} className="text-white" />
                 </button>
               )}
               <button
@@ -291,7 +282,7 @@ export function MediaEditor({ open, onClose, file, type, onSave }: MediaEditorPr
                   backdropFilter: "blur(12px)",
                 }}
               >
-                <HugeiconsIcon icon={Tick01Icon} size={18} className="text-white" />
+                <CheckIcon  size={18} className="text-white" />
                 <span className="text-white text-sm font-medium">Done</span>
               </button>
             </div>
@@ -300,14 +291,14 @@ export function MediaEditor({ open, onClose, file, type, onSave }: MediaEditorPr
           {/* Glassmorphic Bottom Controls */}
           <div
             className={cn(
-              "absolute bottom-0 left-0 right-0 transition-all duration-300",
+              "absolute bottom-0 left-0 right-0 transition-all duration-[var(--ws-motion-base)]",
               showControls ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
             )}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Adjustment Dials */}
             <div
-              className="mx-4 mb-4 px-4 py-5 rounded-2xl"
+              className="mx-4 mb-4 px-4 py-5 rounded-lg"
               style={{
                 background: "rgba(0, 0, 0, 0.4)",
                 backdropFilter: "blur(20px)",
@@ -320,7 +311,7 @@ export function MediaEditor({ open, onClose, file, type, onSave }: MediaEditorPr
                   min={0}
                   max={20}
                   label="Blur"
-                  icon={BlurIcon}
+                  icon={DropletsIcon}
                 />
                 <CircularDial
                   value={brightness}
@@ -328,7 +319,7 @@ export function MediaEditor({ open, onClose, file, type, onSave }: MediaEditorPr
                   min={50}
                   max={150}
                   label="Brightness"
-                  icon={Sun03Icon}
+                  icon={SunIcon}
                 />
                 <CircularDial
                   value={contrast}
@@ -336,7 +327,7 @@ export function MediaEditor({ open, onClose, file, type, onSave }: MediaEditorPr
                   min={50}
                   max={150}
                   label="Contrast"
-                  icon={Infinity01Icon}
+                  icon={InfinityIcon}
                 />
               </div>
             </div>
@@ -353,13 +344,13 @@ export function MediaEditor({ open, onClose, file, type, onSave }: MediaEditorPr
                 className="flex flex-col items-center gap-1.5 group"
               >
                 <div
-                  className="w-12 h-12 rounded-full flex items-center justify-center transition-all group-hover:scale-105"
+                  className="w-12 h-12 rounded-full flex items-center justify-center transition-all"
                   style={{
                     background: "rgba(255, 255, 255, 0.1)",
                     backdropFilter: "blur(12px)",
                   }}
                 >
-                  <HugeiconsIcon icon={RotateRight01Icon} size={22} className="text-white" />
+                  <RotateCwIcon  size={22} className="text-white" />
                 </div>
                 <span className="text-[10px] text-white/70 uppercase tracking-wider">Rotate</span>
               </button>
@@ -375,7 +366,7 @@ export function MediaEditor({ open, onClose, file, type, onSave }: MediaEditorPr
                     backdropFilter: "blur(12px)",
                   }}
                 >
-                  <HugeiconsIcon icon={CropIcon} size={22} className="text-white" />
+                  <CropIcon  size={22} className="text-white" />
                 </div>
                 <span className="text-[10px] text-white/70 uppercase tracking-wider">Crop</span>
               </button>

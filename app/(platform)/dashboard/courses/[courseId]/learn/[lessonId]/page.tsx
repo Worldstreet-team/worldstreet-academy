@@ -1,13 +1,17 @@
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
+import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { fetchCourseForLearning, fetchOtherCourses, getCompletedLessons } from "@/lib/actions/student"
+import { updateLastAccessed } from "@/lib/actions/enrollments"
 import { getCourseRatingSummary, getUserReview } from "@/lib/actions/reviews"
 import { getCourseWatchProgress } from "@/lib/actions/watch-progress"
 import { getCurrentUser } from "@/lib/auth"
+import { MarkCompleteButton } from "@/components/learn/mark-complete-button"
+import { MessageInstructorButton } from "@/app/(platform)/dashboard/instructor/[instructorId]/message-instructor-button"
 import { LessonVideoPlayer } from "@/components/learn/lesson-video-player"
 import { LessonQuizCard } from "@/components/learn/lesson-quiz-card"
 import { LessonSidebar } from "@/components/learn/lesson-sidebar"
@@ -63,27 +67,48 @@ export default async function LessonPage({
     watchProgressMap[wp.lessonId] = wp.percent
   })
 
+  // Remember where the student is so "Continue learning" resumes here.
+  // Fire-and-forget: the action swallows its own errors and a failure must
+  // never block the lesson from rendering.
+  if (currentUser) {
+    void updateLastAccessed(currentUser.id, courseId, actualLessonId)
+  }
+
+  const isLessonCompleted = completedLessonIds.includes(actualLessonId)
+  const courseProgressPercent =
+    lessons.length > 0
+      ? Math.round((completedLessonIds.length / lessons.length) * 100)
+      : 0
+
   return (
     <div className="flex min-h-svh flex-col lg:h-svh">
       {/* Top Bar */}
-      <header className="sticky top-0 z-30 bg-background flex h-12 md:h-14 items-center justify-between border-b px-3 md:px-4 shrink-0">
+      <header className="sticky top-0 z-30 bg-ws-surface flex h-12 md:h-14 items-center justify-between border-b border-ws-hairline px-3 md:px-4 shrink-0">
         <div className="flex items-center gap-2 md:gap-3 min-w-0">
           <Button
             variant="ghost"
             size="sm"
             render={<Link href={`/dashboard/courses/${courseId}`} />}
-            className="shrink-0 text-xs md:text-sm"
+            className="shrink-0 gap-1.5 text-xs md:text-sm text-ws-muted hover:text-ws-primary"
           >
-            ← Back
+            <ArrowLeft className="h-4 w-4" />
+            Back
           </Button>
           <Separator orientation="vertical" className="h-4!" />
-          <span className="text-xs md:text-sm font-medium truncate">
+          <span className="text-xs md:text-sm font-medium truncate text-ws-primary">
             {course.title}
           </span>
         </div>
-        <span className="text-[10px] md:text-xs text-muted-foreground tabular-nums shrink-0">
-          {currentIndex + 1}/{lessons.length}
+        <span className="text-[10px] md:text-xs text-ws-muted tabular-nums shrink-0">
+          {currentIndex + 1}/{lessons.length} · {courseProgressPercent}%
         </span>
+        {/* Course progress — thin brand fill along the header's bottom edge */}
+        <div className="absolute inset-x-0 bottom-0 h-1 bg-ws-track">
+          <div
+            className="h-full bg-ws-brand transition-[width] duration-[var(--ws-motion-fast)]"
+            style={{ width: `${courseProgressPercent}%` }}
+          />
+        </div>
       </header>
 
       <div className="flex flex-1 flex-col lg:flex-row lg:overflow-hidden">
@@ -117,7 +142,7 @@ export default async function LessonPage({
             ) : (
               <div className="aspect-video w-full bg-black flex items-center justify-center">
                 <div className="text-center space-y-2">
-                  <div className="h-3 w-3 rounded-full bg-red-500 animate-pulse mx-auto" />
+                  <div className="h-3 w-3 rounded-full bg-ws-danger animate-pulse mx-auto" />
                   <p className="text-white/60 text-sm">
                     Live Session — Not Started
                   </p>
@@ -137,6 +162,13 @@ export default async function LessonPage({
                   {currentLesson.duration} min
                 </span>
               )}
+              <div className="ml-auto">
+                <MarkCompleteButton
+                  courseId={courseId}
+                  lessonId={actualLessonId}
+                  completed={isLessonCompleted}
+                />
+              </div>
             </div>
             <h1 className="text-lg md:text-xl font-bold">
               {currentLesson.title}
@@ -211,7 +243,7 @@ export default async function LessonPage({
 
             {/* Instructor & Course Interaction */}
             <Separator />
-            <div className="rounded-xl border bg-muted/30 p-4 space-y-4">
+            <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
               {/* Instructor */}
               <div className="flex items-center gap-3">
                 <Avatar size="lg">
@@ -236,9 +268,7 @@ export default async function LessonPage({
                     Course Instructor
                   </p>
                 </div>
-                <Button variant="outline" size="sm">
-                  Message
-                </Button>
+                <MessageInstructorButton instructorId={course.instructorId} />
               </div>
               
               {/* Rating */}

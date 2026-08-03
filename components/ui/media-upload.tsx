@@ -5,16 +5,8 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  Image01Icon,
-  Video01Icon,
-  Upload04Icon,
-  Delete01Icon,
-  PlayIcon,
-  Loading03Icon,
-} from "@hugeicons/core-free-icons"
 import { cn } from "@/lib/utils"
+import { ImageIcon, LoaderCircleIcon, PlayIcon, Trash2Icon, UploadIcon, VideoIcon } from "lucide-react"
 
 /* ─── Types ─── */
 type MediaType = "image" | "video"
@@ -302,7 +294,7 @@ export function MediaUpload({
 
   const isImage = type === "image"
   const accept = isImage ? "image/*" : "video/*"
-  const Icon = isImage ? Image01Icon : Video01Icon
+  const Icon = isImage ? ImageIcon : VideoIcon
   const emptyLabel = isImage ? "No image added" : "No video added"
 
   /* ─────── Hidden file input (shared) ─────── */
@@ -348,8 +340,8 @@ export function MediaUpload({
               {/* Replace overlay on hover */}
               {!uploading && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 group-hover:bg-black/40 group-hover:opacity-100 transition-all">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-white/20 backdrop-blur-md shadow-lg">
-                    <HugeiconsIcon icon={Upload04Icon} size={18} className="text-white" />
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/55">
+                    <UploadIcon  size={18} className="text-white" />
                   </div>
                 </div>
               )}
@@ -374,12 +366,11 @@ export function MediaUpload({
                   onClick={togglePlayback}
                   className="absolute inset-0 flex items-center justify-center bg-black/10 transition-opacity group-hover:bg-black/20"
                 >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/30 bg-white/20 backdrop-blur-md shadow-lg transition-transform group-hover:scale-110">
-                    <HugeiconsIcon
-                      icon={PlayIcon}
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-black/55 transition-transform">
+                    <PlayIcon
+                      
                       size={20}
-                      className="text-white ml-0.5"
-                    />
+                      className="text-white ml-0.5" />
                   </div>
                 </button>
               )}
@@ -391,7 +382,7 @@ export function MediaUpload({
         {uploading && (
           <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
             <div className="flex items-center gap-2">
-              <HugeiconsIcon icon={Loading03Icon} size={14} className="text-primary animate-spin" />
+              <LoaderCircleIcon  size={14} className="text-primary animate-spin" />
               <span className="text-xs font-medium">{uploadStatus || "Uploading..."}</span>
             </div>
             {uploadProgress > 0 && (
@@ -417,9 +408,9 @@ export function MediaUpload({
               disabled={uploading}
             >
               {uploading ? (
-                <HugeiconsIcon icon={Loading03Icon} size={12} className="animate-spin" />
+                <LoaderCircleIcon  size={12} className="animate-spin" />
               ) : (
-                <HugeiconsIcon icon={Upload04Icon} size={12} />
+                <UploadIcon  size={12} />
               )}
               Replace
             </Button>
@@ -431,7 +422,7 @@ export function MediaUpload({
             onClick={handleRemove}
             disabled={uploading}
           >
-            <HugeiconsIcon icon={Delete01Icon} size={12} />
+            <Trash2Icon  size={12} />
             Remove
           </Button>
         </div>
@@ -464,17 +455,15 @@ export function MediaUpload({
         <div className="flex flex-col items-center gap-2 text-center">
           <div className={cn("rounded-full bg-muted p-2", compact && "p-1.5")}>
             {uploading ? (
-              <HugeiconsIcon
-                icon={Loading03Icon}
+              <LoaderCircleIcon
+                
                 size={compact ? 18 : 24}
-                className="text-primary animate-spin"
-              />
+                className="text-primary animate-spin" />
             ) : (
-              <HugeiconsIcon
-                icon={Icon}
+              <Icon
+                
                 size={compact ? 18 : 24}
-                className="text-muted-foreground"
-              />
+                className="text-muted-foreground" />
             )}
           </div>
           
@@ -502,7 +491,7 @@ export function MediaUpload({
               
               {uploadProgress === 0 && (
                 <div className="flex items-center justify-center gap-1.5 text-[10px] text-muted-foreground">
-                  <HugeiconsIcon icon={Loading03Icon} size={10} className="animate-spin" />
+                  <LoaderCircleIcon  size={10} className="animate-spin" />
                   <span>Preparing...</span>
                 </div>
               )}

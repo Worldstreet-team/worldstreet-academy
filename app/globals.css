@@ -1,6 +1,10 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+/* WorldStreet design tokens — vendored copy of ../design-tokens/tokens.css.
+   Vendored rather than imported across repos because the Dockerfile only
+   copies this directory. Academy runs the `platform` theme (see <html>). */
+@import "./ws-tokens.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -8,8 +12,11 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Certificate-only script face — a sanctioned print-artifact exception;
+     nothing else in the DS uses a cursive (or any mono) family. */
   --font-cursive: var(--font-cursive);
+  /* Display/brand voice per the WorldStreet design system (Poppins). */
+  --font-display: var(--font-display);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -39,83 +46,92 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
+  /* Exact design-system ladder (01-foundations): xs 4 · sm 7 · md 10 · lg 13.
+     Not derived by calc() because the system's steps aren't evenly spaced. */
+  --radius-xs: 4px;
+  --radius-sm: 7px;
+  --radius-md: 10px;
+  --radius-lg: 13px;
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
+
+  /* Semantic design-system colors, exposed as Tailwind utilities:
+     bg-ws-page, bg-ws-surface, bg-ws-raised, text-ws-muted, bg-ws-brand … */
+  --color-ws-page: var(--ws-bg-page);
+  --color-ws-sunken: var(--ws-bg-sunken);
+  --color-ws-surface: var(--ws-bg-surface);
+  --color-ws-raised: var(--ws-bg-raised);
+  --color-ws-chip: var(--ws-bg-chip);
+  --color-ws-track: var(--ws-bg-track);
+  --color-ws-hairline: var(--ws-border-hairline);
+  --color-ws-primary: var(--ws-text-primary);
+  --color-ws-muted: var(--ws-text-muted);
+  --color-ws-subtle: var(--ws-text-subtle);
+  --color-ws-brand: var(--ws-brand-primary);
+  --color-ws-brand-active: var(--ws-brand-active);
+  --color-ws-brand-on: var(--ws-brand-on-primary);
+  --color-ws-gold: var(--ws-brand-gold-text);
+  --color-ws-success: var(--ws-status-success);
+  --color-ws-warning: var(--ws-status-warning);
+  --color-ws-danger: var(--ws-status-danger);
+  --color-ws-academy: var(--ws-accent-academy);
+  /* Accent hues (13% washes behind icons only — never large fills). */
+  --color-ws-forex: var(--ws-accent-forex);
+  --color-ws-crypto: var(--ws-accent-crypto);
+  /* Course ratings are always orange, filled (01-foundations). */
+  --color-ws-rating: var(--ws-accent-star);
 }
 
+/* Light mode is NOT defined here. ThemeProvider syncs next-themes' choice to
+   data-ws-theme="platform" | "platform-light" on <html>, and ws-tokens.css
+   (the vendored canonical token file) carries both palettes. Never override
+   --ws-* values in app code. */
+
+/* Same mapping as `.dark` below — shadcn's variables resolve to design-system
+   tokens so components inherit the theme without being rewritten. */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.141 0.005 285.823);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.141 0.005 285.823);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.141 0.005 285.823);
-  --primary: oklch(0.62 0.1 170);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.967 0.001 286.375);
-  --secondary-foreground: oklch(0.21 0.006 285.885);
-  --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
-  --accent: oklch(0.95 0.02 170);
-  --accent-foreground: oklch(0.30 0.06 170);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.92 0.004 286.32);
-  --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.62 0.1 170);
-  --chart-1: oklch(0.62 0.1 170);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.141 0.005 285.823);
-  --sidebar-primary: oklch(0.62 0.1 170);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.95 0.02 170);
-  --sidebar-accent-foreground: oklch(0.30 0.06 170);
-  --sidebar-border: oklch(0.92 0.004 286.32);
-  --sidebar-ring: oklch(0.705 0.015 286.067);
+  --background: var(--ws-bg-page);
+  --foreground: var(--ws-text-primary);
+  --card: var(--ws-bg-surface);
+  --card-foreground: var(--ws-text-primary);
+  --popover: var(--ws-bg-surface);
+  --popover-foreground: var(--ws-text-primary);
+  --primary: var(--ws-brand-primary);
+  --primary-foreground: var(--ws-brand-on-primary);
+  --secondary: var(--ws-bg-raised);
+  --secondary-foreground: var(--ws-text-primary);
+  --muted: var(--ws-bg-raised);
+  --muted-foreground: var(--ws-text-muted);
+  --accent: var(--ws-bg-raised);
+  --accent-foreground: var(--ws-text-primary);
+  --destructive: var(--ws-status-danger);
+  --border: var(--ws-border-hairline);
+  --input: var(--ws-border-hairline);
+  --ring: var(--ws-brand-primary);
+  --chart-1: var(--ws-brand-primary);
+  --chart-2: var(--ws-status-success);
+  --chart-3: var(--ws-accent-crypto);
+  --chart-4: var(--ws-accent-forex);
+  --chart-5: var(--ws-accent-vision);
+  /* Design-system radius ladder: sm 7 / md 10 / lg 13 at 0.45rem. Deliberately
+     tighter than stock Tailwind — that gap is what makes the UI read geometric
+     rather than pillowy. */
+  --radius: 0.8125rem;
+  --sidebar: var(--ws-bg-surface);
+  --sidebar-foreground: var(--ws-text-primary);
+  --sidebar-primary: var(--ws-brand-primary);
+  --sidebar-primary-foreground: var(--ws-brand-on-primary);
+  --sidebar-accent: var(--ws-bg-raised);
+  --sidebar-accent-foreground: var(--ws-text-primary);
+  --sidebar-border: var(--ws-border-hairline);
+  --sidebar-ring: var(--ws-brand-primary);
 }
 
-.dark {
-  --background: oklch(0.141 0.005 285.823);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.21 0.006 285.885);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.21 0.006 285.885);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.62 0.1 170);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.274 0.006 286.033);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.274 0.006 286.033);
-  --muted-foreground: oklch(0.705 0.015 286.067);
-  --accent: oklch(0.25 0.04 170);
-  --accent-foreground: oklch(0.92 0.03 170);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.62 0.1 170);
-  --chart-1: oklch(0.62 0.1 170);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.21 0.006 285.885);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.62 0.1 170);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.25 0.04 170);
-  --sidebar-accent-foreground: oklch(0.92 0.03 170);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.552 0.016 285.938);
-}
+/* Note: shadcn's variables resolve to --ws-* in :root above for BOTH modes —
+   the palette flips via data-ws-theme (platform / platform-light) on <html>,
+   not via a parallel class-scoped variable set. Never put a raw hex here. */
 
 @layer base {
   * {
@@ -124,6 +140,18 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* The sidebar's scroll container ships with a `no-scrollbar` class that was
+   never defined, so its scrollbars (including a stray horizontal one at the
+   bottom of the rail) rendered anyway. Scrolling still works — only the bars
+   are hidden. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 /* ---- Custom thin scrollbars ---- */
@@ -158,43 +186,51 @@
   background: oklch(1 0 0 / 0.25);
 }
 
-/* ---- Marquee animations for welcome page ---- */
-@keyframes marquee-left {
-  0% {
-    transform: translateX(0);
-  }
-  100% {
-    transform: translateX(-50%);
+/* ── WorldStreet motion language ──────────────────────────────────────────
+   The canonical vocabulary only: 120/200/320ms on var(--ws-ease), opacity and
+   small transforms. Entrances are reserved for one hero element per page —
+   grids and sections render instantly; hover feedback stays chromatic
+   (lighten one ladder step), never scale or shadow. */
+@keyframes ws-fade-up {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes ws-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes ws-scale-in {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.ws-animate-in { animation: ws-fade-up var(--ws-motion-slow) var(--ws-ease) both; }
+.ws-animate-fade { animation: ws-fade-in var(--ws-motion-base) var(--ws-ease) both; }
+.ws-animate-scale { animation: ws-scale-in var(--ws-motion-base) var(--ws-ease) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ws-animate-in,
+  .ws-animate-fade,
+  .ws-animate-scale {
+    animation-duration: 0.01ms;
+    animation-delay: 0ms;
   }
 }
 
-@keyframes marquee-right {
-  0% {
-    transform: translateX(-50%);
-  }
-  100% {
-    transform: translateX(0);
-  }
-}
-
-/* ---- Float-up animation for meeting reactions ---- */
+/* ---- Meeting reactions: one short one-shot rise, opacity + small travel ---- */
 @keyframes float-up {
   0% {
     opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-  50% {
-    opacity: 1;
-    transform: translateY(-60px) scale(1.2);
+    transform: translateY(0);
   }
   100% {
     opacity: 0;
-    transform: translateY(-120px) scale(0.8);
+    transform: translateY(-24px);
   }
 }
 
 .animate-float-up {
-  animation: float-up 2.5s ease-out forwards;
+  animation: float-up 600ms var(--ws-ease) forwards;
 }
 
 /* ── Google Translate — permanently hide ALL default UI ──

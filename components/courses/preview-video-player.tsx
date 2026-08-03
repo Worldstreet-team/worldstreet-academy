@@ -4,18 +4,8 @@ import { useState, useRef, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  PlayIcon,
-  PauseIcon,
-  VolumeHighIcon,
-  VolumeMute01Icon,
-  FullScreenIcon,
-  MinimizeScreenIcon,
-  Forward01Icon,
-  Backward01Icon,
-  ShoppingCart01Icon,
-} from "@hugeicons/core-free-icons"
+import { FastForwardIcon, MaximizeIcon, MinimizeIcon, PauseIcon, PlayIcon, RewindIcon, ShoppingCartIcon, Volume2Icon, VolumeXIcon } from "lucide-react"
+import { RenderIcon } from "@/components/shared/render-icon"
 
 interface PreviewVideoPlayerProps {
   src: string
@@ -239,7 +229,7 @@ export function PreviewVideoPlayer({
               className="gap-2"
               render={<Link href={`/dashboard/courses/${courseId}`} />}
             >
-              <HugeiconsIcon icon={ShoppingCart01Icon} size={16} />
+              <ShoppingCartIcon  size={16} />
               {coursePricing === "free" || !coursePrice
                 ? "Enroll for Free"
                 : `Enroll for $${coursePrice}`}
@@ -263,14 +253,14 @@ export function PreviewVideoPlayer({
           className="absolute inset-0 flex items-center justify-center bg-black/30 transition-opacity"
         >
           <div className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
-            <HugeiconsIcon icon={PlayIcon} size={24} className="text-black ml-1" />
+            <PlayIcon  size={24} className="text-black ml-1" />
           </div>
         </button>
       )}
 
       {/* Controls */}
       <div
-        className={`absolute bottom-0 left-0 right-0 px-3 pb-2 pt-8 bg-linear-to-t from-black/80 to-transparent transition-opacity duration-300 ${
+        className={`absolute bottom-0 left-0 right-0 px-3 pb-2 pt-8 bg-linear-to-t from-black/80 to-transparent transition-opacity duration-[var(--ws-motion-base)] ${
           showControls && !showEnrollCTA ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
       >
@@ -291,10 +281,9 @@ export function PreviewVideoPlayer({
               onClick={togglePlay}
               className="p-1.5 text-white hover:text-primary transition-colors"
             >
-              <HugeiconsIcon
-                icon={isPlaying ? PauseIcon : PlayIcon}
-                size={18}
-              />
+              <RenderIcon icon={isPlaying ? PauseIcon : PlayIcon}
+                
+                size={18} />
             </button>
 
             {/* Skip Backward */}
@@ -302,7 +291,7 @@ export function PreviewVideoPlayer({
               onClick={() => skip(-5)}
               className="p-1.5 text-white hover:text-primary transition-colors"
             >
-              <HugeiconsIcon icon={Backward01Icon} size={16} />
+              <RewindIcon  size={16} />
             </button>
 
             {/* Skip Forward */}
@@ -310,7 +299,7 @@ export function PreviewVideoPlayer({
               onClick={() => skip(5)}
               className="p-1.5 text-white hover:text-primary transition-colors"
             >
-              <HugeiconsIcon icon={Forward01Icon} size={16} />
+              <FastForwardIcon  size={16} />
             </button>
 
             {/* Volume */}
@@ -319,10 +308,9 @@ export function PreviewVideoPlayer({
                 onClick={toggleMute}
                 className="p-1.5 text-white hover:text-primary transition-colors"
               >
-                <HugeiconsIcon
-                  icon={isMuted || volume === 0 ? VolumeMute01Icon : VolumeHighIcon}
-                  size={16}
-                />
+                <RenderIcon icon={isMuted || volume === 0 ? VolumeXIcon : Volume2Icon}
+                  
+                  size={16} />
               </button>
               <Slider
                 value={[isMuted ? 0 : volume]}
@@ -345,10 +333,9 @@ export function PreviewVideoPlayer({
               onClick={toggleFullscreen}
               className="p-1.5 text-white hover:text-primary transition-colors"
             >
-              <HugeiconsIcon
-                icon={isFullscreen ? MinimizeScreenIcon : FullScreenIcon}
-                size={16}
-              />
+              <RenderIcon icon={isFullscreen ? MinimizeIcon : MaximizeIcon}
+                
+                size={16} />
             </button>
           </div>
         </div>

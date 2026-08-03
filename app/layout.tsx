@@ -1,26 +1,31 @@
 import type { Metadata, Viewport } from "next";
-import { Geist_Mono, Public_Sans, Dancing_Script } from "next/font/google";
+import { Public_Sans, Dancing_Script, Poppins } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
 const publicSans = Public_Sans({subsets:['latin'],variable:'--font-sans'});
 
+// Certificate-only script face for the printed recipient name — a sanctioned
+// print-artifact exception; the UI itself is Poppins + Public Sans only.
 const dancingScript = Dancing_Script({
   subsets: ['latin'],
   variable: '--font-cursive',
   weight: ['400', '500', '600', '700'],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+// Display/brand voice in the WorldStreet design system — headlines lead with
+// Poppins, body and labels stay Public Sans.
+const poppins = Poppins({
   subsets: ["latin"],
+  variable: "--font-display",
+  weight: ["600", "700", "800"],
 });
 
+// No maximumScale: the design system bans blocking pinch-zoom (06-motion-a11y).
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
   interactiveWidget: "resizes-content",
 };
 
@@ -63,13 +68,21 @@ export default function RootLayout({
             signUpFallbackRedirectUrl: "/dashboard",
           })}
     >
-      <html lang="en" className={publicSans.variable} suppressHydrationWarning>
+      {/* data-ws-theme selects the Academy's palette from the shared design
+          tokens. Academy is a `platform` app: near-black #0B0B0F + gold #FFCC29
+          (not the `shell` stone + #EAB308 used by wallet/auth). */}
+      <html
+        lang="en"
+        className={publicSans.variable}
+        data-ws-theme="platform"
+        suppressHydrationWarning
+      >
         <body
-          className={`${geistMono.variable} ${dancingScript.variable} antialiased`}
+          className={`${dancingScript.variable} ${poppins.variable} antialiased`}
         >
           <ThemeProvider
             attribute="class"
-            defaultTheme="light"
+            defaultTheme="dark"
             enableSystem
             disableTransitionOnChange
           >

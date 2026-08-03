@@ -2,11 +2,7 @@
 
 import Image from "next/image"
 import { motion } from "motion/react"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  Certificate01Icon,
-  Tick02Icon,
-} from "@hugeicons/core-free-icons"
+import { CheckIcon, FileBadgeIcon } from "lucide-react"
 
 export function CertificateList({ data }: { data: unknown }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -25,11 +21,11 @@ export function CertificateList({ data }: { data: unknown }) {
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: i * 0.05 }}
-          className="p-3 rounded-xl bg-card/50 border border-border/30 space-y-2"
+          className="p-3 rounded-lg bg-card/50 border border-ws-hairline space-y-2"
         >
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-amber-500/10">
-              <HugeiconsIcon icon={Certificate01Icon} size={16} className="text-amber-400" />
+            <div className="p-2 rounded-lg bg-ws-warning/10">
+              <FileBadgeIcon  size={16} className="text-ws-warning" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-foreground truncate">
@@ -42,8 +38,8 @@ export function CertificateList({ data }: { data: unknown }) {
               )}
             </div>
             {cert.hasSignature && (
-              <div className="flex items-center gap-1 text-xs text-green-400">
-                <HugeiconsIcon icon={Tick02Icon} size={12} />
+              <div className="flex items-center gap-1 text-xs text-ws-success">
+                <CheckIcon  size={12} />
                 Signed
               </div>
             )}

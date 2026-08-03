@@ -1,16 +1,15 @@
 "use client"
 
+import * as React from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
-import { useEffect } from "react"
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -19,38 +18,38 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { ThemeToggle } from "@/components/theme-toggle"
-import { HugeiconsIcon } from "@hugeicons/react"
-import type { IconSvgElement } from "@hugeicons/react"
 import {
-  Home01Icon,
-  BookOpen01Icon,
-  Add01Icon,
-  Analytics01Icon,
-  Logout01Icon,
-  Message01Icon,
-  DashboardSpeed01Icon,
-  Call02Icon,
-  MeetingRoomIcon,
-  Globe02Icon,
-  BitcoinIcon,
-  ShoppingBag01Icon,
-  PlayIcon,
-  UserMultipleIcon,
-  Video01Icon,
-  Certificate01Icon,
-  UserIcon,
-} from "@hugeicons/core-free-icons"
+  BookOpen,
+  ChartLine,
+  ChevronDown,
+  House,
+  LayoutDashboard,
+  LogOut,
+  MessageCircle,
+  Plus,
+  Trophy,
+  User,
+  Users,
+  type LucideIcon,
+} from "lucide-react"
 import { useUser } from "@/components/providers/user-provider"
 import { LogoutConfirmDialog } from "@/components/shared/logout-confirm-dialog"
 import { useUnreadCount } from "@/lib/hooks/use-unread-count"
-import { useOngoingCall, useActiveCallInfo } from "@/components/providers/call-provider"
+import { useOngoingCall } from "@/components/providers/call-provider"
 import { useSidebarActivity } from "@/lib/hooks/use-sidebar-activity"
+
+/**
+ * Instructor sidebar — same 260px rail recipe as the student AppSidebar
+ * (components/platform/app-sidebar.tsx): 40px rows, 20px Lucide glyphs,
+ * active row a `bg/chip` pill with a gold icon. The four cross-app
+ * WorldStreet links collapse behind one disclosure so they stop competing
+ * with teaching navigation.
+ */
 
 type NavItem = {
   title: string
   href: string
-  icon: IconSvgElement
+  icon: LucideIcon
   match?: (pathname: string) => boolean
 }
 
@@ -58,40 +57,39 @@ const teachItems: NavItem[] = [
   {
     title: "Overview",
     href: "/instructor",
-    icon: Home01Icon,
+    icon: House,
     match: (p) => p === "/instructor",
   },
   {
     title: "Profile",
     href: "/instructor/profile",
-    icon: UserIcon,
+    icon: User,
     match: (p) => p === "/instructor/profile",
   },
   {
     title: "My Courses",
     href: "/instructor/courses",
-    icon: BookOpen01Icon,
+    icon: BookOpen,
     match: (p) =>
       p === "/instructor/courses" ||
-      (p.startsWith("/instructor/courses/") &&
-        !p.endsWith("/new")),
+      (p.startsWith("/instructor/courses/") && !p.endsWith("/new")),
   },
   {
     title: "Add Course",
     href: "/instructor/courses/new",
-    icon: Add01Icon,
+    icon: Plus,
     match: (p) => p === "/instructor/courses/new",
   },
   {
     title: "Certificates",
     href: "/instructor/certificates",
-    icon: Certificate01Icon,
+    icon: Trophy,
     match: (p) => p.startsWith("/instructor/certificates"),
   },
   {
     title: "Analytics",
     href: "/instructor/analytics",
-    icon: Analytics01Icon,
+    icon: ChartLine,
     match: (p) => p === "/instructor/analytics",
   },
 ]
@@ -100,49 +98,80 @@ const connectItems: NavItem[] = [
   {
     title: "Messages",
     href: "/instructor/messages",
-    icon: Message01Icon,
+    icon: MessageCircle,
     match: (p) => p === "/instructor/messages",
   },
   {
     title: "Meetings",
     href: "/instructor/meetings",
-    icon: MeetingRoomIcon,
+    icon: Users,
     match: (p) => p.startsWith("/instructor/meetings"),
   },
 ]
 
-type ExternalNavItem = {
-  title: string
-  href: string
-  icon: IconSvgElement
-}
-
-const worldstreetItems: ExternalNavItem[] = [
-  {
-    title: "Crypto Dashboard",
-    href: "https://dashboard.worldstreetgold.com",
-    icon: BitcoinIcon,
-  },
-  {
-    title: "Shop",
-    href: "https://shop.worldstreetgold.com",
-    icon: ShoppingBag01Icon,
-  },
-  {
-    title: "Xtreme Live",
-    href: "https://xtreme.worldstreetgold.com",
-    icon: PlayIcon,
-  },
-  {
-    title: "Social Platform",
-    href: "https://social.worldstreetgold.com",
-    icon: UserMultipleIcon,
-  },
+const worldstreetApps = [
+  { title: "Crypto Dashboard", href: "https://dashboard.worldstreetgold.com" },
+  { title: "Shop", href: "https://shop.worldstreetgold.com" },
+  { title: "Xtreme Live", href: "https://xtreme.worldstreetgold.com" },
+  { title: "Social Platform", href: "https://social.worldstreetgold.com" },
 ]
 
 function isActive(item: NavItem, pathname: string) {
-  if (item.match) return item.match(pathname)
-  return pathname === item.href
+  return item.match ? item.match(pathname) : pathname === item.href
+}
+
+/** Count/state pill on the right of a nav row. */
+function NavBadge({
+  children,
+  tone = "neutral",
+}: {
+  children: React.ReactNode
+  tone?: "neutral" | "brand" | "live"
+}) {
+  const tones = {
+    neutral: "bg-ws-chip text-ws-muted",
+    brand: "bg-ws-brand text-ws-brand-on",
+    live: "bg-ws-success/15 text-ws-success",
+  }
+  return (
+    <span
+      className={`ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold tabular-nums ${tones[tone]}`}
+    >
+      {children}
+    </span>
+  )
+}
+
+function NavRow({
+  item,
+  active,
+  badge,
+}: {
+  item: NavItem
+  active: boolean
+  badge?: React.ReactNode
+}) {
+  const Icon = item.icon
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        render={<Link href={item.href} />}
+        isActive={active}
+        /* `!` overrides are deliberate: SidebarMenuButton's base cva sets
+           `h-8` and `[&_svg]:size-4`; the system wants 40px hit targets and
+           20px rail icons. */
+        className="!h-10 gap-3 rounded-full px-3 text-[15px] font-medium transition-colors duration-[var(--ws-motion-fast)] data-[active=true]:bg-ws-chip data-[active=true]:font-semibold [&_svg]:!size-5"
+      >
+        <Icon
+          size={20}
+          strokeWidth={2}
+          className={active ? "text-ws-gold" : "text-ws-muted"}
+        />
+        <span className="truncate">{item.title}</span>
+        {badge}
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  )
 }
 
 export function InstructorSidebar() {
@@ -151,20 +180,22 @@ export function InstructorSidebar() {
   const user = useUser()
   const unreadCount = useUnreadCount()
   const hasOngoingCall = useOngoingCall()
-  const callInfo = useActiveCallInfo()
-  const { activeMeetings, invites, hasActivity } = useSidebarActivity()
+  const { activeMeetings, invites } = useSidebarActivity()
+  const [appsOpen, setAppsOpen] = React.useState(false)
 
-  const userInitials = `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`.toUpperCase() || "U"
+  const userInitials =
+    `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`.toUpperCase() || "U"
+
+  const liveCount = activeMeetings.length + invites.length
 
   // Prefetch all navigation routes on mount for faster transitions
-  useEffect(() => {
-    const allRoutes = [
-      ...teachItems.map((item) => item.href),
-      ...connectItems.map((item) => item.href),
+  React.useEffect(() => {
+    const routes = [
+      ...teachItems.map((i) => i.href),
+      ...connectItems.map((i) => i.href),
+      "/dashboard",
     ]
-    allRoutes.forEach((route) => {
-      router.prefetch(route)
-    })
+    routes.forEach((r) => router.prefetch(r))
   }, [router])
 
   return (
@@ -172,134 +203,63 @@ export function InstructorSidebar() {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" render={<Link href="/instructor" />}>
+            {/* Brand mark matches the student sidebar: logo → public landing. */}
+            <SidebarMenuButton
+              size="lg"
+              render={<Link href="/home" aria-label="WorldStreet Academy home" />}
+              className="rounded-md transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-chip"
+            >
+              {/* Unified ecosystem lockup (05-screens): gold wsa-mark 26px +
+                  "WorldStreet" Poppins SemiBold 15 + gold app eyebrow. */}
               <Image
-                src="/worldstreet-logo/WorldStreet1x.png"
-                alt="WorldStreet Academy"
-                width={32}
-                height={32}
-                className="h-8 w-8 shrink-0 object-contain"
+                src="/brand/wsa-mark.png"
+                alt=""
+                width={26}
+                height={26}
+                className="h-[26px] w-[26px] shrink-0 object-contain"
               />
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">WorldStreet</span>
-                <span className="truncate text-xs text-muted-foreground">
-                  Instructor Portal
-                </span>
+              <div className="grid flex-1 text-left leading-tight">
+                <span className="truncate font-display text-[15px] font-semibold">WorldStreet</span>
+                <span className="truncate font-sans text-[10px] font-semibold uppercase tracking-[2px] text-ws-gold">Academy</span>
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent className="gap-1">
         <SidebarGroup>
-          <SidebarGroupLabel>Teach</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {teachItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    render={<Link href={item.href} />}
-                    isActive={isActive(item, pathname)}
-                  >
-                    <HugeiconsIcon icon={item.icon} size={18} />
-                    <span>{item.title}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                <NavRow key={item.title} item={item} active={isActive(item, pathname)} />
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {hasActivity && (
-          <>
-            <SidebarSeparator />
-            <SidebarGroup>
-              <SidebarGroupLabel>Activity</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {activeMeetings.slice(0, 3).map((m) => (
-                    <SidebarMenuItem key={m.id}>
-                      <SidebarMenuButton render={<Link href={`/instructor/meetings?join=${m.id}`} />}>
-                        <HugeiconsIcon icon={Video01Icon} size={18} className="text-muted-foreground" />
-                        <span className="truncate text-xs">{m.title.length > 18 ? m.title.slice(0, 18) + "..." : m.title}</span>
-                        <span className="ml-auto flex items-center -space-x-1.5 shrink-0">
-                          {m.participantAvatars?.slice(0, 4).map((p, i) => (
-                            <Avatar key={i} className="w-4 h-4 border border-sidebar-accent ring-1 ring-sidebar-accent">
-                              <AvatarImage src={p.avatar || ""} alt={p.name} />
-                              <AvatarFallback className="text-[6px]">
-                                {p.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
-                              </AvatarFallback>
-                            </Avatar>
-                          ))}
-                          {m.participantCount > 4 && (
-                            <span className="flex items-center justify-center w-4 h-4 rounded-full border border-sidebar-accent ring-1 ring-sidebar-accent bg-muted text-[6px] font-semibold text-muted-foreground">
-                              +{m.participantCount - 4}
-                            </span>
-                          )}
-                          {(!m.participantAvatars || m.participantAvatars.length === 0) && (
-                            <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                          )}
-                        </span>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                  {invites.slice(0, 2).map((inv) => (
-                    <SidebarMenuItem key={inv.id}>
-                      <SidebarMenuButton render={<Link href={`/instructor/meetings?join=${inv.meetingId}`} />}>
-                        <HugeiconsIcon icon={Video01Icon} size={18} className="text-muted-foreground" />
-                        <span className="truncate text-xs">{inv.title.length > 18 ? inv.title.slice(0, 18) + "..." : inv.title}</span>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          </>
-        )}
-
         <SidebarSeparator />
 
         <SidebarGroup>
-          <SidebarGroupLabel>Connect</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {connectItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    render={<Link href={item.href} />}
-                    isActive={isActive(item, pathname)}
-                  >
-                    <HugeiconsIcon icon={item.icon} size={18} />
-                    <span>{item.title}</span>
-                    {item.title === "Messages" && hasOngoingCall && callInfo && (
-                      <span className="ml-auto flex items-center -space-x-1.5 shrink-0">
-                        <Avatar className="w-5 h-5 border-2 border-sidebar-accent ring-1 ring-sidebar-accent">
-                          <AvatarImage src={user.avatarUrl || ""} />
-                          <AvatarFallback className="text-[7px] bg-primary/10 text-primary">
-                            {user.firstName?.[0]}{user.lastName?.[0]}
-                          </AvatarFallback>
-                        </Avatar>
-                        <Avatar className="w-5 h-5 border-2 border-sidebar-accent ring-1 ring-sidebar-accent">
-                          <AvatarImage src={callInfo.participantAvatar || ""} />
-                          <AvatarFallback className="text-[7px] bg-emerald-500/15 text-emerald-600">
-                            {callInfo.participantName?.[0]?.toUpperCase() || "?"}
-                          </AvatarFallback>
-                        </Avatar>
-                      </span>
-                    )}
-                    {item.title === "Messages" && hasOngoingCall && !callInfo && (
-                      <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-500/15 px-1.5">
-                        <HugeiconsIcon icon={Call02Icon} size={12} className="text-emerald-500" />
-                      </span>
-                    )}
-                    {item.title === "Messages" && !hasOngoingCall && unreadCount > 0 && (
-                      <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
-                        {unreadCount > 99 ? "99+" : unreadCount}
-                      </span>
-                    )}
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                <NavRow
+                  key={item.title}
+                  item={item}
+                  active={isActive(item, pathname)}
+                  badge={
+                    item.title === "Messages" ? (
+                      hasOngoingCall ? (
+                        <NavBadge tone="live">On call</NavBadge>
+                      ) : unreadCount > 0 ? (
+                        <NavBadge tone="brand">{unreadCount > 99 ? "99+" : unreadCount}</NavBadge>
+                      ) : undefined
+                    ) : item.title === "Meetings" && liveCount > 0 ? (
+                      <NavBadge tone="live">{liveCount} live</NavBadge>
+                    ) : undefined
+                  }
+                />
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
@@ -308,23 +268,51 @@ export function InstructorSidebar() {
         <SidebarSeparator />
 
         <SidebarGroup>
-          <SidebarGroupLabel>WorldStreet</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {worldstreetItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    render={
-                      <a href={item.href} target="_blank" rel="noopener noreferrer" />
-                    }
-                  >
-                    <HugeiconsIcon icon={item.icon} size={18} />
-                    <span>{item.title}</span>
-                    <HugeiconsIcon icon={Globe02Icon} size={12} className="ml-auto text-muted-foreground/40" />
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              <NavRow
+                item={{
+                  title: "Student Dashboard",
+                  href: "/dashboard",
+                  icon: LayoutDashboard,
+                }}
+                active={false}
+              />
             </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Cross-app links, collapsed behind one disclosure — a different
+            product surface that shouldn't take four rows from teaching nav. */}
+        <SidebarGroup className="group-data-[collapsible=icon]:hidden mt-auto">
+          <SidebarGroupContent>
+            <button
+              type="button"
+              onClick={() => setAppsOpen((v) => !v)}
+              aria-expanded={appsOpen}
+              className="flex h-10 w-full items-center gap-2 rounded-full px-3 text-[13px] font-medium text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-chip hover:text-ws-primary"
+            >
+              <span>WorldStreet apps</span>
+              <ChevronDown
+                size={14}
+                strokeWidth={2}
+                className={`ml-auto transition-transform duration-[var(--ws-motion-base)] ${appsOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+            {appsOpen && (
+              <SidebarMenu className="mt-1">
+                {worldstreetApps.map((app) => (
+                  <SidebarMenuItem key={app.title}>
+                    <SidebarMenuButton
+                      render={<a href={app.href} target="_blank" rel="noopener noreferrer" />}
+                      className="!h-10 rounded-full px-3 text-[13px] text-ws-muted"
+                    >
+                      <span className="truncate">{app.title}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            )}
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
@@ -333,39 +321,39 @@ export function InstructorSidebar() {
         <SidebarSeparator />
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton render={<Link href="/dashboard" />}>
-              <HugeiconsIcon icon={DashboardSpeed01Icon} size={18} />
-              <span>Student Dashboard</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <div className="flex items-center justify-between px-2 py-1.5">
-              <div className="flex items-center gap-2 min-w-0">
+            <div className="flex items-center justify-between gap-2 px-2 py-1.5">
+              <Link
+                href="/instructor/profile"
+                className="flex min-w-0 items-center gap-2 rounded-full transition-opacity hover:opacity-80"
+              >
                 <Avatar className="h-7 w-7 shrink-0">
-                  {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.firstName} />}
-                  <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                  {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt="" />}
+                  <AvatarFallback className="bg-ws-chip text-xs text-ws-primary">
                     {userInitials}
                   </AvatarFallback>
                 </Avatar>
-                <div className="grid flex-1 text-left text-sm leading-tight min-w-0">
-                  <span className="truncate font-medium text-xs">{user.firstName} {user.lastName}</span>
-                  <span className="truncate text-[10px] text-muted-foreground">
-                    {user.email}
+                <div className="grid min-w-0 flex-1 text-left leading-tight">
+                  <span className="truncate text-xs font-medium text-ws-primary">
+                    {user.firstName} {user.lastName}
                   </span>
+                  <span className="truncate text-[10px] text-ws-subtle">{user.email}</span>
                 </div>
+              </Link>
+              <div className="flex shrink-0 items-center">
+                <LogoutConfirmDialog>
+                  {(openLogout) => (
+                    <button
+                      type="button"
+                      onClick={openLogout}
+                      aria-label="Log out"
+                      className="flex h-9 w-9 items-center justify-center rounded-full text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-chip hover:text-ws-primary"
+                    >
+                      <LogOut size={16} strokeWidth={2} />
+                    </button>
+                  )}
+                </LogoutConfirmDialog>
               </div>
-              <ThemeToggle />
             </div>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <LogoutConfirmDialog>
-              {(openLogout) => (
-                <SidebarMenuButton render={<button type="button" onClick={openLogout} />}>
-                  <HugeiconsIcon icon={Logout01Icon} size={18} />
-                  <span>Log out</span>
-                </SidebarMenuButton>
-              )}
-            </LogoutConfirmDialog>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>

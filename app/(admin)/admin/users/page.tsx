@@ -31,7 +31,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { UserMultipleIcon } from "@hugeicons/core-free-icons"
+import { PageHeader } from "@/components/shared/page-header"
+import { StatTile } from "@/components/shared/stat-tile"
 import {
   adminListUsers,
   adminGetUserDetail,
@@ -41,6 +42,7 @@ import {
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import { formatDate, StatusBadge, FilterChips, Pagination } from "@/components/admin/shared"
 import { useUser } from "@/components/providers/user-provider"
+import { UsersIcon } from "lucide-react"
 
 type RoleFilter = "all" | "USER" | "INSTRUCTOR" | "ADMIN"
 type Role = "USER" | "INSTRUCTOR" | "ADMIN"
@@ -81,16 +83,18 @@ export default function AdminUsersPage() {
   const roleMutation = useMutation({
     mutationFn: ({ userId, newRole }: { userId: string; newRole: Role }) =>
       adminUpdateUserRole(userId, newRole),
-    onSuccess: (res) => {
+    onSuccess: (res, vars) => {
       if (!res.success) {
         setActionError(res.error ?? "Failed to update role")
       } else {
         setActionError(null)
         setPendingRole(null)
+        // Only reflect the new role locally once the server confirmed it.
+        setSelected((prev) =>
+          prev && prev.id === vars.userId ? { ...prev, role: vars.newRole } : prev
+        )
         queryClient.invalidateQueries({ queryKey: ["admin", "users"] })
-        if (selected) {
-          queryClient.invalidateQueries({ queryKey: queryKeys.adminUserDetail(selected.id) })
-        }
+        queryClient.invalidateQueries({ queryKey: queryKeys.adminUserDetail(vars.userId) })
       }
     },
   })
@@ -98,13 +102,12 @@ export default function AdminUsersPage() {
   return (
     <>
       <Topbar variant="admin" />
-      <div className="p-4 sm:p-6 space-y-4 pb-24 md:pb-6">
-        <div>
-          <h1 className="text-lg font-semibold">Users</h1>
-          <p className="text-sm text-muted-foreground">
-            {data ? `${data.total.toLocaleString()} accounts` : "Search and manage accounts."}
-          </p>
-        </div>
+      <div className="flex-1 px-6 pb-24 pt-8 md:px-8 md:pb-12 lg:px-12">
+        <div className="mx-auto w-full max-w-7xl space-y-8">
+        <PageHeader
+          title="Users"
+          subline={data ? `${data.total.toLocaleString()} accounts` : "Search and manage accounts."}
+        />
 
         <div className="flex items-center gap-3 flex-wrap">
           <Input
@@ -114,7 +117,7 @@ export default function AdminUsersPage() {
               setPage(1)
             }}
             placeholder="Search name, email or username…"
-            className="max-w-xs h-8 text-xs"
+            className="max-w-xs h-10 text-sm"
           />
           <FilterChips
             value={role}
@@ -134,18 +137,18 @@ export default function AdminUsersPage() {
         {isLoading ? (
           <div className="space-y-2">
             {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-14 rounded-xl" />
+              <Skeleton key={i} className="h-14 rounded-lg" />
             ))}
           </div>
         ) : !data || data.users.length === 0 ? (
           <EmptyState
-            icon={UserMultipleIcon}
+            icon={UsersIcon}
             title="No users found"
             description="Try a different search or filter."
           />
         ) : (
           <>
-            <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
+            <div className="rounded-lg border border-ws-hairline bg-ws-surface overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -167,7 +170,7 @@ export default function AdminUsersPage() {
                         <div className="flex items-center gap-2.5 min-w-0">
                           <Avatar className="h-7 w-7 shrink-0">
                             {u.avatarUrl && <AvatarImage src={u.avatarUrl} />}
-                            <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                            <AvatarFallback className="text-[10px] bg-ws-chip text-ws-primary">
                               {u.name[0]?.toUpperCase() ?? "?"}
                             </AvatarFallback>
                           </Avatar>
@@ -210,6 +213,7 @@ export default function AdminUsersPage() {
             <Pagination page={data.page} pageCount={data.pageCount} onPageChange={setPage} />
           </>
         )}
+        </div>
       </div>
 
       {/* User detail sheet */}
@@ -221,7 +225,7 @@ export default function AdminUsersPage() {
                 <SheetTitle className="flex items-center gap-3">
                   <Avatar className="h-10 w-10">
                     {selected.avatarUrl && <AvatarImage src={selected.avatarUrl} />}
-                    <AvatarFallback className="bg-primary/10 text-primary">
+                    <AvatarFallback className="bg-ws-chip text-ws-primary">
                       {selected.name[0]?.toUpperCase() ?? "?"}
                     </AvatarFallback>
                   </Avatar>
@@ -248,26 +252,17 @@ export default function AdminUsersPage() {
                 </div>
 
                 {detail && (
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div className="rounded-lg bg-muted/50 py-2">
-                      <p className="text-sm font-semibold">{detail.enrollmentCount}</p>
-                      <p className="text-[10px] text-muted-foreground">Enrollments</p>
-                    </div>
-                    <div className="rounded-lg bg-muted/50 py-2">
-                      <p className="text-sm font-semibold">{detail.orderCount}</p>
-                      <p className="text-[10px] text-muted-foreground">Orders</p>
-                    </div>
-                    <div className="rounded-lg bg-muted/50 py-2">
-                      <p className="text-sm font-semibold">{detail.coursesOwned}</p>
-                      <p className="text-[10px] text-muted-foreground">Courses</p>
-                    </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <StatTile label="Enrolled" value={detail.enrollmentCount} className="p-3" />
+                    <StatTile label="Orders" value={detail.orderCount} className="p-3" />
+                    <StatTile label="Courses" value={detail.coursesOwned} className="p-3" />
                   </div>
                 )}
 
                 {detail?.latestApplication && (
                   <a
                     href={`/admin/applications/${detail.latestApplication.id}`}
-                    className="block rounded-lg border border-border/60 px-3 py-2 hover:bg-muted/50 transition-colors"
+                    className="block rounded-lg border border-ws-hairline px-3 py-2 hover:bg-ws-raised transition-colors"
                   >
                     <p className="text-xs font-medium">Latest instructor application</p>
                     <p className="text-[11px] text-muted-foreground capitalize">
@@ -278,10 +273,10 @@ export default function AdminUsersPage() {
                 )}
 
                 {/* Role management */}
-                <div className="space-y-2 pt-2 border-t border-border/50">
+                <div className="space-y-2 pt-2 border-t border-ws-hairline">
                   <p className="text-xs font-semibold">Change role</p>
                   {selected.id === me.id ? (
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-[11px] text-ws-muted">
                       You can&apos;t change your own role.
                     </p>
                   ) : (
@@ -303,7 +298,7 @@ export default function AdminUsersPage() {
                       ))}
                     </div>
                   )}
-                  {actionError && <p className="text-xs text-destructive">{actionError}</p>}
+                  {actionError && <p className="text-xs text-ws-danger">{actionError}</p>}
                 </div>
               </div>
             </>
@@ -330,6 +325,9 @@ export default function AdminUsersPage() {
               )}
             </DialogDescription>
           </DialogHeader>
+          {/* Error surfaces inside the dialog — previously it rendered in the
+              sheet, hidden behind this modal. */}
+          {actionError && <p className="text-xs text-ws-danger">{actionError}</p>}
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setPendingRole(null)}>
               Cancel
@@ -341,7 +339,6 @@ export default function AdminUsersPage() {
               onClick={() => {
                 if (selected && pendingRole) {
                   roleMutation.mutate({ userId: selected.id, newRole: pendingRole })
-                  setSelected((prev) => (prev ? { ...prev, role: pendingRole } : prev))
                 }
               }}
             >

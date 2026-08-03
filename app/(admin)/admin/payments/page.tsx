@@ -25,7 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { DollarCircleIcon } from "@hugeicons/core-free-icons"
+import { PageHeader } from "@/components/shared/page-header"
 import {
   adminListOrders,
   adminGetOrderDetail,
@@ -42,6 +42,7 @@ import {
   FilterChips,
   Pagination,
 } from "@/components/admin/shared"
+import { CircleDollarSignIcon } from "lucide-react"
 
 /* ═════════════ Orders tab ═════════════ */
 
@@ -104,18 +105,18 @@ function OrdersTab() {
       {isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-14 rounded-xl" />
+            <Skeleton key={i} className="h-14 rounded-lg" />
           ))}
         </div>
       ) : !data || data.orders.length === 0 ? (
         <EmptyState
-          icon={DollarCircleIcon}
+          icon={CircleDollarSignIcon}
           title="No orders"
           description="No orders match this filter."
         />
       ) : (
         <>
-          <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
+          <div className="rounded-lg border border-ws-hairline bg-ws-surface overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -131,7 +132,7 @@ function OrdersTab() {
                   <TableRow key={o.id} className="cursor-pointer" onClick={() => setSelectedId(o.id)}>
                     <TableCell>
                       <p className="font-medium truncate max-w-[180px]">{o.courseTitle}</p>
-                      <p className="text-[10px] text-muted-foreground font-mono truncate max-w-[180px]">
+                      <p className="text-[10px] text-muted-foreground tabular-nums truncate max-w-[180px]">
                         {o.reference}
                       </p>
                     </TableCell>
@@ -176,13 +177,13 @@ function OrdersTab() {
 
               <div className="space-y-3 text-xs">
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="rounded-lg bg-muted/50 px-2.5 py-2">
+                  <div className="rounded-lg bg-ws-raised px-2.5 py-2">
                     <p className="text-muted-foreground text-[10px]">Amount</p>
-                    <p className="font-semibold text-sm">
+                    <p className="font-semibold text-sm tabular-nums">
                       {money(detail.amountMinor, detail.currency)}
                     </p>
                   </div>
-                  <div className="rounded-lg bg-muted/50 px-2.5 py-2">
+                  <div className="rounded-lg bg-ws-raised px-2.5 py-2">
                     <p className="text-muted-foreground text-[10px]">Enrollment</p>
                     <p className="font-medium capitalize">
                       {detail.enrollment ? detail.enrollment.status : "none"}
@@ -192,16 +193,16 @@ function OrdersTab() {
 
                 <div>
                   <p className="text-[10px] text-muted-foreground mb-1">Reference / charge</p>
-                  <p className="font-mono text-[10px] break-all">{detail.reference}</p>
+                  <p className="tabular-nums text-[10px] break-all">{detail.reference}</p>
                   {detail.chargeId && (
-                    <p className="font-mono text-[10px] break-all text-muted-foreground">
+                    <p className="tabular-nums text-[10px] break-all text-muted-foreground">
                       {detail.chargeId}
                     </p>
                   )}
                 </div>
 
                 {detail.earning && (
-                  <div className="rounded-lg border border-border/60 px-2.5 py-2 flex items-center justify-between">
+                  <div className="rounded-lg border border-ws-hairline px-2.5 py-2 flex items-center justify-between">
                     <span className="text-muted-foreground">Instructor earning</span>
                     <span className="flex items-center gap-2">
                       {money(detail.earning.netMinor)}
@@ -215,7 +216,7 @@ function OrdersTab() {
                   <div className="space-y-1.5">
                     {detail.history.map((h, i) => (
                       <div key={i} className="flex items-start gap-2">
-                        <span className="h-1.5 w-1.5 rounded-full bg-primary mt-1 shrink-0" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-ws-brand mt-1 shrink-0" />
                         <div>
                           <span className="font-medium capitalize">
                             {h.status.replace(/_/g, " ")}
@@ -286,7 +287,7 @@ function OrdersTab() {
             placeholder="Reason (required, kept in the audit trail)…"
             className="text-xs min-h-16"
           />
-          {refundError && <p className="text-xs text-destructive">{refundError}</p>}
+          {refundError && <p className="text-xs text-ws-danger">{refundError}</p>}
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setRefundOpen(false)}>
               Cancel
@@ -340,18 +341,18 @@ function EarningsTab() {
       {isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 rounded-xl" />
+            <Skeleton key={i} className="h-12 rounded-lg" />
           ))}
         </div>
       ) : !data || data.earnings.length === 0 ? (
         <EmptyState
-          icon={DollarCircleIcon}
+          icon={CircleDollarSignIcon}
           title="No earnings rows"
           description="No instructor earnings match this filter."
         />
       ) : (
         <>
-          <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
+          <div className="rounded-lg border border-ws-hairline bg-ws-surface overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -380,7 +381,7 @@ function EarningsTab() {
                       <StatusBadge status={e.status} />
                     </TableCell>
                     <TableCell
-                      className={`text-right font-semibold ${e.netMinor < 0 ? "text-destructive" : ""}`}
+                      className={`text-right font-semibold tabular-nums ${e.netMinor < 0 ? "text-ws-danger" : ""}`}
                     >
                       {money(e.netMinor)}
                     </TableCell>
@@ -421,14 +422,14 @@ function ReconcileTab() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-border/60 bg-card p-4 space-y-2">
+      <div className="rounded-lg border border-ws-hairline bg-ws-surface p-4 space-y-2">
         <h3 className="text-sm font-semibold">Wallet reconciliation</h3>
         <p className="text-xs text-muted-foreground leading-relaxed">
           Compares academy orders against the central wallet&apos;s charge records: missing
           charges, amount drift, refunded charges still granting access, and orphaned charges.
           This report is <span className="font-medium text-foreground">read-only</span> — to
           repair access drift, run{" "}
-          <code className="text-[10px] bg-muted px-1 py-0.5 rounded">
+          <code className="text-[10px] bg-ws-raised px-1 py-0.5 rounded-xs">
             node scripts/reconcile-orders.mjs --heal
           </code>{" "}
           from ops.
@@ -439,12 +440,12 @@ function ReconcileTab() {
       </div>
 
       {result && (
-        <div className="rounded-xl border border-border/60 bg-card p-4 space-y-2">
+        <div className="rounded-lg border border-ws-hairline bg-ws-surface p-4 space-y-2">
           {result.error ? (
-            <p className="text-xs text-destructive">{result.error}</p>
+            <p className="text-xs text-ws-danger">{result.error}</p>
           ) : result.findings.length === 0 ? (
-            <p className="text-xs text-emerald-600 font-medium">
-              ✓ Clean — {result.checkedOrders} orders agree with the wallet service.
+            <p className="text-xs text-ws-success font-medium">
+              Clean — {result.checkedOrders} orders agree with the wallet service.
             </p>
           ) : (
             <>
@@ -457,10 +458,10 @@ function ReconcileTab() {
                   <div key={i} className="flex items-start gap-2 text-xs">
                     <span
                       className={`h-1.5 w-1.5 rounded-full mt-1.5 shrink-0 ${
-                        f.severity === "error" ? "bg-destructive" : "bg-orange-400"
+                        f.severity === "error" ? "bg-ws-danger" : "bg-ws-rating"
                       }`}
                     />
-                    <p className="font-mono text-[11px] break-all">{f.message}</p>
+                    <p className="tabular-nums text-[11px] break-all">{f.message}</p>
                   </div>
                 ))}
               </div>
@@ -478,13 +479,12 @@ export default function AdminPaymentsPage() {
   return (
     <>
       <Topbar variant="admin" />
-      <div className="p-4 sm:p-6 space-y-4 pb-24 md:pb-6">
-        <div>
-          <h1 className="text-lg font-semibold">Payments</h1>
-          <p className="text-sm text-muted-foreground">
-            Orders, instructor earnings and wallet reconciliation.
-          </p>
-        </div>
+      <div className="flex-1 px-6 pb-24 pt-8 md:px-8 md:pb-12 lg:px-12">
+        <div className="mx-auto w-full max-w-7xl space-y-8">
+        <PageHeader
+          title="Payments"
+          subline="Orders, instructor earnings and wallet reconciliation."
+        />
 
         <Tabs defaultValue="orders">
           <TabsList>
@@ -502,6 +502,7 @@ export default function AdminPaymentsPage() {
             <ReconcileTab />
           </TabsContent>
         </Tabs>
+        </div>
       </div>
     </>
   )

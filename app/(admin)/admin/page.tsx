@@ -3,46 +3,14 @@
 import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
 import { Topbar } from "@/components/platform/topbar"
-import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  UserMultipleIcon,
-  TeachingIcon,
-  BookOpen01Icon,
-  DollarCircleIcon,
-} from "@hugeicons/core-free-icons"
+import { PageHeader } from "@/components/shared/page-header"
+import { StatTile } from "@/components/shared/stat-tile"
+import { BookOpen, CircleDollarSign, Inbox, Users } from "lucide-react"
 import { getAdminOverview } from "@/lib/actions/admin-overview"
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import { money, formatDateTime, StatusBadge } from "@/components/admin/shared"
-
-function StatCard({
-  label,
-  value,
-  sub,
-  icon,
-}: {
-  label: string
-  value: string
-  sub?: string
-  icon: typeof UserMultipleIcon
-}) {
-  return (
-    <Card>
-      <CardContent className="p-4 flex items-start justify-between">
-        <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">{label}</p>
-          <p className="text-xl font-semibold">{value}</p>
-          {sub && <p className="text-[11px] text-muted-foreground">{sub}</p>}
-        </div>
-        <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-          <HugeiconsIcon icon={icon} size={16} />
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
 
 export default function AdminOverviewPage() {
   const { data, isLoading } = useQuery({
@@ -53,57 +21,56 @@ export default function AdminOverviewPage() {
   return (
     <>
       <Topbar variant="admin" title="Admin" />
-      <div className="p-4 sm:p-6 space-y-6 pb-24 md:pb-6">
-        <div>
-          <h1 className="text-lg font-semibold">Platform overview</h1>
-          <p className="text-sm text-muted-foreground">
-            Users, money and instructor pipeline at a glance.
-          </p>
-        </div>
+      <div className="flex-1 px-6 pb-24 pt-8 md:px-8 md:pb-12 lg:px-12">
+        <div className="mx-auto w-full max-w-7xl space-y-8">
+          <PageHeader
+            title="Platform overview"
+            subline="Users, money and instructor pipeline at a glance."
+          />
 
-        {isLoading || !data ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <Skeleton key={i} className="h-24 rounded-xl" />
-            ))}
-          </div>
-        ) : (
-          <>
+          {isLoading || !data ? (
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <StatCard
-                label="Users"
-                value={data.totals.users.toLocaleString()}
-                sub={`${data.totals.instructors} instructors`}
-                icon={UserMultipleIcon}
-              />
-              <StatCard
-                label="Pending applications"
-                value={data.totals.pendingApplications.toLocaleString()}
-                sub={`30d: ${data.funnel.submitted30d} in · ${data.funnel.approved30d}✓ ${data.funnel.rejected30d}✗${
-                  data.funnel.approvalRatePct != null ? ` · ${data.funnel.approvalRatePct}% approved` : ""
-                }`}
-                icon={TeachingIcon}
-              />
-              <StatCard
-                label="Published courses"
-                value={data.totals.publishedCourses.toLocaleString()}
-                sub={`${data.totals.activeEnrollments.toLocaleString()} active enrollments`}
-                icon={BookOpen01Icon}
-              />
-              <StatCard
-                label="Gross revenue"
-                value={money(data.totals.grossRevenueMinor)}
-                sub={`${money(data.totals.pendingEarningsMinor)} pending · ${money(data.totals.clearedEarningsMinor)} cleared to instructors`}
-                icon={DollarCircleIcon}
-              />
+              {Array.from({ length: 8 }).map((_, i) => (
+                <Skeleton key={i} className="h-24 rounded-lg" />
+              ))}
             </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <StatTile
+                  label="Users"
+                  value={data.totals.users.toLocaleString()}
+                  context={`${data.totals.instructors} instructors`}
+                  icon={<Users size={20} strokeWidth={2} />}
+                />
+                <StatTile
+                  label="Pending applications"
+                  value={data.totals.pendingApplications.toLocaleString()}
+                  context={`30d: ${data.funnel.submitted30d} in · ${data.funnel.approved30d} approved · ${data.funnel.rejected30d} rejected${
+                    data.funnel.approvalRatePct != null ? ` · ${data.funnel.approvalRatePct}% approved` : ""
+                  }`}
+                  icon={<Inbox size={20} strokeWidth={2} />}
+                />
+                <StatTile
+                  label="Published courses"
+                  value={data.totals.publishedCourses.toLocaleString()}
+                  context={`${data.totals.activeEnrollments.toLocaleString()} active enrollments`}
+                  icon={<BookOpen size={20} strokeWidth={2} />}
+                />
+                <StatTile
+                  label="Gross revenue"
+                  value={money(data.totals.grossRevenueMinor)}
+                  context={`${money(data.totals.pendingEarningsMinor)} pending · ${money(data.totals.clearedEarningsMinor)} cleared to instructors`}
+                  icon={<CircleDollarSign size={20} strokeWidth={2} />}
+                  tone="gold"
+                />
+              </div>
 
-            {/* 14-day revenue */}
-            <Card>
-              <CardContent className="p-4">
+              {/* 14-day revenue */}
+              <div className="rounded-lg border border-ws-hairline bg-ws-surface p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-sm font-semibold">Revenue — last 14 days</h2>
-                  <span className="text-xs text-muted-foreground">
+                  <h2 className="text-sm font-semibold text-ws-primary">Revenue — last 14 days</h2>
+                  <span className="text-xs tabular-nums text-ws-muted">
                     {money(data.revenueByDay.reduce((s, d) => s + d.minor, 0))} total
                   </span>
                 </div>
@@ -113,16 +80,16 @@ export default function AdminOverviewPage() {
                     <div className="flex items-end gap-1.5 h-24">
                       {data.revenueByDay.map((d) => (
                         <div key={d.date} className="flex-1 flex flex-col items-center gap-1 group/bar">
-                          <span className="text-[8px] text-muted-foreground opacity-0 group-hover/bar:opacity-100 transition-opacity">
+                          <span className="text-[8px] tabular-nums text-ws-muted opacity-0 group-hover/bar:opacity-100 transition-opacity">
                             {d.minor > 0 ? money(d.minor) : ""}
                           </span>
                           <div
                             className={`w-full rounded-t-md transition-colors ${
-                              d.minor > 0 ? "bg-primary/70 group-hover/bar:bg-primary" : "bg-muted"
+                              d.minor > 0 ? "bg-ws-brand" : "bg-ws-track"
                             }`}
                             style={{ height: `${Math.max(3, (d.minor / max) * 100)}%` }}
                           />
-                          <span className="text-[8px] text-muted-foreground/70">
+                          <span className="text-[8px] tabular-nums text-ws-subtle">
                             {new Date(d.date + "T00:00:00").toLocaleDateString("en-US", { day: "numeric" })}
                           </span>
                         </div>
@@ -130,24 +97,22 @@ export default function AdminOverviewPage() {
                     </div>
                   )
                 })()}
-              </CardContent>
-            </Card>
+              </div>
 
-            <div className="grid lg:grid-cols-2 gap-4">
-              {/* Recent applications */}
-              <Card>
-                <CardContent className="p-4">
+              <div className="grid lg:grid-cols-2 gap-4">
+                {/* Recent applications */}
+                <div className="rounded-lg border border-ws-hairline bg-ws-surface p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-sm font-semibold">Recent applications</h2>
+                    <h2 className="text-sm font-semibold text-ws-primary">Recent applications</h2>
                     <Link
                       href="/admin/applications"
-                      className="text-xs text-primary hover:underline"
+                      className="text-xs font-medium text-ws-muted transition-colors hover:text-ws-primary"
                     >
                       View all
                     </Link>
                   </div>
                   {data.recentApplications.length === 0 ? (
-                    <p className="text-xs text-muted-foreground py-6 text-center">
+                    <p className="text-xs text-ws-muted py-6 text-center">
                       No applications yet.
                     </p>
                   ) : (
@@ -156,17 +121,17 @@ export default function AdminOverviewPage() {
                         <Link
                           key={a.id}
                           href={`/admin/applications/${a.id}`}
-                          className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-muted/50 transition-colors"
+                          className="flex items-center gap-3 rounded-sm px-2 py-2 transition-colors hover:bg-ws-raised"
                         >
                           <Avatar className="h-7 w-7">
                             {a.applicantAvatar && <AvatarImage src={a.applicantAvatar} />}
-                            <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                            <AvatarFallback className="text-[10px] bg-ws-chip text-ws-primary">
                               {a.applicantName[0]?.toUpperCase() ?? "?"}
                             </AvatarFallback>
                           </Avatar>
                           <div className="min-w-0 flex-1">
-                            <p className="text-xs font-medium truncate">{a.applicantName}</p>
-                            <p className="text-[11px] text-muted-foreground truncate">
+                            <p className="text-xs font-medium truncate text-ws-primary">{a.applicantName}</p>
+                            <p className="text-[11px] text-ws-muted truncate">
                               {a.headline}
                             </p>
                           </div>
@@ -175,20 +140,21 @@ export default function AdminOverviewPage() {
                       ))}
                     </div>
                   )}
-                </CardContent>
-              </Card>
+                </div>
 
-              {/* Recent payment events */}
-              <Card>
-                <CardContent className="p-4">
+                {/* Recent payment events */}
+                <div className="rounded-lg border border-ws-hairline bg-ws-surface p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-sm font-semibold">Recent payment events</h2>
-                    <Link href="/admin/payments" className="text-xs text-primary hover:underline">
+                    <h2 className="text-sm font-semibold text-ws-primary">Recent payment events</h2>
+                    <Link
+                      href="/admin/payments"
+                      className="text-xs font-medium text-ws-muted transition-colors hover:text-ws-primary"
+                    >
                       View all
                     </Link>
                   </div>
                   {data.recentPaymentEvents.length === 0 ? (
-                    <p className="text-xs text-muted-foreground py-6 text-center">
+                    <p className="text-xs text-ws-muted py-6 text-center">
                       No payment events yet.
                     </p>
                   ) : (
@@ -196,28 +162,28 @@ export default function AdminOverviewPage() {
                       {data.recentPaymentEvents.map((e) => (
                         <div
                           key={e.id}
-                          className="flex items-center justify-between gap-3 rounded-lg px-2 py-2"
+                          className="flex items-center justify-between gap-3 rounded-sm px-2 py-2"
                         >
                           <div className="min-w-0">
-                            <p className="text-xs font-medium truncate">
+                            <p className="text-xs font-medium truncate capitalize text-ws-primary">
                               {e.type.replace(/_/g, " ")}
                             </p>
-                            <p className="text-[10px] text-muted-foreground font-mono truncate">
+                            <p className="text-[10px] text-ws-muted tabular-nums truncate">
                               {e.reference}
                             </p>
                           </div>
-                          <span className="text-[10px] text-muted-foreground shrink-0">
+                          <span className="text-[10px] text-ws-subtle shrink-0">
                             {formatDateTime(e.createdAt)}
                           </span>
                         </div>
                       ))}
                     </div>
                   )}
-                </CardContent>
-              </Card>
-            </div>
-          </>
-        )}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </>
   )

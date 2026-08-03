@@ -4,10 +4,10 @@ import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { Clock01Icon, CheckmarkCircle02Icon } from "@hugeicons/core-free-icons"
 import { getStudentExamStatus } from "@/lib/actions/exams"
 import { queryKeys } from "@/lib/hooks/queries/keys"
+import { CircleCheckBigIcon, ClockIcon } from "lucide-react"
+import { RenderIcon } from "@/components/shared/render-icon"
 
 /**
  * Knowledge-check card under a lesson — renders only when the lesson has a
@@ -26,17 +26,17 @@ export function LessonQuizCard({ courseId, lessonId }: { courseId: string; lesso
 
   return (
     <div
-      className={`rounded-xl border p-4 flex items-center justify-between gap-3 flex-wrap ${
-        passed ? "border-emerald-500/30 bg-emerald-500/5" : "border-primary/25 bg-primary/[0.04]"
+      className={`rounded-lg border p-4 flex items-center justify-between gap-3 flex-wrap ${
+        passed ? "border-ws-success/30 bg-ws-success/5" : "border-primary/25 bg-primary/[0.04]"
       }`}
     >
       <div className="flex items-center gap-3 min-w-0">
         <div
-          className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ${
-            passed ? "bg-emerald-500/10 text-emerald-600" : "bg-primary/10 text-primary"
+          className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${
+            passed ? "bg-ws-success/10 text-ws-success" : "bg-primary/10 text-primary"
           }`}
         >
-          <HugeiconsIcon icon={passed ? CheckmarkCircle02Icon : Clock01Icon} size={18} />
+          <RenderIcon icon={passed ? CircleCheckBigIcon : ClockIcon}  size={18} />
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -45,7 +45,7 @@ export function LessonQuizCard({ courseId, lessonId }: { courseId: string; lesso
             </p>
             <Badge variant="secondary" className="text-[9px]">knowledge check</Badge>
             {passed && (
-              <Badge className="text-[9px] bg-emerald-600 hover:bg-emerald-600">
+              <Badge className="text-[9px] bg-ws-success hover:bg-ws-success/90">
                 passed{status.bestScorePercent != null ? ` · ${status.bestScorePercent}%` : ""}
               </Badge>
             )}

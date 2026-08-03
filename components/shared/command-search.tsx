@@ -14,29 +14,18 @@ import {
   SheetContent,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  Search01Icon,
-  Home01Icon,
-  BookOpen01Icon,
-  Bookmark01Icon,
-  UserIcon,
-  Settings01Icon,
-  Logout01Icon,
-  Sun03Icon,
-  Moon02Icon,
-  Analytics01Icon,
-} from "@hugeicons/core-free-icons"
-import type { IconSvgElement } from "@hugeicons/react"
 import { type BrowseCourse } from "@/lib/actions/student"
 import { useBrowseCourses } from "@/lib/hooks/queries"
+import { BookOpenIcon, BookmarkIcon, ChartNoAxesColumnIcon, HouseIcon, LogOutIcon, MoonIcon, SearchIcon, SettingsIcon, SunIcon, UserIcon } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
+import { RenderIcon } from "@/components/shared/render-icon"
 
 /* ── Types ────────────────────────────────────────────── */
 type CommandItem = {
   id: string
   label: string
   description?: string
-  icon: IconSvgElement
+  icon: LucideIcon
   thumbnail?: string | null
   action: () => void
   section: "courses" | "pages" | "tools"
@@ -52,7 +41,7 @@ function useCommandItems(courses: BrowseCourse[], isInstructor: boolean) {
       id: "page-dashboard",
       label: "Dashboard",
       description: "Go to your dashboard",
-      icon: Home01Icon,
+      icon: HouseIcon,
       action: () => router.push("/dashboard"),
       section: "pages",
     },
@@ -60,7 +49,7 @@ function useCommandItems(courses: BrowseCourse[], isInstructor: boolean) {
       id: "page-my-courses",
       label: "My Courses",
       description: "View enrolled courses",
-      icon: BookOpen01Icon,
+      icon: BookOpenIcon,
       action: () => router.push("/dashboard/my-courses"),
       section: "pages",
     },
@@ -68,7 +57,7 @@ function useCommandItems(courses: BrowseCourse[], isInstructor: boolean) {
       id: "page-browse",
       label: "Browse Courses",
       description: "Explore the course catalog",
-      icon: Search01Icon,
+      icon: SearchIcon,
       action: () => router.push("/dashboard/courses"),
       section: "pages",
     },
@@ -76,7 +65,7 @@ function useCommandItems(courses: BrowseCourse[], isInstructor: boolean) {
       id: "page-bookmarks",
       label: "Bookmarks",
       description: "Your saved courses",
-      icon: Bookmark01Icon,
+      icon: BookmarkIcon,
       action: () => router.push("/dashboard/bookmarks"),
       section: "pages",
     },
@@ -92,7 +81,7 @@ function useCommandItems(courses: BrowseCourse[], isInstructor: boolean) {
       id: "page-settings",
       label: "Settings",
       description: "Account settings",
-      icon: Settings01Icon,
+      icon: SettingsIcon,
       action: () => router.push("/dashboard/settings"),
       section: "pages",
     },
@@ -100,7 +89,7 @@ function useCommandItems(courses: BrowseCourse[], isInstructor: boolean) {
       id: "page-instructor",
       label: "Instructor Dashboard",
       description: "Switch to instructor view",
-      icon: Analytics01Icon,
+      icon: ChartNoAxesColumnIcon,
       action: () => router.push("/instructor"),
       section: "pages",
     },
@@ -111,7 +100,7 @@ function useCommandItems(courses: BrowseCourse[], isInstructor: boolean) {
       id: "page-instructor-dashboard",
       label: "Instructor Dashboard",
       description: "View analytics and stats",
-      icon: Analytics01Icon,
+      icon: ChartNoAxesColumnIcon,
       action: () => router.push("/instructor"),
       section: "pages",
     },
@@ -119,7 +108,7 @@ function useCommandItems(courses: BrowseCourse[], isInstructor: boolean) {
       id: "page-my-courses",
       label: "My Courses",
       description: "Manage your courses",
-      icon: BookOpen01Icon,
+      icon: BookOpenIcon,
       action: () => router.push("/instructor/courses"),
       section: "pages",
     },
@@ -127,7 +116,7 @@ function useCommandItems(courses: BrowseCourse[], isInstructor: boolean) {
       id: "page-certificates",
       label: "Certificates & Ratings",
       description: "View student certificates",
-      icon: Bookmark01Icon,
+      icon: BookmarkIcon,
       action: () => router.push("/instructor/certificates"),
       section: "pages",
     },
@@ -135,7 +124,7 @@ function useCommandItems(courses: BrowseCourse[], isInstructor: boolean) {
       id: "page-new-course",
       label: "Create New Course",
       description: "Start a new course",
-      icon: Settings01Icon,
+      icon: SettingsIcon,
       action: () => router.push("/instructor/courses/new"),
       section: "pages",
     },
@@ -143,7 +132,7 @@ function useCommandItems(courses: BrowseCourse[], isInstructor: boolean) {
       id: "page-settings",
       label: "Settings",
       description: "Instructor settings",
-      icon: Settings01Icon,
+      icon: SettingsIcon,
       action: () => router.push("/instructor/settings"),
       section: "pages",
     },
@@ -151,7 +140,7 @@ function useCommandItems(courses: BrowseCourse[], isInstructor: boolean) {
       id: "page-student-view",
       label: "Student Dashboard",
       description: "Switch to student view",
-      icon: Home01Icon,
+      icon: HouseIcon,
       action: () => router.push("/dashboard"),
       section: "pages",
     },
@@ -164,7 +153,7 @@ function useCommandItems(courses: BrowseCourse[], isInstructor: boolean) {
       id: "tool-dark-mode",
       label: resolvedTheme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode",
       description: "Toggle color theme",
-      icon: resolvedTheme === "dark" ? Sun03Icon : Moon02Icon,
+      icon: resolvedTheme === "dark" ? SunIcon : MoonIcon,
       action: () => setTheme(resolvedTheme === "dark" ? "light" : "dark"),
       section: "tools",
     },
@@ -172,7 +161,7 @@ function useCommandItems(courses: BrowseCourse[], isInstructor: boolean) {
       id: "tool-logout",
       label: "Log Out",
       description: "Sign out of your account",
-      icon: Logout01Icon,
+      icon: LogOutIcon,
       action: () => {
         // TODO: implement real logout
         router.push("/")
@@ -185,7 +174,7 @@ function useCommandItems(courses: BrowseCourse[], isInstructor: boolean) {
     id: `course-${c.id}`,
     label: c.title,
     description: `${c.instructorName} · ${c.totalLessons} lessons`,
-    icon: BookOpen01Icon,
+    icon: BookOpenIcon,
     thumbnail: c.thumbnailUrl,
     action: () => router.push(`/dashboard/courses/${c.id}`),
     section: "courses" as const,
@@ -231,8 +220,8 @@ function CommandList({
   if (items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-14 text-center">
-        <div className="h-10 w-10 rounded-xl bg-muted/50 flex items-center justify-center mb-3">
-          <HugeiconsIcon icon={Search01Icon} size={18} className="text-muted-foreground/50" />
+        <div className="h-10 w-10 rounded-lg bg-muted/50 flex items-center justify-center mb-3">
+          <SearchIcon  size={18} className="text-muted-foreground/50" />
         </div>
         <p className="text-sm text-muted-foreground">No results found</p>
         {query && <p className="text-[11px] text-muted-foreground/60 mt-1">Try a different search term</p>}
@@ -258,7 +247,7 @@ function CommandList({
                 data-active={isActive}
                 onClick={() => onSelect(item)}
                 onMouseEnter={() => setActiveIndex(idx)}
-                className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition-all duration-150 ${
+                className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition-all duration-[var(--ws-motion-fast)] ${
                   isActive
                     ? "bg-accent/80 text-accent-foreground"
                     : "text-foreground/80 hover:bg-accent/40"
@@ -280,11 +269,10 @@ function CommandList({
                       isActive ? "bg-foreground/10" : "bg-muted/50"
                     }`}
                   >
-                    <HugeiconsIcon
-                      icon={item.icon}
+                    <RenderIcon icon={item.icon}
+                      
                       size={14}
-                      className={isActive ? "text-accent-foreground" : "text-muted-foreground/70"}
-                    />
+                      className={isActive ? "text-accent-foreground" : "text-muted-foreground/70"} />
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
@@ -296,7 +284,7 @@ function CommandList({
                   )}
                 </div>
                 {isActive && (
-                  <kbd className="text-[9px] hidden sm:inline-flex items-center rounded border border-border/40 bg-muted/50 px-1 py-0.5 font-mono text-muted-foreground/60">↵</kbd>
+                  <kbd className="text-[9px] hidden sm:inline-flex items-center rounded border border-ws-hairline bg-muted/50 px-1 py-0.5 tabular-nums text-muted-foreground/60">↵</kbd>
                 )}
               </button>
             )
@@ -322,8 +310,8 @@ function SearchInput({
   showEsc?: boolean
 }) {
   return (
-    <div className="flex items-center gap-3 border-b border-border/50 px-4 py-2.5">
-      <HugeiconsIcon icon={Search01Icon} size={16} className="text-muted-foreground/60 shrink-0" />
+    <div className="flex items-center gap-3 border-b border-ws-hairline px-4 py-2.5">
+      <SearchIcon  size={16} className="text-muted-foreground/60 shrink-0" />
       <input
         ref={inputRef}
         value={query}
@@ -333,7 +321,7 @@ function SearchInput({
         className="flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground/50"
       />
       {showEsc && (
-        <kbd className="hidden sm:inline-flex items-center rounded border border-border/40 bg-muted/50 px-1.5 py-0.5 text-[9px] font-mono text-muted-foreground/60">
+        <kbd className="hidden sm:inline-flex items-center rounded border border-ws-hairline bg-muted/50 px-1.5 py-0.5 text-[9px] tabular-nums text-muted-foreground/60">
           ESC
         </kbd>
       )}
@@ -441,7 +429,7 @@ export function CommandSearch() {
   if (isMobile) {
     return (
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="bottom" showCloseButton={false} className="p-0 gap-0 rounded-t-2xl max-h-[85vh] flex flex-col">
+        <SheetContent side="bottom" showCloseButton={false} className="p-0 gap-0 rounded-t-lg max-h-[85vh] flex flex-col">
           <SheetTitle className="sr-only">Search</SheetTitle>
 
           {/* Drag handle */}
@@ -476,7 +464,7 @@ export function CommandSearch() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent
         showCloseButton={false}
-        className="sm:max-w-md p-0 gap-0 overflow-hidden rounded-xl border-border/50 shadow-xl"
+        className="sm:max-w-md p-0 gap-0 overflow-hidden rounded-lg border-ws-hairline shadow-xl"
       >
         <DialogTitle className="sr-only">Search</DialogTitle>
 
@@ -500,17 +488,17 @@ export function CommandSearch() {
         </div>
 
         {/* Footer hint */}
-        <div className="border-t border-border/40 px-4 py-1.5 flex items-center gap-3 text-[9px] text-muted-foreground/50">
+        <div className="border-t border-ws-hairline px-4 py-1.5 flex items-center gap-3 text-[9px] text-muted-foreground/50">
           <span className="inline-flex items-center gap-1">
-            <kbd className="rounded border border-border/40 bg-muted/40 px-1 py-0.5 font-mono">↑↓</kbd>
+            <kbd className="rounded border border-ws-hairline bg-muted/40 px-1 py-0.5 tabular-nums">↑↓</kbd>
             navigate
           </span>
           <span className="inline-flex items-center gap-1">
-            <kbd className="rounded border border-border/40 bg-muted/40 px-1 py-0.5 font-mono">↵</kbd>
+            <kbd className="rounded border border-ws-hairline bg-muted/40 px-1 py-0.5 tabular-nums">↵</kbd>
             select
           </span>
           <span className="inline-flex items-center gap-1">
-            <kbd className="rounded border border-border/40 bg-muted/40 px-1 py-0.5 font-mono">esc</kbd>
+            <kbd className="rounded border border-ws-hairline bg-muted/40 px-1 py-0.5 tabular-nums">esc</kbd>
             close
           </span>
         </div>

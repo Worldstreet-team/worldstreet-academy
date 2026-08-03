@@ -2,19 +2,15 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
+import { levelChipStyle } from "@/components/shared/level-badge"
 import { Topbar } from "@/components/platform/topbar"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  Edit01Icon,
-  ArrowLeft01Icon,
-  Delete01Icon,
-  Certificate01Icon,
-} from "@hugeicons/core-free-icons"
-import { deleteCourse, fetchCourseForEdit } from "@/lib/actions/instructor"
+import { PageHeader } from "@/components/shared/page-header"
+import { EmptyState } from "@/components/shared/empty-state"
+import { ArtCourses } from "@/components/shared/illustrations"
+import { ArrowLeft, FileQuestion, Pencil } from "lucide-react"
+import { fetchCourseForEdit } from "@/lib/actions/instructor"
 import { ResourceManager } from "@/components/instructor/resource-manager"
+import { DeleteCourseButton } from "@/components/instructor/delete-course-dialog"
 
 export default async function InstructorCourseInfoPage({
   params,
@@ -23,214 +19,226 @@ export default async function InstructorCourseInfoPage({
 }) {
   const { courseId } = await params
   const data = await fetchCourseForEdit(courseId)
-  
+
   if (!data) notFound()
-  
+
   const { course, lessons } = data
-  
+
   // Calculate duration from lessons (videoDuration in seconds)
   const totalSeconds = lessons.reduce((sum, l) => sum + (l.duration || 0), 0)
   const totalHours = Math.floor(totalSeconds / 3600)
   const totalMins = Math.floor((totalSeconds % 3600) / 60)
   const secs = totalSeconds % 60
-  const durationLabel = totalHours > 0 
-    ? `${totalHours}h ${totalMins}m` 
-    : totalMins > 0 
-      ? `${totalMins}m${secs > 0 ? ` ${secs}s` : ""}` 
+  const durationLabel = totalHours > 0
+    ? `${totalHours}h ${totalMins}m`
+    : totalMins > 0
+      ? `${totalMins}m${secs > 0 ? ` ${secs}s` : ""}`
       : `${secs}s`
 
-  const statusBadge = {
-    draft: { label: "Draft", variant: "secondary" as const },
-    published: { label: "Published", variant: "default" as const },
-    archived: { label: "Archived", variant: "outline" as const },
+  const statusChip = {
+    draft: { label: "Draft", className: "bg-ws-chip text-ws-muted" },
+    published: { label: "Published", className: "bg-ws-success/15 text-ws-success" },
+    archived: { label: "Archived", className: "bg-ws-raised text-ws-subtle" },
   }[course.status]
 
   return (
     <>
-      <Topbar 
-        title="Course Info" 
+      <Topbar
+        title="Course Info"
         variant="instructor"
         breadcrumbOverrides={{ [courseId]: course.title }}
       />
-      <div className="p-6 space-y-6">
-        {/* Back + Actions Bar */}
-        <div className="flex items-center justify-between">
-          <Button variant="ghost" size="sm" render={<Link href="/instructor/courses" />}>
-            <HugeiconsIcon icon={ArrowLeft01Icon} size={16} />
-            Back to Courses
-          </Button>
-          <Button render={<Link href={`/instructor/courses/${course.id}/edit`} />}>
-            <HugeiconsIcon icon={Edit01Icon} size={16} />
-            Edit Course
-          </Button>
-        </div>
+      <div className="flex-1 px-6 pb-24 pt-8 md:px-8 md:pb-12 lg:px-12">
+        <div className="mx-auto w-full max-w-7xl space-y-8">
+          {/* Back + edit */}
+          <div className="flex items-center justify-between">
+            <Link
+              href="/instructor/courses"
+              className="inline-flex h-10 items-center gap-1.5 text-[13px] font-medium text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:text-ws-primary"
+            >
+              <ArrowLeft size={14} strokeWidth={2} />
+              Back to Courses
+            </Link>
+            <Button
+              render={<Link href={`/instructor/courses/${course.id}/edit`} />}
+              className="bg-ws-brand text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:bg-ws-brand hover:opacity-90"
+            >
+              <Pencil size={16} strokeWidth={2} />
+              Edit Course
+            </Button>
+          </div>
 
-        {/* Hero — Large Thumbnail */}
-        <div className="aspect-[21/9] w-full rounded-xl bg-muted relative overflow-hidden">
-          {course.thumbnailUrl ? (
-            <Image
-              src={course.thumbnailUrl}
-              alt={course.title}
-              fill
-              className="object-cover"
-              sizes="100vw"
-              priority
-            />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-muted-foreground">Course Thumbnail</span>
-            </div>
-          )}
-        </div>
-
-        {/* Course Title & Badges */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant={statusBadge.variant} className="text-xs">
-              {statusBadge.label}
-            </Badge>
-            <Badge variant="secondary" className="capitalize text-xs">
-              {course.level}
-            </Badge>
-            {course.pricing === "free" ? (
-              <Badge className="text-xs">Free</Badge>
+          {/* Hero — large thumbnail */}
+          <div className="relative aspect-[21/9] w-full overflow-hidden rounded-lg bg-ws-raised">
+            {course.thumbnailUrl ? (
+              <Image
+                src={course.thumbnailUrl}
+                alt={course.title}
+                fill
+                className="object-cover"
+                sizes="100vw"
+                priority
+              />
             ) : (
-              <Badge variant="outline" className="text-xs">
-                ${course.price}
-              </Badge>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-ws-subtle">Course Thumbnail</span>
+              </div>
             )}
           </div>
-          <h1 className="text-2xl font-bold">{course.title}</h1>
-        </div>
 
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Description */}
-            <div className="space-y-2">
-              <h2 className="font-semibold text-base">About this course</h2>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                {course.description}
-              </p>
+          {/* Title + badges */}
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusChip.className}`}
+              >
+                {statusChip.label}
+              </span>
+              <span
+                className="rounded-sm px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.05em]"
+                style={levelChipStyle(course.level)}
+              >
+                {course.level}
+              </span>
+              <span className="rounded-full bg-ws-chip px-2.5 py-0.5 text-xs font-semibold tabular-nums text-ws-gold">
+                {course.pricing === "free" ? "Free" : `$${course.price}`}
+              </span>
             </div>
-
-            <Separator />
-
-            {/* Curriculum */}
-            <div>
-              <h2 className="font-semibold text-base mb-4">
-                Curriculum
-                <span className="text-muted-foreground font-normal ml-2 text-sm">
-                  {lessons.length} {lessons.length === 1 ? "lesson" : "lessons"}
-                </span>
-              </h2>
-              {lessons.length > 0 ? (
-                <div className="space-y-2">
-                  {lessons.map((lesson, index) => (
-                    <div
-                      key={lesson.id}
-                      className="flex items-center justify-between rounded-lg border p-3"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-medium shrink-0">
-                          {index + 1}
-                        </span>
-                        <div>
-                          <p className="text-sm font-medium">{lesson.title}</p>
-                          <p className="text-[11px] text-muted-foreground">
-                            {lesson.type === "video"
-                              ? `Video · ${lesson.duration ? `${Math.floor(lesson.duration / 60)}:${String(lesson.duration % 60).padStart(2, '0')}` : '--:--'}`
-                              : lesson.type === "live"
-                                ? "Live Session"
-                                : `Reading · ${lesson.duration ? `${Math.floor(lesson.duration / 60)}:${String(lesson.duration % 60).padStart(2, '0')}` : '--:--'}`}
-                          </p>
-                        </div>
-                      </div>
-                      {lesson.isFree && (
-                        <Badge variant="secondary" className="text-[10px]">
-                          Free Preview
-                        </Badge>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-lg border-2 border-dashed p-8 text-center">
-                  <p className="text-sm text-muted-foreground">
-                    No lessons added yet.
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-3"
-                    render={<Link href={`/instructor/courses/${course.id}/lessons`} />}
-                  >
-                    Add Lessons
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            <Separator />
-
-            {/* Downloadable materials */}
-            <ResourceManager courseId={course.id} />
+            <PageHeader
+              title={course.title}
+              subline={`${lessons.length} ${lessons.length === 1 ? "lesson" : "lessons"} · ${durationLabel}`}
+            />
           </div>
 
-          {/* Sidebar — Stats & Actions */}
-          <div className="lg:col-span-1">
-            <Card>
-              <CardContent className="p-5 space-y-5">
-                {/* Quick Stats */}
+          <div className="grid gap-6 lg:grid-cols-3">
+            {/* Main content */}
+            <div className="space-y-6 lg:col-span-2">
+              {/* Description */}
+              <div className="space-y-2">
+                <h2 className="text-base font-semibold text-ws-primary">About this course</h2>
+                <p className="text-sm leading-relaxed text-ws-muted">
+                  {course.description}
+                </p>
+              </div>
+
+              <div className="h-px bg-ws-hairline" />
+
+              {/* Curriculum */}
+              <div>
+                <h2 className="mb-4 text-base font-semibold text-ws-primary">
+                  Curriculum
+                  <span className="ml-2 text-sm font-normal text-ws-muted">
+                    {lessons.length} {lessons.length === 1 ? "lesson" : "lessons"}
+                  </span>
+                </h2>
+                {lessons.length > 0 ? (
+                  <div className="space-y-2">
+                    {lessons.map((lesson, index) => (
+                      <div
+                        key={lesson.id}
+                        className="flex items-center justify-between rounded-md border border-ws-hairline bg-ws-surface p-3 transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-raised"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ws-raised text-xs font-medium tabular-nums text-ws-muted">
+                            {index + 1}
+                          </span>
+                          <div>
+                            <p className="text-sm font-medium text-ws-primary">{lesson.title}</p>
+                            <p className="text-[11px] tabular-nums text-ws-muted">
+                              {lesson.type === "video"
+                                ? `Video · ${lesson.duration ? `${Math.floor(lesson.duration / 60)}:${String(lesson.duration % 60).padStart(2, '0')}` : '--:--'}`
+                                : lesson.type === "live"
+                                  ? "Live Session"
+                                  : `Reading · ${lesson.duration ? `${Math.floor(lesson.duration / 60)}:${String(lesson.duration % 60).padStart(2, '0')}` : '--:--'}`}
+                            </p>
+                          </div>
+                        </div>
+                        {lesson.isFree && (
+                          <span className="rounded-full bg-ws-chip px-2 py-0.5 text-[10px] font-medium text-ws-muted">
+                            Free Preview
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-ws-hairline bg-ws-surface">
+                    <EmptyState
+                      art={<ArtCourses />}
+                      title="No lessons yet"
+                      description="Build your curriculum by adding the first lesson."
+                      actionLabel="Add Lessons"
+                      actionHref={`/instructor/courses/${course.id}/lessons`}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="h-px bg-ws-hairline" />
+
+              {/* Downloadable materials */}
+              <ResourceManager courseId={course.id} />
+            </div>
+
+            {/* Sidebar — stats & actions */}
+            <div className="lg:col-span-1">
+              <div className="space-y-5 rounded-lg border border-ws-hairline bg-ws-surface p-5">
+                {/* Quick stats */}
                 <div className="flex items-center justify-around text-center">
                   <div>
-                    <p className="text-2xl font-bold">{lessons.length}</p>
-                    <p className="text-[11px] text-muted-foreground">Lessons</p>
+                    <p className="font-display text-2xl font-semibold tabular-nums text-ws-primary">
+                      {lessons.length}
+                    </p>
+                    <p className="text-[11px] text-ws-muted">Lessons</p>
                   </div>
-                  <Separator orientation="vertical" className="h-10" />
+                  <div className="h-10 w-px bg-ws-hairline" />
                   <div>
-                    <p className="text-2xl font-bold">{durationLabel}</p>
-                    <p className="text-[11px] text-muted-foreground">Duration</p>
+                    <p className="font-display text-2xl font-semibold tabular-nums text-ws-primary">
+                      {durationLabel}
+                    </p>
+                    <p className="text-[11px] text-ws-muted">Duration</p>
                   </div>
                 </div>
 
-                <Separator />
+                <div className="h-px bg-ws-hairline" />
 
-                {/* Course Details */}
+                {/* Course details */}
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Level</span>
-                    <span className="capitalize font-medium">{course.level}</span>
+                    <span className="text-ws-muted">Level</span>
+                    <span className="font-medium capitalize text-ws-primary">{course.level}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Price</span>
-                    <span className="font-medium">
+                    <span className="text-ws-muted">Price</span>
+                    <span className="font-medium tabular-nums text-ws-primary">
                       {course.pricing === "free" ? "Free" : `$${course.price}`}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Status</span>
-                    <Badge variant={statusBadge.variant} className="text-[10px] capitalize">
+                    <span className="text-ws-muted">Status</span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${statusChip.className}`}
+                    >
                       {course.status}
-                    </Badge>
+                    </span>
                   </div>
                   {course.category && (
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Category</span>
-                      <span className="font-medium">{course.category}</span>
+                      <span className="text-ws-muted">Category</span>
+                      <span className="font-medium text-ws-primary">{course.category}</span>
                     </div>
                   )}
                 </div>
 
-                <Separator />
+                <div className="h-px bg-ws-hairline" />
 
                 {/* Actions */}
                 <div className="space-y-2">
                   <Button
-                    className="w-full"
+                    className="w-full bg-ws-brand text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:bg-ws-brand hover:opacity-90"
                     render={<Link href={`/instructor/courses/${course.id}/edit`} />}
                   >
-                    <HugeiconsIcon icon={Edit01Icon} size={16} />
+                    <Pencil size={16} strokeWidth={2} />
                     Edit Course
                   </Button>
                   <Button
@@ -238,23 +246,14 @@ export default async function InstructorCourseInfoPage({
                     className="w-full"
                     render={<Link href={`/instructor/courses/${course.id}/exam`} />}
                   >
-                    <HugeiconsIcon icon={Certificate01Icon} size={16} />
+                    <FileQuestion size={16} strokeWidth={2} />
                     Exam (CBT)
                   </Button>
-                  <form action={deleteCourse} className="w-full">
-                    <input type="hidden" name="courseId" value={course.id} />
-                    <Button
-                      variant="ghost"
-                      className="w-full text-destructive hover:text-destructive"
-                      type="submit"
-                    >
-                      <HugeiconsIcon icon={Delete01Icon} size={16} />
-                      Delete Course
-                    </Button>
-                  </form>
+                  {/* Type-to-confirm dialog; the deleteCourse action is unchanged */}
+                  <DeleteCourseButton courseId={course.id} courseTitle={course.title} />
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -43,3 +43,7 @@ next-env.d.ts
 # Env backups
 .env.local.production
 .env.local.development
+
+# Local mock-mode MongoDB data (pnpm dev:mock)
+/.local-db
+.gstack/

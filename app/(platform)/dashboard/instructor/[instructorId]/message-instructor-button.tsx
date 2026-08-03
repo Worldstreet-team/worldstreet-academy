@@ -3,9 +3,8 @@
 import { useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { Message01Icon } from "@hugeicons/core-free-icons"
 import { getOrCreateConversation } from "@/lib/actions/messages"
+import { MessageSquareIcon } from "lucide-react"
 
 interface MessageInstructorButtonProps {
   instructorId: string
@@ -32,7 +31,7 @@ export function MessageInstructorButton({ instructorId }: MessageInstructorButto
       onClick={handleMessage}
       disabled={isPending}
     >
-      <HugeiconsIcon icon={Message01Icon} size={14} />
+      <MessageSquareIcon  size={14} />
       {isPending ? "Opening..." : "Message Instructor"}
     </Button>
   )

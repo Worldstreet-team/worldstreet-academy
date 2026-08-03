@@ -2,16 +2,10 @@
 
 import Image from "next/image"
 import { motion } from "motion/react"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  UserIcon,
-  BubbleChatIcon,
-  Call02Icon,
-  VideoReplayIcon,
-} from "@hugeicons/core-free-icons"
 import { useVivid } from "@/lib/vivid/provider"
 import type { OnDemandUI } from "@/lib/vivid/types"
 import { parseConfig } from "./helpers"
+import { MessageCircleIcon, PhoneIcon, RotateCcwIcon, UserIcon } from "lucide-react"
 
 export function ContactCardUI({ ui }: { ui: OnDemandUI }) {
   const vivid = useVivid()
@@ -27,7 +21,7 @@ export function ContactCardUI({ ui }: { ui: OnDemandUI }) {
             <Image src={config.userAvatar} alt="" fill className="object-cover" sizes="80px" />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
-              <HugeiconsIcon icon={UserIcon} size={32} className="text-muted-foreground/50" />
+              <UserIcon  size={32} className="text-muted-foreground/50" />
             </div>
           )}
         </div>
@@ -47,35 +41,32 @@ export function ContactCardUI({ ui }: { ui: OnDemandUI }) {
       {/* Action buttons */}
       <div className="flex gap-2">
         <motion.button
-          whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={() => vivid.resolveUI({ action: "message", userId: config.userId })}
-          className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl
+          className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg
                      text-sm font-medium bg-accent/40 hover:bg-accent/60 transition-colors"
         >
-          <HugeiconsIcon icon={BubbleChatIcon} size={16} />
+          <MessageCircleIcon  size={16} />
           Message
         </motion.button>
         <motion.button
-          whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={() => vivid.resolveUI({ action: "call", userId: config.userId, callType: "audio" })}
-          className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl
+          className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg
                      text-sm font-medium bg-foreground text-background hover:bg-foreground/90
                      transition-colors"
         >
-          <HugeiconsIcon icon={Call02Icon} size={16} />
+          <PhoneIcon  size={16} />
           Call
         </motion.button>
       </div>
       <motion.button
-        whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
         onClick={() => vivid.resolveUI({ action: "video-call", userId: config.userId, callType: "video" })}
-        className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl
+        className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg
                    text-sm font-medium bg-accent/20 hover:bg-accent/40 transition-colors"
       >
-        <HugeiconsIcon icon={VideoReplayIcon} size={16} />
+        <RotateCcwIcon  size={16} />
         Video Call
       </motion.button>
     </div>

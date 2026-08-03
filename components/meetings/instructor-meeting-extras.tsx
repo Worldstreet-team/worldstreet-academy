@@ -2,19 +2,6 @@
 
 import { useState, useCallback, useRef, useEffect } from "react"
 import Image from "next/image"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  Copy01Icon,
-  Search01Icon,
-  Loading03Icon,
-  CheckmarkCircle01Icon,
-  UserIcon,
-  Video01Icon,
-  UserGroupIcon,
-  Cancel01Icon,
-  ArrowLeft01Icon,
-  ArrowRight01Icon,
-} from "@hugeicons/core-free-icons"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -25,6 +12,8 @@ import {
   searchUsersByEmail,
   type InviteResult,
 } from "@/lib/actions/meetings"
+import { ChevronLeftIcon, ChevronRightIcon, CircleCheckIcon, CopyIcon, LoaderCircleIcon, SearchIcon, UserIcon, UsersIcon, VideoIcon, XIcon } from "lucide-react"
+import { RenderIcon } from "@/components/shared/render-icon"
 
 /* ═══════════════════════════════════════════════════════════
    INSTRUCTOR INVITE DIALOG
@@ -149,13 +138,13 @@ export function InstructorInviteDialog({
   return (
     open ? (
       <div className="fixed inset-0 z-50 flex items-center justify-center">
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => handleOpenChange(false)} />
-        <div className="relative w-full max-w-sm mx-4 bg-card border border-border/50 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-200 max-h-[85vh] flex flex-col">
+        <div className="absolute inset-0 bg-black/40" onClick={() => handleOpenChange(false)} />
+        <div className="relative w-full max-w-sm mx-4 bg-card border border-ws-hairline rounded-lg shadow-[var(--ws-shadow-sheet)] overflow-hidden animate-in fade-in-0 zoom-in-95 duration-[var(--ws-motion-base)] max-h-[85vh] flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between px-5 pt-5 pb-1 shrink-0">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-muted/60 flex items-center justify-center">
-                <HugeiconsIcon icon={UserGroupIcon} size={17} className="text-foreground" />
+              <div className="w-9 h-9 rounded-lg bg-muted/60 flex items-center justify-center">
+                <UsersIcon  size={17} className="text-foreground" />
               </div>
               <h2 className="text-sm font-semibold text-foreground">Invite People</h2>
             </div>
@@ -163,7 +152,7 @@ export function InstructorInviteDialog({
               onClick={() => handleOpenChange(false)}
               className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted/80 transition-colors"
             >
-              <HugeiconsIcon icon={Cancel01Icon} size={16} className="text-muted-foreground" />
+              <XIcon  size={16} className="text-muted-foreground" />
             </button>
           </div>
 
@@ -176,17 +165,16 @@ export function InstructorInviteDialog({
                 <Input
                   value={meetingLink}
                   readOnly
-                  className="h-9 pr-9 text-xs bg-muted/20 border-border/30 text-foreground/60 select-all cursor-text"
+                  className="h-9 pr-9 text-xs bg-muted/20 border-ws-hairline text-foreground/60 select-all cursor-text"
                 />
                 <button
                   onClick={copyLink}
                   className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 rounded-md flex items-center justify-center hover:bg-muted transition-colors"
                 >
-                  <HugeiconsIcon
-                    icon={copiedLink ? CheckmarkCircle01Icon : Copy01Icon}
+                  <RenderIcon icon={copiedLink ? CircleCheckIcon : CopyIcon}
+                    
                     size={13}
-                    className={copiedLink ? "text-emerald-500" : "text-muted-foreground/60"}
-                  />
+                    className={copiedLink ? "text-ws-success" : "text-muted-foreground/60"} />
                 </button>
               </div>
             </div>
@@ -195,30 +183,28 @@ export function InstructorInviteDialog({
             <div className="space-y-1.5">
               <label className="text-[11px] font-medium text-muted-foreground">Invite by Email</label>
               <div className="relative">
-                <HugeiconsIcon
-                  icon={Search01Icon}
+                <SearchIcon
+                  
                   size={13}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/40"
-                />
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/40" />
                 <Input
                   placeholder="Search by email..."
                   value={searchQuery}
                   onChange={(e) => handleSearchInput(e.target.value)}
-                  className="h-9 pl-8 text-xs bg-muted/20 border-border/30"
+                  className="h-9 pl-8 text-xs bg-muted/20 border-ws-hairline"
                   autoComplete="off"
                 />
                 {isSearching && (
-                  <HugeiconsIcon
-                    icon={Loading03Icon}
+                  <LoaderCircleIcon
+                    
                     size={13}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground animate-spin"
-                  />
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground animate-spin" />
                 )}
               </div>
 
               {/* Results */}
               {searchResults.length > 0 && (
-                <div className="rounded-xl bg-muted/20 overflow-hidden">
+                <div className="rounded-lg bg-muted/20 overflow-hidden">
                   {searchResults.map((user, i) => {
                     const localState = invitedUsers.get(user.email)
                     const isInviting = localState?.status === "inviting"
@@ -228,7 +214,7 @@ export function InstructorInviteDialog({
                     return (
                       <div
                         key={user.id}
-                        className={`flex items-center gap-2.5 px-3 py-2 ${i > 0 ? "border-t border-border/20" : ""}`}
+                        className={`flex items-center gap-2.5 px-3 py-2 ${i > 0 ? "border-t border-ws-hairline" : ""}`}
                       >
                         <Avatar className="w-7 h-7 shrink-0">
                           {user.avatar && <AvatarImage src={user.avatar} alt={user.name} />}
@@ -242,11 +228,11 @@ export function InstructorInviteDialog({
                         </div>
 
                         {isInCall ? (
-                          <span className="text-[10px] font-medium text-emerald-500 shrink-0">In call</span>
+                          <span className="text-[10px] font-medium text-ws-success shrink-0">In call</span>
                         ) : isInviting ? (
-                          <HugeiconsIcon icon={Loading03Icon} size={12} className="text-muted-foreground animate-spin shrink-0" />
+                          <LoaderCircleIcon  size={12} className="text-muted-foreground animate-spin shrink-0" />
                         ) : isInvited ? (
-                          <HugeiconsIcon icon={CheckmarkCircle01Icon} size={12} className="text-emerald-500 shrink-0" />
+                          <CircleCheckIcon  size={12} className="text-ws-success shrink-0" />
                         ) : (
                           <button
                             onClick={() => handleInvite(user.email, user.name)}
@@ -276,13 +262,13 @@ export function InstructorInviteDialog({
                   {Array.from(invitedUsers.values()).map((inv) => (
                     <div key={inv.email} className="flex items-center gap-2 px-2 py-1.5 rounded-lg">
                       <div className="w-4 h-4 rounded-full bg-muted/40 flex items-center justify-center shrink-0">
-                        <HugeiconsIcon icon={UserIcon} size={8} className="text-muted-foreground/50" />
+                        <UserIcon  size={8} className="text-muted-foreground/50" />
                       </div>
                       <span className="text-[11px] font-medium truncate flex-1">{inv.name}</span>
-                      {inv.status === "inviting" && <HugeiconsIcon icon={Loading03Icon} size={10} className="text-muted-foreground animate-spin shrink-0" />}
-                      {inv.status === "invited" && <HugeiconsIcon icon={CheckmarkCircle01Icon} size={10} className="text-emerald-500 shrink-0" />}
-                      {inv.status === "already_in_call" && <span className="text-[9px] text-emerald-500 shrink-0">In call</span>}
-                      {inv.status === "error" && <span className="text-[9px] text-red-400 shrink-0">Failed</span>}
+                      {inv.status === "inviting" && <LoaderCircleIcon  size={10} className="text-muted-foreground animate-spin shrink-0" />}
+                      {inv.status === "invited" && <CircleCheckIcon  size={10} className="text-ws-success shrink-0" />}
+                      {inv.status === "already_in_call" && <span className="text-[9px] text-ws-success shrink-0">In call</span>}
+                      {inv.status === "error" && <span className="text-[9px] text-ws-danger shrink-0">Failed</span>}
                     </div>
                   ))}
                 </div>
@@ -339,7 +325,7 @@ export function CourseMeetingCards({
     return (
       <div className="flex gap-3 overflow-hidden">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-56 w-64 shrink-0 rounded-2xl bg-muted/40 animate-pulse" />
+          <div key={i} className="h-56 w-64 shrink-0 rounded-lg bg-muted/40 animate-pulse" />
         ))}
       </div>
     )
@@ -358,16 +344,16 @@ export function CourseMeetingCards({
           <button
             onClick={() => api?.scrollPrev()}
             disabled={!canScrollPrev}
-            className="h-7 w-7 rounded-lg flex items-center justify-center border border-border/40 hover:bg-muted/60 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            className="h-7 w-7 rounded-lg flex items-center justify-center border border-ws-hairline hover:bg-muted/60 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
           >
-            <HugeiconsIcon icon={ArrowLeft01Icon} size={14} className="text-foreground/70" />
+            <ChevronLeftIcon  size={14} className="text-foreground/70" />
           </button>
           <button
             onClick={() => api?.scrollNext()}
             disabled={!canScrollNext}
-            className="h-7 w-7 rounded-lg flex items-center justify-center border border-border/40 hover:bg-muted/60 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            className="h-7 w-7 rounded-lg flex items-center justify-center border border-ws-hairline hover:bg-muted/60 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
           >
-            <HugeiconsIcon icon={ArrowRight01Icon} size={14} className="text-foreground/70" />
+            <ChevronRightIcon  size={14} className="text-foreground/70" />
           </button>
         </div>
       </div>
@@ -380,7 +366,7 @@ export function CourseMeetingCards({
         <CarouselContent className="-ml-3">
           {courses.map((course) => (
             <CarouselItem key={course.id} className="pl-3 basis-[260px] sm:basis-[280px] md:basis-[300px]">
-              <div className="group relative rounded-2xl border border-border/40 bg-card overflow-hidden hover:border-border/80 hover:shadow-sm transition-all">
+              <div className="group relative rounded-lg border border-ws-hairline bg-card overflow-hidden hover:border-ws-hairline transition-all">
                 <div className="relative h-56 bg-muted/30">
                   {course.thumbnailUrl ? (
                     <Image
@@ -391,7 +377,7 @@ export function CourseMeetingCards({
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      <HugeiconsIcon icon={Video01Icon} size={28} className="text-muted-foreground/30" />
+                      <VideoIcon  size={28} className="text-muted-foreground/30" />
                     </div>
                   )}
 
@@ -400,16 +386,16 @@ export function CourseMeetingCards({
                       <div className="min-w-0">
                         <h3 className="text-[13px] font-semibold text-white truncate drop-shadow-sm">{course.title}</h3>
                         <div className="flex items-center gap-1 mt-0.5">
-                          <HugeiconsIcon icon={UserGroupIcon} size={10} className="text-white/70" />
+                          <UsersIcon  size={10} className="text-white/70" />
                           <span className="text-[10px] text-white/70 font-medium">{course.enrolledCount} enrolled</span>
                         </div>
                       </div>
 
                       <button
                         onClick={() => onStartMeeting(course)}
-                        className="flex items-center gap-1.5 h-8 px-3.5 rounded-xl text-[11px] font-semibold text-white bg-white/20 backdrop-blur-md border border-white/20 hover:bg-white/30 transition-all shadow-lg shrink-0"
+                        className="flex items-center gap-1.5 h-8 px-3.5 rounded-lg text-[11px] font-semibold text-white bg-black/55 border border-white/20 hover:bg-black/70 transition-colors shrink-0"
                       >
-                        <HugeiconsIcon icon={Video01Icon} size={13} />
+                        <VideoIcon  size={13} />
                         Start Call
                       </button>
                     </div>
@@ -464,8 +450,8 @@ export function CreateCourseMeetingModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => onOpenChange(false)} />
-      <div className="relative w-full max-w-md mx-4 bg-card border border-border/40 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-200">
+      <div className="absolute inset-0 bg-black/50" onClick={() => onOpenChange(false)} />
+      <div className="relative w-full max-w-md mx-4 bg-card border border-ws-hairline rounded-lg shadow-[var(--ws-shadow-sheet)] overflow-hidden animate-in fade-in-0 zoom-in-95 duration-[var(--ws-motion-base)]">
         {/* Thumbnail header */}
         {course.thumbnailUrl ? (
           <div className="relative h-36 bg-muted/30">
@@ -474,9 +460,9 @@ export function CreateCourseMeetingModal({
             {/* Close button on thumbnail */}
             <button
               onClick={() => onOpenChange(false)}
-              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center hover:bg-black/50 transition-colors"
+              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/30 flex items-center justify-center hover:bg-black/50 transition-colors"
             >
-              <HugeiconsIcon icon={Cancel01Icon} size={14} className="text-white" />
+              <XIcon  size={14} className="text-white" />
             </button>
             {/* Floating course title over thumbnail */}
             <div className="absolute bottom-3 left-4 right-4">
@@ -487,8 +473,8 @@ export function CreateCourseMeetingModal({
         ) : (
           <div className="flex items-center justify-between px-5 pt-5 pb-1">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-muted/50 flex items-center justify-center">
-                <HugeiconsIcon icon={Video01Icon} size={18} className="text-muted-foreground" />
+              <div className="w-10 h-10 rounded-lg bg-muted/50 flex items-center justify-center">
+                <VideoIcon  size={18} className="text-muted-foreground" />
               </div>
               <div>
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">New Session</p>
@@ -499,7 +485,7 @@ export function CreateCourseMeetingModal({
               onClick={() => onOpenChange(false)}
               className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted/80 transition-colors"
             >
-              <HugeiconsIcon icon={Cancel01Icon} size={16} className="text-muted-foreground" />
+              <XIcon  size={16} className="text-muted-foreground" />
             </button>
           </div>
         )}
@@ -507,8 +493,8 @@ export function CreateCourseMeetingModal({
         {/* Body */}
         <div className="px-5 py-5 space-y-4">
           {/* Enrolled count badge */}
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/30">
-            <HugeiconsIcon icon={UserGroupIcon} size={14} className="text-muted-foreground" />
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/30">
+            <UsersIcon  size={14} className="text-muted-foreground" />
             <span className="text-xs text-muted-foreground">
               <span className="font-semibold text-foreground">{course.enrolledCount}</span>{" "}
               student{course.enrolledCount !== 1 ? "s" : ""} will be notified via email
@@ -524,7 +510,7 @@ export function CreateCourseMeetingModal({
               onChange={(e) => setTitle(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleCreate()}
               placeholder="e.g. Week 3 — Market Analysis"
-              className="h-11 text-sm bg-muted/20 border-border/40 rounded-xl focus-visible:ring-1 focus-visible:ring-foreground/20"
+              className="h-11 text-sm bg-muted/20 border-ws-hairline rounded-lg focus-visible:ring-1 focus-visible:ring-foreground/20"
             />
           </div>
 
@@ -532,23 +518,23 @@ export function CreateCourseMeetingModal({
           <div className="flex gap-2 pt-1">
             <button
               onClick={() => onOpenChange(false)}
-              className="flex-1 h-11 rounded-xl text-sm font-medium text-muted-foreground border border-border/40 hover:bg-muted/40 transition-colors"
+              className="flex-1 h-11 rounded-lg text-sm font-medium text-muted-foreground border border-ws-hairline hover:bg-muted/40 transition-colors"
             >
               Cancel
             </button>
             <Button
               onClick={handleCreate}
               disabled={!title.trim() || isCreating}
-              className="flex-1 gap-2 h-11 bg-foreground hover:bg-foreground/90 text-background text-sm font-medium rounded-xl"
+              className="flex-1 gap-2 h-11 bg-foreground hover:bg-foreground/90 text-background text-sm font-medium rounded-lg"
             >
               {isCreating ? (
                 <>
-                  <HugeiconsIcon icon={Loading03Icon} size={15} className="animate-spin" />
+                  <LoaderCircleIcon  size={15} className="animate-spin" />
                   Starting...
                 </>
               ) : (
                 <>
-                  <HugeiconsIcon icon={Video01Icon} size={15} />
+                  <VideoIcon  size={15} />
                   Start Session
                 </>
               )}

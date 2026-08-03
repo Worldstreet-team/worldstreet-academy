@@ -18,12 +18,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  TeachingIcon,
-  Cancel01Icon,
-  CheckmarkCircle02Icon,
-} from "@hugeicons/core-free-icons"
 import { useUser } from "@/components/providers/user-provider"
 import {
   submitInstructorApplication,
@@ -34,6 +28,7 @@ import {
 } from "@/lib/actions/applications"
 import { getVideoUploadUrl, getDocumentUploadUrl } from "@/lib/actions/upload"
 import { queryKeys } from "@/lib/hooks/queries/keys"
+import { CircleCheckBigIcon, GraduationCapIcon, XIcon } from "lucide-react"
 
 /* ── Upload-or-paste field (sample video / CV) ── */
 
@@ -164,7 +159,7 @@ function StatusTracker({ status }: { status: string }) {
               }`}
             >
               {i < current ? (
-                <HugeiconsIcon icon={CheckmarkCircle02Icon} size={13} />
+                <CircleCheckBigIcon  size={13} />
               ) : (
                 i + 1
               )}
@@ -317,7 +312,7 @@ function ApplicationForm({ onSubmitted }: { onSubmitted: () => void }) {
                         onClick={() => setExpertise((prev) => prev.filter((t) => t !== tag))}
                         aria-label={`Remove ${tag}`}
                       >
-                        <HugeiconsIcon icon={Cancel01Icon} size={10} />
+                        <XIcon  size={10} />
                       </button>
                     </Badge>
                   ))}
@@ -338,7 +333,7 @@ function ApplicationForm({ onSubmitted }: { onSubmitted: () => void }) {
                     className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
                       experienceYears === opt
                         ? "bg-foreground text-background border-foreground"
-                        : "border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted"
+                        : "border-ws-hairline text-muted-foreground hover:text-foreground hover:bg-muted"
                     }`}
                   >
                     {opt} yrs
@@ -444,7 +439,7 @@ function ApplicationForm({ onSubmitted }: { onSubmitted: () => void }) {
               </div>
 
               {/* Terms of teaching */}
-              <label className="flex items-start gap-2.5 rounded-lg border border-border/60 px-3 py-2.5 cursor-pointer hover:bg-muted/40 transition-colors">
+              <label className="flex items-start gap-2.5 rounded-lg border border-ws-hairline px-3 py-2.5 cursor-pointer hover:bg-muted/40 transition-colors">
                 <input
                   type="checkbox"
                   checked={termsAccepted}
@@ -558,8 +553,8 @@ export default function BecomeInstructorPage() {
       <Topbar />
       <div className="p-4 sm:p-6 pb-24 md:pb-6 max-w-2xl mx-auto space-y-5">
         <div className="text-center space-y-2 py-4">
-          <div className="mx-auto h-12 w-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
-            <HugeiconsIcon icon={TeachingIcon} size={24} />
+          <div className="mx-auto h-12 w-12 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+            <GraduationCapIcon  size={24} />
           </div>
           <h1 className="text-xl font-semibold">Become an instructor</h1>
           <p className="text-sm text-muted-foreground max-w-md mx-auto">
@@ -571,7 +566,7 @@ export default function BecomeInstructorPage() {
         {isInstructor ? (
           <Card>
             <CardContent className="p-6 text-center space-y-3">
-              <p className="text-sm font-medium">You already have instructor access 🎉</p>
+              <p className="text-sm font-medium">You already have instructor access</p>
               <p className="text-xs text-muted-foreground">
                 Head to your instructor portal to create and manage courses.
               </p>
@@ -581,7 +576,7 @@ export default function BecomeInstructorPage() {
             </CardContent>
           </Card>
         ) : isLoading ? (
-          <Skeleton className="h-64 rounded-xl" />
+          <Skeleton className="h-64 rounded-lg" />
         ) : isActive && application ? (
           <Card>
             <CardContent className="p-5 space-y-5">
@@ -600,7 +595,7 @@ export default function BecomeInstructorPage() {
               </div>
               {application.proposedSlots.length > 0 && !application.interview && (
                 <div className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-3 space-y-2">
-                  <p className="text-xs font-semibold">🗓️ Pick your interview time</p>
+                  <p className="text-xs font-semibold">Pick your interview time</p>
                   <p className="text-[11px] text-muted-foreground">
                     Our team proposed {application.proposedSlots.length} time
                     {application.proposedSlots.length === 1 ? "" : "s"} — choose what works for you.
@@ -612,7 +607,7 @@ export default function BecomeInstructorPage() {
                         type="button"
                         disabled={pickSlot.isPending}
                         onClick={() => pickSlot.mutate(slot.at)}
-                        className="w-full flex items-center justify-between rounded-lg border border-border/60 bg-background px-3 py-2 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors disabled:opacity-50"
+                        className="w-full flex items-center justify-between rounded-lg border border-ws-hairline bg-background px-3 py-2 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors disabled:opacity-50"
                       >
                         <span className="text-xs font-medium">
                           {new Date(slot.at).toLocaleString("en-US", {
@@ -632,7 +627,7 @@ export default function BecomeInstructorPage() {
               {application.status === "interview_scheduled" && application.interview && (
                 <div className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-3 flex items-center justify-between gap-3 flex-wrap">
                   <div>
-                    <p className="text-xs font-semibold">🎙️ Your interview call</p>
+                    <p className="text-xs font-semibold">Your interview call</p>
                     <p className="text-[11px] text-muted-foreground mt-0.5">
                       {application.interview.scheduledAt
                         ? new Date(application.interview.scheduledAt).toLocaleString("en-US", {
@@ -694,7 +689,7 @@ export default function BecomeInstructorPage() {
               { step: "2", title: "Interview", body: "Our team reviews and may invite you to a short call." },
               { step: "3", title: "Teach & earn", body: "Publish courses and earn 85% of every sale." },
             ].map((item) => (
-              <div key={item.step} className="rounded-xl border border-border/60 p-3.5">
+              <div key={item.step} className="rounded-lg border border-ws-hairline p-3.5">
                 <span className="text-[10px] font-bold text-primary">STEP {item.step}</span>
                 <p className="text-xs font-semibold mt-1">{item.title}</p>
                 <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">

@@ -4,6 +4,7 @@ import * as React from "react"
 import { useParams, useSearchParams } from "next/navigation"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Topbar } from "@/components/platform/topbar"
+import { PageHeader } from "@/components/shared/page-header"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -18,8 +19,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { Add01Icon, Delete02Icon, Edit01Icon, Cancel01Icon } from "@hugeicons/core-free-icons"
 import {
   getCourseExamForInstructor,
   upsertExam,
@@ -32,6 +31,7 @@ import {
   type QuestionInput,
 } from "@/lib/actions/exams"
 import { queryKeys } from "@/lib/hooks/queries/keys"
+import { CheckIcon, PlusIcon, SquarePenIcon, Trash2Icon, XIcon } from "lucide-react"
 
 /* ── Question editor dialog ── */
 
@@ -99,14 +99,14 @@ function QuestionDialog({
                 className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
                   type === t
                     ? "bg-foreground text-background border-foreground"
-                    : "border-border/60 text-muted-foreground hover:bg-muted"
+                    : "border-ws-hairline text-ws-muted hover:bg-ws-raised"
                 }`}
               >
                 {t === "single" ? "Single choice" : "Multiple answers"}
               </button>
             ))}
             <div className="ml-auto flex items-center gap-1.5">
-              <label className="text-[11px] text-muted-foreground">Points</label>
+              <label className="text-[11px] text-ws-muted">Points</label>
               <Input
                 inputMode="numeric"
                 className="h-7 w-14 text-xs"
@@ -124,7 +124,7 @@ function QuestionDialog({
           />
 
           <div className="space-y-1.5">
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[11px] text-ws-muted">
               Options — tick the correct one{type === "multi" ? "s" : ""}.
             </p>
             {options.map((opt, i) => (
@@ -137,11 +137,11 @@ function QuestionDialog({
                     type === "single" ? "rounded-full" : "rounded"
                   } ${
                     correct.includes(i)
-                      ? "border-emerald-500 bg-emerald-500 text-white"
-                      : "border-muted-foreground/40 hover:border-foreground"
+                      ? "border-ws-success bg-ws-success text-white"
+                      : "border-ws-muted/40 hover:border-ws-primary"
                   }`}
                 >
-                  {correct.includes(i) && <span className="text-[10px]">✓</span>}
+                  {correct.includes(i) && <CheckIcon size={10} />}
                 </button>
                 <Input
                   value={opt}
@@ -155,7 +155,7 @@ function QuestionDialog({
                   <button
                     type="button"
                     aria-label="Remove option"
-                    className="text-muted-foreground/60 hover:text-destructive"
+                    className="text-ws-muted/60 hover:text-destructive"
                     onClick={() => {
                       setOptions((prev) => prev.filter((_, j) => j !== i))
                       setCorrect((prev) =>
@@ -163,7 +163,7 @@ function QuestionDialog({
                       )
                     }}
                   >
-                    <HugeiconsIcon icon={Cancel01Icon} size={14} />
+                    <XIcon  size={14} />
                   </button>
                 )}
               </div>
@@ -174,7 +174,7 @@ function QuestionDialog({
                 variant="ghost"
                 onClick={() => setOptions((prev) => [...prev, ""])}
               >
-                <HugeiconsIcon icon={Add01Icon} size={12} /> Add option
+                <PlusIcon  size={12} /> Add option
               </Button>
             )}
           </div>
@@ -326,31 +326,30 @@ function InstructorExamPageInner() {
 
   return (
     <>
-      <Topbar variant="instructor" />
-      <div className="p-4 sm:p-6 space-y-4 pb-24 md:pb-6 max-w-3xl">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <h1 className="text-lg font-semibold">
-              {lessonId ? "Lesson knowledge check" : "Course exam (CBT)"}
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              {lessonId
-                ? "Short practice quiz shown to students on this lesson — never gates the certificate."
-                : "Timed multiple-choice exam — optionally required for the certificate."}
-            </p>
-          </div>
-          {exam && (
-            <div className="flex items-center gap-2">
-              <Badge variant={exam.status === "published" ? "default" : "outline"}>
-                {exam.status}
-              </Badge>
-              {exam.examRequired && <Badge variant="secondary">required</Badge>}
-            </div>
-          )}
-        </div>
+      <Topbar title={lessonId ? "Lesson Quiz" : "Course Exam"} variant="instructor" />
+      <div className="flex-1 px-6 pb-24 pt-8 md:px-8 md:pb-12 lg:px-12">
+        <div className="mx-auto w-full max-w-3xl space-y-6">
+        <PageHeader
+          title={lessonId ? "Lesson knowledge check" : "Course exam (CBT)"}
+          subline={
+            lessonId
+              ? "Short practice quiz shown to students on this lesson — never gates the certificate."
+              : "Timed multiple-choice exam — optionally required for the certificate."
+          }
+          action={
+            exam ? (
+              <div className="flex items-center gap-2">
+                <Badge variant={exam.status === "published" ? "default" : "outline"}>
+                  {exam.status}
+                </Badge>
+                {exam.examRequired && <Badge variant="secondary">required</Badge>}
+              </div>
+            ) : undefined
+          }
+        />
 
         {isLoading ? (
-          <Skeleton className="h-64 rounded-xl" />
+          <Skeleton className="h-64 rounded-lg" />
         ) : (
           <>
             {/* Settings */}
@@ -411,7 +410,7 @@ function InstructorExamPageInner() {
                 </div>
                 {settingsError && <p className="text-xs text-destructive">{settingsError}</p>}
                 <Button size="sm" disabled={save.isPending} onClick={() => save.mutate()}>
-                  {save.isPending ? "Saving…" : savedFlash ? "Saved ✓" : exam ? "Save settings" : "Create exam"}
+                  {save.isPending ? "Saving…" : savedFlash ? "Saved" : exam ? "Save settings" : "Create exam"}
                 </Button>
               </CardContent>
             </Card>
@@ -423,7 +422,7 @@ function InstructorExamPageInner() {
                   <div className="flex items-center justify-between">
                     <h2 className="text-sm font-semibold">
                       Questions{" "}
-                      <span className="text-muted-foreground font-normal">
+                      <span className="text-ws-muted font-normal">
                         ({exam.questionCount} · {exam.totalPoints} points)
                       </span>
                     </h2>
@@ -435,12 +434,12 @@ function InstructorExamPageInner() {
                         setQDialogOpen(true)
                       }}
                     >
-                      <HugeiconsIcon icon={Add01Icon} size={12} /> Add question
+                      <PlusIcon  size={12} /> Add question
                     </Button>
                   </div>
 
                   {exam.questions.length === 0 ? (
-                    <p className="text-xs text-muted-foreground py-6 text-center">
+                    <p className="text-xs text-ws-muted py-6 text-center">
                       No questions yet — add your first one.
                     </p>
                   ) : (
@@ -448,7 +447,7 @@ function InstructorExamPageInner() {
                       {exam.questions.map((q, i) => (
                         <div
                           key={q.id}
-                          className="rounded-xl border border-border/60 px-3 py-2.5 space-y-1.5"
+                          className="rounded-lg border border-ws-hairline px-3 py-2.5 space-y-1.5"
                         >
                           <div className="flex items-start justify-between gap-2">
                             <p className="text-xs font-medium leading-relaxed">
@@ -461,22 +460,22 @@ function InstructorExamPageInner() {
                               <button
                                 type="button"
                                 aria-label="Edit question"
-                                className="text-muted-foreground hover:text-foreground p-1"
+                                className="text-ws-muted hover:text-foreground p-1"
                                 onClick={() => {
                                   setEditingQuestion(q)
                                   setQError(null)
                                   setQDialogOpen(true)
                                 }}
                               >
-                                <HugeiconsIcon icon={Edit01Icon} size={13} />
+                                <SquarePenIcon  size={13} />
                               </button>
                               <button
                                 type="button"
                                 aria-label="Delete question"
-                                className="text-muted-foreground hover:text-destructive p-1"
+                                className="text-ws-muted hover:text-destructive p-1"
                                 onClick={() => removeQuestion.mutate(q.id)}
                               >
-                                <HugeiconsIcon icon={Delete02Icon} size={13} />
+                                <Trash2Icon  size={13} />
                               </button>
                             </div>
                           </div>
@@ -487,7 +486,9 @@ function InstructorExamPageInner() {
                                 variant={q.correctOptionIds.includes(o.id) ? "default" : "outline"}
                                 className="text-[9px] font-normal"
                               >
-                                {q.correctOptionIds.includes(o.id) ? "✓ " : ""}
+                                {q.correctOptionIds.includes(o.id) && (
+                                  <CheckIcon size={9} className="mr-0.5 shrink-0" />
+                                )}
                                 {o.text.length > 40 ? o.text.slice(0, 40) + "…" : o.text}
                               </Badge>
                             ))}
@@ -507,7 +508,7 @@ function InstructorExamPageInner() {
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-xs font-semibold">Published</p>
-                      <p className="text-[11px] text-muted-foreground">
+                      <p className="text-[11px] text-ws-muted">
                         Students can see and take the exam.
                       </p>
                     </div>
@@ -518,10 +519,10 @@ function InstructorExamPageInner() {
                     />
                   </div>
                   {!lessonId && (
-                  <div className="flex items-center justify-between gap-3 pt-2 border-t border-border/50">
+                  <div className="flex items-center justify-between gap-3 pt-2 border-t border-ws-hairline">
                     <div>
                       <p className="text-xs font-semibold">Required for certificate</p>
-                      <p className="text-[11px] text-muted-foreground">
+                      <p className="text-[11px] text-ws-muted">
                         Students must pass before the course counts as completed. Applies to
                         completions from now on — already-completed students keep their
                         certificates.
@@ -540,6 +541,7 @@ function InstructorExamPageInner() {
             )}
           </>
         )}
+        </div>
       </div>
 
       <QuestionDialog

@@ -2,9 +2,8 @@
 
 import { useState } from "react"
 import { motion } from "motion/react"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { StarIcon } from "@hugeicons/core-free-icons"
 import { useVivid } from "@/lib/vivid/provider"
+import { StarIcon } from "lucide-react"
 
 export function RatingUI() {
   const vivid = useVivid()
@@ -17,22 +16,20 @@ export function RatingUI() {
         {[1, 2, 3, 4, 5].map((star) => (
           <motion.button
             key={star}
-            whileHover={{ scale: 1.25, y: -2 }}
-            whileTap={{ scale: 0.9 }}
+            whileTap={{ scale: 0.98 }}
             onMouseEnter={() => setHoveredStar(star)}
             onMouseLeave={() => setHoveredStar(0)}
             onClick={() => setRating(star)}
             className="p-1 cursor-pointer"
           >
-            <HugeiconsIcon
-              icon={StarIcon}
+            <StarIcon
+              
               size={32}
-              className={`transition-colors duration-150 ${
+              className={`transition-colors duration-[var(--ws-motion-fast)] ${
                 star <= (hoveredStar || rating)
-                  ? "text-amber-400 fill-amber-400"
+                  ? "text-ws-rating fill-ws-rating"
                   : "text-muted-foreground/20"
-              }`}
-            />
+              }`} />
           </motion.button>
         ))}
       </div>
@@ -42,10 +39,9 @@ export function RatingUI() {
             {rating === 5 ? "Excellent!" : rating === 4 ? "Great!" : rating === 3 ? "Good" : rating === 2 ? "Fair" : "Poor"}
           </p>
           <motion.button
-            whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => vivid.resolveUI({ rating })}
-            className="w-full py-2.5 rounded-xl text-sm font-medium bg-foreground text-background
+            className="w-full py-2.5 rounded-lg text-sm font-medium bg-foreground text-background
                        hover:bg-foreground/90 transition-colors"
           >
             Submit {rating} star{rating !== 1 ? "s" : ""}

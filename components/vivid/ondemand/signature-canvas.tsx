@@ -2,9 +2,8 @@
 
 import { useRef, useState, useEffect } from "react"
 import { motion } from "motion/react"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { PencilEdit01Icon } from "@hugeicons/core-free-icons"
 import { useVivid } from "@/lib/vivid/provider"
+import { PencilIcon } from "lucide-react"
 
 export function SignatureCanvasUI() {
   const vivid = useVivid()
@@ -41,7 +40,7 @@ export function SignatureCanvasUI() {
     <div className="space-y-4">
       <canvas
         ref={canvasRef}
-        className="w-full h-40 rounded-2xl border border-border/50 bg-zinc-900 dark:bg-background cursor-crosshair touch-none"
+        className="w-full h-40 rounded-lg border border-ws-hairline bg-ws-sunken cursor-crosshair touch-none"
         onMouseDown={(e) => {
           isDrawing.current = true
           const ctx = getCtx()
@@ -78,7 +77,6 @@ export function SignatureCanvasUI() {
       />
       <div className="flex gap-2">
         <motion.button
-          whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={() => {
             const ctx = getCtx()
@@ -86,13 +84,12 @@ export function SignatureCanvasUI() {
               ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
             }
           }}
-          className="flex-1 py-2.5 px-3 rounded-xl text-sm font-medium bg-accent/40
+          className="flex-1 py-2.5 px-3 rounded-lg text-sm font-medium bg-accent/40
                      hover:bg-accent/60 transition-colors"
         >
           Clear
         </motion.button>
         <motion.button
-          whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           disabled={isSaving}
           onClick={async () => {
@@ -102,14 +99,14 @@ export function SignatureCanvasUI() {
               vivid.resolveUI({ signatureDataUrl: dataUrl })
             }
           }}
-          className="flex-1 py-2.5 px-3 rounded-xl text-sm font-medium bg-foreground text-background
+          className="flex-1 py-2.5 px-3 rounded-lg text-sm font-medium bg-foreground text-background
                      hover:bg-foreground/90 transition-colors flex items-center justify-center gap-2
                      disabled:opacity-50"
         >
           {isSaving ? (
             <span className="inline-block w-4 h-4 border-2 border-background/30 border-t-background rounded-full animate-spin" />
           ) : (
-            <HugeiconsIcon icon={PencilEdit01Icon} size={14} />
+            <PencilIcon  size={14} />
           )}
           {isSaving ? "Saving…" : "Save"}
         </motion.button>

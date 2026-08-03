@@ -1,3 +1,4 @@
+import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/platform/app-sidebar"
@@ -10,6 +11,7 @@ import { QueryProvider } from "@/components/providers/query-provider"
 import { VividWrapper } from "@/components/vivid/vivid-wrapper"
 import { getCachedUser } from "@/lib/auth/cached"
 import { TranslateScript } from "@/components/translator/translate-script"
+import { OnboardingModal } from "@/components/welcome/onboarding-modal"
 
 export default async function PlatformLayout({
   children,
@@ -22,6 +24,10 @@ export default async function PlatformLayout({
     const isLocalDev = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_")
     redirect(isLocalDev ? "/login" : "https://www.worldstreetgold.com/login")
   }
+
+  // The sidebar writes `sidebar_state` when toggled, but nothing read it
+  // back — so a collapsed rail sprang open again on every navigation.
+  const sidebarOpen = (await cookies()).get("sidebar_state")?.value !== "false"
 
   return (
     <QueryProvider>
@@ -38,7 +44,7 @@ export default async function PlatformLayout({
                 avatarUrl: user.avatarUrl,
               }}
             >
-              <SidebarProvider>
+              <SidebarProvider defaultOpen={sidebarOpen}>
                 <AppSidebar />
                 <SidebarInset>
                   {children}
@@ -46,6 +52,9 @@ export default async function PlatformLayout({
                 <PlatformBottomNav />
                 <CommandSearch />
                 <TranslateScript initialLanguage={user.preferredLanguage} />
+                {/* First run: introduce the Academy over the real dashboard
+                    rather than on a separate page. */}
+                {!user.hasOnboarded && <OnboardingModal userName={user.firstName} />}
               </SidebarProvider>
             </VividWrapper>
           </MeetingProvider>

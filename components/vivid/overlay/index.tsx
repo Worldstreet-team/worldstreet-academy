@@ -6,16 +6,6 @@
  */
 
 import { motion, AnimatePresence } from "motion/react"
-import { HugeiconsIcon } from "@hugeicons/react"
-import type { IconSvgElement } from "@hugeicons/react"
-import {
-  TeachingIcon,
-  UserGroupIcon,
-  BubbleChatIcon,
-  Certificate01Icon,
-  UserIcon,
-  Search01Icon,
-} from "@hugeicons/core-free-icons"
 import type { OverlayPanel, OverlaySection } from "@/lib/vivid/types"
 
 import { CourseGrid } from "./course-grid"
@@ -27,20 +17,23 @@ import { ProfileCard } from "./profile-card"
 import { CertificateList } from "./certificate-list"
 import { SearchResultsList } from "./search-results"
 import { GenericData } from "./generic-data"
+import { FileBadgeIcon, GraduationCapIcon, MessageCircleIcon, SearchIcon, UserIcon, UsersIcon } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
+import { RenderIcon } from "@/components/shared/render-icon"
 
 // ============================================================================
 // Constants
 // ============================================================================
 
-const SECTION_ICONS: Record<OverlaySection, IconSvgElement> = {
-  courses: TeachingIcon,
-  meetings: UserGroupIcon,
-  messages: BubbleChatIcon,
-  enrollments: Certificate01Icon,
-  "course-detail": TeachingIcon,
+const SECTION_ICONS: Record<OverlaySection, LucideIcon> = {
+  courses: GraduationCapIcon,
+  meetings: UsersIcon,
+  messages: MessageCircleIcon,
+  enrollments: FileBadgeIcon,
+  "course-detail": GraduationCapIcon,
   profile: UserIcon,
-  "search-results": Search01Icon,
-  certificates: Certificate01Icon,
+  "search-results": SearchIcon,
+  certificates: FileBadgeIcon,
 }
 
 // ============================================================================
@@ -48,13 +41,13 @@ const SECTION_ICONS: Record<OverlaySection, IconSvgElement> = {
 // ============================================================================
 
 export function OverlayPanelView({ panel }: { panel: OverlayPanel }) {
-  const icon = SECTION_ICONS[panel.section] || TeachingIcon
+  const icon = SECTION_ICONS[panel.section] || GraduationCapIcon
 
   return (
     <div className="p-6 space-y-5">
       <div className="flex items-center gap-3">
-        <div className="p-2 rounded-xl bg-accent/30">
-          <HugeiconsIcon icon={icon} size={16} className="text-foreground/70" />
+        <div className="p-2 rounded-lg bg-accent/30">
+          <RenderIcon icon={icon}  size={16} className="text-foreground/70" />
         </div>
         <h3 className="text-lg font-semibold text-foreground tracking-tight capitalize">
           {panel.title}
@@ -67,7 +60,7 @@ export function OverlayPanelView({ panel }: { panel: OverlayPanel }) {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}
-          transition={{ type: "spring", stiffness: 300, damping: 25 }}
+          transition={{ duration: 0.32, ease: [0.2, 0, 0, 1] }}
         >
           {panel.data === null ? (
             <OverlaySkeleton section={panel.section} />
@@ -95,7 +88,7 @@ function OverlaySkeleton({ section }: { section: OverlaySection }) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: i * 0.05 }}
-          className="p-3 rounded-xl bg-card/40 border border-border/20 space-y-2"
+          className="p-3 rounded-lg bg-card/40 border border-ws-hairline space-y-2"
         >
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-lg bg-muted/40 animate-pulse shrink-0" />

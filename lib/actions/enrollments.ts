@@ -546,7 +546,7 @@ export async function getEnrollmentProgress(
 export async function checkEnrollment(
   userId: string,
   courseId: string
-): Promise<{ isEnrolled: boolean; status?: string }> {
+): Promise<{ isEnrolled: boolean; status?: string; resumeLessonId?: string | null }> {
   try {
     await connectDB()
 
@@ -559,7 +559,7 @@ export async function checkEnrollment(
       user: userId,
       course: courseId,
       status: { $in: ["active", "completed"] },
-    }).select("status")
+    }).select("status lastAccessedLesson")
 
     if (!enrollment) {
       return { isEnrolled: false }
@@ -568,6 +568,7 @@ export async function checkEnrollment(
     return {
       isEnrolled: true,
       status: enrollment.status,
+      resumeLessonId: enrollment.lastAccessedLesson?.toString() ?? null,
     }
   } catch (error) {
     console.error("Check enrollment error:", error)

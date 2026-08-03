@@ -1,8 +1,6 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { Copy01Icon, Delete02Icon } from "@hugeicons/core-free-icons"
 import { cn } from "@/lib/utils"
 import { deleteMessage } from "@/lib/actions/messages"
 import {
@@ -15,6 +13,7 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
 } from "@/components/ui/alert-dialog"
+import { CopyIcon, Trash2Icon } from "lucide-react"
 
 type MessageContextMenuProps = {
   children: React.ReactNode
@@ -149,7 +148,7 @@ export function MessageContextMenu({
         <div className="fixed inset-0 z-50" onClick={() => setIsOpen(false)}>
           <div
             ref={menuRef}
-            className="fixed min-w-[150px] py-1.5 rounded-xl bg-popover/95 backdrop-blur-xl shadow-lg border border-border/50 animate-in fade-in zoom-in-95 duration-150"
+            className="fixed min-w-[150px] py-1.5 rounded-lg bg-popover shadow-lg border border-ws-hairline animate-in fade-in zoom-in-95 duration-[var(--ws-motion-fast)]"
             style={{ left: position.x, top: position.y }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -157,15 +156,15 @@ export function MessageContextMenu({
               onClick={handleCopy}
               className="flex items-center gap-2.5 w-full px-3 py-2 text-sm hover:bg-muted/80 transition-colors"
             >
-              <HugeiconsIcon icon={Copy01Icon} size={15} className="text-muted-foreground" />
+              <CopyIcon  size={15} className="text-muted-foreground" />
               <span>Copy</span>
             </button>
             {isOwn && (
               <button
                 onClick={handleDeleteClick}
-                className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-red-500 hover:bg-red-500/10 transition-colors"
+                className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-ws-danger hover:bg-ws-danger/10 transition-colors"
               >
-                <HugeiconsIcon icon={Delete02Icon} size={15} />
+                <Trash2Icon  size={15} />
                 <span>Delete</span>
               </button>
             )}

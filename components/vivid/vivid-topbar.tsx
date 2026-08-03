@@ -5,13 +5,8 @@
  */
 
 import { motion } from "motion/react"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  Cancel01Icon,
-  ArrowExpand02Icon,
-  ArrowShrink02Icon,
-} from "@hugeicons/core-free-icons"
 import { useVivid } from "@/lib/vivid/provider"
+import { Maximize2Icon, Minimize2Icon, XIcon } from "lucide-react"
 
 const stateLabels: Record<string, string> = {
   idle: "Offline",
@@ -27,16 +22,17 @@ export function TopBar() {
   const vivid = useVivid()
 
   return (
-    <div className="flex items-center justify-between px-6 py-4 border-b border-border/20 relative z-10">
+    <div className="flex items-center justify-between px-6 py-4 border-b border-ws-hairline relative z-10">
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2">
+          {/* Mic live-state dot — opacity-only loop while listening
+              (sanctioned live-state exception, 06-motion) */}
           <motion.div
             animate={{
-              scale: vivid.isListening ? [1, 1.3, 1] : 1,
-              backgroundColor: vivid.isConnected ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.3)",
+              opacity: vivid.isListening ? [0.4, 1, 0.4] : vivid.isConnected ? 0.8 : 0.3,
             }}
-            transition={{ repeat: vivid.isListening ? Infinity : 0, duration: 1 }}
-            className="w-2 h-2 rounded-full"
+            transition={{ repeat: vivid.isListening ? Infinity : 0, duration: 1.2, ease: "easeInOut" }}
+            className="w-2 h-2 rounded-full bg-foreground"
           />
           <span className="text-sm font-medium text-foreground/80">
             WorldStreet AI
@@ -51,8 +47,7 @@ export function TopBar() {
         {/* Expand / Minimize toggle */}
         {vivid.isConnected && (
           <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => vivid.setViewMode(
               vivid.viewMode === "expanded" ? "minimized" : "expanded"
             )}
@@ -60,21 +55,20 @@ export function TopBar() {
             aria-label={vivid.viewMode === "expanded" ? "Minimize" : "Expand"}
           >
             {vivid.viewMode === "expanded" ? (
-              <HugeiconsIcon icon={ArrowShrink02Icon} size={16} />
+              <Minimize2Icon  size={16} />
             ) : (
-              <HugeiconsIcon icon={ArrowExpand02Icon} size={16} />
+              <Maximize2Icon  size={16} />
             )}
           </motion.button>
         )}
 
         {/* Close */}
         <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+          whileTap={{ scale: 0.98 }}
           onClick={() => vivid.endSession()}
           className="p-2 rounded-lg hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive"
         >
-          <HugeiconsIcon icon={Cancel01Icon} size={16} />
+          <XIcon  size={16} />
         </motion.button>
       </div>
     </div>

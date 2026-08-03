@@ -8,18 +8,10 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react"
 import { Button } from "@/components/ui/button"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  Tick02Icon,
-  Cancel01Icon,
-  Delete02Icon,
-  Upload03Icon,
-  PencilEdit02Icon,
-  Eraser01Icon,
-} from "@hugeicons/core-free-icons"
 import { saveSignature } from "@/lib/actions/signature"
 import { getImageUploadUrl } from "@/lib/actions/upload"
 import { cn } from "@/lib/utils"
+import { CheckIcon, EraserIcon, PencilLineIcon, Trash2Icon, UploadIcon, XIcon } from "lucide-react"
 
 type Tool = "pen" | "eraser"
 type PenSize = 2 | 3 | 5
@@ -103,7 +95,7 @@ export function SignatureCanvas({
 
       if (tool === "pen") {
         ctx.globalCompositeOperation = "source-over"
-        ctx.strokeStyle = "#1a1a1a"
+        ctx.strokeStyle = "#1a1a1a" // signature ink — near-black pen on the paper pad, matches print output
         ctx.lineWidth = penSize
       } else {
         ctx.globalCompositeOperation = "destination-out"
@@ -224,30 +216,30 @@ export function SignatureCanvas({
           <button
             onClick={() => setTool("pen")}
             className={cn(
-              "p-2 rounded-lg transition-all duration-200",
+              "p-2 rounded-lg transition-all duration-[var(--ws-motion-base)]",
               tool === "pen"
-                ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
-                : "text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                ? "bg-ws-primary text-ws-page"
+                : "text-ws-muted hover:text-ws-primary hover:bg-ws-chip"
             )}
             title="Pen"
           >
-            <HugeiconsIcon icon={PencilEdit02Icon} size={16} />
+            <PencilLineIcon  size={16} />
           </button>
           <button
             onClick={() => setTool("eraser")}
             className={cn(
-              "p-2 rounded-lg transition-all duration-200",
+              "p-2 rounded-lg transition-all duration-[var(--ws-motion-base)]",
               tool === "eraser"
-                ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
-                : "text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                ? "bg-ws-primary text-ws-page"
+                : "text-ws-muted hover:text-ws-primary hover:bg-ws-chip"
             )}
             title="Eraser"
           >
-            <HugeiconsIcon icon={Eraser01Icon} size={16} />
+            <EraserIcon  size={16} />
           </button>
 
           {/* Divider */}
-          <div className="w-px h-5 bg-neutral-200 dark:bg-neutral-700 mx-1" />
+          <div className="w-px h-5 bg-ws-track mx-1" />
 
           {/* Pen sizes */}
           {PEN_SIZES.map((s) => (
@@ -255,10 +247,10 @@ export function SignatureCanvas({
               key={s.value}
               onClick={() => setPenSize(s.value)}
               className={cn(
-                "w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 text-[10px] font-semibold",
+                "w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-[var(--ws-motion-base)] text-[10px] font-semibold",
                 penSize === s.value
-                  ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
-                  : "text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                  ? "bg-ws-primary text-ws-page"
+                  : "text-ws-muted hover:text-ws-primary hover:bg-ws-chip"
               )}
               title={`Size ${s.label}`}
             >
@@ -277,10 +269,10 @@ export function SignatureCanvas({
         <div className="flex items-center gap-1">
           <button
             onClick={clearCanvas}
-            className="p-2 rounded-lg text-neutral-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all duration-200"
+            className="p-2 rounded-lg text-ws-muted hover:text-ws-danger hover:bg-ws-danger/15 transition-all duration-[var(--ws-motion-base)]"
             title="Clear"
           >
-            <HugeiconsIcon icon={Delete02Icon} size={16} />
+            <Trash2Icon  size={16} />
           </button>
         </div>
       </div>
@@ -289,8 +281,8 @@ export function SignatureCanvas({
       <div
         ref={containerRef}
         className={cn(
-          "relative rounded-xl border-2 border-dashed border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-950 overflow-hidden",
-          isDrawing && "border-neutral-400 dark:border-neutral-500",
+          "relative rounded-lg border-2 border-dashed border-ws-hairline bg-ws-sunken overflow-hidden",
+          isDrawing && "border-ws-subtle",
           compact ? "h-28" : "h-36"
         )}
       >
@@ -308,12 +300,12 @@ export function SignatureCanvas({
         />
 
         {/* Guide line */}
-        <div className="absolute bottom-6 left-8 right-8 h-px bg-neutral-100 dark:bg-neutral-800 pointer-events-none" />
+        <div className="absolute bottom-6 left-8 right-8 h-px bg-ws-track pointer-events-none" />
 
         {/* Placeholder text */}
         {!hasContent && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <p className="text-neutral-300 dark:text-neutral-600 text-sm font-light tracking-wide">
+            <p className="text-ws-subtle text-sm font-light tracking-wide">
               Sign here
             </p>
           </div>
@@ -325,9 +317,9 @@ export function SignatureCanvas({
         <div className="flex items-center gap-2">
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-1.5 text-xs text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors"
+            className="flex items-center gap-1.5 text-xs text-ws-muted hover:text-ws-primary transition-colors"
           >
-            <HugeiconsIcon icon={Upload03Icon} size={14} />
+            <UploadIcon  size={14} />
             Upload instead
           </button>
           <input
@@ -351,7 +343,7 @@ export function SignatureCanvas({
               onClick={onCancel}
               className="gap-1 text-xs h-8"
             >
-              <HugeiconsIcon icon={Cancel01Icon} size={14} />
+              <XIcon  size={14} />
               Cancel
             </Button>
           )}
@@ -382,7 +374,7 @@ export function SignatureCanvas({
                 />
               </svg>
             ) : (
-              <HugeiconsIcon icon={Tick02Icon} size={14} />
+              <CheckIcon  size={14} />
             )}
             Save Signature
           </Button>

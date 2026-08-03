@@ -5,11 +5,11 @@ import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { StarIcon, Bookmark01Icon, PlayCircle02Icon } from "@hugeicons/core-free-icons"
 import { useBookmarkContext } from "@/components/providers/bookmark-provider"
+import { levelChipStyle } from "@/components/shared/level-badge"
 import type { Course } from "@/lib/types"
 import type { BrowseCourse } from "@/lib/actions/student"
+import { BookmarkIcon, CirclePlayIcon, StarIcon } from "lucide-react"
 
 type CourseData = Course | BrowseCourse
 
@@ -29,7 +29,7 @@ export function CourseCard({ course }: { course: CourseData }) {
 
   return (
     <Link href={`/dashboard/courses/${course.id}`}>
-      <Card className="group h-full transition-all hover:shadow-md hover:border-primary/30">
+      <Card className="group h-full transition-all hover:border-primary/30">
         {/* Flush image */}
         <div className="aspect-video w-full bg-muted relative overflow-hidden">
           {course.thumbnailUrl ? (
@@ -37,7 +37,7 @@ export function CourseCard({ course }: { course: CourseData }) {
               src={course.thumbnailUrl}
               alt={course.title}
               fill
-              className="object-cover group-hover:scale-105 transition-transform duration-300"
+              className="object-cover transition-transform duration-[var(--ws-motion-base)]"
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
             />
           ) : (
@@ -47,7 +47,7 @@ export function CourseCard({ course }: { course: CourseData }) {
           )}
           {/* Glassmorphic price badge */}
           <Badge
-            className="absolute top-2.5 left-2.5 text-[10px] z-10 border border-white/30 shadow-lg backdrop-blur-md bg-white/20 text-white dark:bg-black/30 dark:border-white/20"
+            className="absolute top-2.5 left-2.5 text-[10px] z-10 border border-white/20 bg-black/55 text-white"
           >
             {course.pricing === "free" ? "Free" : `$${course.price}`}
           </Badge>
@@ -59,18 +59,18 @@ export function CourseCard({ course }: { course: CourseData }) {
               e.stopPropagation()
               toggle(course.id)
             }}
-            className={`absolute top-2.5 right-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/30 backdrop-blur-md shadow-lg transition-all hover:bg-white/40 dark:border-white/20 ${
+            className={`absolute top-2.5 right-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/30 shadow-lg transition-all hover:bg-white/40 dark:border-white/20 ${
               favorited
                 ? "bg-primary/80 text-white"
                 : "bg-white/20 text-white dark:bg-black/30"
             }`}
           >
-            <HugeiconsIcon icon={Bookmark01Icon} size={14} fill={favorited ? "currentColor" : "none"} />
+            <BookmarkIcon  size={14} fill={favorited ? "currentColor" : "none"} />
           </button>
           {/* Lesson count + duration overlay */}
           {course.totalLessons > 0 && (
-            <div className="absolute bottom-2 right-2 z-10 flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-white border border-white/20 backdrop-blur-md bg-black/50 shadow-lg">
-              <HugeiconsIcon icon={PlayCircle02Icon} size={11} />
+            <div className="absolute bottom-2 right-2 z-10 flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-white border border-white/20 bg-black/55">
+              <CirclePlayIcon  size={11} />
               <span>{course.totalLessons}</span>
               {course.totalDuration > 0 && (
                 <>
@@ -84,12 +84,16 @@ export function CourseCard({ course }: { course: CourseData }) {
 
         <CardContent className="p-4 space-y-2.5">
           <div className="flex items-center gap-1.5">
-            <Badge variant="secondary" className="text-[10px] capitalize">
+            <Badge
+              variant="secondary"
+              className="text-[10px] capitalize"
+              style={levelChipStyle(course.level)}
+            >
               {course.level}
             </Badge>
             {course.rating && (
               <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground ml-auto">
-                <HugeiconsIcon icon={StarIcon} size={11} className="text-orange-500" fill="currentColor" />
+                <StarIcon  size={11} className="text-ws-rating" fill="currentColor" />
                 {course.rating}
               </span>
             )}

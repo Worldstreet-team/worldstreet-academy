@@ -6,8 +6,6 @@
  */
 
 import { motion, AnimatePresence } from "motion/react"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { Cancel01Icon } from "@hugeicons/core-free-icons"
 import { useVivid } from "@/lib/vivid/provider"
 import type { OnDemandUI } from "@/lib/vivid/types"
 
@@ -21,6 +19,7 @@ import { ProgressDashboardUI } from "./progress-dashboard"
 import { ContactCardUI } from "./contact-card"
 import { CheckoutConfirmUI } from "./checkout-confirm"
 import { FriendSearchUI } from "./friend-search"
+import { XIcon } from "lucide-react"
 
 export function OnDemandUIPanel({ ui }: { ui: OnDemandUI }) {
   const vivid = useVivid()
@@ -30,12 +29,11 @@ export function OnDemandUIPanel({ ui }: { ui: OnDemandUI }) {
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-foreground tracking-tight">{ui.title}</h3>
         <motion.button
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
+          whileTap={{ scale: 0.98 }}
           onClick={() => vivid.dismissUI()}
           className="p-1.5 rounded-lg hover:bg-accent/50 text-muted-foreground"
         >
-          <HugeiconsIcon icon={Cancel01Icon} size={16} />
+          <XIcon  size={16} />
         </motion.button>
       </div>
       {ui.description && (

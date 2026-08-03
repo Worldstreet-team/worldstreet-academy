@@ -6,8 +6,7 @@ import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { cn } from "@/lib/utils"
 import { useMediaQuery } from "@/lib/hooks/use-media-query"
 import { Button } from "@/components/ui/button"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { Cancel01Icon } from "@hugeicons/core-free-icons"
+import { XIcon } from "lucide-react"
 
 /* ─── Context to share viewport mode with children ─── */
 const DesktopContext = React.createContext(true)
@@ -55,7 +54,7 @@ function ResponsiveModalContent({
     <DialogPrimitive.Portal>
       {/* Overlay / backdrop */}
       <DialogPrimitive.Backdrop
-        className="data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 bg-black/10 duration-100 data-ending-style:opacity-0 data-starting-style:opacity-0 supports-backdrop-filter:backdrop-blur-xs fixed inset-0 z-50"
+        className="data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 bg-black/10 duration-[var(--ws-motion-fast)] data-ending-style:opacity-0 data-starting-style:opacity-0 supports-backdrop-filter: fixed inset-0 z-50"
       />
 
       {/* Popup — dialog on desktop, bottom sheet on mobile */}
@@ -64,8 +63,8 @@ function ResponsiveModalContent({
         className={cn(
           "bg-background outline-none text-sm z-50 fixed",
           isDesktop
-            ? "data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-foreground/10 grid max-w-[calc(100%-2rem)] gap-4 rounded-xl p-4 ring-1 duration-100 sm:max-w-sm top-1/2 left-1/2 w-full -translate-x-1/2 -translate-y-1/2"
-            : "data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:slide-out-to-bottom-10 data-open:slide-in-from-bottom-10 flex flex-col gap-4 shadow-lg transition duration-200 ease-in-out inset-x-0 bottom-0 rounded-t-xl border-t p-4",
+            ? "data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-foreground/10 grid max-w-[calc(100%-2rem)] gap-4 rounded-lg p-4 ring-1 duration-[var(--ws-motion-fast)] sm:max-w-sm top-1/2 left-1/2 w-full -translate-x-1/2 -translate-y-1/2"
+            : "data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:slide-out-to-bottom-10 data-open:slide-in-from-bottom-10 flex flex-col gap-4 shadow-lg transition duration-[var(--ws-motion-base)] ease-in-out inset-x-0 bottom-0 rounded-t-lg border-t p-4",
           className
         )}
         {...props}
@@ -91,7 +90,7 @@ function ResponsiveModalContent({
               />
             }
           >
-            <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} />
+            <XIcon  strokeWidth={2} />
             <span className="sr-only">Close</span>
           </DialogPrimitive.Close>
         )}
@@ -126,7 +125,7 @@ function ResponsiveModalFooter({
       data-slot="responsive-modal-footer"
       className={cn(
         isDesktop
-          ? "bg-muted/50 -mx-4 -mb-4 rounded-b-xl border-t p-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"
+          ? "bg-muted/50 -mx-4 -mb-4 rounded-b-lg border-t p-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"
           : "flex flex-col-reverse gap-2 pt-2",
         className
       )}

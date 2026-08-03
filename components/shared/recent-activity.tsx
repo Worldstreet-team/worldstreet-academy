@@ -8,24 +8,16 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  Video01Icon,
-  Calendar03Icon,
-  ArrowRight01Icon,
-  Message01Icon,
-  Clock01Icon,
-  UserMultipleIcon,
-} from "@hugeicons/core-free-icons"
 import { getMyMeetings, getMyMeetingInvites, type MeetingWithDetails, type MeetingInviteItem } from "@/lib/actions/meetings"
 import { getConversations, type ConversationWithDetails } from "@/lib/actions/messages"
+import { CalendarDaysIcon, ChevronRightIcon, ClockIcon, MessageSquareIcon, UsersIcon, VideoIcon } from "lucide-react"
 
 /* ── Status badge helper ── */
 function MeetingStatusBadge({ status }: { status: string }) {
   const variants: Record<string, { label: string; className: string }> = {
-    active: { label: "Live", className: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20" },
-    waiting: { label: "Waiting", className: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20" },
-    scheduled: { label: "Scheduled", className: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/20" },
+    active: { label: "Live", className: "bg-ws-success/15 text-ws-success dark:text-ws-success border-ws-success/20" },
+    waiting: { label: "Waiting", className: "bg-ws-warning/15 text-ws-warning dark:text-ws-warning border-ws-warning/20" },
+    scheduled: { label: "Scheduled", className: "bg-ws-forex/15 text-ws-forex dark:text-ws-forex border-ws-forex/20" },
   }
   const v = variants[status] ?? { label: status, className: "" }
   return (
@@ -143,8 +135,8 @@ export function RecentActivity({
         <div className="space-y-2.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                <HugeiconsIcon icon={Video01Icon} size={14} className="text-emerald-500" />
+              <div className="w-7 h-7 rounded-lg bg-ws-success/10 flex items-center justify-center">
+                <VideoIcon  size={14} className="text-ws-success" />
               </div>
               <h3 className="text-sm font-semibold">Active Meetings</h3>
             </div>
@@ -165,7 +157,7 @@ export function RecentActivity({
             <div className="space-y-2">
               {activeMeetings.slice(0, 3).map((meeting) => (
                 <Link key={meeting.id} href={`${meetingsHref}?join=${meeting.id}`}>
-                  <Card className="group hover:border-emerald-500/30 hover:shadow-sm transition-all">
+                  <Card className="group hover:border-ws-success/30 transition-all">
                     <CardContent className="p-3 flex items-center gap-3">
                       {meeting.courseThumbnailUrl ? (
                         <div className="w-10 h-10 rounded-lg bg-muted relative overflow-hidden shrink-0">
@@ -178,18 +170,18 @@ export function RecentActivity({
                           />
                         </div>
                       ) : (
-                        <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
-                          <HugeiconsIcon icon={Video01Icon} size={16} className="text-emerald-500" />
+                        <div className="w-10 h-10 rounded-lg bg-ws-success/10 flex items-center justify-center shrink-0">
+                          <VideoIcon  size={16} className="text-ws-success" />
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate group-hover:text-emerald-600 transition-colors">
+                        <p className="text-sm font-medium truncate group-hover:text-ws-success transition-colors">
                           {meeting.title}
                         </p>
                         <div className="flex items-center gap-2 mt-0.5">
                           <MeetingStatusBadge status={meeting.status} />
                           <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                            <HugeiconsIcon icon={UserMultipleIcon} size={10} />
+                            <UsersIcon  size={10} />
                             {meeting.participantCount}
                           </span>
                         </div>
@@ -206,8 +198,8 @@ export function RecentActivity({
         <div className="space-y-2.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                <HugeiconsIcon icon={Calendar03Icon} size={14} className="text-blue-500" />
+              <div className="w-7 h-7 rounded-lg bg-ws-forex/10 flex items-center justify-center">
+                <CalendarDaysIcon  size={14} className="text-ws-forex" />
               </div>
               <h3 className="text-sm font-semibold">Invitations</h3>
             </div>
@@ -228,7 +220,7 @@ export function RecentActivity({
             <div className="space-y-2">
               {invites.slice(0, 3).map((invite) => (
                 <Link key={invite.id} href={`${meetingsHref}?join=${invite.meetingId}`}>
-                  <Card className="group hover:border-blue-500/30 hover:shadow-sm transition-all">
+                  <Card className="group hover:border-ws-forex/30 transition-all">
                     <CardContent className="p-3 flex items-center gap-3">
                       {invite.courseThumbnailUrl ? (
                         <div className="w-10 h-10 rounded-lg bg-muted relative overflow-hidden shrink-0">
@@ -241,12 +233,12 @@ export function RecentActivity({
                           />
                         </div>
                       ) : (
-                        <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
-                          <HugeiconsIcon icon={Calendar03Icon} size={16} className="text-blue-500" />
+                        <div className="w-10 h-10 rounded-lg bg-ws-forex/10 flex items-center justify-center shrink-0">
+                          <CalendarDaysIcon  size={16} className="text-ws-forex" />
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate group-hover:text-blue-600 transition-colors">
+                        <p className="text-sm font-medium truncate group-hover:text-ws-forex transition-colors">
                           {invite.title}
                         </p>
                         <div className="flex items-center gap-2 mt-0.5">
@@ -270,8 +262,8 @@ export function RecentActivity({
         <div className="space-y-2.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-violet-500/10 flex items-center justify-center">
-                <HugeiconsIcon icon={Message01Icon} size={14} className="text-violet-500" />
+              <div className="w-7 h-7 rounded-lg bg-ws-crypto/10 flex items-center justify-center">
+                <MessageSquareIcon  size={14} className="text-ws-crypto" />
               </div>
               <h3 className="text-sm font-semibold">Messages</h3>
             </div>
@@ -292,7 +284,7 @@ export function RecentActivity({
             <div className="space-y-2">
               {recentConversations.map((convo) => (
                 <Link key={convo.id} href={`${messagesHref}?chat=${convo.id}`}>
-                  <Card className="group hover:border-violet-500/30 hover:shadow-sm transition-all">
+                  <Card className="group hover:border-ws-crypto/30 transition-all">
                     <CardContent className="p-3 flex items-center gap-3">
                       <Avatar size="sm" className="shrink-0">
                         <AvatarFallback>
@@ -304,11 +296,11 @@ export function RecentActivity({
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-medium truncate group-hover:text-violet-600 transition-colors">
+                          <p className="text-sm font-medium truncate group-hover:text-ws-crypto transition-colors">
                             {convo.participant.name}
                           </p>
                           {convo.unreadCount > 0 && (
-                            <span className="shrink-0 w-4.5 h-4.5 rounded-full bg-violet-500 text-white text-[9px] flex items-center justify-center font-medium">
+                            <span className="shrink-0 w-4.5 h-4.5 rounded-full bg-ws-crypto text-white text-[9px] flex items-center justify-center font-medium">
                               {convo.unreadCount > 9 ? "9+" : convo.unreadCount}
                             </span>
                           )}
@@ -318,16 +310,16 @@ export function RecentActivity({
                             {convo.isOwnLastMessage && "You: "}
                             {convo.lastMessageType !== "text"
                               ? convo.lastMessageType === "image"
-                                ? "📷 Photo"
+                                ? "Photo"
                                 : convo.lastMessageType === "video"
-                                  ? "🎬 Video"
+                                  ? "Video"
                                   : convo.lastMessageType === "audio"
-                                    ? "🎤 Audio"
-                                    : "📎 File"
+                                    ? "Audio"
+                                    : "File"
                               : convo.lastMessage}
                           </p>
                           <span className="text-[10px] text-muted-foreground/50 shrink-0 flex items-center gap-0.5">
-                            <HugeiconsIcon icon={Clock01Icon} size={9} />
+                            <ClockIcon  size={9} />
                             {timeAgo(convo.lastMessageAt)}
                           </span>
                         </div>
@@ -350,7 +342,7 @@ export function RecentActivity({
           render={<Link href={meetingsHref} />}
         >
           All Meetings
-          <HugeiconsIcon icon={ArrowRight01Icon} size={12} />
+          <ChevronRightIcon  size={12} />
         </Button>
         <Button
           variant="outline"
@@ -359,7 +351,7 @@ export function RecentActivity({
           render={<Link href={messagesHref} />}
         >
           All Messages
-          <HugeiconsIcon icon={ArrowRight01Icon} size={12} />
+          <ChevronRightIcon  size={12} />
         </Button>
       </div>
     </section>

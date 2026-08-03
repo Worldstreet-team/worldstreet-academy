@@ -3,11 +3,10 @@
 import Image from "next/image"
 import { useState, useEffect } from "react"
 import { motion } from "motion/react"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { Tick02Icon } from "@hugeicons/core-free-icons"
 import { useVivid } from "@/lib/vivid/provider"
 import type { OnDemandUI } from "@/lib/vivid/types"
 import { parseConfig } from "./helpers"
+import { CheckIcon } from "lucide-react"
 
 export function ProgressDashboardUI({ ui }: { ui: OnDemandUI }) {
   const vivid = useVivid()
@@ -54,7 +53,7 @@ export function ProgressDashboardUI({ ui }: { ui: OnDemandUI }) {
       {/* Course header */}
       <div className="flex items-center gap-3">
         {config.thumbnailUrl && (
-          <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-muted shrink-0">
+          <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-muted shrink-0">
             <Image src={config.thumbnailUrl} alt="" fill className="object-cover" sizes="48px" />
           </div>
         )}
@@ -77,7 +76,8 @@ export function ProgressDashboardUI({ ui }: { ui: OnDemandUI }) {
               strokeWidth="6"
               className="text-accent/30"
             />
-            <motion.circle
+            {/* Static ring fill — off-ladder 1s circOut sweep removed (06-motion) */}
+            <circle
               cx="50" cy="50" r="42"
               fill="none"
               stroke="currentColor"
@@ -85,9 +85,7 @@ export function ProgressDashboardUI({ ui }: { ui: OnDemandUI }) {
               strokeLinecap="round"
               className="text-foreground"
               strokeDasharray={circumference}
-              initial={{ strokeDashoffset: circumference }}
-              animate={{ strokeDashoffset: circumference - (circumference * pct) / 100 }}
-              transition={{ duration: 1, ease: "circOut", delay: 0.3 }}
+              strokeDashoffset={circumference - (circumference * pct) / 100}
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
@@ -114,7 +112,7 @@ export function ProgressDashboardUI({ ui }: { ui: OnDemandUI }) {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.4 + i * 0.04 }}
               className={`
-                flex items-center gap-3 p-2.5 rounded-xl text-sm
+                flex items-center gap-3 p-2.5 rounded-lg text-sm
                 ${lesson.isCompleted
                   ? "bg-accent/20 text-foreground/60"
                   : "bg-card/40 text-foreground"
@@ -125,10 +123,10 @@ export function ProgressDashboardUI({ ui }: { ui: OnDemandUI }) {
                 w-5 h-5 rounded-full flex items-center justify-center shrink-0 border
                 ${lesson.isCompleted
                   ? "bg-foreground text-background border-foreground"
-                  : "border-border/60"
+                  : "border-ws-hairline"
                 }
               `}>
-                {lesson.isCompleted && <HugeiconsIcon icon={Tick02Icon} size={10} />}
+                {lesson.isCompleted && <CheckIcon  size={10} />}
               </div>
               <span className={`flex-1 truncate ${lesson.isCompleted ? "line-through" : ""}`}>
                 {lesson.title}
@@ -142,10 +140,9 @@ export function ProgressDashboardUI({ ui }: { ui: OnDemandUI }) {
       )}
 
       <motion.button
-        whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
         onClick={() => vivid.resolveUI({ acknowledged: true, progress: pct })}
-        className="w-full py-2.5 rounded-xl text-sm font-medium bg-accent/40
+        className="w-full py-2.5 rounded-lg text-sm font-medium bg-accent/40
                    hover:bg-accent/60 transition-colors"
       >
         Got it

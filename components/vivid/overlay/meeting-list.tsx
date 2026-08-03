@@ -1,8 +1,7 @@
 "use client"
 
 import { motion } from "motion/react"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { UserGroupIcon } from "@hugeicons/core-free-icons"
+import { UsersIcon } from "lucide-react"
 
 export interface MeetingItem {
   id?: string
@@ -24,11 +23,11 @@ export function MeetingList({ data }: { data: unknown }) {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: i * 0.04 }}
-          className="flex items-center gap-3 p-3.5 rounded-2xl bg-card/50 border border-border/20
-                     hover:border-foreground/10 hover:bg-card/70 transition-all duration-200"
+          className="flex items-center gap-3 p-3.5 rounded-lg bg-card/50 border border-ws-hairline
+                     hover:border-foreground/10 hover:bg-card/70 transition-all duration-[var(--ws-motion-base)]"
         >
-          <div className="p-2 rounded-xl bg-accent/30">
-            <HugeiconsIcon icon={UserGroupIcon} size={16} className="text-foreground/70" />
+          <div className="p-2 rounded-lg bg-accent/30">
+            <UsersIcon  size={16} className="text-foreground/70" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate">{m.title}</p>
@@ -37,8 +36,8 @@ export function MeetingList({ data }: { data: unknown }) {
             </p>
           </div>
           <span className={`text-[11px] px-2.5 py-1 rounded-lg font-medium ${
-            m.status === "active" ? "bg-emerald-500/15 text-emerald-500" :
-            m.status === "waiting" ? "bg-amber-500/15 text-amber-500" :
+            m.status === "active" ? "bg-ws-success/15 text-ws-success" :
+            m.status === "waiting" ? "bg-ws-warning/15 text-ws-warning" :
             "bg-accent/30 text-muted-foreground"
           }`}>
             {m.status}

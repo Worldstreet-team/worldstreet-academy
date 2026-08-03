@@ -1,6 +1,6 @@
 "use client"
 
-import { useActionState, useState, useEffect } from "react"
+import { useActionState, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -27,20 +27,9 @@ import {
 } from "@/components/ui/collapsible"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { SectionDivider } from "@/components/instructor/section-divider"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  ArrowLeft01Icon,
-  ArrowDown01Icon,
-  Add01Icon,
-  Delete01Icon,
-  Video01Icon,
-  ViewIcon,
-  Tick02Icon,
-  Edit01Icon,
-  File01Icon,
-} from "@hugeicons/core-free-icons"
 import { cn } from "@/lib/utils"
-import { ThemeToggle } from "@/components/theme-toggle"
+import { EmptyState } from "@/components/shared/empty-state"
+import { ArtCourses } from "@/components/shared/illustrations"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
 import {
   DropdownMenu,
@@ -50,6 +39,8 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useUser } from "@/components/providers/user-provider"
 import type { Lesson, CourseLevel, CoursePricing, CourseStatus, CourseCategory } from "@/lib/types"
+import { CheckIcon, ChevronDownIcon, ChevronLeftIcon, EyeIcon, FileIcon, PlusIcon, SquarePenIcon, Trash2Icon, VideoIcon } from "lucide-react"
+import { RenderIcon } from "@/components/shared/render-icon"
 
 // Minimal course data for editing
 type EditableCourse = {
@@ -110,8 +101,8 @@ type EditorLesson = {
 }
 
 const typeIcons = {
-  video: Video01Icon,
-  text: File01Icon,
+  video: VideoIcon,
+  text: FileIcon,
 }
 
 const initialFormState: CourseFormState = {
@@ -160,7 +151,12 @@ export function CourseEditor({
   const [previewError, setPreviewError] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
 
-  useEffect(() => setPreviewError(false), [thumbnailUrl])
+  /* Reset the broken-preview flag whenever a new thumbnail URL comes in —
+     done at the change site rather than in an effect (react-hooks lint). */
+  function changeThumbnailUrl(url: string) {
+    setThumbnailUrl(url)
+    setPreviewError(false)
+  }
 
   /* Get presigned URL for course thumbnail upload */
   async function getCourseThumbnailPresignedUrl(file: File) {
@@ -227,7 +223,7 @@ export function CourseEditor({
             size="sm"
             render={<Link href="/instructor/courses" />}
           >
-            <HugeiconsIcon icon={ArrowLeft01Icon} size={16} />
+            <ChevronLeftIcon  size={16} />
             Courses
           </Button>
           <Separator orientation="vertical" className="!h-4" />
@@ -236,7 +232,6 @@ export function CourseEditor({
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <ThemeToggle />
           <Badge variant="secondary" className="text-[10px] capitalize">
             {status}
           </Badge>
@@ -259,10 +254,10 @@ export function CourseEditor({
 
             <DropdownMenu>
               <DropdownMenuTrigger
-                className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground shadow-xs hover:bg-primary/90 transition-colors cursor-pointer disabled:opacity-50"
+                className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-sm bg-ws-brand px-4 text-sm font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90 disabled:opacity-50"
               >
                 {isPending ? "Saving…" : "Save"}
-                <HugeiconsIcon icon={ArrowDown01Icon} size={14} />
+                <ChevronDownIcon  size={14} />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" sideOffset={4}>
                 <DropdownMenuItem
@@ -277,7 +272,7 @@ export function CourseEditor({
                     })
                   }}
                 >
-                  <HugeiconsIcon icon={Edit01Icon} size={14} />
+                  <SquarePenIcon  size={14} />
                   Save as Draft
                 </DropdownMenuItem>
                 <DropdownMenuItem
@@ -292,7 +287,7 @@ export function CourseEditor({
                     })
                   }}
                 >
-                  <HugeiconsIcon icon={Tick02Icon} size={14} />
+                  <CheckIcon  size={14} />
                   Save &amp; Publish
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -341,8 +336,8 @@ export function CourseEditor({
           <MediaUpload
             type="image"
             value={thumbnailUrl}
-            onChange={(url) => setThumbnailUrl(url)}
-            onRemove={() => setThumbnailUrl("")}
+            onChange={(url) => changeThumbnailUrl(url)}
+            onRemove={() => changeThumbnailUrl("")}
             onGetPresignedUrl={getCourseThumbnailPresignedUrl}
           />
           {uploadError && (
@@ -437,10 +432,12 @@ export function CourseEditor({
           <SectionDivider label="Curriculum" />
 
           {lessons.length === 0 ? (
-            <div className="rounded-lg border-2 border-dashed border-border p-8 text-center space-y-2">
-              <p className="text-sm text-muted-foreground">
-                No lessons yet. Start building your curriculum.
-              </p>
+            <div className="rounded-lg border border-dashed border-ws-hairline">
+              <EmptyState
+                art={<ArtCourses />}
+                title="No lessons yet"
+                description="Start building your curriculum with the button below."
+              />
             </div>
           ) : (
             /* ── Simple lesson list ── */
@@ -465,7 +462,7 @@ export function CourseEditor({
                           isExpanded && "rounded-b-none border-b-0 bg-muted/10"
                         )}
                       >
-                        <span className="text-[11px] font-mono font-semibold text-muted-foreground w-5 text-center shrink-0">
+                        <span className="text-[11px] tabular-nums font-semibold text-muted-foreground w-5 text-center shrink-0">
                           {String(i + 1).padStart(2, "0")}
                         </span>
                         <div className="flex-1 min-w-0">
@@ -473,11 +470,10 @@ export function CourseEditor({
                             {lesson.title || "Untitled Lesson"}
                           </p>
                           <div className="flex items-center gap-1.5 mt-0.5">
-                            <HugeiconsIcon
-                              icon={typeIcons[lesson.type]}
+                            <RenderIcon icon={typeIcons[lesson.type]}
+                              
                               size={12}
-                              className="text-muted-foreground"
-                            />
+                              className="text-muted-foreground" />
                             <span className="text-[11px] text-muted-foreground capitalize">
                               {lesson.type}
                             </span>
@@ -501,14 +497,13 @@ export function CourseEditor({
                             )}
                           </div>
                         </div>
-                        <HugeiconsIcon
-                          icon={ArrowDown01Icon}
+                        <ChevronDownIcon
+                          
                           size={16}
                           className={cn(
-                            "text-muted-foreground transition-transform duration-200 shrink-0",
+                            "text-muted-foreground transition-transform duration-[var(--ws-motion-base)] shrink-0",
                             isExpanded && "rotate-180"
-                          )}
-                        />
+                          )} />
                       </CollapsibleTrigger>
 
                       {/* Expanded form */}
@@ -693,7 +688,7 @@ export function CourseEditor({
                               size="sm"
                               onClick={() => removeLesson(lesson.tempId)}
                             >
-                              <HugeiconsIcon icon={Delete01Icon} size={14} />
+                              <Trash2Icon  size={14} />
                               Remove Lesson
                             </Button>
                           </div>
@@ -711,7 +706,7 @@ export function CourseEditor({
             className="w-full border-dashed"
             onClick={addNewLesson}
           >
-            <HugeiconsIcon icon={Add01Icon} size={16} />
+            <PlusIcon  size={16} />
             Add Lesson
           </Button>
 
@@ -739,11 +734,10 @@ export function CourseEditor({
         {/* ───────── RIGHT: Preview ───────── */}
         <div className="overflow-auto p-5 space-y-4 bg-muted/10 hidden lg:block">
           <div className="flex items-center gap-2">
-            <HugeiconsIcon
-              icon={ViewIcon}
+            <EyeIcon
+              
               size={14}
-              className="text-muted-foreground"
-            />
+              className="text-muted-foreground" />
             <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
               Student Preview
             </span>
@@ -825,11 +819,10 @@ export function CourseEditor({
                         />
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center bg-muted">
-                          <HugeiconsIcon 
-                            icon={typeIcons[lesson.type]} 
+                          <RenderIcon icon={typeIcons[lesson.type]} 
+                             
                             size={12} 
-                            className="text-muted-foreground/50" 
-                          />
+                            className="text-muted-foreground/50" />
                         </div>
                       )}
                       <div className="absolute bottom-0.5 right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/70 text-[9px] font-semibold text-white">

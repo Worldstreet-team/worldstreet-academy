@@ -5,19 +5,7 @@ import StarterKit from "@tiptap/starter-kit"
 import Placeholder from "@tiptap/extension-placeholder"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  TextBoldIcon,
-  TextItalicIcon,
-  TextStrikethroughIcon,
-  LeftToRightListBulletIcon,
-  LeftToRightListNumberIcon,
-  QuoteDownIcon,
-  ArrowTurnBackwardIcon,
-  ArrowTurnForwardIcon,
-  SourceCodeIcon,
-  MinusSignIcon,
-} from "@hugeicons/core-free-icons"
+import { BoldIcon, CodeXmlIcon, ItalicIcon, ListIcon, ListOrderedIcon, MinusIcon, QuoteIcon, Redo2Icon, StrikethroughIcon, Undo2Icon } from "lucide-react"
 
 interface RichTextEditorProps {
   value: string
@@ -71,28 +59,28 @@ function Toolbar({ editor }: { editor: Editor | null }) {
         active={editor.isActive("bold")}
         title="Bold (⌘B)"
       >
-        <HugeiconsIcon icon={TextBoldIcon} size={14} />
+        <BoldIcon  size={14} />
       </ToolbarButton>
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleItalic().run()}
         active={editor.isActive("italic")}
         title="Italic (⌘I)"
       >
-        <HugeiconsIcon icon={TextItalicIcon} size={14} />
+        <ItalicIcon  size={14} />
       </ToolbarButton>
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleStrike().run()}
         active={editor.isActive("strike")}
         title="Strikethrough"
       >
-        <HugeiconsIcon icon={TextStrikethroughIcon} size={14} />
+        <StrikethroughIcon  size={14} />
       </ToolbarButton>
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleCode().run()}
         active={editor.isActive("code")}
         title="Inline Code"
       >
-        <HugeiconsIcon icon={SourceCodeIcon} size={14} />
+        <CodeXmlIcon  size={14} />
       </ToolbarButton>
 
       <div className="mx-1 h-4 w-px bg-border" />
@@ -102,27 +90,27 @@ function Toolbar({ editor }: { editor: Editor | null }) {
         active={editor.isActive("bulletList")}
         title="Bullet List"
       >
-        <HugeiconsIcon icon={LeftToRightListBulletIcon} size={14} />
+        <ListIcon  size={14} />
       </ToolbarButton>
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
         active={editor.isActive("orderedList")}
         title="Numbered List"
       >
-        <HugeiconsIcon icon={LeftToRightListNumberIcon} size={14} />
+        <ListOrderedIcon  size={14} />
       </ToolbarButton>
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleBlockquote().run()}
         active={editor.isActive("blockquote")}
         title="Quote"
       >
-        <HugeiconsIcon icon={QuoteDownIcon} size={14} />
+        <QuoteIcon  size={14} />
       </ToolbarButton>
       <ToolbarButton
         onClick={() => editor.chain().focus().setHorizontalRule().run()}
         title="Horizontal Rule"
       >
-        <HugeiconsIcon icon={MinusSignIcon} size={14} />
+        <MinusIcon  size={14} />
       </ToolbarButton>
 
       <div className="mx-1 h-4 w-px bg-border" />
@@ -132,14 +120,14 @@ function Toolbar({ editor }: { editor: Editor | null }) {
         disabled={!editor.can().undo()}
         title="Undo (⌘Z)"
       >
-        <HugeiconsIcon icon={ArrowTurnBackwardIcon} size={14} />
+        <Undo2Icon  size={14} />
       </ToolbarButton>
       <ToolbarButton
         onClick={() => editor.chain().focus().redo().run()}
         disabled={!editor.can().redo()}
         title="Redo (⇧⌘Z)"
       >
-        <HugeiconsIcon icon={ArrowTurnForwardIcon} size={14} />
+        <Redo2Icon  size={14} />
       </ToolbarButton>
     </div>
   )

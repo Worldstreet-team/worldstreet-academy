@@ -2,10 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useQueryClient } from "@tanstack/react-query"
-import Image from "next/image"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { UserAdd01Icon, Search01Icon, Cancel01Icon } from "@hugeicons/core-free-icons"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Topbar } from "@/components/platform/topbar"
+import { ArtMessages } from "@/components/shared/illustrations"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -48,6 +47,7 @@ import { ConversationListSkeleton, MessagesAreaSkeleton } from "@/components/ske
 import { useCall } from "@/components/providers/call-provider"
 import { useConversations, queryKeys } from "@/lib/hooks/queries"
 import type { ConversationWithDetails as ConvType } from "@/lib/actions/messages"
+import { SearchIcon, UserPlusIcon, XIcon } from "lucide-react"
 
 // Extended message type with status for optimistic updates
 type OptimisticMessage = MessageWithDetails & { status?: "pending" | "sent" | "error"; uploadProgress?: number }
@@ -422,11 +422,15 @@ export default function InstructorMessagesPage() {
   }, [queryClient])
 
   return (
-    <div className="flex-1 flex h-dvh overflow-hidden">
+    <>
+      <Topbar title="Messages" variant="instructor" />
+
       {/* Hide bottom nav when chat is open on mobile */}
       {showMobileChat && (
         <style>{`@media (max-width: 767px) { nav.fixed.bottom-0 { display: none !important; } }`}</style>
       )}
+
+      <div className="flex-1 flex h-[calc(100dvh-4rem)] overflow-hidden">
 
       {/* Conversation List */}
       <div className={showMobileChat ? "hidden md:flex" : "flex w-full md:w-auto"}>
@@ -443,7 +447,7 @@ export default function InstructorMessagesPage() {
               onClick={() => setShowUserSearch(true)}
               className="h-8 w-8"
             >
-              <HugeiconsIcon icon={UserAdd01Icon} size={18} />
+              <UserPlusIcon  size={18} />
             </Button>
           </div>
           
@@ -499,17 +503,9 @@ export default function InstructorMessagesPage() {
                     <div className="px-3 py-4 space-y-1 max-w-3xl mx-auto w-full">
                       {messageGroups.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-12 px-4">
-                          <div className="relative w-48 h-48 sm:w-56 sm:h-56 mb-4">
-                            <Image
-                              src="/user/dashboard/no-messages-illustration.png"
-                              alt=""
-                              fill
-                              className="object-contain"
-                              sizes="224px"
-                            />
-                          </div>
+                          <ArtMessages className="w-44 sm:w-52 mb-4" />
                           <h3 className="text-base font-semibold mb-1">No messages here yet</h3>
-                          <p className="text-sm text-muted-foreground text-center max-w-xs">
+                          <p className="text-sm text-ws-muted text-center max-w-xs">
                             Be the first to send a hello! Start a conversation and connect.
                           </p>
                         </div>
@@ -582,9 +578,9 @@ export default function InstructorMessagesPage() {
               )}
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-muted-foreground">
-            <div className="text-center">
-              <Image src="/user/dashboard/no-messages-illustration.png" alt="No messages" width={180} height={180} className="mx-auto mb-4 opacity-80" />
+          <div className="flex-1 flex items-center justify-center text-ws-muted">
+            <div className="flex flex-col items-center text-center">
+              <ArtMessages className="mx-auto mb-4 w-44" />
               <p className="text-sm">Select a conversation or start a new one</p>
               <Button
                 variant="outline"
@@ -592,7 +588,7 @@ export default function InstructorMessagesPage() {
                 className="mt-4"
                 onClick={() => setShowUserSearch(true)}
               >
-                <HugeiconsIcon icon={UserAdd01Icon} size={16} className="mr-2" />
+                <UserPlusIcon  size={16} className="mr-2" />
                 New Conversation
               </Button>
             </div>
@@ -608,11 +604,10 @@ export default function InstructorMessagesPage() {
           </ResponsiveModalHeader>
           <div className="space-y-4">
             <div className="relative">
-              <HugeiconsIcon
-                icon={Search01Icon}
+              <SearchIcon
+                
                 size={16}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-              />
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search users by name or email..."
                 value={searchQuery}
@@ -629,7 +624,7 @@ export default function InstructorMessagesPage() {
                     setSearchResults([])
                   }}
                 >
-                  <HugeiconsIcon icon={Cancel01Icon} size={14} />
+                  <XIcon  size={14} />
                 </Button>
               )}
             </div>
@@ -690,7 +685,7 @@ export default function InstructorMessagesPage() {
                         <button
                           key={user.id}
                           onClick={() => handleStartConversation(user)}
-                          className="flex flex-col items-center gap-1 p-1.5 rounded-xl hover:bg-muted transition-colors"
+                          className="flex flex-col items-center gap-1 p-1.5 rounded-lg hover:bg-muted transition-colors"
                         >
                           <Avatar className="h-12 w-12">
                             <AvatarImage src={user.avatar || undefined} />
@@ -711,6 +706,7 @@ export default function InstructorMessagesPage() {
           </div>
         </ResponsiveModalContent>
       </ResponsiveModal>
-    </div>
+      </div>
+    </>
   )
 }

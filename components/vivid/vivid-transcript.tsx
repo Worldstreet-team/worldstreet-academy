@@ -166,7 +166,7 @@ function inlineStyleClasses(styles: InlineStyle[]): string {
   if (styles.includes("italic")) cls.push("italic")
   if (styles.includes("underline")) cls.push("underline underline-offset-2")
   if (styles.includes("strikethrough")) cls.push("line-through")
-  if (styles.includes("code")) cls.push("font-mono text-[0.9em] bg-muted/30 px-1 rounded")
+  if (styles.includes("code")) cls.push("tabular-nums text-[0.9em] bg-muted/30 px-1 rounded")
   return cls.join(" ")
 }
 
@@ -241,18 +241,15 @@ function LyricLine({ line, isLatest }: { line: TranscriptLine; isLatest: boolean
   return (
     <motion.div
       layout="position"
-      initial={{ opacity: 0, y: 20, filter: "blur(4px)" }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{
         opacity: isLatest ? 1 : line.isFinal ? 0.3 : 1,
         y: 0,
-        filter: "blur(0px)",
-        scale: isLatest && !line.isFinal ? 1.02 : 1,
       }}
       exit={{ opacity: 0, y: -10 }}
       transition={{
-        layout: { type: "spring", stiffness: 200, damping: 25 },
-        opacity: { duration: 0.4 },
-        filter: { duration: 0.3 },
+        layout: { duration: 0.2, ease: [0.2, 0, 0, 1] },
+        opacity: { duration: 0.32, ease: [0.2, 0, 0, 1] },
       }}
       className="flex justify-start overflow-hidden"
     >
@@ -300,8 +297,8 @@ function LyricLine({ line, isLatest }: { line: TranscriptLine; isLatest: boolean
                     fontWeight: isSpoken || isCurrent ? 700 : (token.styles.includes("bold") ? 700 : 400),
                   }}
                   transition={{
-                    duration: isCurrent ? 0.15 : 0.25,
-                    ease: "easeOut",
+                    duration: isCurrent ? 0.12 : 0.2,
+                    ease: [0.2, 0, 0, 1],
                   }}
                   className={`inline ${styleCls} ${hdrCls}`}
                   style={{
@@ -317,13 +314,13 @@ function LyricLine({ line, isLatest }: { line: TranscriptLine; isLatest: boolean
               )
             }
 
-            // Non-streaming, non-final fallback
+            // Non-streaming, non-final fallback — single reveal, no per-token stagger
             return (
               <motion.span
                 key={`${ti}-${token.word}`}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.2, delay: ti * 0.03, ease: "easeOut" }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.2, ease: [0.2, 0, 0, 1] }}
                 className={`inline font-medium ${styleCls} ${hdrCls}`}
               >
                 {prefix}{token.word}

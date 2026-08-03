@@ -10,14 +10,9 @@ import {
   type ReactNode,
 } from "react"
 import { useRouter, usePathname } from "next/navigation"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  Mic01Icon,
-  MicOff01Icon,
-  CallEnd01Icon,
-  Video01Icon,
-} from "@hugeicons/core-free-icons"
 import { cn } from "@/lib/utils"
+import { MicIcon, MicOffIcon, PhoneOffIcon, VideoIcon } from "lucide-react"
+import { RenderIcon } from "@/components/shared/render-icon"
 
 /* ═══════════════════════════════════════════════════════
    TYPES
@@ -179,12 +174,12 @@ export function MeetingProvider({ children }: { children: ReactNode }) {
       {/* Floating PIP bar — shown when minimized */}
       {activeMeetingInfo && isMinimized && (
         <div
-          className="fixed bottom-24 right-4 z-9998 cursor-pointer animate-in slide-in-from-bottom-4 fade-in duration-200"
+          className="fixed bottom-24 right-4 z-9998 cursor-pointer animate-in slide-in-from-bottom-4 fade-in duration-[var(--ws-motion-base)]"
           onClick={handlePipClick}
         >
-          <div className="flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl border border-border/50 bg-background">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center shrink-0">
-              <HugeiconsIcon icon={Video01Icon} size={18} className="text-emerald-500" />
+          <div className="flex items-center gap-3 px-4 py-3 rounded-lg shadow-2xl border border-ws-hairline bg-background">
+            <div className="w-10 h-10 rounded-lg bg-ws-success/15 flex items-center justify-center shrink-0">
+              <VideoIcon  size={18} className="text-ws-success" />
             </div>
             <div className="flex flex-col min-w-0">
               <span className="text-sm font-medium text-foreground truncate max-w-35">
@@ -192,8 +187,7 @@ export function MeetingProvider({ children }: { children: ReactNode }) {
               </span>
               <div className="flex items-center gap-1.5">
                 <span className="relative flex h-1.5 w-1.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-ws-success" />
                 </span>
                 <PipTimer startTime={activeMeetingInfo.startTime} />
               </div>
@@ -204,21 +198,20 @@ export function MeetingProvider({ children }: { children: ReactNode }) {
                 className={cn(
                   "w-9 h-9 rounded-full flex items-center justify-center transition-colors",
                   pipMuted
-                    ? "bg-red-500/15 hover:bg-red-500/25"
+                    ? "bg-ws-danger/15 hover:bg-ws-danger/25"
                     : "bg-muted hover:bg-muted/80",
                 )}
               >
-                <HugeiconsIcon
-                  icon={pipMuted ? MicOff01Icon : Mic01Icon}
+                <RenderIcon icon={pipMuted ? MicOffIcon : MicIcon}
+                  
                   size={16}
-                  className={pipMuted ? "text-red-400" : "text-foreground"}
-                />
+                  className={pipMuted ? "text-ws-danger" : "text-foreground"} />
               </button>
               <button
                 onClick={handlePipEnd}
-                className="w-9 h-9 rounded-full bg-red-500/85 hover:bg-red-500 flex items-center justify-center transition-colors"
+                className="w-9 h-9 rounded-full bg-ws-danger/85 hover:bg-ws-danger flex items-center justify-center transition-colors"
               >
-                <HugeiconsIcon icon={CallEnd01Icon} size={16} className="text-white" />
+                <PhoneOffIcon  size={16} className="text-white" />
               </button>
             </div>
           </div>

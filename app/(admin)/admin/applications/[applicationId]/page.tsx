@@ -4,7 +4,6 @@ import * as React from "react"
 import { useParams } from "next/navigation"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Topbar } from "@/components/platform/topbar"
-import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -19,6 +18,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Ban } from "lucide-react"
+import { useUser } from "@/components/providers/user-provider"
 import {
   adminGetApplication,
   adminStartApplicationReview,
@@ -39,7 +40,7 @@ const REJECTION_REASONS: { value: RejectionReason; label: string }[] = [
   { value: "other", label: "Other" },
 ]
 import { queryKeys } from "@/lib/hooks/queries/keys"
-import { formatDate, formatDateTime, StatusBadge } from "@/components/admin/shared"
+import { formatDate, formatDateTime, StatusBadge, FilterChips } from "@/components/admin/shared"
 
 function LinkRow({ label, href }: { label: string; href?: string }) {
   if (!href) return null
@@ -50,7 +51,7 @@ function LinkRow({ label, href }: { label: string; href?: string }) {
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-primary hover:underline truncate max-w-[240px]"
+        className="text-ws-gold hover:underline truncate max-w-[240px]"
       >
         {href.replace(/^https?:\/\//, "")}
       </a>
@@ -62,8 +63,10 @@ export default function AdminApplicationDetailPage() {
   const params = useParams<{ applicationId: string }>()
   const applicationId = params.applicationId
   const queryClient = useQueryClient()
+  const me = useUser()
 
   const [note, setNote] = React.useState("")
+  const [unassignConfirmOpen, setUnassignConfirmOpen] = React.useState(false)
   const [decisionDialog, setDecisionDialog] = React.useState<"approved" | "rejected" | null>(null)
   const [decisionNote, setDecisionNote] = React.useState("")
   const [actionError, setActionError] = React.useState<string | null>(null)
@@ -82,6 +85,14 @@ export default function AdminApplicationDetailPage() {
   const [scRec, setScRec] = React.useState<"approve" | "reject" | "unsure">("unsure")
   const [scNotes, setScNotes] = React.useState("")
   const [scSaved, setScSaved] = React.useState(false)
+  const scSavedTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Clear the "Saved" flash timer if the page unmounts before it fires.
+  React.useEffect(() => {
+    return () => {
+      if (scSavedTimeout.current) clearTimeout(scSavedTimeout.current)
+    }
+  }, [])
 
   const { data: app, isLoading } = useQuery({
     queryKey: queryKeys.adminApplicationDetail(applicationId),
@@ -164,7 +175,10 @@ export default function AdminApplicationDetailPage() {
 
   const assign = useMutation({
     mutationFn: (v: boolean) => adminAssignApplication(applicationId, v),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      setUnassignConfirmOpen(false)
+      invalidate()
+    },
   })
 
   const saveScorecard = useMutation({
@@ -179,7 +193,8 @@ export default function AdminApplicationDetailPage() {
     onSuccess: (res) => {
       if (res.success) {
         setScSaved(true)
-        setTimeout(() => setScSaved(false), 1500)
+        if (scSavedTimeout.current) clearTimeout(scSavedTimeout.current)
+        scSavedTimeout.current = setTimeout(() => setScSaved(false), 1500)
       }
       invalidate()
     },
@@ -203,22 +218,22 @@ export default function AdminApplicationDetailPage() {
   return (
     <>
       <Topbar variant="admin" breadcrumbOverrides={{ [applicationId]: app?.applicantName ?? "Application" }} />
-      <div className="p-4 sm:p-6 space-y-4 pb-24 md:pb-6 max-w-4xl">
+      <div className="flex-1 px-6 pb-24 pt-8 md:px-8 md:pb-12 lg:px-12">
+        <div className="mx-auto w-full max-w-4xl space-y-4">
         {isLoading || !app ? (
           <div className="space-y-3">
-            <Skeleton className="h-24 rounded-xl" />
-            <Skeleton className="h-48 rounded-xl" />
+            <Skeleton className="h-24 rounded-lg" />
+            <Skeleton className="h-48 rounded-lg" />
           </div>
         ) : (
           <>
             {/* Applicant header */}
-            <Card>
-              <CardContent className="p-4">
+            <div className="rounded-lg border border-ws-hairline bg-ws-surface p-4">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="flex items-center gap-3 min-w-0">
                     <Avatar className="h-12 w-12">
                       {app.applicantAvatar && <AvatarImage src={app.applicantAvatar} />}
-                      <AvatarFallback className="bg-primary/10 text-primary">
+                      <AvatarFallback className="bg-ws-chip text-ws-primary">
                         {app.applicantName[0]?.toUpperCase() ?? "?"}
                       </AvatarFallback>
                     </Avatar>
@@ -236,21 +251,39 @@ export default function AdminApplicationDetailPage() {
                     </div>
                   </div>
 
-                  {/* Actions */}
+                  {/* Actions — one gold primary (Approve), one danger (Reject),
+                      everything else stays quiet as ghosts. */}
                   {isActive && (
                     <div className="flex items-center gap-2 shrink-0 flex-wrap">
                       <Button
                         size="sm"
                         variant="ghost"
                         disabled={assign.isPending}
-                        onClick={() => assign.mutate(!app.assignedToName)}
+                        onClick={() => {
+                          if (
+                            app.assignedToName &&
+                            app.assignedToName !== `${me.firstName} ${me.lastName}`.trim()
+                          ) {
+                            // Clearing a colleague's claim deserves a pause.
+                            setUnassignConfirmOpen(true)
+                          } else {
+                            assign.mutate(!app.assignedToName)
+                          }
+                        }}
                       >
-                        {app.assignedToName ? `⊘ Unassign (${app.assignedToName})` : "Assign to me"}
+                        {app.assignedToName ? (
+                          <>
+                            <Ban size={14} strokeWidth={2} />
+                            Unassign ({app.assignedToName})
+                          </>
+                        ) : (
+                          "Assign to me"
+                        )}
                       </Button>
                       {app.status === "submitted" && (
                         <Button
                           size="sm"
-                          variant="outline"
+                          variant="ghost"
                           disabled={startReview.isPending}
                           onClick={() => startReview.mutate()}
                         >
@@ -260,7 +293,7 @@ export default function AdminApplicationDetailPage() {
                       {!app.interview && (
                         <Button
                           size="sm"
-                          variant="outline"
+                          variant="ghost"
                           onClick={() => {
                             setProposeError(null)
                             setScheduleMin(new Date(Date.now() + 5 * 60_000).toISOString().slice(0, 16))
@@ -272,7 +305,7 @@ export default function AdminApplicationDetailPage() {
                       )}
                       <Button
                         size="sm"
-                        variant="outline"
+                        variant="ghost"
                         onClick={() => {
                           setScheduleError(null)
                           setScheduleMin(new Date(Date.now() + 5 * 60_000).toISOString().slice(0, 16))
@@ -298,7 +331,7 @@ export default function AdminApplicationDetailPage() {
                   )}
                 </div>
                 {app.proposedSlots.length > 0 && !app.interview && (
-                  <div className="mt-3 rounded-lg border border-border/60 bg-muted/30 px-3 py-2.5">
+                  <div className="mt-3 rounded-lg border border-ws-hairline bg-ws-raised px-3 py-2.5">
                     <p className="text-xs font-semibold">
                       Waiting on the applicant to pick a slot
                     </p>
@@ -312,10 +345,10 @@ export default function AdminApplicationDetailPage() {
                   </div>
                 )}
                 {actionError && (
-                  <p className="text-xs text-destructive mt-2">{actionError}</p>
+                  <p className="text-xs text-ws-danger mt-2">{actionError}</p>
                 )}
                 {app.interview && (
-                  <div className="mt-3 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2.5 flex items-center justify-between gap-3 flex-wrap">
+                  <div className="mt-3 rounded-lg border border-ws-brand/25 bg-ws-brand/10 px-3 py-2.5 flex items-center justify-between gap-3 flex-wrap">
                     <div>
                       <p className="text-xs font-semibold">Interview scheduled</p>
                       <p className="text-[11px] text-muted-foreground">
@@ -337,18 +370,16 @@ export default function AdminApplicationDetailPage() {
                   </div>
                 )}
                 {app.status === "rejected" && app.decisionNote && (
-                  <p className="text-xs text-muted-foreground mt-2 border-l-2 border-destructive/40 pl-2">
+                  <p className="text-xs text-muted-foreground mt-2 border-l-2 border-ws-danger/40 pl-2">
                     Decision note: {app.decisionNote}
                   </p>
                 )}
-              </CardContent>
-            </Card>
+            </div>
 
             <div className="grid lg:grid-cols-5 gap-4">
               {/* Answers */}
               <div className="lg:col-span-3 space-y-4">
-                <Card>
-                  <CardContent className="p-4 space-y-4">
+                <div className="rounded-lg border border-ws-hairline bg-ws-surface p-4 space-y-4">
                     <div>
                       <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
                         Headline
@@ -388,7 +419,7 @@ export default function AdminApplicationDetailPage() {
                         {app.answers.motivation}
                       </p>
                     </div>
-                    <div className="space-y-1.5 pt-1 border-t border-border/50">
+                    <div className="space-y-1.5 pt-1 border-t border-ws-hairline">
                       <LinkRow label="Portfolio" href={app.answers.portfolioUrl} />
                       <LinkRow label="Sample video" href={app.answers.sampleVideoUrl} />
                       <LinkRow label="CV / credentials" href={app.answers.cvUrl} />
@@ -396,16 +427,14 @@ export default function AdminApplicationDetailPage() {
                       <LinkRow label="Twitter / X" href={app.answers.twitter} />
                       <LinkRow label="Website" href={app.answers.website} />
                     </div>
-                  </CardContent>
-                </Card>
+                </div>
               </div>
 
               {/* Notes + timeline */}
               <div className="lg:col-span-2 space-y-4">
                 {/* Interview scorecard */}
                 {isActive && (
-                  <Card>
-                    <CardContent className="p-4 space-y-3">
+                  <div className="rounded-lg border border-ws-hairline bg-ws-surface p-4 space-y-3">
                       <div className="flex items-center justify-between">
                         <h2 className="text-sm font-semibold">Interview scorecard</h2>
                         {app.scorecard && (
@@ -429,10 +458,10 @@ export default function AdminApplicationDetailPage() {
                                 key={n}
                                 type="button"
                                 onClick={() => setter(n)}
-                                className={`h-6 w-6 rounded-md text-[10px] font-semibold border transition-colors ${
+                                className={`h-6 w-6 rounded-xs text-[10px] font-semibold border transition-colors ${
                                   value >= n
-                                    ? "bg-primary text-primary-foreground border-primary"
-                                    : "border-border/60 text-muted-foreground hover:bg-muted"
+                                    ? "bg-ws-brand text-ws-brand-on border-transparent"
+                                    : "border-ws-hairline text-ws-muted hover:bg-ws-raised"
                                 }`}
                               >
                                 {n}
@@ -441,6 +470,8 @@ export default function AdminApplicationDetailPage() {
                           </div>
                         </div>
                       ))}
+                      {/* Same chip anatomy as FilterChips, but the selected fill
+                          carries the recommendation's meaning (success/danger). */}
                       <div className="flex items-center gap-1.5 pt-1">
                         {(["approve", "unsure", "reject"] as const).map((r) => (
                           <button
@@ -450,11 +481,11 @@ export default function AdminApplicationDetailPage() {
                             className={`text-xs px-2.5 py-1 rounded-full border capitalize transition-colors ${
                               scRec === r
                                 ? r === "approve"
-                                  ? "bg-emerald-600 text-white border-emerald-600"
+                                  ? "bg-ws-success/15 text-ws-success border-ws-success/40 font-medium"
                                   : r === "reject"
-                                    ? "bg-destructive text-white border-destructive"
-                                    : "bg-foreground text-background border-foreground"
-                                : "border-border/60 text-muted-foreground hover:bg-muted"
+                                    ? "bg-ws-danger/15 text-ws-danger border-ws-danger/40 font-medium"
+                                    : "bg-ws-brand text-ws-brand-on border-transparent font-medium"
+                                : "border-ws-hairline text-ws-muted hover:bg-ws-raised hover:text-ws-primary"
                             }`}
                           >
                             {r}
@@ -474,21 +505,19 @@ export default function AdminApplicationDetailPage() {
                         disabled={saveScorecard.isPending}
                         onClick={() => saveScorecard.mutate()}
                       >
-                        {saveScorecard.isPending ? "Saving…" : scSaved ? "Saved ✓" : "Save scorecard"}
+                        {saveScorecard.isPending ? "Saving…" : scSaved ? "Saved" : "Save scorecard"}
                       </Button>
-                    </CardContent>
-                  </Card>
+                  </div>
                 )}
 
-                <Card>
-                  <CardContent className="p-4">
+                <div className="rounded-lg border border-ws-hairline bg-ws-surface p-4">
                     <h2 className="text-sm font-semibold mb-2">Reviewer notes</h2>
                     <div className="space-y-2 mb-3">
                       {app.reviewerNotes.length === 0 ? (
                         <p className="text-xs text-muted-foreground">No notes yet.</p>
                       ) : (
                         app.reviewerNotes.map((n, i) => (
-                          <div key={i} className="rounded-lg bg-muted/50 px-2.5 py-2">
+                          <div key={i} className="rounded-lg bg-ws-raised px-2.5 py-2">
                             <p className="text-xs whitespace-pre-wrap">{n.note}</p>
                             <p className="text-[10px] text-muted-foreground mt-1">
                               {n.byName} · {formatDateTime(n.at)}
@@ -512,16 +541,14 @@ export default function AdminApplicationDetailPage() {
                     >
                       {addNote.isPending ? "Saving…" : "Add note"}
                     </Button>
-                  </CardContent>
-                </Card>
+                </div>
 
-                <Card>
-                  <CardContent className="p-4">
+                <div className="rounded-lg border border-ws-hairline bg-ws-surface p-4">
                     <h2 className="text-sm font-semibold mb-2">Timeline</h2>
                     <div className="space-y-2">
                       {app.history.map((h, i) => (
                         <div key={i} className="flex items-start gap-2">
-                          <span className="h-1.5 w-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
+                          <span className="h-1.5 w-1.5 rounded-full bg-ws-brand mt-1.5 shrink-0" />
                           <div className="min-w-0">
                             <p className="text-xs font-medium capitalize">
                               {h.status.replace(/_/g, " ")}
@@ -537,13 +564,39 @@ export default function AdminApplicationDetailPage() {
                         </div>
                       ))}
                     </div>
-                  </CardContent>
-                </Card>
+                </div>
               </div>
             </div>
           </>
         )}
+        </div>
       </div>
+
+      {/* Unassign confirm — only shown when clearing another admin's claim */}
+      <Dialog open={unassignConfirmOpen} onOpenChange={setUnassignConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Unassign {app?.assignedToName}?</DialogTitle>
+            <DialogDescription>
+              This application is claimed by {app?.assignedToName}, not you. Unassigning removes
+              it from their queue — check with them before taking it over.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setUnassignConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              disabled={assign.isPending}
+              onClick={() => assign.mutate(false)}
+            >
+              {assign.isPending ? "Unassigning…" : "Unassign anyway"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Schedule interview dialog */}
       <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>
@@ -564,7 +617,7 @@ export default function AdminApplicationDetailPage() {
             onChange={(e) => setScheduleAt(e.target.value)}
             min={scheduleMin}
           />
-          {scheduleError && <p className="text-xs text-destructive">{scheduleError}</p>}
+          {scheduleError && <p className="text-xs text-ws-danger">{scheduleError}</p>}
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setScheduleOpen(false)}>
               Cancel
@@ -607,7 +660,7 @@ export default function AdminApplicationDetailPage() {
               />
             ))}
           </div>
-          {proposeError && <p className="text-xs text-destructive">{proposeError}</p>}
+          {proposeError && <p className="text-xs text-ws-danger">{proposeError}</p>}
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setProposeOpen(false)}>
               Cancel
@@ -637,22 +690,11 @@ export default function AdminApplicationDetailPage() {
             </DialogDescription>
           </DialogHeader>
           {decisionDialog === "rejected" && (
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {REJECTION_REASONS.map((r) => (
-                <button
-                  key={r.value}
-                  type="button"
-                  onClick={() => setRejectionReason(r.value)}
-                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                    rejectionReason === r.value
-                      ? "bg-foreground text-background border-foreground"
-                      : "border-border/60 text-muted-foreground hover:bg-muted"
-                  }`}
-                >
-                  {r.label}
-                </button>
-              ))}
-            </div>
+            <FilterChips
+              value={rejectionReason}
+              onChange={setRejectionReason}
+              options={REJECTION_REASONS}
+            />
           )}
           <Textarea
             value={decisionNote}

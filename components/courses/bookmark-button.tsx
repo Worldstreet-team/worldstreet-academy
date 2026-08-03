@@ -1,9 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useState, useTransition } from "react"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { Bookmark01Icon } from "@hugeicons/core-free-icons"
 import { toggleCourseBookmark, checkCoursesBookmarked } from "@/lib/actions/student"
+import { BookmarkIcon } from "lucide-react"
 
 export function BookmarkButton({ courseId, className }: { courseId: string; className?: string }) {
   const [isBookmarked, setIsBookmarked] = useState(false)
@@ -32,13 +31,12 @@ export function BookmarkButton({ courseId, className }: { courseId: string; clas
       type="button"
       onClick={handleToggle}
       disabled={isPending}
-      className={className ?? "absolute top-3 right-3 flex h-8 w-8 items-center justify-center rounded-full border border-white/30 bg-black/30 backdrop-blur-sm text-white hover:bg-black/50 transition-all"}
+      className={className ?? "absolute top-3 right-3 flex h-8 w-8 items-center justify-center rounded-full border border-white/30 bg-black/30 text-white hover:bg-black/50 transition-all"}
     >
-      <HugeiconsIcon
-        icon={Bookmark01Icon}
+      <BookmarkIcon
+        
         size={16}
-        fill={isBookmarked ? "currentColor" : "none"}
-      />
+        fill={isBookmarked ? "currentColor" : "none"} />
     </button>
   )
 }

@@ -1,8 +1,6 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { StarIcon } from "@hugeicons/core-free-icons"
 import { cn } from "@/lib/utils"
 import { submitReview, updateReview } from "@/lib/actions/reviews"
 import { useUser } from "@/components/providers/user-provider"
@@ -15,6 +13,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { StarIcon } from "lucide-react"
 
 type CourseRatingProps = {
   courseId: string
@@ -99,18 +98,17 @@ export function CourseRating({
         {/* Star preview */}
         <div className="flex items-center justify-center gap-1 py-2">
           {[1, 2, 3, 4, 5].map((star) => (
-            <HugeiconsIcon
+            <StarIcon
               key={star}
-              icon={StarIcon}
+              
               size={28}
-              className={star <= pendingStar ? "text-orange-500" : "text-muted-foreground/20"}
-              fill={star <= pendingStar ? "currentColor" : "none"}
-            />
+              className={star <= pendingStar ? "text-ws-rating" : "text-muted-foreground/20"}
+              fill={star <= pendingStar ? "currentColor" : "none"} />
           ))}
         </div>
 
         {error && (
-          <p className="text-xs text-red-500 text-center">{error}</p>
+          <p className="text-xs text-ws-danger text-center">{error}</p>
         )}
 
         <DialogFooter>
@@ -139,7 +137,7 @@ export function CourseRating({
       <>
         {confirmDialog}
         <div className={cn(
-          inline ? "flex items-center justify-between" : "rounded-xl border bg-muted/30 p-4 text-center space-y-1.5"
+          inline ? "flex items-center justify-between" : "rounded-lg border bg-muted/30 p-4 text-center space-y-1.5"
         )}>
           <div className={cn("flex items-center gap-0.5", !inline && "justify-center")}>
             {[1, 2, 3, 4, 5].map((star) => (
@@ -147,14 +145,13 @@ export function CourseRating({
                 key={star}
                 type="button"
                 onClick={() => handleStarClick(star)}
-                className="p-0.5 transition-transform hover:scale-110"
+                className="p-0.5 transition-transform"
               >
-                <HugeiconsIcon
-                  icon={StarIcon}
+                <StarIcon
+                  
                   size={inline ? 16 : 18}
-                  className={star <= rating ? "text-orange-500" : "text-muted-foreground/30"}
-                  fill={star <= rating ? "currentColor" : "none"}
-                />
+                  className={star <= rating ? "text-ws-rating" : "text-muted-foreground/30"}
+                  fill={star <= rating ? "currentColor" : "none"} />
               </button>
             ))}
           </div>
@@ -185,19 +182,18 @@ export function CourseRating({
                 onMouseEnter={() => setHovered(star)}
                 onMouseLeave={() => setHovered(0)}
                 onClick={() => handleStarClick(star)}
-                className="p-0.5 transition-transform hover:scale-110"
+                className="p-0.5 transition-transform"
               >
-                <HugeiconsIcon
-                  icon={StarIcon}
+                <StarIcon
+                  
                   size={16}
                   className={cn(
                     "transition-colors",
                     star <= (hovered || rating)
-                      ? "text-orange-500"
+                      ? "text-ws-rating"
                       : "text-muted-foreground/30"
                   )}
-                  fill={star <= (hovered || rating) ? "currentColor" : "none"}
-                />
+                  fill={star <= (hovered || rating) ? "currentColor" : "none"} />
               </button>
             ))}
           </div>
@@ -209,7 +205,7 @@ export function CourseRating({
   return (
     <>
       {confirmDialog}
-      <div className="rounded-xl border bg-muted/30 p-4 space-y-2.5">
+      <div className="rounded-lg border bg-muted/30 p-4 space-y-2.5">
         <div className="text-center space-y-0.5">
           <p className="text-sm font-semibold">Rate this course</p>
           <p className="text-[11px] text-muted-foreground">
@@ -224,19 +220,18 @@ export function CourseRating({
               onMouseEnter={() => setHovered(star)}
               onMouseLeave={() => setHovered(0)}
               onClick={() => handleStarClick(star)}
-              className="p-1 transition-transform hover:scale-110"
+              className="p-1 transition-transform"
             >
-              <HugeiconsIcon
-                icon={StarIcon}
+              <StarIcon
+                
                 size={24}
                 className={cn(
                   "transition-colors",
                   star <= (hovered || rating)
-                    ? "text-orange-500"
+                    ? "text-ws-rating"
                     : "text-muted-foreground/30"
                 )}
-                fill={star <= (hovered || rating) ? "currentColor" : "none"}
-              />
+                fill={star <= (hovered || rating) ? "currentColor" : "none"} />
             </button>
           ))}
         </div>

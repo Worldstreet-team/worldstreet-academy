@@ -1,3 +1,4 @@
+import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 import { InstructorSidebar } from "@/components/instructor/instructor-sidebar"
@@ -28,6 +29,10 @@ export default async function InstructorLayout({
     redirect("/dashboard/become-instructor")
   }
 
+  // The sidebar writes `sidebar_state` when toggled, but nothing read it
+  // back — so a collapsed rail sprang open again on every navigation.
+  const sidebarOpen = (await cookies()).get("sidebar_state")?.value !== "false"
+
   return (
     <QueryProvider>
       <UserProvider user={user}>
@@ -43,7 +48,7 @@ export default async function InstructorLayout({
                 avatarUrl: user.avatarUrl,
               }}
             >
-              <SidebarProvider>
+              <SidebarProvider defaultOpen={sidebarOpen}>
                 <InstructorSidebar />
                 <SidebarInset>
                   {children}
