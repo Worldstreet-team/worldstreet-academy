@@ -79,7 +79,7 @@ export function MinimizedBar() {
       {/* Full-viewport drag constraint boundary */}
       <div
         ref={constraintsRef}
-        className="fixed inset-0 z-998 pointer-events-none"
+        className="fixed inset-0 z-60 pointer-events-none"
       />
       <motion.div
         drag
@@ -92,7 +92,10 @@ export function MinimizedBar() {
         animate={{ y: 0, opacity: 1, scale: 1 }}
         exit={{ y: 80, opacity: 0, scale: 0.9 }}
         transition={{ duration: 0.32, ease: [0.2, 0, 0, 1] }}
-        className="fixed bottom-6 left-1/2 -translate-x-1/2 z-999 touch-none"
+        /* Clears the fixed bottom nav (and its safe-area inset) on mobile;
+           the nav is md:hidden, so from md the pill drops back to bottom-6.
+           max-w keeps the pill inside a 320px viewport. */
+        className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] md:bottom-6 left-1/2 -translate-x-1/2 z-60 touch-none max-w-[calc(100vw-2rem)]"
       >
         <motion.div
           layoutId="vivid-surface"

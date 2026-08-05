@@ -135,7 +135,7 @@ export default function CheckoutPage() {
   return (
     <>
       <Topbar title="Checkout" />
-      <div className="flex-1 overflow-y-auto pb-24 md:pb-8">
+      <div className="flex-1 overflow-y-auto pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-8">
         <div className="max-w-lg mx-auto px-4 md:px-6 py-8 space-y-6">
           {/* Back */}
           <button

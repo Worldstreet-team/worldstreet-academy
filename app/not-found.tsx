@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="min-h-dvh flex flex-col bg-background">
       {/* Logo at top left */}
       <header className="p-6">
         <Link href="/" className="flex items-center gap-2 w-fit">

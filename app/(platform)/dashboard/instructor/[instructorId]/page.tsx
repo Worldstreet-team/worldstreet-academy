@@ -56,7 +56,7 @@ export default async function InstructorProfilePage({
           instructor: "Instructors"
         }}
       />
-      <div className="flex-1 pb-24 md:pb-8">
+      <div className="flex-1 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-8">
         {/* Header */}
         <div className="relative bg-ws-surface border-b border-ws-hairline pt-4 pb-8 px-4 md:px-6 lg:px-8">
           {/* Back button */}

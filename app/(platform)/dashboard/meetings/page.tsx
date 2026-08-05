@@ -1552,14 +1552,14 @@ export default function MeetingsPage() {
                 <button
                   onClick={() => setGridPage(Math.max(0, currentSlide - 1))}
                   disabled={currentSlide === 0}
-                  className="md:hidden flex absolute left-0 top-1/2 -translate-y-1/2 z-20 h-8 w-8 items-center justify-center rounded-full bg-ws-surface border border-ws-hairline text-muted-foreground hover:text-foreground hover:bg-background/80 transition-colors disabled:opacity-0 disabled:pointer-events-none"
+                  className="ws-touch-target md:hidden flex absolute left-0 top-1/2 -translate-y-1/2 z-20 h-8 w-8 items-center justify-center rounded-full bg-ws-surface border border-ws-hairline text-muted-foreground hover:text-foreground hover:bg-background/80 transition-colors disabled:opacity-0 disabled:pointer-events-none"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
                 </button>
                 <button
                   onClick={() => setGridPage(Math.min(totalSlideCount - 1, currentSlide + 1))}
                   disabled={currentSlide === totalSlideCount - 1}
-                  className="md:hidden flex absolute right-0 top-1/2 -translate-y-1/2 z-20 h-8 w-8 items-center justify-center rounded-full bg-ws-surface border border-ws-hairline text-muted-foreground hover:text-foreground hover:bg-background/80 transition-colors disabled:opacity-0 disabled:pointer-events-none"
+                  className="ws-touch-target md:hidden flex absolute right-0 top-1/2 -translate-y-1/2 z-20 h-8 w-8 items-center justify-center rounded-full bg-ws-surface border border-ws-hairline text-muted-foreground hover:text-foreground hover:bg-background/80 transition-colors disabled:opacity-0 disabled:pointer-events-none"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
                 </button>
@@ -1809,7 +1809,7 @@ export default function MeetingsPage() {
       )}
 
       <div className="flex-1 overflow-y-auto">
-        <div className="px-4 md:px-6 pt-6 pb-24 md:pb-6 space-y-6">
+        <div className="px-4 md:px-6 pt-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6 space-y-6">
           {/* Quick actions hero */}
           <MeetingQuickActions
             onCreateNew={() => setShowCreate(true)}

@@ -44,7 +44,7 @@ export default function InstructorCoursesPage() {
   return (
     <>
       <Topbar title="My Courses" variant="instructor" />
-      <div className="flex-1 px-6 pb-24 pt-8 md:px-8 md:pb-12 lg:px-12">
+      <div className="flex-1 px-4 sm:px-6 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-8 md:px-8 md:pb-12 lg:px-12">
         <div className="mx-auto w-full max-w-7xl space-y-8">
           <PageHeader
             title="My Courses"
@@ -73,7 +73,7 @@ export default function InstructorCoursesPage() {
                 value={courseSearch}
                 onChange={(e) => setCourseSearch(e.target.value)}
                 placeholder="Search your courses..."
-                className="h-10 w-full rounded-md border border-ws-hairline bg-ws-surface pl-9 pr-3 text-sm text-ws-primary outline-none transition-colors duration-[var(--ws-motion-fast)] placeholder:text-ws-muted focus:border-ws-muted/40"
+                className="h-11 md:h-10 w-full rounded-md border border-ws-hairline bg-ws-surface pl-9 pr-3 text-base md:text-sm text-ws-primary outline-none transition-colors duration-[var(--ws-motion-fast)] placeholder:text-ws-muted focus:border-ws-muted/40"
               />
             </div>
             <div className="flex flex-wrap items-center gap-2">

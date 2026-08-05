@@ -112,7 +112,7 @@ export function OnboardingModal({ userName }: OnboardingModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-[var(--ws-motion-base)]"
+      className="fixed inset-0 z-80 flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-[var(--ws-motion-base)]"
       role="dialog"
       aria-modal="true"
       aria-labelledby="onboarding-title"

@@ -24,7 +24,7 @@ const INK_ON_GOLD = "#1B1A16"
 
 type RGB = { r: number; g: number; b: number }
 
-const FALLBACK_BRAND: RGB = { r: 255, g: 204, b: 41 } // #FFCC29
+const FALLBACK_BRAND: RGB = { r: 234, g: 179, b: 8 } // #EAB308 (DS v2 gold)
 const WHITE: RGB = { r: 255, g: 255, b: 255 }
 
 function readBrandColor(): RGB {

@@ -174,7 +174,7 @@ export function MeetingProvider({ children }: { children: ReactNode }) {
       {/* Floating PIP bar — shown when minimized */}
       {activeMeetingInfo && isMinimized && (
         <div
-          className="fixed bottom-24 right-4 z-9998 cursor-pointer animate-in slide-in-from-bottom-4 fade-in duration-[var(--ws-motion-base)]"
+          className="fixed bottom-24 right-4 z-90 cursor-pointer animate-in slide-in-from-bottom-4 fade-in duration-[var(--ws-motion-base)]"
           onClick={handlePipClick}
         >
           <div className="flex items-center gap-3 px-4 py-3 rounded-lg shadow-2xl border border-ws-hairline bg-background">

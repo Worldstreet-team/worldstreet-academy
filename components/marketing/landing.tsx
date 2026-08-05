@@ -99,8 +99,11 @@ export async function Landing() {
           </div>
 
           {/* Live stats from the catalog */}
+          {/* gap-x-12 between two content-sized columns is ~48px of a 272px
+              320px-viewport line box — enough to push a long stat label out.
+              The gutter opens back up from sm, where there is room for it. */}
           {stats.length > 0 && (
-          <dl className="mx-auto mt-14 grid w-fit grid-cols-2 gap-x-12 gap-y-6 sm:grid-cols-4">
+          <dl className="mx-auto mt-14 grid w-fit max-w-full grid-cols-2 gap-x-6 gap-y-6 sm:grid-cols-4 sm:gap-x-12">
             {stats.map((s) => (
               <div key={s.label}>
                 <dd className="font-display text-2xl font-bold tabular-nums text-ws-primary md:text-3xl">

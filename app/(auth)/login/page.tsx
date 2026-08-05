@@ -2,7 +2,7 @@ import { SignIn } from "@clerk/nextjs"
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="min-h-dvh flex items-center justify-center bg-background">
       <SignIn
         forceRedirectUrl="/dashboard"
         signUpUrl="/register"

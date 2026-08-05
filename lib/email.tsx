@@ -31,29 +31,29 @@ export type MeetingEmailData = {
 }
 
 /* ─── Shared Styles ───
-   Email HTML can't read CSS variables, so the brand's platform-light values
-   are inlined as literals (design-tokens/tokens.css, platform-light mode):
-   page #FAFAFA · surface #FFFFFF · raised #F4F4F6 · hairline #E4E4E9 ·
-   ink #18181B · muted #6E6E78 · subtle #9A9AA3 · gold #FFCC29 on ink #0B0B0F ·
-   success #059669. Keep these in sync with the token file. */
+   Email HTML can't read CSS variables, so the DS v2 LIGHT values are inlined
+   as literals (design-tokens/tokens.css, light mode, sRGB approximations):
+   body #F8F7F6 (sunken) · surface #FFFFFF · raised #F5F4F3 · hairline #E9E7E5 ·
+   ink #292524 · muted #837A72 · subtle #8A8177 · gold #EAB308 on ink #1C1917 ·
+   success #047857. Keep these in sync with the token file. */
 
 const base = {
   fontFamily: "'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
 }
 
 const body: React.CSSProperties = {
-  backgroundColor: "#fafafa",
+  backgroundColor: "#F8F7F6",
   margin: 0,
   padding: "40px 0",
 }
 
 const card: React.CSSProperties = {
   backgroundColor: "#ffffff",
-  borderRadius: "13px",
+  borderRadius: "20px",
   maxWidth: "460px",
   margin: "0 auto",
   overflow: "hidden",
-  border: "1px solid #E4E4E9",
+  border: "1px solid #E9E7E5",
 }
 
 const contentPad: React.CSSProperties = {
@@ -65,28 +65,28 @@ const heading: React.CSSProperties = {
   fontFamily: "'Poppins', 'Public Sans', -apple-system, 'Segoe UI', Roboto, sans-serif",
   fontSize: "20px",
   fontWeight: 600,
-  color: "#18181B",
+  color: "#292524",
   margin: "0 0 6px",
   lineHeight: "1.35",
 }
 
 const sub: React.CSSProperties = {
   fontSize: "13px",
-  color: "#6E6E78",
+  color: "#837A72",
   margin: "0",
   lineHeight: "1.5",
 }
 
 const muted: React.CSSProperties = {
   fontSize: "12px",
-  color: "#9A9AA3",
+  color: "#8A8177",
   margin: "4px 0 0",
 }
 
 const cta: React.CSSProperties = {
   display: "inline-block",
-  backgroundColor: "#FFCC29", // brand/primary
-  color: "#0B0B0F", // brand/on-primary
+  backgroundColor: "#EAB308", // brand/primary
+  color: "#1C1917", // brand/on-primary
   borderRadius: "7px",
   padding: "11px 36px",
   fontWeight: 600,
@@ -96,7 +96,7 @@ const cta: React.CSSProperties = {
 
 const linkSmall: React.CSSProperties = {
   fontSize: "11px",
-  color: "#9A9AA3",
+  color: "#8A8177",
   textDecoration: "underline",
   wordBreak: "break-all" as const,
 }
@@ -108,7 +108,7 @@ const footer: React.CSSProperties = {
 
 const footerText: React.CSSProperties = {
   fontSize: "11px",
-  color: "#9A9AA3",
+  color: "#8A8177",
   margin: 0,
 }
 
@@ -140,13 +140,13 @@ function AvatarCircle({ src, initial, offset }: { src?: string; initial: string;
     <div
       style={{
         ...base,
-        backgroundColor: offset ? "#F4F4F6" : "#E4E4E9",
+        backgroundColor: offset ? "#F5F4F3" : "#E9E7E5",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         fontSize: "18px",
         fontWeight: 700,
-        color: offset ? "#9A9AA3" : "#6E6E78",
+        color: offset ? "#8A8177" : "#837A72",
       }}
     >
       {initial}
@@ -221,7 +221,7 @@ function MeetingNotificationEmail({ data }: { data: MeetingEmailData }) {
             {data.courseName && <Text style={muted}>{data.courseName}</Text>}
 
             {data.scheduledAt ? (
-              <Text style={{ ...muted, color: "#6E6E78" }}>
+              <Text style={{ ...muted, color: "#837A72" }}>
                 Scheduled for{" "}
                 {new Date(data.scheduledAt).toLocaleString("en-US", {
                   dateStyle: "medium",
@@ -229,7 +229,7 @@ function MeetingNotificationEmail({ data }: { data: MeetingEmailData }) {
                 })}
               </Text>
             ) : (
-              <Text style={{ ...muted, color: "#059669", fontWeight: 500 }}>
+              <Text style={{ ...muted, color: "#047857", fontWeight: 500 }}>
                 Happening right now
               </Text>
             )}
@@ -240,7 +240,7 @@ function MeetingNotificationEmail({ data }: { data: MeetingEmailData }) {
               </Button>
             </Section>
 
-            <Hr style={{ borderColor: "#E4E4E9", margin: "24px 0 16px" }} />
+            <Hr style={{ borderColor: "#E9E7E5", margin: "24px 0 16px" }} />
 
             <Link href={data.meetingLink} style={linkSmall}>
               {data.meetingLink}
@@ -291,7 +291,7 @@ function MeetingInviteEmail({
               </Button>
             </Section>
 
-            <Hr style={{ borderColor: "#E4E4E9", margin: "24px 0 16px" }} />
+            <Hr style={{ borderColor: "#E9E7E5", margin: "24px 0 16px" }} />
 
             <Link href={data.meetingLink} style={linkSmall}>
               {data.meetingLink}
@@ -344,7 +344,7 @@ function ApplicationReceivedEmail({ data }: { data: ApplicationEmailData }) {
               </Button>
             </Section>
 
-            <Hr style={{ borderColor: "#E4E4E9", margin: "24px 0 16px" }} />
+            <Hr style={{ borderColor: "#E9E7E5", margin: "24px 0 16px" }} />
 
             <Link href={data.statusUrl} style={linkSmall}>
               {data.statusUrl}
@@ -387,7 +387,7 @@ function ApplicationDecisionEmail({ data }: { data: ApplicationEmailData }) {
             </Text>
 
             {data.decisionNote && (
-              <Text style={{ ...muted, color: "#6E6E78", marginTop: "10px" }}>
+              <Text style={{ ...muted, color: "#837A72", marginTop: "10px" }}>
                 “{data.decisionNote}”
               </Text>
             )}
@@ -398,7 +398,7 @@ function ApplicationDecisionEmail({ data }: { data: ApplicationEmailData }) {
               </Button>
             </Section>
 
-            <Hr style={{ borderColor: "#E4E4E9", margin: "24px 0 16px" }} />
+            <Hr style={{ borderColor: "#E9E7E5", margin: "24px 0 16px" }} />
 
             <Link href={data.statusUrl} style={linkSmall}>
               {data.statusUrl}
@@ -448,7 +448,7 @@ function InterviewInviteEmail({ data }: { data: InterviewEmailData }) {
               {data.applicantName}, the next step of your instructor application is a short
               video call with {data.hostName}.
             </Text>
-            <Text style={{ ...muted, color: "#059669", fontWeight: 500, marginTop: "10px" }}>
+            <Text style={{ ...muted, color: "#047857", fontWeight: 500, marginTop: "10px" }}>
               {when}
             </Text>
             <Text style={muted}>
@@ -462,7 +462,7 @@ function InterviewInviteEmail({ data }: { data: InterviewEmailData }) {
               </Button>
             </Section>
 
-            <Hr style={{ borderColor: "#E4E4E9", margin: "24px 0 16px" }} />
+            <Hr style={{ borderColor: "#E9E7E5", margin: "24px 0 16px" }} />
 
             <Link href={data.joinUrl} style={linkSmall}>
               {data.joinUrl}
@@ -515,7 +515,7 @@ function SimplePipelineEmail({
                 {ctaLabel}
               </Button>
             </Section>
-            <Hr style={{ borderColor: "#E4E4E9", margin: "24px 0 16px" }} />
+            <Hr style={{ borderColor: "#E9E7E5", margin: "24px 0 16px" }} />
             <Link href={ctaUrl} style={linkSmall}>
               {ctaUrl}
             </Link>
@@ -602,7 +602,7 @@ export async function sendSlotsProposedEmail(
     ...data.slots.map((iso, i) =>
       React.createElement(
         Text,
-        { key: i, style: { ...muted, color: "#059669", fontWeight: 500, margin: "2px 0" } },
+        { key: i, style: { ...muted, color: "#047857", fontWeight: 500, margin: "2px 0" } },
         new Date(iso).toLocaleString("en-US", { dateStyle: "full", timeStyle: "short" })
       )
     )

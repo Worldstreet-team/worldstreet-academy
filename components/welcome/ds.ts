@@ -3,8 +3,8 @@
  *
  * These resolve through the shared WorldStreet tokens (`app/ws-tokens.css`,
  * vendored from `design-tokens/tokens.css`) rather than hardcoding hexes, so
- * the Academy picks up its `platform` palette — near-black #0B0B0F and gold
- * #FFCC29 — instead of the `shell` stone + #EAB308 used by wallet/auth.
+ * the Academy picks up the DS v2 stone ladder — page #0C0A09 and gold
+ * #EAB308 — one look across the ecosystem since 2026-08-05.
  *
  * They're plain strings because these components apply them via inline
  * `style`, where `var(--ws-*)` resolves normally.

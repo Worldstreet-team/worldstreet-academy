@@ -92,7 +92,7 @@ export function AdminBottomNav() {
               key={item.title}
               href={item.href}
               className={cn(
-                "flex flex-col items-center gap-0.5 py-1.5 px-3 text-[10px] transition-colors",
+                "flex min-h-11 flex-col items-center justify-center gap-0.5 py-1.5 px-3 text-[10px] transition-colors",
                 active
                   ? "text-ws-gold font-medium"
                   : "text-ws-muted hover:text-ws-primary"
@@ -110,7 +110,7 @@ export function AdminBottomNav() {
               <button
                 type="button"
                 className={cn(
-                  "flex flex-col items-center gap-0.5 py-1.5 px-3 text-[10px] transition-colors",
+                  "flex min-h-11 flex-col items-center justify-center gap-0.5 py-1.5 px-3 text-[10px] transition-colors",
                   moreActive
                     ? "text-ws-gold font-medium"
                     : "text-ws-muted hover:text-ws-primary"

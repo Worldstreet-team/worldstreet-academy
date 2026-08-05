@@ -20,7 +20,7 @@ export default function AdminError({
   }, [error])
 
   return (
-    <div className="flex-1 px-6 pb-24 pt-8 md:px-8 md:pb-12 lg:px-12">
+    <div className="flex-1 px-4 sm:px-6 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-8 md:px-8 md:pb-12 lg:px-12">
       <div className="mx-auto w-full max-w-7xl">
         <div className="mx-auto mt-16 max-w-md rounded-lg border border-ws-hairline bg-ws-surface p-8 text-center">
           <h1 className="font-display text-xl font-semibold text-ws-primary">

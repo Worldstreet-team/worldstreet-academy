@@ -28,7 +28,7 @@ export default function InstructorCertificatesPage() {
   return (
     <>
       <Topbar title="Certificates & Ratings" variant="instructor" />
-      <div className="flex-1 px-6 pb-24 pt-8 md:px-8 md:pb-12 lg:px-12">
+      <div className="flex-1 px-4 sm:px-6 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-8 md:px-8 md:pb-12 lg:px-12">
         <div className="mx-auto w-full max-w-7xl space-y-8">
           <PageHeader
             title="Certificates & Ratings"

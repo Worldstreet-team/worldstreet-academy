@@ -145,10 +145,10 @@ export function MessageContextMenu({
 
       {/* Context menu overlay */}
       {isOpen && (
-        <div className="fixed inset-0 z-50" onClick={() => setIsOpen(false)}>
+        <div className="fixed inset-0 z-80" onClick={() => setIsOpen(false)}>
           <div
             ref={menuRef}
-            className="fixed min-w-[150px] py-1.5 rounded-lg bg-popover shadow-lg border border-ws-hairline animate-in fade-in zoom-in-95 duration-[var(--ws-motion-fast)]"
+            className="fixed z-80 min-w-[150px] py-1.5 rounded-lg bg-popover shadow-lg border border-ws-hairline animate-in fade-in zoom-in-95 duration-[var(--ws-motion-fast)]"
             style={{ left: position.x, top: position.y }}
             onClick={(e) => e.stopPropagation()}
           >

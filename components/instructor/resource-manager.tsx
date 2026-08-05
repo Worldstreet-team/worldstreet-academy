@@ -179,7 +179,7 @@ export function ResourceManager({ courseId }: { courseId: string }) {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="e.g. Chart Patterns Cheat Sheet"
-            className="h-9 text-sm"
+            className="h-11 text-base md:h-9 md:text-sm"
           />
         </div>
 
@@ -188,7 +188,7 @@ export function ResourceManager({ courseId }: { courseId: string }) {
             type="checkbox"
             checked={isFree}
             onChange={(e) => setIsFree(e.target.checked)}
-            className="h-3.5 w-3.5"
+            className="h-4 w-4 shrink-0"
           />
           Free preview (downloadable without enrolling)
         </label>
@@ -224,7 +224,7 @@ export function ResourceManager({ courseId }: { courseId: string }) {
               value={linkUrl}
               onChange={(e) => setLinkUrl(e.target.value)}
               placeholder="…or paste a link"
-              className="h-9 text-sm"
+              className="h-11 text-base md:h-9 md:text-sm"
             />
             <Button variant="outline" size="sm" disabled={busy || !linkUrl.trim()} onClick={handleAddLink}>
               Add

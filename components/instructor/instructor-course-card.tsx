@@ -71,7 +71,7 @@ export function InstructorCourseCard({
           <DropdownMenu>
             <DropdownMenuTrigger
               aria-label={`Actions for ${course.title}`}
-              className="absolute right-2.5 top-2.5 z-10 flex h-8 w-8 items-center justify-center rounded-sm bg-black/45 text-white transition-colors duration-[var(--ws-motion-fast)] hover:bg-black/70"
+              className="ws-touch-target absolute right-2.5 top-2.5 z-10 flex h-8 w-8 items-center justify-center rounded-sm bg-black/45 text-white transition-colors duration-[var(--ws-motion-fast)] hover:bg-black/70"
             >
               <EllipsisVertical size={16} strokeWidth={2} />
             </DropdownMenuTrigger>

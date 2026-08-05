@@ -26,7 +26,7 @@ export default function BookmarksPage() {
   return (
     <>
       <Topbar title="Bookmarks" />
-      <div className="flex-1 px-6 pb-24 pt-8 md:px-8 md:pb-12 lg:px-12">
+      <div className="flex-1 px-4 sm:px-6 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-8 md:px-8 md:pb-12 lg:px-12">
         <div className="mx-auto w-full max-w-7xl space-y-8">
           <div>
             <h1 className="font-display text-[28px] font-semibold tracking-[-0.02em] text-ws-primary">
@@ -64,7 +64,7 @@ export default function BookmarksPage() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search bookmarks…"
-                  className="h-10 w-full rounded-full bg-ws-chip pl-11 pr-4 text-sm text-ws-primary outline-none transition-colors duration-[var(--ws-motion-fast)] placeholder:text-ws-subtle focus:ring-[1.5px] focus:ring-ws-brand"
+                  className="h-11 md:h-10 w-full rounded-full bg-ws-chip pl-11 pr-4 text-base md:text-sm text-ws-primary outline-none transition-colors duration-[var(--ws-motion-fast)] placeholder:text-ws-subtle focus:ring-[1.5px] focus:ring-ws-brand"
                 />
               </div>
 

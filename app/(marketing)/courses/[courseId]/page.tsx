@@ -48,7 +48,7 @@ export default async function CourseDetailPage({
   ]
 
   return (
-    <div className="container mx-auto px-4 py-8 pb-24 md:pb-12">
+    <div className="container mx-auto px-4 py-8 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-12">
       <div className="grid lg:grid-cols-3 gap-8">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">

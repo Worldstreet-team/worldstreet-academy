@@ -4,8 +4,10 @@
   "private": true,
   "packageManager": "pnpm@10.32.0",
   "scripts": {
-    "dev": "next dev",
+    "dev": "node ../design-tokens/sync.mjs --check && next dev",
     "dev:mock": "node scripts/dev-mock.mjs",
+    "tokens:check": "node ../design-tokens/sync.mjs --check",
+    "tokens:sync": "node ../design-tokens/sync.mjs",
     "build": "next build",
     "start": "next start -p 3000",
     "lint": "eslint",

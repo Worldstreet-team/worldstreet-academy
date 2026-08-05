@@ -81,7 +81,7 @@ function QuestionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-lg max-h-[85dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{initial ? "Edit question" : "Add question"}</DialogTitle>
         </DialogHeader>
@@ -149,7 +149,7 @@ function QuestionDialog({
                     setOptions((prev) => prev.map((o, j) => (j === i ? e.target.value : o)))
                   }
                   placeholder={`Option ${i + 1}`}
-                  className="h-8 text-xs"
+                  className="h-11 text-base md:h-8 md:text-xs"
                 />
                 {options.length > 2 && (
                   <button
@@ -327,7 +327,7 @@ function InstructorExamPageInner() {
   return (
     <>
       <Topbar title={lessonId ? "Lesson Quiz" : "Course Exam"} variant="instructor" />
-      <div className="flex-1 px-6 pb-24 pt-8 md:px-8 md:pb-12 lg:px-12">
+      <div className="flex-1 px-4 sm:px-6 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-8 md:px-8 md:pb-12 lg:px-12">
         <div className="mx-auto w-full max-w-3xl space-y-6">
         <PageHeader
           title={lessonId ? "Lesson knowledge check" : "Course exam (CBT)"}

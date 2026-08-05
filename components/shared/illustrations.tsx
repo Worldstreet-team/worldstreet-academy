@@ -52,9 +52,9 @@ function Halo({ id, cx = 100, cy = 80 }: { id: string; cx?: number; cy?: number 
     <>
       <defs>
         <radialGradient id={id} cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#FFCC29" stopOpacity="0.08" />
-          <stop offset="65%" stopColor="#FFCC29" stopOpacity="0.04" />
-          <stop offset="100%" stopColor="#FFCC29" stopOpacity="0" />
+          <stop offset="0%" stopColor="#EAB308" stopOpacity="0.08" />
+          <stop offset="65%" stopColor="#EAB308" stopOpacity="0.04" />
+          <stop offset="100%" stopColor="#EAB308" stopOpacity="0" />
         </radialGradient>
       </defs>
       <ellipse cx={cx} cy={cy} rx={92} ry={64} fill={`url(#${id})`} />

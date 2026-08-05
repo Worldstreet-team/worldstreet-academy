@@ -5,8 +5,15 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 
 function Table({ className, ...props }: React.ComponentProps<"table">) {
+  // overscroll-x-contain stops a sideways flick at the end of the table from
+  // chaining to the document and triggering the browser's back gesture. The
+  // scrollbar stays visible — on a wide table it is the only affordance
+  // telling you there are more columns.
   return (
-    <div data-slot="table-container" className="relative w-full overflow-x-auto">
+    <div
+      data-slot="table-container"
+      className="relative w-full overflow-x-auto overscroll-x-contain"
+    >
       <table
         data-slot="table"
         className={cn("w-full caption-bottom text-sm", className)}

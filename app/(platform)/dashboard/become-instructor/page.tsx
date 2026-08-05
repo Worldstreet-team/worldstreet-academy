@@ -551,7 +551,7 @@ export default function BecomeInstructorPage() {
   return (
     <>
       <Topbar />
-      <div className="p-4 sm:p-6 pb-24 md:pb-6 max-w-2xl mx-auto space-y-5">
+      <div className="p-4 sm:p-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6 max-w-2xl mx-auto space-y-5">
         <div className="text-center space-y-2 py-4">
           <div className="mx-auto h-12 w-12 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
             <GraduationCapIcon  size={24} />

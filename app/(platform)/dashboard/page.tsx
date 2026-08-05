@@ -192,7 +192,7 @@ export default function DashboardPage() {
     <>
       <Topbar title="Dashboard" />
 
-      <div className="flex-1 px-6 pb-24 pt-8 md:px-8 md:pb-12 lg:px-12">
+      <div className="flex-1 px-4 sm:px-6 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-8 md:px-8 md:pb-12 lg:px-12">
         <div className="mx-auto w-full max-w-7xl space-y-12">
           {/* Greeting pane — mascot + greeting on the left, the learner's
               overall standing on the right, on a quiet surface card. The

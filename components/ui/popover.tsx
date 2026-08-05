@@ -24,7 +24,7 @@ function PopoverBackdrop({
   return (
     <PopoverPrimitive.Backdrop
       data-slot="popover-backdrop"
-      className={cn("fixed inset-0 z-50", className)}
+      className={cn("fixed inset-0 z-80", className)}
       {...props}
     />
   )
@@ -37,7 +37,7 @@ function PopoverPositioner({
   return (
     <PopoverPrimitive.Positioner
       data-slot="popover-positioner"
-      className={cn("z-50", className)}
+      className={cn("z-80", className)}
       {...props}
     />
   )
@@ -58,7 +58,7 @@ function PopoverContent({
 }) {
   return (
     <PopoverPortal>
-      <PopoverPositioner side={side} align={align} sideOffset={sideOffset}>
+      <PopoverPositioner side={side} align={align} sideOffset={sideOffset} collisionPadding={8}>
         <PopoverPrimitive.Popup
           data-slot="popover-content"
           className={cn(

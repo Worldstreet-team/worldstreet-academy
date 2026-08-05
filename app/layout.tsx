@@ -27,6 +27,11 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   interactiveWidget: "resizes-content",
+  // Required for env(safe-area-inset-*) to report real values. Without it iOS
+  // letterboxes the page and every inset resolves to 0 — which silently
+  // disabled the safe-area padding on the bottom navs, the meeting controls
+  // and the side panel. Paired with the `.safe-area-*` helpers in globals.css.
+  viewportFit: "cover",
 };
 
 export const metadata: Metadata = {
@@ -69,7 +74,7 @@ export default function RootLayout({
           })}
     >
       {/* data-ws-theme selects the Academy's palette from the shared design
-          tokens. Academy is a `platform` app: near-black #0B0B0F + gold #FFCC29
+          tokens. DS v2 (2026-08-05): stone ladder #0C0A09 + gold #EAB308, dark default
           (not the `shell` stone + #EAB308 used by wallet/auth). */}
       <html
         lang="en"

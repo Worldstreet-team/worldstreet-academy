@@ -144,7 +144,7 @@ export function InstructorProfileClient({
             </button>
             <div>
               <p className="text-sm font-semibold">{fullName}</p>
-              <p className="text-xs text-muted-foreground">{user?.email}</p>
+              <p className="break-all text-xs text-muted-foreground">{user?.email}</p>
             </div>
           </div>
 

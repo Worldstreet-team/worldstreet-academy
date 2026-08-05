@@ -30,8 +30,8 @@ export function CourseCarousel({ courses, title }: { courses: BrowseCourse[]; ti
           <h3 className="font-semibold text-sm">{title}</h3>
           {courses.length > 2 && (
             <div className="flex items-center gap-1">
-              <CarouselPrevious className="static translate-x-0 translate-y-0 h-7 w-7" />
-              <CarouselNext className="static translate-x-0 translate-y-0 h-7 w-7" />
+              <CarouselPrevious className="ws-touch-target static translate-x-0 translate-y-0 h-7 w-7" />
+              <CarouselNext className="ws-touch-target static translate-x-0 translate-y-0 h-7 w-7" />
             </div>
           )}
         </div>

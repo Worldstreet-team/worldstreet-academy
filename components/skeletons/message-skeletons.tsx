@@ -186,7 +186,7 @@ export function MessagesAreaSkeleton() {
  */
 export function MessagesPageSkeleton() {
   return (
-    <div className="flex-1 flex h-[calc(100vh-4rem)] overflow-hidden">
+    <div className="flex-1 flex h-[calc(100dvh-4rem)] overflow-hidden">
       {/* Conversation list skeleton */}
       <div className="w-full md:w-80 lg:w-96 border-r bg-background">
         <div className="p-3 border-b flex items-center justify-between">

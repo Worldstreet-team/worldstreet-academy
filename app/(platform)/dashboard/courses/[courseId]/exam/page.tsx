@@ -258,7 +258,7 @@ export default function CourseExamPage() {
   return (
     <React.Suspense
       fallback={
-        <div className="flex min-h-[40vh] items-center justify-center">
+        <div className="flex min-h-[40dvh] items-center justify-center">
           <LoaderCircle className="h-5 w-5 animate-spin text-ws-muted" aria-label="Loading exam" />
         </div>
       }
@@ -309,7 +309,7 @@ function CourseExamPageInner() {
   return (
     <>
       <Topbar />
-      <div className="p-4 sm:p-6 pb-24 md:pb-6">
+      <div className="p-4 sm:p-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6">
         {runner ? (
           <ExamRunner runner={runner} onFinished={finish} />
         ) : result ? (

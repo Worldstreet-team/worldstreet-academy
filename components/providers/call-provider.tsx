@@ -717,7 +717,7 @@ function ReconnectionBanner({
   }
 
   return (
-    <div className="fixed bottom-24 right-4 z-[9999] animate-in slide-in-from-bottom-4 fade-in duration-[var(--ws-motion-base)]">
+    <div className="fixed bottom-24 right-4 z-90 animate-in slide-in-from-bottom-4 fade-in duration-[var(--ws-motion-base)]">
       <div className="flex items-center gap-3 px-4 py-3 rounded-lg shadow-2xl border border-ws-hairline bg-background">
         <div className="relative">
           <Avatar className="w-10 h-10">

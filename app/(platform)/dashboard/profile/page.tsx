@@ -79,7 +79,7 @@ export default function ProfilePage() {
   return (
     <>
       <Topbar title="Profile" />
-      <div className="flex-1 p-4 md:p-6 lg:p-8 space-y-6 max-w-3xl pb-24 md:pb-8">
+      <div className="flex-1 p-4 md:p-6 lg:p-8 space-y-6 max-w-3xl pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-8">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Profile</h1>
           <p className="text-muted-foreground mt-1">
@@ -158,7 +158,7 @@ export default function ProfilePage() {
 
               <div className="space-y-0.5">
                 <h2 className="text-lg font-semibold">{fullName}</h2>
-                <p className="text-sm text-muted-foreground">{user.email}</p>
+                <p className="break-all text-sm text-muted-foreground">{user.email}</p>
                 <p className="text-xs text-muted-foreground capitalize">
                   {user.role.toLowerCase()} &middot; Since {memberSince}
                 </p>
@@ -233,7 +233,7 @@ export default function ProfilePage() {
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Email
                     </p>
-                    <p className="mt-1 text-sm">{user.email}</p>
+                    <p className="mt-1 break-all text-sm">{user.email}</p>
                   </div>
                 </div>
                 {bio && (

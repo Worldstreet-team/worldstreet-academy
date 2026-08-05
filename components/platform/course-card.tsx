@@ -136,7 +136,7 @@ export function CourseCard({
                 e.stopPropagation()
                 onToggleBookmark()
               }}
-              className="absolute right-2.5 top-2.5 z-10 flex h-8 w-8 items-center justify-center rounded-sm bg-black/45 text-white opacity-90 transition-colors duration-[var(--ws-motion-fast)] hover:bg-black/70"
+              className="ws-touch-target absolute right-2.5 top-2.5 z-10 flex h-8 w-8 items-center justify-center rounded-sm bg-black/45 text-white opacity-90 transition-colors duration-[var(--ws-motion-fast)] hover:bg-black/70"
             >
               <BookmarkIcon
                 

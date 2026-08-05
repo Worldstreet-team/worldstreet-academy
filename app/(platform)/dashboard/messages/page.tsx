@@ -572,7 +572,7 @@ export default function MessagesPage() {
                 </div>
               ) : (
                 <>
-                  <div className="flex-1 overflow-y-auto max-h-[calc(100vh-16rem)] md:max-h-[calc(100vh-12rem)]">
+                  <div className="flex-1 overflow-y-auto max-h-[calc(100dvh-16rem)] md:max-h-[calc(100dvh-12rem)]">
                     <div className="px-3 py-4 space-y-1 max-w-3xl mx-auto w-full">
                       {messageGroups.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-12 px-4">

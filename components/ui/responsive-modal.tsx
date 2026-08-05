@@ -54,14 +54,14 @@ function ResponsiveModalContent({
     <DialogPrimitive.Portal>
       {/* Overlay / backdrop */}
       <DialogPrimitive.Backdrop
-        className="data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 bg-black/10 duration-[var(--ws-motion-fast)] data-ending-style:opacity-0 data-starting-style:opacity-0 supports-backdrop-filter: fixed inset-0 z-50"
+        className="data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 bg-black/10 duration-[var(--ws-motion-fast)] data-ending-style:opacity-0 data-starting-style:opacity-0 supports-backdrop-filter: fixed inset-0 z-80"
       />
 
       {/* Popup — dialog on desktop, bottom sheet on mobile */}
       <DialogPrimitive.Popup
         data-slot="responsive-modal-content"
         className={cn(
-          "bg-background outline-none text-sm z-50 fixed",
+          "bg-background outline-none text-sm z-80 fixed",
           isDesktop
             ? "data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-foreground/10 grid max-w-[calc(100%-2rem)] gap-4 rounded-lg p-4 ring-1 duration-[var(--ws-motion-fast)] sm:max-w-sm top-1/2 left-1/2 w-full -translate-x-1/2 -translate-y-1/2"
             : "data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:slide-out-to-bottom-10 data-open:slide-in-from-bottom-10 flex flex-col gap-4 shadow-lg transition duration-[var(--ws-motion-base)] ease-in-out inset-x-0 bottom-0 rounded-t-lg border-t p-4",

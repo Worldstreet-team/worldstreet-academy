@@ -63,7 +63,7 @@ export function InstructorBottomNav() {
         key={item.title}
         href={item.href}
         className={cn(
-          "flex flex-col items-center gap-0.5 px-3 py-1.5 text-[10px] transition-colors duration-[var(--ws-motion-fast)]",
+          "flex min-h-11 flex-col items-center justify-center gap-0.5 px-3 py-1.5 text-[10px] transition-colors duration-[var(--ws-motion-fast)]",
           active
             ? "font-medium text-ws-gold"
             : "text-ws-muted hover:text-ws-primary"

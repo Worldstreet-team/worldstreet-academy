@@ -53,7 +53,7 @@ export default function BrowseCoursesPage() {
   return (
     <>
       <Topbar title="Browse Courses" />
-      <div className="flex-1 p-4 md:p-6 lg:p-8 space-y-6 pb-24 md:pb-8">
+      <div className="flex-1 p-4 md:p-6 lg:p-8 space-y-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-8">
         <div className="space-y-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Browse Courses</h1>
@@ -74,7 +74,7 @@ export default function BrowseCoursesPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search courses"
-                className="h-10 w-full rounded-full bg-ws-chip pl-10 pr-4 text-sm text-ws-primary placeholder:text-ws-subtle outline-none border border-transparent transition-colors duration-[var(--ws-motion-fast)] focus:border-ws-brand"
+                className="h-11 md:h-10 w-full rounded-full bg-ws-chip pl-10 pr-4 text-base md:text-sm text-ws-primary placeholder:text-ws-subtle outline-none border border-transparent transition-colors duration-[var(--ws-motion-fast)] focus:border-ws-brand"
               />
             </div>
             <Popover>

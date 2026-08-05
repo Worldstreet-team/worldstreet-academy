@@ -588,7 +588,7 @@ function FullscreenMediaViewer({
 
   return (
     <div
-      className="fixed inset-0 z-100 flex items-center justify-center animate-in fade-in duration-[var(--ws-motion-base)]"
+      className="fixed inset-0 z-80 flex items-center justify-center animate-in fade-in duration-[var(--ws-motion-base)]"
       onClick={onClose}
     >
       {/* Glassmorphic backdrop */}

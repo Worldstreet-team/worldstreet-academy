@@ -51,7 +51,7 @@ export function VividWidget() {
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.98, opacity: 0 }}
             transition={{ duration: 0.2, ease: [0.2, 0, 0, 1] }}
-            className="fixed bottom-6 right-6 z-999 hidden md:block"
+            className="fixed bottom-6 right-6 z-60 hidden md:block"
           >
             <OrbButton />
           </motion.div>
@@ -67,7 +67,7 @@ export function VividWidget() {
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.98, opacity: 0 }}
             transition={{ duration: 0.2, ease: [0.2, 0, 0, 1] }}
-            className="fixed bottom-6 right-6 z-999 hidden md:block"
+            className="fixed bottom-6 right-6 z-60 hidden md:block"
           >
             <OrbButton />
           </motion.div>
@@ -111,7 +111,7 @@ function FullPageExperience() {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.32, ease: [0.2, 0, 0, 1] }}
-      className="fixed inset-0 z-998 flex flex-col bg-ws-page"
+      className="fixed inset-0 z-70 flex flex-col bg-ws-page"
       style={{ borderRadius: 0 }}
     >
       {/* Top bar */}
@@ -146,7 +146,7 @@ function FullPageExperience() {
                 // Desktop: full-height side panel
                 "md:w-105 md:border-l md:border-ws-hairline",
                 // Mobile: bottom card
-                "max-md:mx-4 max-md:mb-4 max-md:rounded-lg max-md:border max-md:border-ws-hairline max-md:max-h-[60vh]",
+                "max-md:mx-4 max-md:mb-4 max-md:rounded-lg max-md:border max-md:border-ws-hairline max-md:max-h-[60dvh]",
                 // Shared
                 "bg-ws-surface overflow-y-auto",
                 "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden!",

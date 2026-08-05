@@ -1047,7 +1047,7 @@ export function VideoCall({
   if (isMinimized) {
     if (callState === "ended") {
       return (
-        <div className="fixed bottom-24 right-4 z-[9999] animate-in slide-in-from-bottom-4 fade-in duration-[var(--ws-motion-base)]">
+        <div className="fixed bottom-24 right-4 z-90 animate-in slide-in-from-bottom-4 fade-in duration-[var(--ws-motion-base)]">
           <div className="flex items-center gap-3 px-4 py-3 rounded-lg shadow-2xl border border-ws-hairline bg-background">
             <Avatar className="w-10 h-10">
               <AvatarImage src={callerAvatar} alt={callerName} />
@@ -1074,7 +1074,7 @@ export function VideoCall({
 
     return (
       <div
-        className="fixed bottom-24 right-4 z-[9999] cursor-pointer animate-in slide-in-from-bottom-4 fade-in duration-[var(--ws-motion-base)]"
+        className="fixed bottom-24 right-4 z-90 cursor-pointer animate-in slide-in-from-bottom-4 fade-in duration-[var(--ws-motion-base)]"
         onClick={handleRestore}
       >
         {remoteAudioElement}
@@ -1181,7 +1181,7 @@ export function VideoCall({
 
   // ── Modal call UI ──
   return (
-    <div className="fixed inset-0 z-[9998] flex items-center justify-center">
+    <div className="fixed inset-0 z-90 flex items-center justify-center">
       {remoteAudioElement}
       {/* Backdrop */}
       <div
@@ -1190,7 +1190,7 @@ export function VideoCall({
       />
 
       <div
-        className="relative w-[95vw] h-[93vh] md:w-[90vw] md:h-[90vh] rounded-lg md:rounded-lg overflow-hidden shadow-2xl bg-black animate-in fade-in zoom-in-95 duration-[var(--ws-motion-base)]"
+        className="relative w-[95vw] h-[93dvh] md:w-[90vw] md:h-[90dvh] rounded-lg md:rounded-lg overflow-hidden shadow-2xl bg-black animate-in fade-in zoom-in-95 duration-[var(--ws-motion-base)]"
         onClick={() =>
           callState === "connected" && setShowControls(!showControls)
         }

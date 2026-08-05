@@ -59,7 +59,7 @@ export function CourseCard({ course }: { course: CourseData }) {
               e.stopPropagation()
               toggle(course.id)
             }}
-            className={`absolute top-2.5 right-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/30 shadow-lg transition-all hover:bg-white/40 dark:border-white/20 ${
+            className={`ws-touch-target absolute top-2.5 right-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/30 shadow-lg transition-all hover:bg-white/40 dark:border-white/20 ${
               favorited
                 ? "bg-primary/80 text-white"
                 : "bg-white/20 text-white dark:bg-black/30"

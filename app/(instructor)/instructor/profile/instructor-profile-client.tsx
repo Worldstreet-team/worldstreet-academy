@@ -147,7 +147,7 @@ export function InstructorProfileClient({
             </button>
             <div className="space-y-1">
               <h2 className="text-xl font-bold">{fullName}</h2>
-              <p className="text-sm text-muted-foreground">{user?.email}</p>
+              <p className="break-all text-sm text-muted-foreground">{user?.email}</p>
               <p className="text-xs text-muted-foreground">
                 Instructor · Since {memberSince}
               </p>

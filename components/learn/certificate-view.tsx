@@ -479,7 +479,7 @@ export function CertificateClient({ data }: { data: CertificateData }) {
   }, [data, studentSig, logoPath])
 
   return (
-    <div className="min-h-screen flex flex-col items-center bg-ws-page">
+    <div className="min-h-dvh flex flex-col items-center bg-ws-page">
       {/* Top bar */}
       <div className="w-full max-w-5xl px-4 py-4 flex items-center justify-between">
         <Button

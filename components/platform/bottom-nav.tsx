@@ -140,7 +140,7 @@ export function PlatformBottomNav() {
               key={item.title}
               href={item.href}
               className={cn(
-                "flex flex-col items-center gap-0.5 py-1.5 px-3 text-[10px] transition-colors",
+                "flex min-h-11 flex-col items-center justify-center gap-0.5 py-1.5 px-3 text-[10px] transition-colors",
                 active
                   ? "text-foreground font-medium"
                   : "text-muted-foreground hover:text-foreground"
@@ -180,7 +180,7 @@ export function PlatformBottomNav() {
               key={item.title}
               href={item.href}
               className={cn(
-                "flex flex-col items-center gap-0.5 py-1.5 px-3 text-[10px] transition-colors",
+                "flex min-h-11 flex-col items-center justify-center gap-0.5 py-1.5 px-3 text-[10px] transition-colors",
                 active
                   ? "text-foreground font-medium"
                   : "text-muted-foreground hover:text-foreground"

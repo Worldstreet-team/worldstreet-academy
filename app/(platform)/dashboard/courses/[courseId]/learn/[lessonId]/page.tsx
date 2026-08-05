@@ -152,7 +152,7 @@ export default async function LessonPage({
           </div>
 
           {/* Lesson Info */}
-          <div className="p-4 md:p-6 space-y-4 pb-24 md:pb-6">
+          <div className="p-4 md:p-6 space-y-4 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6">
             <div className="flex items-center gap-2">
               <Badge variant="secondary" className="text-xs capitalize">
                 {currentLesson.type}

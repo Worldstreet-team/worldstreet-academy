@@ -429,7 +429,7 @@ export function CommandSearch() {
   if (isMobile) {
     return (
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="bottom" showCloseButton={false} className="p-0 gap-0 rounded-t-lg max-h-[85vh] flex flex-col">
+        <SheetContent side="bottom" showCloseButton={false} className="p-0 gap-0 rounded-t-lg max-h-[85dvh] flex flex-col">
           <SheetTitle className="sr-only">Search</SheetTitle>
 
           {/* Drag handle */}
@@ -444,7 +444,7 @@ export function CommandSearch() {
             onKeyDown={handleKeyDown}
           />
 
-          <div ref={listRef} className="flex-1 overflow-y-auto max-h-[60vh] overscroll-contain">
+          <div ref={listRef} className="flex-1 overflow-y-auto max-h-[60dvh] overscroll-contain">
             <CommandList
               items={filtered}
               query={query}

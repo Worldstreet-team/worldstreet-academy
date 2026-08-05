@@ -48,7 +48,7 @@ export default async function InstructorCourseInfoPage({
         variant="instructor"
         breadcrumbOverrides={{ [courseId]: course.title }}
       />
-      <div className="flex-1 px-6 pb-24 pt-8 md:px-8 md:pb-12 lg:px-12">
+      <div className="flex-1 px-4 sm:px-6 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-8 md:px-8 md:pb-12 lg:px-12">
         <div className="mx-auto w-full max-w-7xl space-y-8">
           {/* Back + edit */}
           <div className="flex items-center justify-between">
