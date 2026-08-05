@@ -8,7 +8,6 @@ import { UserProvider } from "@/components/providers/user-provider"
 import { CallProvider } from "@/components/providers/call-provider"
 import { MeetingProvider } from "@/components/providers/meeting-provider"
 import { QueryProvider } from "@/components/providers/query-provider"
-import { VividWrapper } from "@/components/vivid/vivid-wrapper"
 import { getCachedUser } from "@/lib/auth/cached"
 
 export default async function InstructorLayout({
@@ -38,25 +37,14 @@ export default async function InstructorLayout({
       <UserProvider user={user}>
         <CallProvider>
           <MeetingProvider>
-            <VividWrapper
-              user={{
-                id: user.id,
-                firstName: user.firstName,
-                lastName: user.lastName,
-                email: user.email,
-                role: user.role,
-                avatarUrl: user.avatarUrl,
-              }}
-            >
-              <SidebarProvider defaultOpen={sidebarOpen}>
-                <InstructorSidebar />
-                <SidebarInset>
-                  {children}
-                </SidebarInset>
-                <InstructorBottomNav />
-                <CommandSearch />
-              </SidebarProvider>
-            </VividWrapper>
+            <SidebarProvider defaultOpen={sidebarOpen}>
+              <InstructorSidebar />
+              <SidebarInset>
+                {children}
+              </SidebarInset>
+              <InstructorBottomNav />
+              <CommandSearch />
+            </SidebarProvider>
           </MeetingProvider>
         </CallProvider>
       </UserProvider>

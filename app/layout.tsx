@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import { Public_Sans, Dancing_Script, Poppins } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -88,6 +89,16 @@ export default function RootLayout({
           >
             {children}
           </ThemeProvider>
+          {/* Vivid voice assistant — hosted widget, site-wide (marketing,
+              dashboard, instructor, admin). The key is publishable; behavior
+              (voice, knowledge, routes, guardrails, allowed origins) is
+              configured in the Vivid dashboard, not in this repo. */}
+          <Script
+            src="https://platformvivid.worldstreetgold.com/widget.js"
+            data-key="pk_live_UFtFcw9sZ0UNpoM8yZO80swv"
+            data-api="https://platformvivid.worldstreetgold.com"
+            strategy="afterInteractive"
+          />
         </body>
       </html>
     </ClerkProvider>

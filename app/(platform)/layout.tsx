@@ -8,7 +8,6 @@ import { UserProvider } from "@/components/providers/user-provider"
 import { CallProvider } from "@/components/providers/call-provider"
 import { MeetingProvider } from "@/components/providers/meeting-provider"
 import { QueryProvider } from "@/components/providers/query-provider"
-import { VividWrapper } from "@/components/vivid/vivid-wrapper"
 import { getCachedUser } from "@/lib/auth/cached"
 import { TranslateScript } from "@/components/translator/translate-script"
 import { OnboardingModal } from "@/components/welcome/onboarding-modal"
@@ -34,29 +33,18 @@ export default async function PlatformLayout({
       <UserProvider user={user}>
         <CallProvider>
           <MeetingProvider>
-            <VividWrapper
-              user={{
-                id: user.id,
-                firstName: user.firstName,
-                lastName: user.lastName,
-                email: user.email,
-                role: user.role,
-                avatarUrl: user.avatarUrl,
-              }}
-            >
-              <SidebarProvider defaultOpen={sidebarOpen}>
-                <AppSidebar />
-                <SidebarInset>
-                  {children}
-                </SidebarInset>
-                <PlatformBottomNav />
-                <CommandSearch />
-                <TranslateScript initialLanguage={user.preferredLanguage} />
-                {/* First run: introduce the Academy over the real dashboard
-                    rather than on a separate page. */}
-                {!user.hasOnboarded && <OnboardingModal userName={user.firstName} />}
-              </SidebarProvider>
-            </VividWrapper>
+            <SidebarProvider defaultOpen={sidebarOpen}>
+              <AppSidebar />
+              <SidebarInset>
+                {children}
+              </SidebarInset>
+              <PlatformBottomNav />
+              <CommandSearch />
+              <TranslateScript initialLanguage={user.preferredLanguage} />
+              {/* First run: introduce the Academy over the real dashboard
+                  rather than on a separate page. */}
+              {!user.hasOnboarded && <OnboardingModal userName={user.firstName} />}
+            </SidebarProvider>
           </MeetingProvider>
         </CallProvider>
       </UserProvider>

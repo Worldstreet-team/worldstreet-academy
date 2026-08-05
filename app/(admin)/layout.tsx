@@ -8,7 +8,6 @@ import { UserProvider } from "@/components/providers/user-provider"
 import { CallProvider } from "@/components/providers/call-provider"
 import { MeetingProvider } from "@/components/providers/meeting-provider"
 import { QueryProvider } from "@/components/providers/query-provider"
-import { VividWrapper } from "@/components/vivid/vivid-wrapper"
 import { getCachedUser } from "@/lib/auth/cached"
 
 export default async function AdminLayout({
@@ -28,8 +27,9 @@ export default async function AdminLayout({
     redirect("/dashboard")
   }
 
-  // Same provider chrome as the student/instructor dashboards — calls,
-  // meetings (interview rooms) and the Vivid assistant all work in here.
+  // Same provider chrome as the student/instructor dashboards — calls and
+  // meetings (interview rooms) work in here. The Vivid assistant is injected
+  // site-wide by the root layout.
   // The sidebar writes `sidebar_state` when toggled, but nothing read it
   // back — so a collapsed rail sprang open again on every navigation.
   const sidebarOpen = (await cookies()).get("sidebar_state")?.value !== "false"
@@ -39,23 +39,12 @@ export default async function AdminLayout({
       <UserProvider user={user}>
         <CallProvider>
           <MeetingProvider>
-            <VividWrapper
-              user={{
-                id: user.id,
-                firstName: user.firstName,
-                lastName: user.lastName,
-                email: user.email,
-                role: user.role,
-                avatarUrl: user.avatarUrl,
-              }}
-            >
-              <SidebarProvider defaultOpen={sidebarOpen}>
-                <AdminSidebar />
-                <SidebarInset>{children}</SidebarInset>
-                <AdminBottomNav />
-                <CommandSearch />
-              </SidebarProvider>
-            </VividWrapper>
+            <SidebarProvider defaultOpen={sidebarOpen}>
+              <AdminSidebar />
+              <SidebarInset>{children}</SidebarInset>
+              <AdminBottomNav />
+              <CommandSearch />
+            </SidebarProvider>
           </MeetingProvider>
         </CallProvider>
       </UserProvider>
