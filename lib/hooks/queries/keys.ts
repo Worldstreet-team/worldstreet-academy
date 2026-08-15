@@ -50,6 +50,14 @@ export const queryKeys = {
     filters ? (["admin", "earnings", filters] as const) : (["admin", "earnings"] as const),
   adminCourses: (filters?: { status?: string; search?: string; page?: number }) =>
     filters ? (["admin", "courses", filters] as const) : (["admin", "courses"] as const),
+  adminEnrollments: (filters?: {
+    course?: string
+    status?: string
+    payment?: string
+    search?: string
+    page?: number
+  }) =>
+    filters ? (["admin", "enrollments", filters] as const) : (["admin", "enrollments"] as const),
   adminReviews: (filters?: { filter?: string; page?: number }) =>
     filters ? (["admin", "reviews", filters] as const) : (["admin", "reviews"] as const),
   adminApplications: (filters?: { status?: string; page?: number }) =>

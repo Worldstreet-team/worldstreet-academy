@@ -1,4 +1,11 @@
-export type EnrollmentStatus = "active" | "completed" | "expired"
+export type EnrollmentStatus =
+  | "pre_enrolled"
+  | "active"
+  | "completed"
+  | "expired"
+  | "refunded"
+  | "suspended"
+  | "cancelled"
 
 export type Enrollment = {
   id: string
@@ -6,6 +13,8 @@ export type Enrollment = {
   courseId: string
   status: EnrollmentStatus
   enrolledAt: string
+  preEnrolledAt: string | null
+  activatedAt: string | null
   completedAt: string | null
 }
 

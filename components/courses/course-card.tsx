@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useBookmarkContext } from "@/components/providers/bookmark-provider"
+import { AvailabilityCountdown } from "@/components/shared/availability-countdown"
 import { levelChipStyle } from "@/components/shared/level-badge"
 import type { Course } from "@/lib/types"
 import type { BrowseCourse } from "@/lib/actions/student"
@@ -26,6 +27,9 @@ function formatDuration(totalMinutes: number): string {
 export function CourseCard({ course }: { course: CourseData }) {
   const { isBookmarked, toggle } = useBookmarkContext()
   const favorited = isBookmarked(course.id)
+  // Browse rows know their schedule; the mock Course type doesn't carry one.
+  const availableAt = "availableAt" in course ? course.availableAt : null
+  const comingSoon = Boolean(availableAt && new Date(availableAt) > new Date())
 
   return (
     <Link href={`/dashboard/courses/${course.id}`}>
@@ -51,6 +55,12 @@ export function CourseCard({ course }: { course: CourseData }) {
           >
             {course.pricing === "free" ? "Free" : `$${course.price}`}
           </Badge>
+          {comingSoon && availableAt && (
+            <Badge className="absolute bottom-2.5 left-2.5 z-10 border border-ws-gold/40 bg-black/70 text-[10px] text-ws-gold">
+              Coming Soon ·{" "}
+              <AvailabilityCountdown availableAt={availableAt} variant="compact" />
+            </Badge>
+          )}
           {/* Bookmark button */}
           <button
             type="button"

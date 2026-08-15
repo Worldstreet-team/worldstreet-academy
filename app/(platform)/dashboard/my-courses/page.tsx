@@ -124,17 +124,27 @@ export default function MyCoursesPage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                  {filteredCourses.map((course) => (
-                    <CourseCard
-                      key={course.id}
-                      href={`/dashboard/courses/${course.courseId}/learn/${course.resumeLessonId ?? course.firstLessonId ?? "first"}`}
-                      title={course.courseTitle}
-                      thumbnailUrl={course.courseThumbnail}
-                      instructorName={course.instructorName}
-                      instructorAvatarUrl={course.instructorAvatarUrl}
-                      progress={course.progress}
-                    />
-                  ))}
+                  {filteredCourses.map((course) => {
+                    // A reservation isn't startable: the card routes to the
+                    // course page (countdown + status) instead of the player.
+                    const preLaunch = course.status === "pre_enrolled"
+                    return (
+                      <CourseCard
+                        key={course.id}
+                        href={
+                          preLaunch
+                            ? `/dashboard/courses/${course.courseId}`
+                            : `/dashboard/courses/${course.courseId}/learn/${course.resumeLessonId ?? course.firstLessonId ?? "first"}`
+                        }
+                        title={course.courseTitle}
+                        thumbnailUrl={course.courseThumbnail}
+                        instructorName={course.instructorName}
+                        instructorAvatarUrl={course.instructorAvatarUrl}
+                        progress={course.progress}
+                        comingSoonAt={preLaunch ? course.courseAvailableAt : null}
+                      />
+                    )
+                  })}
                 </div>
               )}
             </>

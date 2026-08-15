@@ -12,17 +12,23 @@ export default async function EditCoursePage({
   
   if (!data) notFound()
 
-  // Transform data to match the CourseEditor expected format
+  // Transform data to match the CourseEditor expected format. Every editable
+  // field must pass through here — anything dropped gets wiped on save,
+  // because the editor posts the full document back.
   const course = {
     id: data.course.id,
     title: data.course.title,
     description: data.course.description,
+    shortDescription: data.course.shortDescription,
     thumbnailUrl: data.course.thumbnailUrl,
-    level: data.course.level as "beginner" | "intermediate" | "advanced",
-    pricing: data.course.pricing as "free" | "paid",
+    level: data.course.level,
+    pricing: data.course.pricing,
     price: data.course.price,
-    status: data.course.status as "draft" | "published" | "archived",
+    status: data.course.status,
     category: data.course.category,
+    whatYouWillLearn: data.course.whatYouWillLearn,
+    availableAt: data.course.availableAt,
+    preEnrollEnabled: data.course.preEnrollEnabled,
   }
 
   const lessons = data.lessons.map((l) => ({

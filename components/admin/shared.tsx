@@ -61,10 +61,18 @@ const STATUS_TONES: Record<string, BadgeTone> = {
   // courses / exams
   draft: "neutral",
   published: "success",
+  suspended: "danger",
+  closed: "subtle",
   archived: "neutral",
+  coming_soon: "admin", // gold — scheduled, watchable
+  live: "success",
   completed: "success",
   passed: "success",
   banned: "danger",
+  // enrollments
+  pre_enrolled: "admin",
+  active: "success",
+  expired: "neutral",
   // roles
   USER: "subtle",
   INSTRUCTOR: "neutral",

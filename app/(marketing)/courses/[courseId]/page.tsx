@@ -6,6 +6,8 @@ import { levelChipStyle } from "@/components/shared/level-badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { fetchPublicCourse } from "@/lib/actions/student"
 import { checkEnrollment } from "@/lib/actions/enrollments"
+import { CourseSchedulingCta } from "@/components/shared/course-scheduling-cta"
+import { courseAvailability } from "@/lib/types/course"
 import { getCurrentUser } from "@/lib/auth"
 import { CourseOutcomes } from "@/components/courses/course-outcomes"
 import { CourseReviews } from "@/components/courses/course-reviews"
@@ -255,7 +257,22 @@ export default async function CourseDetailPage({
             </div>
 
             <div className="mt-6">
-              {isEnrolled ? (
+              {courseAvailability({ status: "published", availableAt: course.availableAt }) ===
+                "coming_soon" || enrollment?.status === "pre_enrolled" ? (
+                <CourseSchedulingCta
+                  courseId={course.id}
+                  availableAt={course.availableAt}
+                  isComingSoon={
+                    courseAvailability({ status: "published", availableAt: course.availableAt }) ===
+                    "coming_soon"
+                  }
+                  preEnrollEnabled={course.preEnrollEnabled}
+                  isPreEnrolled={enrollment?.status === "pre_enrolled"}
+                  isPaid={course.pricing === "paid"}
+                  price={course.price}
+                  signedIn={Boolean(currentUser)}
+                />
+              ) : isEnrolled ? (
                 <Link
                   href={`/dashboard/courses/${course.id}/learn/${enrollment?.resumeLessonId ?? firstLessonId}`}
                   className="flex h-11 w-full items-center justify-center rounded-sm bg-ws-brand px-5 text-sm font-semibold text-ws-brand-on transition-opacity hover:opacity-90"

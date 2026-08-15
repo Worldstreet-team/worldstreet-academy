@@ -13,6 +13,8 @@ import {
   fetchOtherCourses,
 } from "@/lib/actions/student"
 import { checkEnrollment } from "@/lib/actions/enrollments"
+import { CourseSchedulingCta } from "@/components/shared/course-scheduling-cta"
+import { courseAvailability } from "@/lib/types/course"
 import { getCurrentUser } from "@/lib/auth"
 import { LessonPreviewAccordion } from "@/components/courses/lesson-preview-accordion"
 import { AboutInstructor } from "@/components/courses/about-instructor"
@@ -53,7 +55,7 @@ export default async function CourseDetailPage({
       fetchEnrolledCoursesFromInstructor(course.instructorId).catch(() => []),
       currentUser
         ? checkEnrollment(currentUser.id, courseId)
-        : Promise.resolve({ isEnrolled: false, resumeLessonId: null }),
+        : Promise.resolve({ isEnrolled: false, status: undefined as string | undefined, resumeLessonId: null }),
       fetchOtherCourses(courseId),
     ])
   const isEnrolled = enrollmentStatus.isEnrolled
@@ -72,9 +74,25 @@ export default async function CourseDetailPage({
 
   const priceLabel = course.pricing === "free" ? "Free" : `$${course.price}`
 
+  const isComingSoon =
+    courseAvailability({ status: "published", availableAt: course.availableAt }) === "coming_soon"
+  const isPreEnrolled = enrollmentStatus.status === "pre_enrolled"
+
   // Shared CTA — the exact enroll/continue/resume routing, rendered in both
-  // the desktop rail and the mobile action bar.
-  const cta = isEnrolled ? (
+  // the desktop rail and the mobile action bar. Scheduled courses get the
+  // countdown + pre-enroll face until the customer is actually active.
+  const cta = isComingSoon || isPreEnrolled ? (
+    <CourseSchedulingCta
+      courseId={course.id}
+      availableAt={course.availableAt}
+      isComingSoon={isComingSoon}
+      preEnrollEnabled={course.preEnrollEnabled}
+      isPreEnrolled={isPreEnrolled}
+      isPaid={course.pricing === "paid"}
+      price={course.price}
+      signedIn={Boolean(currentUser)}
+    />
+  ) : isEnrolled ? (
     <Link
       href={`/dashboard/courses/${course.id}/learn/${enrollmentStatus.resumeLessonId ?? firstLessonId}`}
       className="flex h-11 flex-1 items-center justify-center rounded-sm bg-ws-brand px-5 text-sm font-semibold text-ws-brand-on transition-opacity hover:opacity-90"

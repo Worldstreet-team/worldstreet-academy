@@ -38,6 +38,8 @@ export default async function InstructorCourseInfoPage({
   const statusChip = {
     draft: { label: "Draft", className: "bg-ws-chip text-ws-muted" },
     published: { label: "Published", className: "bg-ws-success/15 text-ws-success" },
+    suspended: { label: "Suspended", className: "bg-ws-warning/15 text-ws-warning" },
+    closed: { label: "Closed", className: "bg-ws-raised text-ws-subtle" },
     archived: { label: "Archived", className: "bg-ws-raised text-ws-subtle" },
   }[course.status]
 

@@ -2,7 +2,15 @@ import mongoose, { Schema, Document, Model, Types } from "mongoose"
 
 export type CourseLevel = "beginner" | "intermediate" | "advanced"
 export type CoursePricing = "free" | "paid"
-export type CourseStatus = "draft" | "published" | "archived"
+/**
+ * Stored lifecycle only. "Coming soon" vs "live" is NEVER stored — it is
+ * derived from status + availableAt at read time (courseAvailability in
+ * lib/types/course.ts), so the flip at the availability instant needs no cron.
+ *  - suspended: temporarily offline by admin; enrolled users keep records but
+ *    nobody can start or newly activate.
+ *  - closed: no new enrollments; existing enrollments keep access.
+ */
+export type CourseStatus = "draft" | "published" | "suspended" | "closed" | "archived"
 
 export interface ICourse extends Document {
   _id: Types.ObjectId
@@ -43,6 +51,17 @@ export interface ICourse extends Document {
   targetAudience: string[]
   // Timestamps
   publishedAt: Date | null
+  /**
+   * When a published course becomes startable. null = live the moment it is
+   * published. Future date = customers see "Coming Soon" + countdown, and may
+   * pre-enroll (free, uncharged) while preEnrollEnabled.
+   */
+  availableAt: Date | null
+  /** Admin gate for pre-launch enrollment on scheduled courses. */
+  preEnrollEnabled: boolean
+  /** Stamped by the course-live cron after went-live emails go out — the guard
+   *  that makes that batch idempotent. */
+  liveNotifiedAt: Date | null
   /** When true, passing the course exam gates completion + certificate (enforced web + Go). */
   examRequired: boolean
   createdAt: Date
@@ -112,7 +131,7 @@ const CourseSchema = new Schema<ICourse>(
     },
     status: {
       type: String,
-      enum: ["draft", "published", "archived"],
+      enum: ["draft", "published", "suspended", "closed", "archived"],
       default: "draft",
       index: true,
     },
@@ -153,6 +172,19 @@ const CourseSchema = new Schema<ICourse>(
       default: false,
     },
     publishedAt: {
+      type: Date,
+      default: null,
+    },
+    availableAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+    preEnrollEnabled: {
+      type: Boolean,
+      default: true,
+    },
+    liveNotifiedAt: {
       type: Date,
       default: null,
     },

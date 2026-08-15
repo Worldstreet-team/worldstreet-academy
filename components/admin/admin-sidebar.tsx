@@ -80,6 +80,12 @@ const manageItems: NavItem[] = [
     match: (p) => p.startsWith("/admin/courses"),
   },
   {
+    title: "Enrollments",
+    href: "/admin/enrollments",
+    icon: GraduationCap,
+    match: (p) => p.startsWith("/admin/enrollments"),
+  },
+  {
     title: "Reviews",
     href: "/admin/reviews",
     icon: Star,

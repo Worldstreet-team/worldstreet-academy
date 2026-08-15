@@ -28,6 +28,8 @@ export type AdminCourseRow = {
   ratingAverage: number | null
   createdAt: string
   publishedAt: string | null
+  availableAt: string | null
+  preEnrollEnabled: boolean
 }
 
 export async function adminListCourses(filters?: {
@@ -82,6 +84,8 @@ export async function adminListCourses(filters?: {
           ratingAverage: c.rating?.average ?? null,
           createdAt: c.createdAt.toISOString(),
           publishedAt: c.publishedAt ? new Date(c.publishedAt).toISOString() : null,
+          availableAt: c.availableAt ? new Date(c.availableAt).toISOString() : null,
+          preEnrollEnabled: c.preEnrollEnabled ?? true,
         }
       }),
       total,
@@ -94,10 +98,14 @@ export async function adminListCourses(filters?: {
   }
 }
 
-/** Admin course status lifecycle: draft ↔ published → archived (and back to published). */
+/**
+ * Admin course status lifecycle: draft ↔ published, plus the admin-only
+ * verbs — suspended (temporarily offline), closed (no new enrollments),
+ * archived (out of the catalogue).
+ */
 export async function adminSetCourseStatus(
   courseId: string,
-  status: "draft" | "published" | "archived"
+  status: "draft" | "published" | "suspended" | "closed" | "archived"
 ) {
   try {
     await connectDB()
@@ -117,14 +125,16 @@ export async function adminSetCourseStatus(
     }
     await course.save()
 
+    const titleByStatus: Record<typeof status, string> = {
+      published: "Your course was published",
+      suspended: "Your course was temporarily suspended",
+      closed: "Your course was closed to new enrollments",
+      archived: "Your course was archived",
+      draft: "Your course was moved to draft",
+    }
     await notifyUser(course.instructor.toString(), {
       type: "course",
-      title:
-        status === "published"
-          ? "Your course was published"
-          : status === "archived"
-            ? "Your course was archived"
-            : "Your course was moved to draft",
+      title: titleByStatus[status],
       body: `"${course.title}" — updated by an administrator.`,
       href: `/instructor/courses/${course._id.toString()}`,
     })

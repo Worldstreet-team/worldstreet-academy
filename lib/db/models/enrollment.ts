@@ -1,6 +1,21 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose"
 
-export type EnrollmentStatus = "active" | "completed" | "expired" | "refunded"
+/**
+ * pre_enrolled — enrolled before the course's availableAt, uncharged. Becomes
+ * active via activation (free course going live, or payment success on a paid
+ * one). "Payment required" is NOT a stored status: it is a pre_enrolled
+ * enrollment whose course is live and paid — derived at read time.
+ * suspended/cancelled — admin actions on one customer's enrollment; restore
+ * returns to pre_enrolled or active depending on activatedAt.
+ */
+export type EnrollmentStatus =
+  | "pre_enrolled"
+  | "active"
+  | "completed"
+  | "expired"
+  | "refunded"
+  | "suspended"
+  | "cancelled"
 
 export interface IEnrollment extends Document {
   _id: Types.ObjectId
@@ -12,6 +27,10 @@ export interface IEnrollment extends Document {
   pricePaid: number
   currency: string
   transactionId: string | null
+  /** Set when the user pre-enrolled on a scheduled course (no charge). */
+  preEnrolledAt: Date | null
+  /** When access was actually granted — payment success, or free-course start. */
+  activatedAt: Date | null
   /** True for pre-payment-integration paid enrollments granted without a real charge (grandfathered, excluded from earnings). */
   legacyUnpaid: boolean
   // Progress tracking
@@ -44,7 +63,7 @@ const EnrollmentSchema = new Schema<IEnrollment>(
     },
     status: {
       type: String,
-      enum: ["active", "completed", "expired", "refunded"],
+      enum: ["pre_enrolled", "active", "completed", "expired", "refunded", "suspended", "cancelled"],
       default: "active",
     },
     purchasedAt: {
@@ -61,6 +80,14 @@ const EnrollmentSchema = new Schema<IEnrollment>(
     },
     transactionId: {
       type: String,
+      default: null,
+    },
+    preEnrolledAt: {
+      type: Date,
+      default: null,
+    },
+    activatedAt: {
+      type: Date,
       default: null,
     },
     legacyUnpaid: {

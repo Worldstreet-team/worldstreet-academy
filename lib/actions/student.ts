@@ -21,6 +21,8 @@ export type BrowseCourse = {
   pricing: "free" | "paid"
   price: number | null
   status: string
+  availableAt: string | null
+  preEnrollEnabled: boolean
   totalLessons: number
   totalDuration: number
   enrolledCount: number
@@ -38,6 +40,7 @@ export type StudentEnrollment = {
   totalLessons: number
   lastAccessedAt: string
   status: string
+  courseAvailableAt: string | null
   firstLessonId: string | null
   /** Lesson to resume at — last accessed lesson, falling back to the first. */
   resumeLessonId: string | null
@@ -133,6 +136,8 @@ export async function fetchBrowseCourses(options?: {
         pricing: course.pricing as "free" | "paid",
         price: course.price,
         status: course.status,
+        availableAt: course.availableAt ? course.availableAt.toISOString() : null,
+        preEnrollEnabled: course.preEnrollEnabled ?? true,
         totalLessons: course.totalLessons || 0,
         totalDuration: course.totalDuration || 0,
         enrolledCount: course.enrolledCount || 0,
@@ -175,6 +180,8 @@ export type PublicCourse = {
   level: "beginner" | "intermediate" | "advanced"
   pricing: "free" | "paid"
   price: number | null
+  availableAt: string | null
+  preEnrollEnabled: boolean
   totalLessons: number
   totalDuration: number
   enrolledCount: number
@@ -236,6 +243,8 @@ export async function fetchPublicCourse(courseId: string): Promise<PublicCourse 
       level: course.level as "beginner" | "intermediate" | "advanced",
       pricing: course.pricing as "free" | "paid",
       price: course.price,
+      availableAt: course.availableAt ? course.availableAt.toISOString() : null,
+      preEnrollEnabled: course.preEnrollEnabled ?? true,
       totalLessons: course.totalLessons || 0,
       totalDuration: course.totalDuration || 0,
       enrolledCount: course.enrolledCount || 0,
@@ -408,6 +417,8 @@ export async function fetchOtherCourses(excludeCourseId: string): Promise<Browse
         pricing: course.pricing as "free" | "paid",
         price: course.price,
         status: course.status,
+        availableAt: course.availableAt ? course.availableAt.toISOString() : null,
+        preEnrollEnabled: course.preEnrollEnabled ?? true,
         totalLessons: course.totalLessons || 0,
         totalDuration: course.totalDuration || 0,
         enrolledCount: course.enrolledCount || 0,
@@ -437,7 +448,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
     const enrollments = await Enrollment.find({ user: user._id })
       .populate({
         path: "course",
-        select: "title thumbnailUrl instructor totalLessons",
+        select: "title thumbnailUrl instructor totalLessons availableAt status",
         populate: {
           path: "instructor",
           select: "firstName lastName avatarUrl",
@@ -454,6 +465,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
           title: string
           thumbnailUrl: string
           totalLessons?: number
+          availableAt?: Date | null
           instructor: { firstName: string; lastName: string; avatarUrl: string | null }
         }
         
@@ -473,6 +485,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
           totalLessons: course.totalLessons || 0,
           lastAccessedAt: enrollment.lastAccessedAt?.toISOString() || new Date().toISOString(),
           status: enrollment.status,
+          courseAvailableAt: course.availableAt ? new Date(course.availableAt).toISOString() : null,
           firstLessonId: firstLesson?._id.toString() || null,
           resumeLessonId:
             enrollment.lastAccessedLesson?.toString() ??

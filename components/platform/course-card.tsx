@@ -4,6 +4,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { levelChipStyle } from "@/components/shared/level-badge"
+import { AvailabilityCountdown } from "@/components/shared/availability-countdown"
 import { abbreviateCount } from "@/lib/utils"
 import { ArrowRightIcon, BookmarkIcon, CheckIcon, PlayIcon, StarIcon } from "lucide-react"
 
@@ -62,6 +63,9 @@ type CourseCardProps = {
   enrolledCount?: number
   isBookmarked?: boolean
   onToggleBookmark?: () => void
+  /** ISO date: renders the "Not live yet" face — chip on the cover, countdown
+   *  in the footer — replacing progress/price until the course launches. */
+  comingSoonAt?: string | null
 }
 
 export function CourseCard({
@@ -80,8 +84,9 @@ export function CourseCard({
   enrolledCount,
   isBookmarked,
   onToggleBookmark,
+  comingSoonAt,
 }: CourseCardProps) {
-  const showProgress = typeof progress === "number"
+  const showProgress = typeof progress === "number" && !comingSoonAt
   const isComplete = progress === 100
   const duration = formatDuration(totalDuration ?? 0)
   const coverMeta = [
@@ -110,6 +115,12 @@ export function CourseCard({
 
           {/* Bottom scrim so overlaid chips read against any photo */}
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/60 to-transparent" />
+
+          {comingSoonAt && (
+            <span className="absolute left-3 top-2.5 z-10 inline-flex items-center rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ws-gold">
+              Not live yet
+            </span>
+          )}
 
           {/* Lessons · duration — the reference's cover pill */}
           {coverMeta.length > 0 && (
@@ -170,7 +181,22 @@ export function CourseCard({
 
           {/* Footer */}
           <div className="mt-auto pt-4">
-            {showProgress ? (
+            {comingSoonAt ? (
+              <div className="flex items-center justify-between gap-2 border-t border-ws-hairline pt-3">
+                <span className="text-[12px] text-ws-muted">
+                  Starts in{" "}
+                  <AvailabilityCountdown
+                    availableAt={comingSoonAt}
+                    variant="compact"
+                    className="font-semibold tabular-nums text-ws-primary"
+                  />
+                </span>
+                <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-ws-gold">
+                  View
+                  <ArrowRightIcon size={13} aria-hidden />
+                </span>
+              </div>
+            ) : showProgress ? (
               <>
                 <div className="h-1 w-full overflow-hidden rounded-full bg-ws-track">
                   <div

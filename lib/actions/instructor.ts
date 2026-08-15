@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
+import type mongoose from "mongoose"
 import connectDB from "@/lib/db"
 import { Course, Lesson, User, ICourse } from "@/lib/db/models"
 import { uploadThumbnail, deleteFromCloudinary } from "@/lib/cloudinary"
@@ -63,6 +64,45 @@ async function getAuthenticatedInstructor() {
   return instructor
 }
 
+/**
+ * Which courses this user may touch. ADMINs manage the whole catalogue (the
+ * admin portal reuses these actions); instructors only their own courses.
+ */
+function courseScope(user: { role?: string; _id: unknown }): mongoose.QueryFilter<ICourse> {
+  return user.role === "ADMIN" ? {} : ({ instructor: user._id } as mongoose.QueryFilter<ICourse>)
+}
+
+/** Statuses a non-admin may write. Suspend/close/archive are admin verbs. */
+const INSTRUCTOR_STATUSES: CourseStatus[] = ["draft", "published"]
+
+/**
+ * Where the editor returns after save. Whitelisted — the value rides the form
+ * as a hidden field, so never redirect to arbitrary input.
+ */
+function editorReturnPath(formData: FormData): string {
+  const raw = formData.get("returnTo")
+  return raw === "/admin/courses" ? "/admin/courses" : "/instructor/courses"
+}
+
+/** "" clears the schedule; anything else must parse as a real date. */
+function parseAvailableAt(raw: FormDataEntryValue | null): Date | null | "invalid" {
+  if (typeof raw !== "string" || raw.trim() === "") return null
+  const date = new Date(raw)
+  return Number.isNaN(date.getTime()) ? "invalid" : date
+}
+
+function parseStringArray(raw: FormDataEntryValue | null): string[] {
+  if (typeof raw !== "string" || !raw) return []
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed)
+      ? parsed.filter((x): x is string => typeof x === "string" && x.trim() !== "").map((x) => x.trim())
+      : []
+  } catch {
+    return []
+  }
+}
+
 // ---- Fetch Instructor Courses ----
 export async function fetchInstructorCourses(): Promise<InstructorCourseItem[]> {
   try {
@@ -101,7 +141,7 @@ export async function fetchCourseForEdit(courseId: string) {
     
     const course = await Course.findOne({
       _id: courseId,
-      instructor: instructor._id,
+      ...courseScope(instructor),
     }).lean()
     
     if (!course) return null
@@ -115,12 +155,16 @@ export async function fetchCourseForEdit(courseId: string) {
         id: course._id.toString(),
         title: course.title,
         description: course.description,
+        shortDescription: course.shortDescription ?? "",
         thumbnailUrl: course.thumbnailUrl,
         level: course.level as CourseLevel,
         pricing: course.pricing as CoursePricing,
         price: course.price,
         status: course.status as CourseStatus,
         category: (course.category || "Cryptocurrency") as CourseCategory,
+        whatYouWillLearn: course.whatYouWillLearn ?? [],
+        availableAt: course.availableAt ? course.availableAt.toISOString() : null,
+        preEnrollEnabled: course.preEnrollEnabled ?? true,
       },
       lessons: lessons.map((l) => ({
         id: l._id.toString(),
@@ -147,6 +191,7 @@ export async function createCourse(
 ): Promise<CourseFormState> {
   const title = formData.get("title") as string
   const description = formData.get("description") as string
+  const shortDescription = (formData.get("shortDescription") as string) || ""
   const thumbnailUrl = formData.get("thumbnailUrl") as string
   const level = formData.get("level") as CourseLevel
   const pricing = formData.get("pricing") as CoursePricing
@@ -154,6 +199,9 @@ export async function createCourse(
   const status = formData.get("status") as CourseStatus
   const category = formData.get("category") as string
   const lessonsJson = formData.get("lessons") as string
+  const whatYouWillLearn = parseStringArray(formData.get("whatYouWillLearn"))
+  const availableAt = parseAvailableAt(formData.get("availableAt"))
+  const preEnrollEnabled = formData.get("preEnrollEnabled") !== "false"
 
   // Validate
   const fieldErrors: Record<string, string> = {}
@@ -170,6 +218,12 @@ export async function createCourse(
   if (pricing === "paid" && (!price || parseFloat(price) <= 0)) {
     fieldErrors.price = "Please enter a valid price"
   }
+  if (availableAt === "invalid") {
+    fieldErrors.availableAt = "Availability date could not be read"
+  }
+  if (shortDescription.length > 200) {
+    fieldErrors.shortDescription = "Short description must be 200 characters or less"
+  }
 
   if (Object.keys(fieldErrors).length > 0) {
     return { success: false, error: null, fieldErrors }
@@ -178,19 +232,29 @@ export async function createCourse(
   try {
     await connectDB()
     const instructor = await getAuthenticatedInstructor()
-    
+
+    const requestedStatus = status || "draft"
+    if (instructor.role !== "ADMIN" && !INSTRUCTOR_STATUSES.includes(requestedStatus)) {
+      return { success: false, error: "Only admins can set that course status", fieldErrors: {} }
+    }
+
     // Create the course
     const course = await Course.create({
       title,
       slug: generateSlug(title),
       description,
+      shortDescription: shortDescription.trim() || null,
       thumbnailUrl: thumbnailUrl || null,
       instructor: instructor._id,
       level,
       pricing,
       price: pricing === "paid" ? parseFloat(price) : 0,
-      status: status || "draft",
+      status: requestedStatus,
       category: category || "Cryptocurrency",
+      whatYouWillLearn,
+      availableAt: availableAt === "invalid" ? null : availableAt,
+      preEnrollEnabled,
+      publishedAt: requestedStatus === "published" ? new Date() : null,
     })
     
     // Create lessons if provided
@@ -240,12 +304,13 @@ export async function createCourse(
     })
 
     revalidatePath("/instructor/courses")
+    revalidatePath("/admin/courses")
   } catch (error) {
     console.error("Create course error:", error)
     return { success: false, error: "Failed to create course", fieldErrors: {} }
   }
 
-  redirect("/instructor/courses")
+  redirect(editorReturnPath(formData))
 }
 
 // ---- Update Course ----
@@ -256,6 +321,7 @@ export async function updateCourse(
   const courseId = formData.get("courseId") as string
   const title = formData.get("title") as string
   const description = formData.get("description") as string
+  const shortDescription = (formData.get("shortDescription") as string) || ""
   const thumbnailUrl = formData.get("thumbnailUrl") as string
   const level = formData.get("level") as CourseLevel
   const pricing = formData.get("pricing") as CoursePricing
@@ -263,6 +329,9 @@ export async function updateCourse(
   const status = formData.get("status") as CourseStatus
   const category = formData.get("category") as string
   const lessonsJson = formData.get("lessons") as string
+  const whatYouWillLearn = parseStringArray(formData.get("whatYouWillLearn"))
+  const availableAt = parseAvailableAt(formData.get("availableAt"))
+  const preEnrollEnabled = formData.get("preEnrollEnabled") !== "false"
 
   const fieldErrors: Record<string, string> = {}
 
@@ -275,6 +344,12 @@ export async function updateCourse(
   if (pricing === "paid" && (!price || parseFloat(price) <= 0)) {
     fieldErrors.price = "Please enter a valid price"
   }
+  if (availableAt === "invalid") {
+    fieldErrors.availableAt = "Availability date could not be read"
+  }
+  if (shortDescription.length > 200) {
+    fieldErrors.shortDescription = "Short description must be 200 characters or less"
+  }
 
   if (Object.keys(fieldErrors).length > 0) {
     return { success: false, error: null, fieldErrors }
@@ -283,27 +358,43 @@ export async function updateCourse(
   try {
     await connectDB()
     const instructor = await getAuthenticatedInstructor()
-    
-    // Verify ownership
+
+    // Verify ownership (admins may edit any course)
     const existingCourse = await Course.findOne({
       _id: courseId,
-      instructor: instructor._id,
+      ...courseScope(instructor),
     })
-    
+
     if (!existingCourse) {
       return { success: false, error: "Course not found", fieldErrors: {} }
     }
-    
+
+    if (
+      instructor.role !== "ADMIN" &&
+      status !== existingCourse.status &&
+      !INSTRUCTOR_STATUSES.includes(status)
+    ) {
+      return { success: false, error: "Only admins can set that course status", fieldErrors: {} }
+    }
+
     // Update course
     await Course.findByIdAndUpdate(courseId, {
       title,
       description,
+      shortDescription: shortDescription.trim() || null,
       thumbnailUrl: thumbnailUrl || null,
       level,
       pricing,
       price: pricing === "paid" ? parseFloat(price) : 0,
       status,
       category: category || existingCourse.category,
+      whatYouWillLearn,
+      availableAt: availableAt === "invalid" ? existingCourse.availableAt : availableAt,
+      preEnrollEnabled,
+      // First transition to published stamps the moment; later republishes keep it.
+      ...(status === "published" && !existingCourse.publishedAt
+        ? { publishedAt: new Date() }
+        : {}),
     })
     
     // Update lessons if provided
@@ -354,12 +445,13 @@ export async function updateCourse(
 
     revalidatePath("/instructor/courses")
     revalidatePath(`/instructor/courses/${courseId}/edit`)
+    revalidatePath("/admin/courses")
   } catch (error) {
     console.error("Update course error:", error)
     return { success: false, error: "Failed to update course", fieldErrors: {} }
   }
 
-  redirect("/instructor/courses")
+  redirect(editorReturnPath(formData))
 }
 
 // ---- Delete Course ----
@@ -372,12 +464,12 @@ export async function deleteCourse(formData: FormData): Promise<void> {
     
     const course = await Course.findOne({
       _id: courseId,
-      instructor: instructor._id,
+      ...courseScope(instructor),
     })
     
     if (!course) {
       // Just redirect without error for form action
-      redirect("/instructor/courses")
+      redirect(editorReturnPath(formData))
     }
     
     // Delete thumbnail from Cloudinary if exists
@@ -403,11 +495,12 @@ export async function deleteCourse(formData: FormData): Promise<void> {
     })
 
     revalidatePath("/instructor/courses")
+    revalidatePath("/admin/courses")
   } catch (error) {
     console.error("Delete course error:", error)
   }
 
-  redirect("/instructor/courses")
+  redirect(editorReturnPath(formData))
 }
 
 // ---- Add Lesson ----
@@ -444,7 +537,7 @@ export async function addLesson(
     // Verify ownership
     const course = await Course.findOne({
       _id: courseId,
-      instructor: instructor._id,
+      ...courseScope(instructor),
     })
     
     if (!course) {
@@ -495,7 +588,7 @@ export async function deleteLesson(formData: FormData): Promise<void> {
     // Verify ownership
     const course = await Course.findOne({
       _id: courseId,
-      instructor: instructor._id,
+      ...courseScope(instructor),
     })
     
     if (!course) {
@@ -537,7 +630,7 @@ export async function uploadCourseThumbnail(
     
     const course = await Course.findOne({
       _id: courseId,
-      instructor: instructor._id,
+      ...courseScope(instructor),
     })
     
     if (!course) {

@@ -22,6 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import Link from "next/link"
 import { MoreHorizontal } from "lucide-react"
 import { PageHeader } from "@/components/shared/page-header"
 import {
@@ -31,11 +32,14 @@ import {
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import {
   formatDate,
+  formatDateTime,
   StatusBadge,
   FilterChips,
   Pagination,
 } from "@/components/admin/shared"
-import { BookOpenIcon, StarIcon } from "lucide-react"
+import { courseAvailability } from "@/lib/types/course"
+import type { CourseStatus } from "@/lib/types/course"
+import { BookOpenIcon, PlusIcon, StarIcon } from "lucide-react"
 
 export default function AdminCoursesPage() {
   const queryClient = useQueryClient()
@@ -59,7 +63,7 @@ export default function AdminCoursesPage() {
   })
 
   const setCourseStatus = useMutation({
-    mutationFn: ({ courseId, newStatus }: { courseId: string; newStatus: "draft" | "published" | "archived" }) =>
+    mutationFn: ({ courseId, newStatus }: { courseId: string; newStatus: CourseStatus }) =>
       adminSetCourseStatus(courseId, newStatus),
     onSuccess: (res, vars) => {
       setActionError(res.success ? null : (res.error ?? "Failed"))
@@ -75,7 +79,13 @@ export default function AdminCoursesPage() {
         <div className="mx-auto w-full max-w-7xl space-y-8">
         <PageHeader
           title="Courses"
-          subline={data ? `${data.total.toLocaleString()} courses` : "Course catalog moderation."}
+          subline={data ? `${data.total.toLocaleString()} courses` : "Create and manage the catalogue."}
+          action={
+            <Button size="sm" render={<Link href="/admin/courses/new" />}>
+              <PlusIcon size={14} />
+              New course
+            </Button>
+          }
         />
 
         <div className="flex items-center gap-3 flex-wrap">
@@ -98,6 +108,8 @@ export default function AdminCoursesPage() {
               { value: "all", label: "All" },
               { value: "published", label: "Published" },
               { value: "draft", label: "Drafts" },
+              { value: "suspended", label: "Suspended" },
+              { value: "closed", label: "Closed" },
               { value: "archived", label: "Archived" },
             ]}
           />
@@ -142,11 +154,23 @@ export default function AdminCoursesPage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium truncate">{c.title}</p>
+                      <Link
+                        href={`/admin/courses/${c.id}/edit`}
+                        className="text-sm font-medium truncate hover:underline"
+                      >
+                        {c.title}
+                      </Link>
                       <StatusBadge status={c.status} />
+                      {/* Published + future date = the derived Coming Soon state,
+                          worth surfacing here since the raw status won't show it. */}
+                      {courseAvailability({ status: c.status as CourseStatus, availableAt: c.availableAt }) ===
+                        "coming_soon" && <StatusBadge status="coming_soon" />}
                     </div>
                     <p className="text-xs text-muted-foreground truncate">
-                      {c.instructorName} · {c.totalLessons} lessons · {c.enrolledCount} students
+                      {c.instructorName} · {c.totalLessons} lessons ·{" "}
+                      <Link href={`/admin/enrollments?course=${c.id}`} className="hover:underline">
+                        {c.enrolledCount} students
+                      </Link>
                       {c.ratingAverage ? (
                         <span className="inline-flex items-center gap-0.5 ml-1">
                           · <StarIcon  size={10} className="text-ws-rating" />
@@ -157,6 +181,7 @@ export default function AdminCoursesPage() {
                     <p className="text-[10px] text-muted-foreground/70">
                       {c.pricing === "free" ? "Free" : `$${c.price ?? 0}`} · created{" "}
                       {formatDate(c.createdAt)}
+                      {c.availableAt ? ` · available ${formatDateTime(c.availableAt)}` : ""}
                     </p>
                   </div>
                   <DropdownMenu>
@@ -167,7 +192,13 @@ export default function AdminCoursesPage() {
                     >
                       <MoreHorizontal size={16} strokeWidth={2} />
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-44">
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuItem render={<Link href={`/admin/courses/${c.id}/edit`} />}>
+                        Edit course
+                      </DropdownMenuItem>
+                      <DropdownMenuItem render={<Link href={`/admin/enrollments?course=${c.id}`} />}>
+                        View enrollments
+                      </DropdownMenuItem>
                       {c.status !== "published" && (
                         <DropdownMenuItem
                           onClick={() =>
@@ -184,6 +215,33 @@ export default function AdminCoursesPage() {
                           }
                         >
                           Unpublish (to draft)
+                        </DropdownMenuItem>
+                      )}
+                      {c.status === "published" && (
+                        <DropdownMenuItem
+                          onClick={() =>
+                            setCourseStatus.mutate({ courseId: c.id, newStatus: "suspended" })
+                          }
+                        >
+                          Suspend
+                        </DropdownMenuItem>
+                      )}
+                      {c.status === "suspended" && (
+                        <DropdownMenuItem
+                          onClick={() =>
+                            setCourseStatus.mutate({ courseId: c.id, newStatus: "published" })
+                          }
+                        >
+                          Reinstate
+                        </DropdownMenuItem>
+                      )}
+                      {(c.status === "published" || c.status === "suspended") && (
+                        <DropdownMenuItem
+                          onClick={() =>
+                            setCourseStatus.mutate({ courseId: c.id, newStatus: "closed" })
+                          }
+                        >
+                          Close enrollments
                         </DropdownMenuItem>
                       )}
                       {c.status !== "archived" && (

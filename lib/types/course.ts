@@ -1,7 +1,39 @@
 export type CourseLevel = "beginner" | "intermediate" | "advanced"
 export type CoursePricing = "free" | "paid"
-export type CourseStatus = "draft" | "published" | "archived"
+export type CourseStatus = "draft" | "published" | "suspended" | "closed" | "archived"
 export type CourseCategory = "Cryptocurrency" | "Trading" | "DeFi" | "NFTs" | "Development" | "Blockchain" | "Other"
+
+/**
+ * What a customer can DO with a course right now — derived, never stored.
+ * "coming_soon" flips to "live" the instant availableAt passes, with no cron:
+ * every reader computes it from the same two fields.
+ */
+export type CourseAvailability =
+  | "draft"
+  | "coming_soon"
+  | "live"
+  | "suspended"
+  | "closed"
+  | "archived"
+
+export function courseAvailability(
+  course: { status: CourseStatus; availableAt: string | Date | null },
+  now: Date = new Date(),
+): CourseAvailability {
+  if (course.status !== "published") return course.status
+  if (!course.availableAt) return "live"
+  return new Date(course.availableAt) > now ? "coming_soon" : "live"
+}
+
+/** Customer-facing label for an availability state (admin sees raw statuses). */
+export const AVAILABILITY_LABEL: Record<CourseAvailability, string> = {
+  draft: "Draft",
+  coming_soon: "Coming Soon",
+  live: "Live",
+  suspended: "Temporarily Unavailable",
+  closed: "Closed",
+  archived: "Archived",
+}
 
 export type Course = {
   id: string
@@ -16,6 +48,8 @@ export type Course = {
   price: number | null
   currency: string
   status: CourseStatus
+  availableAt: string | null
+  preEnrollEnabled: boolean
   category?: CourseCategory
   totalLessons: number
   totalDuration: number // in minutes

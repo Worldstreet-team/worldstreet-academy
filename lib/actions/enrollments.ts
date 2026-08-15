@@ -17,6 +17,8 @@ import {
 } from "@/lib/db/models"
 import { Types } from "mongoose"
 import { getCurrentUser } from "@/lib/auth/actions"
+import { courseAvailability } from "@/lib/types/course"
+import { sendEnrollmentConfirmationEmail } from "@/lib/email"
 import {
   createWalletCharge,
   refundWalletCharge,
@@ -57,7 +59,7 @@ export type PurchaseResult =
   | {
       success: false
       error: string
-      code?: "auth" | "not_found" | "insufficient_funds" | "wallet_unavailable" | "enroll_failed"
+      code?: "auth" | "not_found" | "not_live" | "insufficient_funds" | "wallet_unavailable" | "enroll_failed"
       shortfallMinor?: number
       availableMinor?: number
     }
@@ -106,14 +108,26 @@ export async function purchaseCourse(courseId: string): Promise<PurchaseResult> 
     // row is kept for audit, so we reactivate it rather than insert (the
     // {user, course} unique index forbids a second row).
     const existing = await Enrollment.findOne({ user: user.id, course: courseId })
-    if (existing && existing.status !== "refunded") {
+    // A pre-enrolled row is a reservation, not access: purchase ACTIVATES it.
+    const isActivation = existing?.status === "pre_enrolled"
+    if (existing && existing.status !== "refunded" && !isActivation) {
       return { success: true, data: { enrollmentId: existing._id.toString(), alreadyEnrolled: true } }
     }
-    const isRepurchase = Boolean(existing)
+    const isRepurchase = Boolean(existing) && !isActivation
 
     const course = await Course.findOne({ _id: courseId, status: "published" })
     if (!course) {
       return { success: false, error: "Course not found or not available", code: "not_found" }
+    }
+
+    // Scheduled courses take money only once they are live — before that the
+    // only door is preEnrollCourse, which never charges.
+    if (courseAvailability(course) === "coming_soon") {
+      return {
+        success: false,
+        error: "This course isn't live yet. You can enroll now and pay when it launches.",
+        code: "not_live",
+      }
     }
 
     const price = course.pricing === "paid" ? course.price ?? 0 : 0
@@ -227,9 +241,9 @@ export async function purchaseCourse(courseId: string): Promise<PurchaseResult> 
     // before payment.
     let enrollment
     try {
-      if (isRepurchase) {
-        // Restore the audited row. Progress is deliberately preserved: the
-        // student is buying the same course back, not starting over.
+      if (isRepurchase || isActivation) {
+        // Restore (re-purchase) or activate (pre-enrollment) the audited row.
+        // Progress is deliberately preserved either way.
         enrollment = await Enrollment.findOneAndUpdate(
           { user: user.id, course: courseId },
           {
@@ -239,6 +253,7 @@ export async function purchaseCourse(courseId: string): Promise<PurchaseResult> 
               currency: "USD",
               transactionId: chargeId,
               purchasedAt: new Date(),
+              activatedAt: new Date(),
               legacyUnpaid: false,
             },
           },
@@ -253,6 +268,7 @@ export async function purchaseCourse(courseId: string): Promise<PurchaseResult> 
           currency: "USD",
           transactionId: chargeId,
           purchasedAt: new Date(),
+          activatedAt: new Date(),
         })
       }
     } catch (err: unknown) {
@@ -326,11 +342,14 @@ export async function purchaseCourse(courseId: string): Promise<PurchaseResult> 
       }
     }
 
-    // Update course + instructor aggregates
-    await Course.findByIdAndUpdate(courseId, { $inc: { enrolledCount: 1 } })
+    // Update course + instructor aggregates. Pre-enrollment already counted
+    // this student, so activation only moves money aggregates.
+    if (!isActivation) {
+      await Course.findByIdAndUpdate(courseId, { $inc: { enrolledCount: 1 } })
+    }
     await User.findByIdAndUpdate(course.instructor, {
       $inc: {
-        "instructorProfile.totalStudents": 1,
+        ...(isActivation ? {} : { "instructorProfile.totalStudents": 1 }),
         "instructorProfile.totalEarnings": isPaid ? (price * INSTRUCTOR_REVENUE_SHARE) : 0,
       },
     })
@@ -554,11 +573,13 @@ export async function checkEnrollment(
     // for audit) but must read as "not enrolled", or the course page would
     // offer "Continue learning" into content the server will refuse, and
     // checkout would bounce the user to the success screen instead of letting
-    // them buy the course back.
+    // them buy the course back. pre_enrolled is surfaced via `status` with
+    // isEnrolled false — a reservation, not access — so course pages can show
+    // "Enrolled · starts …" without unlocking anything.
     const enrollment = await Enrollment.findOne({
       user: userId,
       course: courseId,
-      status: { $in: ["active", "completed"] },
+      status: { $in: ["active", "completed", "pre_enrolled"] },
     }).select("status lastAccessedLesson")
 
     if (!enrollment) {
@@ -566,13 +587,110 @@ export async function checkEnrollment(
     }
 
     return {
-      isEnrolled: true,
+      isEnrolled: enrollment.status !== "pre_enrolled",
       status: enrollment.status,
       resumeLessonId: enrollment.lastAccessedLesson?.toString() ?? null,
     }
   } catch (error) {
     console.error("Check enrollment error:", error)
     return { isEnrolled: false }
+  }
+}
+
+export type PreEnrollResult =
+  | { success: true; data: { enrollmentId: string; alreadyEnrolled?: boolean } }
+  | { success: false; error: string; code?: "auth" | "not_found" | "not_open" | "already_live" }
+
+/**
+ * Reserve a seat on a scheduled course before it goes live. Never charges:
+ * the record is a reservation (status "pre_enrolled") that purchaseCourse
+ * later activates — payment happens there, once the course is live.
+ */
+export async function preEnrollCourse(courseId: string): Promise<PreEnrollResult> {
+  try {
+    await connectDB()
+
+    const user = await getCurrentUser()
+    if (!user) {
+      return { success: false, error: "You need to be signed in to enroll", code: "auth" }
+    }
+
+    const course = await Course.findOne({ _id: courseId, status: "published" })
+    if (!course) {
+      return { success: false, error: "Course not found or not available", code: "not_found" }
+    }
+    if (courseAvailability(course) !== "coming_soon") {
+      // The course went live between render and click — the normal purchase
+      // flow is the right door now.
+      return { success: false, error: "This course is already live", code: "already_live" }
+    }
+    if (!course.preEnrollEnabled) {
+      return { success: false, error: "Pre-launch enrollment isn't open for this course", code: "not_open" }
+    }
+
+    const existing = await Enrollment.findOne({ user: user.id, course: courseId })
+    if (existing && !["refunded", "cancelled"].includes(existing.status)) {
+      return { success: true, data: { enrollmentId: existing._id.toString(), alreadyEnrolled: true } }
+    }
+
+    let enrollment
+    if (existing) {
+      // A refunded/cancelled row coming back as a reservation keeps its audit
+      // trail; activation will restamp the money fields.
+      enrollment = await Enrollment.findOneAndUpdate(
+        { user: user.id, course: courseId },
+        {
+          $set: {
+            status: "pre_enrolled",
+            preEnrolledAt: new Date(),
+            pricePaid: 0,
+            transactionId: null,
+          },
+        },
+        { new: true }
+      )
+      if (!enrollment) throw new Error("pre-enroll: enrollment row vanished")
+    } else {
+      try {
+        enrollment = await Enrollment.create({
+          user: user.id,
+          course: courseId,
+          status: "pre_enrolled",
+          preEnrolledAt: new Date(),
+          pricePaid: 0,
+        })
+      } catch (err: unknown) {
+        const isDuplicate =
+          typeof err === "object" && err !== null && (err as { code?: number }).code === 11000
+        if (!isDuplicate) throw err
+        const winner = await Enrollment.findOne({ user: user.id, course: courseId })
+        if (!winner) throw err
+        return { success: true, data: { enrollmentId: winner._id.toString(), alreadyEnrolled: true } }
+      }
+      await Course.findByIdAndUpdate(courseId, { $inc: { enrolledCount: 1 } })
+      await User.findByIdAndUpdate(course.instructor, {
+        $inc: { "instructorProfile.totalStudents": 1 },
+      })
+    }
+
+    const availableAtIso = course.availableAt ? course.availableAt.toISOString() : null
+    void sendEnrollmentConfirmationEmail({
+      to: user.email ?? "",
+      firstName: user.firstName ?? "",
+      courseTitle: course.title,
+      courseId: course._id.toString(),
+      availableAtIso,
+      isPaid: course.pricing === "paid",
+      price: course.price ?? 0,
+    })
+
+    revalidatePath("/dashboard/my-courses")
+    revalidatePath(`/courses/${courseId}`)
+
+    return { success: true, data: { enrollmentId: enrollment._id.toString() } }
+  } catch (error) {
+    console.error("Pre-enroll error:", error)
+    return { success: false, error: "Failed to enroll in course" }
   }
 }
 

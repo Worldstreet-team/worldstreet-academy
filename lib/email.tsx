@@ -807,3 +807,174 @@ export async function sendMeetingInviteEmail(
     return { success: false, error: "Failed to send invite" }
   }
 }
+
+/* ─── Course enrollment lifecycle ─── */
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://academy.worldstreetgold.com"
+
+export type EnrollmentEmailData = {
+  to: string
+  firstName: string
+  courseTitle: string
+  courseId: string
+  /** null = live immediately (plain confirmation, no countdown framing). */
+  availableAtIso: string | null
+  isPaid: boolean
+  price: number
+}
+
+function formatLaunch(iso: string): string {
+  return new Date(iso).toLocaleString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "UTC",
+    timeZoneName: "short",
+  })
+}
+
+function EnrollmentConfirmationEmail({ data }: { data: EnrollmentEmailData }) {
+  const courseUrl = `${APP_URL}/dashboard/courses/${data.courseId}`
+  return (
+    <Html style={base}>
+      <Head />
+      <Preview>You&apos;re enrolled in {data.courseTitle}</Preview>
+      <Body style={body}>
+        <Container style={card}>
+          <Section style={contentPad}>
+            <Text style={heading}>You&apos;re enrolled</Text>
+            <Text style={sub}>
+              {data.firstName ? `${data.firstName} — you` : "You"}&apos;re in.
+              Your seat on <strong>{data.courseTitle}</strong> is reserved.
+            </Text>
+            {data.availableAtIso ? (
+              <>
+                <Text style={sub}>
+                  The course isn&apos;t live yet — it opens on{" "}
+                  <strong>{formatLaunch(data.availableAtIso)}</strong>. Nothing
+                  was charged today{data.isPaid
+                    ? ` — payment ($${data.price.toFixed(2)}) is only asked for when the course is live and you choose to start`
+                    : ""}.
+                </Text>
+                <Text style={muted}>
+                  We&apos;ll email you the moment it goes live.
+                </Text>
+              </>
+            ) : (
+              <Text style={sub}>The course is live — you can start right away.</Text>
+            )}
+
+            <Section style={{ marginTop: "28px" }}>
+              <Button href={courseUrl} style={cta}>
+                View the course
+              </Button>
+            </Section>
+
+            <Hr style={{ borderColor: "#E4E4E9", margin: "24px 0 16px" }} />
+
+            <Link href={courseUrl} style={linkSmall}>
+              {courseUrl}
+            </Link>
+          </Section>
+        </Container>
+
+        <Section style={footer}>
+          <Text style={footerText}>WorldStreet Academy</Text>
+        </Section>
+      </Body>
+    </Html>
+  )
+}
+
+export async function sendEnrollmentConfirmationEmail(data: EnrollmentEmailData) {
+  if (!data.to) return { success: false, error: "No recipient" }
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: data.to,
+      subject: `You're enrolled: ${data.courseTitle}`,
+      react: React.createElement(EnrollmentConfirmationEmail, { data }),
+    })
+    if (error) {
+      console.error("[Email] Enrollment confirmation failed:", error)
+      return { success: false, error: error.message }
+    }
+    return { success: true }
+  } catch (err) {
+    console.error("[Email] Enrollment confirmation error:", err)
+    return { success: false, error: "Failed to send email" }
+  }
+}
+
+export type CourseLiveEmailData = {
+  to: string
+  firstName: string
+  courseTitle: string
+  courseId: string
+  isPaid: boolean
+  price: number
+}
+
+function CourseLiveEmail({ data }: { data: CourseLiveEmailData }) {
+  const courseUrl = `${APP_URL}/dashboard/courses/${data.courseId}`
+  return (
+    <Html style={base}>
+      <Head />
+      <Preview>{data.courseTitle} is now live</Preview>
+      <Body style={body}>
+        <Container style={card}>
+          <Section style={contentPad}>
+            <Text style={heading}>Your course is now live</Text>
+            <Text style={sub}>
+              {data.firstName ? `${data.firstName} — the` : "The"} wait is over:{" "}
+              <strong>{data.courseTitle}</strong> just went live.
+            </Text>
+            <Text style={sub}>
+              {data.isPaid
+                ? `Start whenever you're ready — payment ($${data.price.toFixed(2)}) happens at the door, and your seat is already reserved.`
+                : "It's free and your seat is already reserved — jump straight in."}
+            </Text>
+
+            <Section style={{ marginTop: "28px" }}>
+              <Button href={courseUrl} style={cta}>
+                {data.isPaid ? `Start course — $${data.price.toFixed(2)}` : "Start course"}
+              </Button>
+            </Section>
+
+            <Hr style={{ borderColor: "#E4E4E9", margin: "24px 0 16px" }} />
+
+            <Link href={courseUrl} style={linkSmall}>
+              {courseUrl}
+            </Link>
+          </Section>
+        </Container>
+
+        <Section style={footer}>
+          <Text style={footerText}>WorldStreet Academy</Text>
+        </Section>
+      </Body>
+    </Html>
+  )
+}
+
+export async function sendCourseLiveEmail(data: CourseLiveEmailData) {
+  if (!data.to) return { success: false, error: "No recipient" }
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: data.to,
+      subject: `Now live: ${data.courseTitle}`,
+      react: React.createElement(CourseLiveEmail, { data }),
+    })
+    if (error) {
+      console.error("[Email] Course live failed:", error)
+      return { success: false, error: error.message }
+    }
+    return { success: true }
+  } catch (err) {
+    console.error("[Email] Course live error:", err)
+    return { success: false, error: "Failed to send email" }
+  }
+}

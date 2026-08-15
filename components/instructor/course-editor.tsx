@@ -47,12 +47,42 @@ type EditableCourse = {
   id: string
   title: string
   description: string
+  shortDescription?: string
   thumbnailUrl: string | null
   level: CourseLevel
   pricing: CoursePricing
   price: number | null
   status: CourseStatus
   category?: CourseCategory
+  whatYouWillLearn?: string[]
+  availableAt?: string | null
+  preEnrollEnabled?: boolean
+}
+
+const CATEGORIES: CourseCategory[] = [
+  "Cryptocurrency",
+  "Trading",
+  "DeFi",
+  "NFTs",
+  "Development",
+  "Blockchain",
+  "Other",
+]
+
+/** ISO string → value for a datetime-local input, in the viewer's timezone. */
+function isoToLocalInput(iso: string | null | undefined): string {
+  if (!iso) return ""
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ""
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+/** datetime-local value → ISO string for the wire ("" stays ""). */
+function localInputToIso(local: string): string {
+  if (!local) return ""
+  const d = new Date(local)
+  return Number.isNaN(d.getTime()) ? "" : d.toISOString()
 }
 
 /* ─── Duration helpers (stored in seconds) ─── */
@@ -130,9 +160,14 @@ function emptyLesson(): EditorLesson {
 export function CourseEditor({
   course,
   existingLessons = [],
+  adminMode = false,
+  returnTo = "/instructor/courses",
 }: {
   course?: EditableCourse
   existingLessons?: Lesson[]
+  /** Admin portal context: full status set, admin back-link. */
+  adminMode?: boolean
+  returnTo?: string
 }) {
   const user = useUser()
   const isEdit = !!course
@@ -142,12 +177,16 @@ export function CourseEditor({
   /* Course fields */
   const [title, setTitle] = useState(course?.title ?? "")
   const [description, setDescription] = useState(course?.description ?? "")
+  const [shortDescription, setShortDescription] = useState(course?.shortDescription ?? "")
   const [thumbnailUrl, setThumbnailUrl] = useState(course?.thumbnailUrl ?? "")
   const [level, setLevel] = useState(course?.level ?? "beginner")
   const [category, setCategory] = useState(course?.category ?? "Cryptocurrency")
   const [pricing, setPricing] = useState(course?.pricing ?? "free")
   const [price, setPrice] = useState(course?.price?.toString() ?? "")
   const [status, setStatus] = useState(course?.status ?? "draft")
+  const [objectives, setObjectives] = useState<string[]>(course?.whatYouWillLearn ?? [])
+  const [availableAtLocal, setAvailableAtLocal] = useState(isoToLocalInput(course?.availableAt))
+  const [preEnrollEnabled, setPreEnrollEnabled] = useState(course?.preEnrollEnabled ?? true)
   const [previewError, setPreviewError] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
 
@@ -221,7 +260,7 @@ export function CourseEditor({
           <Button
             variant="ghost"
             size="sm"
-            render={<Link href="/instructor/courses" />}
+            render={<Link href={returnTo} />}
           >
             <ChevronLeftIcon  size={16} />
             Courses
@@ -241,11 +280,17 @@ export function CourseEditor({
             )}
             <input type="hidden" name="title" value={title} />
             <input type="hidden" name="description" value={description} />
+            <input type="hidden" name="shortDescription" value={shortDescription} />
             <input type="hidden" name="thumbnailUrl" value={thumbnailUrl} />
             <input type="hidden" name="level" value={level} />
+            <input type="hidden" name="category" value={category} />
             <input type="hidden" name="pricing" value={pricing} />
             <input type="hidden" name="price" value={price} />
             <input type="hidden" name="status" value={status} />
+            <input type="hidden" name="whatYouWillLearn" value={JSON.stringify(objectives)} />
+            <input type="hidden" name="availableAt" value={localInputToIso(availableAtLocal)} />
+            <input type="hidden" name="preEnrollEnabled" value={preEnrollEnabled ? "true" : "false"} />
+            <input type="hidden" name="returnTo" value={returnTo} />
             <input
               type="hidden"
               name="lessons"
@@ -290,6 +335,27 @@ export function CourseEditor({
                   <CheckIcon  size={14} />
                   Save &amp; Publish
                 </DropdownMenuItem>
+                {/* Suspend/close are admin verbs — the server enforces this
+                    too; hiding them here just keeps the instructor menu honest. */}
+                {adminMode &&
+                  (["suspended", "closed"] as const).map((s) => (
+                    <DropdownMenuItem
+                      key={s}
+                      className="text-sm gap-2"
+                      onClick={() => {
+                        setStatus(s)
+                        requestAnimationFrame(() => {
+                          const form = document.querySelector<HTMLFormElement>(
+                            "[data-editor-form]"
+                          )
+                          form?.requestSubmit()
+                        })
+                      }}
+                    >
+                      <SquarePenIcon size={14} />
+                      {s === "suspended" ? "Save & Suspend" : "Save & Close"}
+                    </DropdownMenuItem>
+                  ))}
               </DropdownMenuContent>
             </DropdownMenu>
           </form>
@@ -331,6 +397,61 @@ export function CourseEditor({
             />
           </div>
 
+          <div className="space-y-1.5">
+            <Label htmlFor="ed-short-desc">
+              Short description{" "}
+              <span className="text-[10px] font-normal text-muted-foreground">
+                (course cards · {shortDescription.length}/200)
+              </span>
+            </Label>
+            <Textarea
+              id="ed-short-desc"
+              placeholder="One or two lines shown on course listings"
+              value={shortDescription}
+              maxLength={200}
+              onChange={(e) => setShortDescription(e.target.value)}
+              className="min-h-16"
+            />
+            {state.fieldErrors.shortDescription && (
+              <p className="text-xs text-destructive">{state.fieldErrors.shortDescription}</p>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>What students will learn</Label>
+            <div className="space-y-2">
+              {objectives.map((obj, i) => (
+                <div className="flex items-center gap-2" key={i}>
+                  <Input
+                    value={obj}
+                    placeholder={`Objective ${i + 1}`}
+                    onChange={(e) =>
+                      setObjectives((prev) => prev.map((o, j) => (j === i ? e.target.value : o)))
+                    }
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Remove objective"
+                    onClick={() => setObjectives((prev) => prev.filter((_, j) => j !== i))}
+                  >
+                    <Trash2Icon size={14} />
+                  </Button>
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setObjectives((prev) => [...prev, ""])}
+              >
+                <PlusIcon size={14} />
+                Add objective
+              </Button>
+            </div>
+          </div>
+
           <SectionDivider label="Thumbnail" />
 
           <MediaUpload
@@ -364,6 +485,22 @@ export function CourseEditor({
               </Select>
             </div>
             <div className="space-y-1.5">
+              <Label>Category</Label>
+              <Select
+                defaultValue={category}
+                onValueChange={(v) => setCategory((v ?? "Cryptocurrency") as typeof category)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORIES.map((c) => (
+                    <SelectItem value={c} key={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5 col-span-2">
               <Label>Status</Label>
               <Select
                 defaultValue={status}
@@ -377,10 +514,52 @@ export function CourseEditor({
                 <SelectContent>
                   <SelectItem value="draft">Draft</SelectItem>
                   <SelectItem value="published">Published</SelectItem>
+                  {adminMode && <SelectItem value="suspended">Suspended</SelectItem>}
+                  {adminMode && <SelectItem value="closed">Closed</SelectItem>}
                   <SelectItem value="archived">Archived</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <SectionDivider label="Availability" />
+
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="ed-available-at">Available from</Label>
+              <Input
+                id="ed-available-at"
+                type="datetime-local"
+                value={availableAtLocal}
+                onChange={(e) => setAvailableAtLocal(e.target.value)}
+                className="max-w-[260px]"
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Leave empty to make the course available the moment it is published.
+                With a future date, a published course shows as &ldquo;Coming Soon&rdquo;
+                with a live countdown, and flips to Live on its own — no further action.
+              </p>
+              {state.fieldErrors.availableAt && (
+                <p className="text-xs text-destructive">{state.fieldErrors.availableAt}</p>
+              )}
+            </div>
+
+            {availableAtLocal && (
+              <div className="flex items-center justify-between rounded-md border p-3">
+                <div className="space-y-0.5">
+                  <p className="text-sm font-medium">Allow pre-launch enrollment</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    Customers can enroll free before launch and are asked to pay
+                    only once the course is live.
+                  </p>
+                </div>
+                <Switch
+                  checked={preEnrollEnabled}
+                  onCheckedChange={(v) => setPreEnrollEnabled(Boolean(v))}
+                  aria-label="Allow pre-launch enrollment"
+                />
+              </div>
+            )}
           </div>
 
           <SectionDivider label="Pricing" />
