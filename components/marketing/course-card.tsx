@@ -7,7 +7,6 @@ import { StarIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { levelChipStyle } from "@/components/shared/level-badge"
 import { WishlistButton, autoBookmark } from "@/components/marketing/wishlist-button"
-import { useDragSuppressed } from "@/components/marketing/motion/drag-rail"
 import type { BrowseCourse } from "@/lib/actions/student"
 
 export function formatDuration(totalMinutes: number): string {
@@ -53,72 +52,61 @@ export function dropDateLabel(availableAt: string): string {
  * course page; the WishlistButton is an absolutely-positioned SIBLING of the
  * link inside the same relative wrapper (valid HTML, no click collision).
  * Clicking through fires `autoBookmark` — fire-and-forget, never blocking
- * navigation, and suppressed when the interaction was a rail drag.
+ * navigation.
  *
- * Hover is chromatic (border → ws-brand/40) plus the one sanctioned zoom
- * exception: the thumbnail eases 1→1.03 inside its clipped frame over 600ms
+ * Fills its grid cell (`w-full`); the caller's grid owns the sizing. Hover is
+ * chromatic (border → ws-brand/40) plus the one sanctioned zoom exception:
+ * the thumbnail eases 1→1.03 inside its clipped frame over 600ms
  * `--ws-ease-rise` — the image moves, the card chrome stays static.
  */
 export function MarketingCourseCard({
   course,
   signedIn,
   className,
-  imageParallaxRef,
 }: {
   course: BrowseCourse
   signedIn: boolean
   className?: string
-  /** Receives the inner image wrapper for the rail's micro-parallax loop. */
-  imageParallaxRef?: (el: HTMLDivElement | null) => void
 }) {
-  const suppressed = useDragSuppressed()
-  const duration = formatDuration(course.totalDuration)
   const drop = isFutureDrop(course)
 
   return (
     <article
       className={cn(
-        "group relative w-[19rem] shrink-0 overflow-hidden rounded-lg border border-ws-hairline bg-ws-surface transition-colors duration-[var(--ws-motion-base)] hover:border-ws-brand/40 md:w-[21rem]",
+        "group relative w-full overflow-hidden rounded-lg border border-ws-hairline bg-ws-surface transition-colors duration-[var(--ws-motion-base)] hover:border-ws-brand/40",
         className
       )}
     >
       <Link
         href={`/courses/${course.id}`}
         className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40"
-        onClick={(e) => {
-          if (suppressed?.current) {
-            e.preventDefault()
-            return
-          }
+        onClick={() => {
           if (signedIn) void autoBookmark(course.id)
         }}
         draggable={false}
       >
         {/* Clipped thumbnail frame */}
         <div className="relative aspect-video w-full overflow-hidden bg-ws-sunken">
-          {/* Oversized horizontally so the ±6% micro-parallax never shows edges. */}
-          <div ref={imageParallaxRef} className="absolute -inset-x-[8%] inset-y-0 will-change-transform">
-            {course.thumbnailUrl ? (
+          {course.thumbnailUrl ? (
+            <Image
+              src={course.thumbnailUrl}
+              alt=""
+              fill
+              draggable={false}
+              className="object-cover transition-transform duration-600 ease-[var(--ws-ease-rise)] group-hover:scale-[1.03]"
+              sizes="(max-width: 640px) 92vw, (max-width: 1024px) 46vw, 416px"
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center bg-ws-raised">
               <Image
-                src={course.thumbnailUrl}
+                src="/brand/wsa-mark.png"
                 alt=""
-                fill
-                draggable={false}
-                className="object-cover transition-transform duration-600 ease-[var(--ws-ease-rise)] group-hover:scale-[1.03]"
-                sizes="(max-width: 768px) 19rem, 21rem"
+                width={32}
+                height={32}
+                className="h-8 w-8 object-contain opacity-40"
               />
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center bg-ws-raised">
-                <Image
-                  src="/brand/wsa-mark.png"
-                  alt=""
-                  width={32}
-                  height={32}
-                  className="h-8 w-8 object-contain opacity-40"
-                />
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Body */}
@@ -145,28 +133,10 @@ export function MarketingCourseCard({
             {course.title}
           </h3>
 
-          <div className="mt-2 flex items-center gap-2">
-            {course.instructorAvatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={course.instructorAvatarUrl}
-                alt=""
-                className="h-5 w-5 shrink-0 rounded-full object-cover ring-1 ring-ws-hairline"
-              />
-            ) : (
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ws-chip text-[8px] font-semibold text-ws-muted">
-                {initials(course.instructorName)}
-              </span>
-            )}
-            <span className="truncate text-[13px] text-ws-muted">
-              {course.instructorName}
-            </span>
-          </div>
-
           <div className="mt-3 flex items-center justify-between gap-2 border-t border-ws-hairline pt-3">
-            <span className="text-[12px] tabular-nums text-ws-muted">
-              {course.totalLessons} lessons{duration ? ` · ${duration}` : ""}
-            </span>
+            {/* No lesson/duration counts: brand-new programs read "0 lessons"
+                and that is worse than saying nothing. */}
+            <span />
             <span className="flex items-center gap-2">
               {course.rating !== null && (
                 <span className="inline-flex items-center gap-1 text-[12px] tabular-nums text-ws-muted">

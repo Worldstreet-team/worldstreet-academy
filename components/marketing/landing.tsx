@@ -1,13 +1,15 @@
 import { fetchBrowseCourses, type BrowseCourse } from "@/lib/actions/student"
 import { fetchLandingReviews } from "@/lib/actions/reviews"
 import { getCurrentUser } from "@/lib/auth/actions"
-import { Hero, ProductFrames } from "@/components/marketing/hero-slider"
+import { HeroWall } from "@/components/marketing/hero-wall"
+import { RoomsTimeline } from "@/components/marketing/rooms-timeline"
 import { WordsMarquee } from "@/components/marketing/words-marquee"
 import { AboutBand } from "@/components/marketing/about-band"
 import { ProgramsList } from "@/components/marketing/programs-list"
-import { CatalogueRail } from "@/components/marketing/catalogue-rail"
+import { CatalogueGrid } from "@/components/marketing/catalogue-rail"
 import { UpcomingDrops } from "@/components/marketing/upcoming-drops"
-import { ReviewsFinale } from "@/components/marketing/reviews-finale"
+import { Testimonials, FinaleCta } from "@/components/marketing/reviews-finale"
+import { Faq } from "@/components/marketing/faq"
 
 const isLocalDev = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_")
 const REGISTER_URL = isLocalDev ? "/register" : "https://worldstreetgold.com/register"
@@ -25,12 +27,12 @@ function futureDrops(published: BrowseCourse[]): BrowseCourse[] {
 }
 
 /**
- * The Academy landing at `/` — clean editorial composition. Six sections:
- * hero + product-frame band (pure DS vignettes, no course art), the raised
- * About panel, the interactive Programs index, the catalogue rail (the ONLY
- * section allowed to show course thumbnails), Upcoming drops (hidden when
- * nothing is scheduled), and From-the-floor + finale (reviews render only at
- * the 3-review floor).
+ * The Academy landing at `/` — clean editorial composition, in order: hero,
+ * the band of words, the About statement, the interactive Programs index, the
+ * product-frame walkthrough (pure DS vignettes, no course art), the catalogue
+ * card grid (the ONLY section allowed to show course thumbnails), Upcoming
+ * drops (hidden when nothing is scheduled), testimonials (real reviews, from
+ * the first one up), the static FAQ, and the compact finale CTA.
  *
  * This server component is the ONLY fetch point; sections are client leaves
  * that receive data as props. Every fetch already falls back to `[]`/null,
@@ -48,8 +50,8 @@ export async function Landing() {
   const signedIn = Boolean(user)
   const published = courses.filter((c) => c.status === "published")
 
-  // ── Catalogue rail: 8 published, from the same single fetch.
-  const railCourses = published.slice(0, 8)
+  // ── Catalogue rail: every published course — the rail scrolls.
+  const gridCourses = published.slice(0, 12)
 
   // ── Upcoming drops (hidden when nothing is queued).
   const drops = futureDrops(published)
@@ -64,7 +66,7 @@ export async function Landing() {
       }
     >
       {/* §1 — Hero: type and CTAs on the open stage */}
-      <Hero signedIn={signedIn} registerUrl={REGISTER_URL} />
+      <HeroWall courses={published} signedIn={signedIn} registerUrl={REGISTER_URL} />
 
       {/* §2 — The band of words */}
       <WordsMarquee />
@@ -76,16 +78,22 @@ export async function Landing() {
       <ProgramsList />
 
       {/* §5 — The product walkthrough, mid-page where it reads as evidence */}
-      <ProductFrames />
+      <RoomsTimeline />
 
-      {/* §6 — The catalogue (the ONLY course-art section; hides below 3) */}
-      <CatalogueRail courses={railCourses} signedIn={signedIn} />
+      {/* §6 — The catalogue grid (the ONLY course-art section; hides below 3) */}
+      <CatalogueGrid courses={gridCourses} signedIn={signedIn} />
 
-      {/* §5 — Upcoming drops (renders only when something is scheduled) */}
+      {/* §7 — Upcoming drops (renders only when something is scheduled) */}
       {drops.length > 0 && <UpcomingDrops drops={drops} />}
 
-      {/* §6 — From the floor + finale (reviews render only at ≥3) */}
-      <ReviewsFinale reviews={reviews} signedIn={signedIn} registerUrl={REGISTER_URL} />
+      {/* §8 — From the floor (real reviews; hides only at zero) */}
+      <Testimonials reviews={reviews} />
+
+      {/* §9 — FAQ (static, truthful) */}
+      <Faq />
+
+      {/* §10 — Compact finale CTA */}
+      <FinaleCta signedIn={signedIn} registerUrl={REGISTER_URL} />
     </div>
   )
 }

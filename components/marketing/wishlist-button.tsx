@@ -65,10 +65,13 @@ function queueBookmarkCheck(courseId: string): Promise<boolean> {
 }
 
 /* ------------------------------------------------------------------------- *
- * WishlistButton — small ghost heart chip.
+ * WishlistButton — heart control in two shapes.
+ *
+ *   variant="chip" (default)  small ghost heart, for card corners
+ *   variant="full"            full-width labelled CTA, for course pages
  *
  * Signed-in: optimistic toggle against `toggleCourseBookmark`, reverting if
- * the server declines. Signed-out: identical-looking chip that links to
+ * the server declines. Signed-out: an identical-looking control that links to
  * /login, so the two states never shift layout.
  * ------------------------------------------------------------------------- */
 
@@ -78,14 +81,26 @@ const chipClasses =
   "transition-colors hover:bg-ws-raised hover:text-ws-primary " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40"
 
+const fullClasses =
+  "inline-flex h-11 w-full items-center justify-center gap-2 rounded-sm px-5 " +
+  "text-sm font-semibold transition-opacity hover:opacity-90 " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40"
+
+/** Idle (not yet saved) reads as the page's primary action. */
+const fullIdleClasses = "bg-ws-brand text-ws-brand-on"
+/** Saved steps back to a confirmed, secondary state — same height, no shift. */
+const fullSavedClasses = "border border-ws-hairline bg-ws-chip text-ws-primary"
+
 export function WishlistButton({
   courseId,
   signedIn,
   className,
+  variant = "chip",
 }: {
   courseId: string
   signedIn: boolean
   className?: string
+  variant?: "chip" | "full"
 }) {
   const [bookmarked, setBookmarked] = useState(false)
   const [, startTransition] = useTransition()
@@ -114,16 +129,22 @@ export function WishlistButton({
     })
   }, [courseId])
 
+  const isFull = variant === "full"
+
   if (!signedIn) {
     return (
       <Link
         href="/login"
         aria-label="Sign in to save this course to your wishlist"
         title="Sign in to save"
-        className={cn(chipClasses, className)}
+        className={cn(
+          isFull ? cn(fullClasses, fullIdleClasses) : chipClasses,
+          className
+        )}
         onClick={(e) => e.stopPropagation()}
       >
-        <Heart size={15} strokeWidth={1.75} aria-hidden />
+        <Heart size={isFull ? 16 : 15} strokeWidth={1.75} aria-hidden />
+        {isFull && "Add to wishlist"}
       </Link>
     )
   }
@@ -140,17 +161,21 @@ export function WishlistButton({
         handleToggle()
       }}
       className={cn(
-        chipClasses,
-        bookmarked && "border-ws-brand/40 text-ws-gold hover:text-ws-gold",
+        isFull
+          ? cn(fullClasses, bookmarked ? fullSavedClasses : fullIdleClasses)
+          : chipClasses,
+        !isFull && bookmarked && "border-ws-brand/40 text-ws-gold hover:text-ws-gold",
         className
       )}
     >
       <Heart
-        size={15}
+        size={isFull ? 16 : 15}
         strokeWidth={1.75}
         fill={bookmarked ? "currentColor" : "none"}
+        className={isFull && bookmarked ? "text-ws-gold" : undefined}
         aria-hidden
       />
+      {isFull && (bookmarked ? "In your wishlist" : "Add to wishlist")}
     </button>
   )
 }

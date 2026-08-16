@@ -3,6 +3,7 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { MarketingMobileNav, type MarketingNavLink } from "@/components/marketing/mobile-nav"
+import { NavbarShell } from "@/components/marketing/navbar-shell"
 import { getCurrentUser } from "@/lib/auth/actions"
 
 const isLocalDev = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_")
@@ -26,11 +27,10 @@ export async function Navbar() {
   ]
 
   return (
-    // TopNav spec (05-screens): solid surface + hairline, 26px mark,
-    // wordmark Poppins SemiBold 15.
-    <header className="sticky top-0 z-50 w-full border-b border-ws-hairline bg-ws-surface">
-      <div className="container mx-auto flex h-16 items-center justify-between gap-2 px-4">
-        <div className="flex min-w-0 items-center gap-8">
+    // Floating glass bar: transparent over the hero, condensing into a
+    // blurred pill on scroll (NavbarShell owns that state).
+    <NavbarShell>
+        <div className="flex min-w-0 items-center gap-6 lg:gap-8">
           {/* Unified ecosystem lockup (05-screens): gold wsa-mark 26px +
               "WorldStreet" Poppins SemiBold 15 + gold app eyebrow. */}
           <Link href="/" className="flex shrink-0 items-center gap-2">
@@ -46,17 +46,17 @@ export async function Navbar() {
               <span className="font-sans text-[10px] font-semibold uppercase tracking-[2px] text-ws-gold">Academy</span>
             </span>
           </Link>
-          <nav className="hidden md:flex items-center gap-6">
+          <nav className="hidden items-center gap-1 md:flex">
             <Link
               href="/courses"
-              className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              className="rounded-full px-3 py-1.5 text-sm font-medium text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-chip hover:text-ws-primary"
             >
               Courses
             </Link>
             {user && (
               <Link
                 href="/dashboard"
-                className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                className="rounded-full px-3 py-1.5 text-sm font-medium text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-chip hover:text-ws-primary"
               >
                 My Learning
               </Link>
@@ -64,7 +64,7 @@ export async function Navbar() {
             {isInstructor && (
               <Link
                 href="/instructor"
-                className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                className="rounded-full px-3 py-1.5 text-sm font-medium text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-chip hover:text-ws-primary"
               >
                 Instructor Dashboard
               </Link>
@@ -79,7 +79,7 @@ export async function Navbar() {
             // pushes the bar past a 320px viewport.
             <Link
               href="/dashboard"
-              className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-sm bg-ws-brand px-3 text-sm font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90 sm:px-5 sm:text-base"
+              className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-ws-brand px-4 text-sm font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90 sm:px-5"
             >
               <span className="sm:hidden">Dashboard</span>
               <span className="hidden sm:inline">Go to dashboard</span>
@@ -91,19 +91,18 @@ export async function Navbar() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="hidden md:inline-flex"
+                className="hidden rounded-full md:inline-flex"
                 render={<a href={LOGIN_URL} />}
               >
                 Sign In
               </Button>
-              <Button size="sm" className="shrink-0 whitespace-nowrap" render={<a href={REGISTER_URL} />}>
+              <Button size="sm" className="shrink-0 whitespace-nowrap rounded-full px-4" render={<a href={REGISTER_URL} />}>
                 Get Started
               </Button>
             </>
           )}
           <MarketingMobileNav links={mobileLinks} />
         </div>
-      </div>
-    </header>
+    </NavbarShell>
   )
 }

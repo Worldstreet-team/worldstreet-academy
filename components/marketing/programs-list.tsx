@@ -25,19 +25,27 @@ import {
 import { useMediaQuery, useMotionOK } from "@/components/marketing/motion/bus"
 
 /**
- * §3 — PROGRAMS. An interactive editorial index: five rows (Learn, Live
- * sessions, Exams, Certificates, Vivid AI). The active row reads at full
- * opacity with a gold numeral; hover/focus/click switches it, and the list
- * auto-advances every 5s until the first interaction. On lg+ a compact
- * vignette panel (DS primitives only — never course art) swaps per row, with
- * a floating info-chip carrying one truthful sentence. Below lg the rows
- * collapse to an accordion (chevron pinned to row 1's last column, same
- * pattern as the old platform index).
+ * §4 — PROGRAMS. A tight editorial index: five fixed-grid rows
+ * (`[3rem_1fr_auto]` so numerals and titles rail up perfectly — nothing ever
+ * translates on hover or activation). The active row carries a gold numeral,
+ * ws-primary title and a one-line description that expands IN PLACE
+ * (height-animated; instant under reduced motion); inactive rows sit at
+ * ws-subtle. Hover/focus/click switches rows and the list auto-advances
+ * every 5s until the first interaction.
+ *
+ * On lg+ the right column is a framed panel stretched to the exact height of
+ * the list (grid items-stretch): the per-row vignette (DS primitives only —
+ * never course art) centered inside it, and the truthful fact line pinned at
+ * the panel's bottom edge, inside the frame. Below lg the rows collapse to an
+ * accordion on the same fixed grid.
  */
 
 type Program = {
   numeral: string
   title: string
+  /** One line for the expanding row description. */
+  blurb: string
+  /** The full truthful sentence, pinned inside the lg+ panel. */
   fact: string
   vignette: React.ComponentType
 }
@@ -46,30 +54,35 @@ const PROGRAMS: Program[] = [
   {
     numeral: "01",
     title: "Learn",
+    blurb: "Video and text lessons with free previews — progress autosaves.",
     fact: "Video and text lessons with free previews — your watch position autosaves and every lesson tracks complete.",
     vignette: LearnVignette,
   },
   {
     numeral: "02",
     title: "Live sessions",
+    blurb: "Scheduled classes with a moderated stage, chat and polls.",
     fact: "Scheduled classes on a moderated stage: raise your hand to speak, vote in polls, react, share screens.",
     vignette: LiveVignette,
   },
   {
     numeral: "03",
     title: "Exams",
+    blurb: "Timed, shuffled per attempt, with a pass mark set per course.",
     fact: "Timed, questions shuffled per attempt, attempts limited, answers autosaved. The default pass mark is 70% — instructors set it per course.",
     vignette: ExamsVignette,
   },
   {
     numeral: "04",
     title: "Certificates",
+    blurb: "Signed by you and your instructor, downloadable as a PDF.",
     fact: "Pass the exam and your certificate unlocks — signed by your instructor and by you, downloadable as a PDF with its own ID.",
     vignette: CertificatesVignette,
   },
   {
     numeral: "05",
     title: "Vivid AI",
+    blurb: "A voice assistant that answers, then navigates you there.",
     fact: "A voice assistant on every page — ask it anything about the academy and it takes you where you need to go.",
     vignette: VividVignette,
   },
@@ -118,17 +131,17 @@ export function ProgramsList() {
 
         <div
           ref={listRef}
-          className="mt-12 grid gap-12 lg:mt-16 lg:grid-cols-[1fr_26rem] lg:gap-16 xl:grid-cols-[1fr_28rem]"
+          className="mt-12 grid items-stretch gap-12 lg:mt-16 lg:grid-cols-[1fr_24rem] lg:gap-16 xl:grid-cols-[1fr_26rem]"
         >
           {/* ── The index rows ── */}
           <div>
             {PROGRAMS.map((program, i) => {
               const isLast = i === PROGRAMS.length - 1
-              const isActive = i === active
-              const expanded = open === i
+              // Desktop: the active row expands. Mobile: the open one.
+              const expanded = isCompact ? open === i : active === i
 
               return (
-                <Reveal key={program.title} delay={i * 0.07} y={18} duration={0.6}>
+                <Reveal key={program.title} delay={i * 0.06} y={14} duration={0.55}>
                   <div
                     className={cn(
                       "group relative border-t border-ws-hairline",
@@ -143,7 +156,7 @@ export function ProgramsList() {
                     <button
                       type="button"
                       className="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40"
-                      aria-expanded={isCompact ? expanded : undefined}
+                      aria-expanded={expanded}
                       onMouseEnter={() => {
                         if (!isCompact) select(i)
                       }}
@@ -159,40 +172,23 @@ export function ProgramsList() {
                         }
                       }}
                     >
-                      <div className="grid grid-cols-[2.75rem_1fr_auto] items-baseline gap-x-4 py-6 lg:grid-cols-[3.75rem_1fr_auto] lg:py-7">
+                      <div className="grid grid-cols-[3rem_1fr_auto] items-baseline gap-x-4 py-5">
                         <span
                           className={cn(
-                            "font-display text-[15px] font-semibold tabular-nums transition-colors duration-[var(--ws-motion-base)]",
-                            (isCompact ? expanded : isActive)
-                              ? "text-ws-gold"
-                              : "text-ws-subtle"
+                            "font-display text-[14px] font-semibold tabular-nums transition-colors duration-[var(--ws-motion-base)]",
+                            expanded ? "text-ws-gold" : "text-ws-subtle"
                           )}
                         >
                           {program.numeral}
                         </span>
                         <span
                           className={cn(
-                            "font-display text-2xl font-semibold tracking-[-0.01em] transition-[color,translate] duration-200 ease-[var(--ws-ease)] group-hover:translate-x-2 md:text-3xl",
-                            (isCompact ? expanded : isActive)
-                              ? "text-ws-primary"
-                              : "text-ws-subtle"
+                            "font-display text-xl font-semibold tracking-[-0.01em] transition-colors duration-[var(--ws-motion-base)] md:text-2xl",
+                            expanded ? "text-ws-primary" : "text-ws-subtle"
                           )}
                         >
                           {program.title}
                         </span>
-                        {/* Fact line: accordion body below lg, sr-only otherwise
-                            so the sentence is never lost to screen readers. */}
-                        <span
-                          className={cn(
-                            expanded
-                              ? "col-span-full mt-2 block text-[14px] leading-relaxed text-ws-muted lg:sr-only"
-                              : "sr-only"
-                          )}
-                        >
-                          {program.fact}
-                        </span>
-                        {/* Pinned to row 1's last column so the expanding fact
-                            line never reflows it under the numeral. */}
                         <span className="col-start-3 row-start-1 self-center justify-self-end lg:hidden">
                           <ChevronDownIcon
                             size={16}
@@ -203,6 +199,22 @@ export function ProgramsList() {
                             )}
                           />
                         </span>
+                        {/* The in-place description: height-animated on the
+                            title's own column, so nothing ever shifts
+                            sideways. Instant under reduced motion. */}
+                        <motion.span
+                          className="col-start-2 row-start-2 block overflow-hidden"
+                          initial={false}
+                          animate={{
+                            height: expanded ? "auto" : 0,
+                            opacity: expanded ? 1 : 0,
+                          }}
+                          transition={{ duration: ok ? 0.35 : 0, ease: EASE_LUX }}
+                        >
+                          <span className="block pt-2 text-[14px] leading-relaxed text-ws-muted">
+                            {program.blurb}
+                          </span>
+                        </motion.span>
                       </div>
                     </button>
                   </div>
@@ -211,60 +223,47 @@ export function ProgramsList() {
             })}
           </div>
 
-          {/* ── The vignette panel (lg+) ── */}
-          <div className="relative hidden lg:block">
-            <Reveal delay={0.15} y={24}>
-              <div className="sticky top-24 pb-8">
-                <div className="relative">
-                  <div className="relative h-[26rem] overflow-hidden rounded-xl border border-ws-hairline bg-ws-sunken/40">
-                    <AnimatePresence initial={false}>
-                      <motion.div
-                        key={active}
-                        className="absolute inset-0 flex items-center p-6"
-                        initial={{ opacity: 0, y: ok ? 24 : 0 }}
-                        animate={{
-                          opacity: 1,
-                          y: 0,
-                          transition: { duration: ok ? 0.6 : 0.25, ease: EASE_INERTIA },
-                        }}
-                        exit={{
-                          opacity: 0,
-                          y: ok ? -16 : 0,
-                          transition: { duration: ok ? 0.35 : 0.2, ease: EASE_EXIT },
-                        }}
-                      >
-                        <div className="w-full">
-                          <ActiveVignette />
-                        </div>
-                      </motion.div>
-                    </AnimatePresence>
-                  </div>
-                  {/* Floating info chip — one truthful sentence per row. */}
+          {/* ── The framed panel (lg+), stretched to the list's height ── */}
+          <div className="hidden lg:block">
+            <Reveal className="h-full" delay={0.15} y={24}>
+              <div className="flex h-full flex-col overflow-hidden rounded-xl border border-ws-hairline bg-ws-surface">
+                {/* Vignette stage — centered, clipped by the frame. */}
+                <div className="relative flex-1">
                   <AnimatePresence initial={false}>
                     <motion.div
                       key={active}
-                      aria-hidden
-                      className="absolute -bottom-6 left-6 right-6 rounded-lg border border-ws-hairline bg-ws-surface p-4 shadow-xl shadow-black/40"
-                      initial={{ opacity: 0, y: ok ? 12 : 0 }}
+                      className="absolute inset-0 flex items-center justify-center p-6"
+                      initial={{ opacity: 0, y: ok ? 20 : 0 }}
                       animate={{
                         opacity: 1,
                         y: 0,
-                        transition: {
-                          duration: ok ? 0.5 : 0.25,
-                          ease: EASE_LUX,
-                          delay: 0.1,
-                        },
+                        transition: { duration: ok ? 0.55 : 0.25, ease: EASE_INERTIA },
                       }}
                       exit={{
                         opacity: 0,
-                        transition: { duration: 0.2 },
+                        y: ok ? -12 : 0,
+                        transition: { duration: ok ? 0.3 : 0.2, ease: EASE_EXIT },
                       }}
                     >
-                      <p className="text-[13px] leading-relaxed text-ws-muted">
-                        {PROGRAMS[active].fact}
-                      </p>
+                      <div className="w-full max-w-[21rem]">
+                        <ActiveVignette />
+                      </div>
                     </motion.div>
                   </AnimatePresence>
+                </div>
+                {/* The truthful fact line — pinned at the panel's bottom
+                    edge, inside the frame. aria-hidden: it duplicates the
+                    row content for sighted users only. */}
+                <div aria-hidden className="border-t border-ws-hairline px-5 py-4">
+                  <motion.p
+                    key={active}
+                    className="min-h-[4rem] text-[13px] leading-relaxed text-ws-muted"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: ok ? 0.35 : 0 }}
+                  >
+                    {PROGRAMS[active].fact}
+                  </motion.p>
                 </div>
               </div>
             </Reveal>

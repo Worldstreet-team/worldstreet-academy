@@ -1,142 +1,113 @@
 "use client"
 
-import * as React from "react"
 import Link from "next/link"
 import { StarIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { LineMask } from "@/components/marketing/motion/line-mask"
-import { Marquee } from "@/components/marketing/motion/marquee"
 import { Reveal, RevealGroup } from "@/components/marketing/motion/reveal"
-import { EASE_INERTIA } from "@/components/marketing/motion/ease"
-import { useMediaQuery, useMotionOK } from "@/components/marketing/motion/bus"
-import { motion } from "motion/react"
 import type { LandingReview } from "@/lib/actions/reviews"
 
 /**
- * §7 — FROM THE FLOOR + FINALE. Real reviews only (`fetchLandingReviews`
- * verbatim, clamp-only) in two opposing marquee rows; below the 3-review
- * floor the section is just the finale. Fallbacks: reduced motion, or coarse
- * pointer with <7 reviews → static columns grid; coarse with ≥7 → one row.
+ * §8 — FROM THE FLOOR. Real reviews only (`fetchLandingReviews` verbatim,
+ * clamp-only), as a static card grid: up to six cards, 1 / 2 / 3 columns,
+ * centered and narrower when there are fewer. Renders from the FIRST review
+ * up — below one review the section vanishes entirely, never an empty shell.
+ * No marquee: motion here is a subtle stagger-in and a hover border-brighten.
  */
-export function ReviewsFinale({
-  reviews,
+export function Testimonials({ reviews }: { reviews: LandingReview[] }) {
+  if (reviews.length === 0) return null
+
+  const shown = reviews.slice(0, 6)
+
+  return (
+    <section className="relative isolate py-24 md:py-32">
+      <div className="mx-auto max-w-6xl px-6">
+        <RevealGroup>
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-ws-gold">
+            From the floor
+          </p>
+          <h2
+            className="mt-4 max-w-3xl font-display font-semibold leading-[1.05] tracking-[-0.02em] text-ws-primary"
+            style={{ fontSize: "clamp(2rem, 4.5vw, 3.5rem)" }}
+          >
+            Rated by the people who did the work.
+          </h2>
+        </RevealGroup>
+
+        <div
+          className={cn(
+            "mt-12 grid grid-cols-1 gap-5",
+            shown.length >= 2 && "sm:grid-cols-2",
+            shown.length >= 3 && "lg:grid-cols-3",
+            // Fewer reviews: a narrower, centered grid instead of a sparse row.
+            shown.length === 1 && "mx-auto max-w-md",
+            shown.length === 2 && "mx-auto max-w-3xl"
+          )}
+        >
+          {shown.map((review, i) => (
+            <Reveal key={review.id} delay={(i % 3) * 0.07} y={20} duration={0.6}>
+              <ReviewCard review={review} />
+            </Reveal>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/**
+ * §10 — FINALE. A compact CTA band: hairline top border, an always-reachable
+ * heading (plain fade-up at viewport amount 0.2, once — it can never
+ * dead-end the way the old masked-line reveal did), one supporting line, and
+ * the two CTAs. The glow is absolutely positioned, so it adds zero height —
+ * no minimum-height caverns.
+ */
+export function FinaleCta({
   signedIn,
   registerUrl,
 }: {
-  reviews: LandingReview[]
   signedIn: boolean
   registerUrl: string
 }) {
-  const ok = useMotionOK()
-  const coarse = useMediaQuery("(pointer: coarse)")
-
-  const showReviews = reviews.length >= 3
-  // Below 7 reviews a marquee row is sparser than the viewport on ANY
-  // pointer — a lone card drifting across a blank band. Grid until dense.
-  const useStaticGrid = !ok || reviews.length < 7
-  const singleRow = coarse && reviews.length >= 7
-
-  const topRow = reviews.filter((_, i) => i % 2 === 0)
-  const bottomRow = reviews.filter((_, i) => i % 2 === 1)
-
   return (
-    <>
-      {showReviews && (
-        <section className="relative isolate overflow-hidden py-28">
-          <div className="mx-auto max-w-6xl px-6 pb-12">
-            <RevealGroup>
-              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-ws-gold">
-                From the floor
-              </p>
-              <h2
-                className="mt-4 max-w-3xl font-display font-semibold leading-[1.05] tracking-[-0.02em] text-ws-primary"
-                style={{ fontSize: "clamp(2rem, 4.5vw, 3.5rem)" }}
-              >
-                Rated by the people who did the work.
-              </h2>
-            </RevealGroup>
-          </div>
-
-          {useStaticGrid ? (
-            <div className="mx-auto max-w-6xl gap-5 px-6 columns-1 md:columns-2 lg:columns-3">
-              {reviews.slice(0, 6).map((review, i) => (
-                <Reveal key={review.id} delay={i * 0.07} className="mb-5 break-inside-avoid">
-                  <ReviewCard review={review} />
-                </Reveal>
-              ))}
-            </div>
-          ) : singleRow ? (
-            <Marquee speed={22} direction="left">
-              {reviews.map((review) => (
-                <ReviewCard key={review.id} review={review} className="w-[19rem]" />
-              ))}
-            </Marquee>
-          ) : (
-            <div className="space-y-5">
-              <Marquee speed={28} direction="left">
-                {topRow.map((review) => (
-                  <ReviewCard key={review.id} review={review} className="w-[22rem]" />
-                ))}
-              </Marquee>
-              <Marquee speed={22} direction="right">
-                {bottomRow.map((review) => (
-                  <ReviewCard key={review.id} review={review} className="w-[22rem]" />
-                ))}
-              </Marquee>
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* ── Finale ── */}
-      <section className="relative isolate overflow-hidden py-32 text-center md:py-44">
-        <div
-          aria-hidden
-          className="absolute left-1/2 top-1/2 h-[36rem] w-[56rem] max-w-[150vw] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[140px]"
-          style={{ background: "var(--ws-glow-brand)" }}
-        />
-        <div className="relative mx-auto max-w-4xl px-6">
-          <LineMask
-            as="h2"
-            mode="inview"
-            className="font-display text-[clamp(2.75rem,7vw,6.5rem)] font-semibold leading-[0.98] tracking-[-0.03em] text-ws-primary"
-            lines={[
-              { text: "Ready when" },
-              { text: "the market is.", className: "text-ws-gold" },
-            ]}
-          />
-          <motion.div
-            className="mt-10 flex flex-wrap items-center justify-center gap-3"
-            initial={{ opacity: 0, y: ok ? 20 : 0 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.6 }}
-            transition={{ duration: 0.7, ease: EASE_INERTIA, delay: 0.25 }}
-          >
-            {signedIn ? (
-              <Link
-                href="/dashboard"
-                className="inline-flex h-12 items-center justify-center rounded-sm bg-ws-brand px-9 text-[15px] font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90"
-              >
-                Get started
-              </Link>
-            ) : (
-              <a
-                href={registerUrl}
-                className="inline-flex h-12 items-center justify-center rounded-sm bg-ws-brand px-9 text-[15px] font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90"
-              >
-                Get started
-              </a>
-            )}
+    <section className="relative isolate overflow-hidden border-t border-ws-hairline py-20 text-center md:py-24">
+      <div
+        aria-hidden
+        className="absolute left-1/2 top-1/2 h-[20rem] w-[44rem] max-w-[120vw] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[120px]"
+        style={{ background: "var(--ws-glow-brand)" }}
+      />
+      <div className="relative mx-auto max-w-3xl px-6">
+        <Reveal as="h2" amount={0.2} className="font-display text-[clamp(2.5rem,5.5vw,4.25rem)] font-semibold leading-[1.02] tracking-[-0.03em] text-ws-primary">
+          <span className="block">Ready when</span>
+          <span className="block text-ws-gold">the market is.</span>
+        </Reveal>
+        <Reveal as="p" amount={0.2} delay={0.1} className="mx-auto mt-5 max-w-md text-[15px] leading-relaxed text-ws-muted">
+          Courses run beginner to advanced — start where you are.
+        </Reveal>
+        <Reveal amount={0.2} delay={0.18} className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          {signedIn ? (
             <Link
-              href="/courses"
-              className="inline-flex h-12 items-center justify-center rounded-sm border border-ws-hairline px-8 text-[15px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:border-ws-brand/40 hover:text-ws-gold"
+              href="/dashboard"
+              className="inline-flex h-12 items-center justify-center rounded-sm bg-ws-brand px-9 text-[15px] font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90"
             >
-              Browse courses
+              Get started
             </Link>
-          </motion.div>
-        </div>
-      </section>
-    </>
+          ) : (
+            <a
+              href={registerUrl}
+              className="inline-flex h-12 items-center justify-center rounded-sm bg-ws-brand px-9 text-[15px] font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90"
+            >
+              Get started
+            </a>
+          )}
+          <Link
+            href="/courses"
+            className="inline-flex h-12 items-center justify-center rounded-sm border border-ws-hairline px-8 text-[15px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:border-ws-brand/40 hover:text-ws-gold"
+          >
+            Browse courses
+          </Link>
+        </Reveal>
+      </div>
+    </section>
   )
 }
 
@@ -144,20 +115,9 @@ export function ReviewsFinale({
  * One review card — everything on it comes from `LandingReview` verbatim
  * (content is clamped, never rewritten). No dates, no invented roles.
  */
-function ReviewCard({
-  review,
-  className,
-}: {
-  review: LandingReview
-  className?: string
-}) {
+function ReviewCard({ review }: { review: LandingReview }) {
   return (
-    <figure
-      className={cn(
-        "flex shrink-0 flex-col rounded-lg border border-ws-hairline bg-ws-surface p-5",
-        className
-      )}
-    >
+    <figure className="flex h-full flex-col rounded-xl border border-ws-hairline bg-ws-surface p-6 transition-colors duration-[var(--ws-motion-base)] hover:border-ws-brand/30">
       <div className="flex items-center gap-0.5" aria-label={`${review.rating} out of 5 stars`}>
         {Array.from({ length: review.rating }).map((_, i) => (
           <StarIcon key={i} size={12} fill="currentColor" className="text-ws-rating" />
@@ -168,13 +128,13 @@ function ReviewCard({
       )}
       <blockquote
         className={cn(
-          "line-clamp-4 text-[15px] leading-relaxed text-ws-primary/90",
+          "mb-4 line-clamp-5 text-[15px] leading-relaxed text-ws-primary/90",
           review.title ? "mt-1.5" : "mt-3"
         )}
       >
         {review.content}
       </blockquote>
-      <figcaption className="mt-4 flex items-center gap-2.5 border-t border-ws-hairline pt-4">
+      <figcaption className="mt-auto flex items-center gap-2.5 border-t border-ws-hairline pt-4">
         {review.reviewerAvatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img

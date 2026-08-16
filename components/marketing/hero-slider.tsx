@@ -296,7 +296,7 @@ export function ProductFrames() {
 
 /* ── Browser-chrome frame ────────────────────────────────────────────────── */
 
-function BrowserFrame({
+export function BrowserFrame({
   route,
   children,
 }: {
@@ -330,7 +330,7 @@ const LESSONS = [
   { title: "Setting Up Your First Wallet", state: "locked" as const },
 ]
 
-function ClassroomVignette() {
+export function ClassroomVignette() {
   const ok = useMotionOK()
   return (
     <div
@@ -458,7 +458,7 @@ const CHAT = [
   { who: "them", text: "Exactly. Watch how price treats them." },
 ]
 
-function LiveRoomVignette() {
+export function LiveRoomVignette() {
   const ok = useMotionOK()
   return (
     <div
@@ -587,7 +587,7 @@ const EXAM_CHECKS = [
   "Score clears the pass mark",
 ]
 
-function ExamVignette() {
+export function ExamVignette() {
   const ok = useMotionOK()
   return (
     <div
