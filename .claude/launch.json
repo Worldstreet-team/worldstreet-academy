@@ -4,7 +4,7 @@
     {
       "name": "academy-dev",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["dev"],
+      "runtimeArgs": ["exec", "next", "dev"],
       "port": 3000,
       "autoPort": true
     }

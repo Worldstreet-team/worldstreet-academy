@@ -115,14 +115,31 @@ export function ProgramsList() {
   const ActiveVignette = PROGRAMS[active].vignette
 
   return (
-    <section className="relative isolate py-24 md:py-32">
-      <div className="mx-auto max-w-7xl px-6">
+    <section className="relative isolate py-16 md:py-24">
+      <div className="mx-auto w-full max-w-[112rem] px-4 sm:px-6">
+        {/* The gold panel — same surface language as the catalogue: one
+            near-full-bleed primary field, dot mesh at 70% dissolving from the
+            left, everything inside recoloured onto ws-brand-on. */}
+        <div className="relative overflow-hidden rounded-2xl bg-ws-brand px-6 py-14 sm:rounded-3xl sm:px-10 sm:py-16 lg:px-14 lg:py-20 xl:px-16">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 left-0 w-full opacity-70 lg:w-1/2"
+            style={{
+              backgroundImage:
+                "radial-gradient(circle, rgba(0,0,0,0.5) 1.5px, transparent 1.5px)",
+              backgroundSize: "20px 20px",
+              maskImage: "linear-gradient(to right, black, transparent 85%)",
+              WebkitMaskImage: "linear-gradient(to right, black, transparent 85%)",
+            }}
+          />
+
+          <div className="relative mx-auto max-w-[84rem]">
         <RevealGroup>
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-ws-gold">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ws-brand-on/70">
             Programs
           </p>
           <h2
-            className="mt-4 max-w-3xl font-display font-semibold leading-[1.05] tracking-[-0.02em] text-ws-primary"
+            className="mt-4 max-w-3xl font-display font-semibold leading-[1.05] tracking-[-0.02em] text-ws-brand-on"
             style={{ fontSize: "clamp(2rem, 4.5vw, 3.5rem)" }}
           >
             From first lesson to signed certificate.
@@ -144,18 +161,18 @@ export function ProgramsList() {
                 <Reveal key={program.title} delay={i * 0.06} y={14} duration={0.55}>
                   <div
                     className={cn(
-                      "group relative border-t border-ws-hairline",
+                      "group relative border-t border-black/15",
                       isLast && "border-b"
                     )}
                   >
-                    {/* Gold hairline sweeps the row's top border on hover. */}
+                    {/* On gold, the sweep inverts: black hairline, not gold. */}
                     <span
                       aria-hidden
-                      className="absolute inset-x-0 top-[-1px] h-px origin-left scale-x-0 bg-ws-brand transition-transform duration-300 ease-[var(--land-ease-inertia)] group-hover:scale-x-100"
+                      className="absolute inset-x-0 top-[-1px] h-px origin-left scale-x-0 bg-black transition-transform duration-300 ease-[var(--land-ease-inertia)] group-hover:scale-x-100"
                     />
                     <button
                       type="button"
-                      className="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40"
+                      className="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/40"
                       aria-expanded={expanded}
                       onMouseEnter={() => {
                         if (!isCompact) select(i)
@@ -176,7 +193,7 @@ export function ProgramsList() {
                         <span
                           className={cn(
                             "font-display text-[14px] font-semibold tabular-nums transition-colors duration-[var(--ws-motion-base)]",
-                            expanded ? "text-ws-gold" : "text-ws-subtle"
+                            expanded ? "text-black" : "text-ws-brand-on/45"
                           )}
                         >
                           {program.numeral}
@@ -184,7 +201,7 @@ export function ProgramsList() {
                         <span
                           className={cn(
                             "font-display text-xl font-semibold tracking-[-0.01em] transition-colors duration-[var(--ws-motion-base)] md:text-2xl",
-                            expanded ? "text-ws-primary" : "text-ws-subtle"
+                            expanded ? "text-ws-brand-on" : "text-ws-brand-on/55"
                           )}
                         >
                           {program.title}
@@ -194,7 +211,7 @@ export function ProgramsList() {
                             size={16}
                             aria-hidden
                             className={cn(
-                              "text-ws-subtle transition-transform duration-200",
+                              "text-ws-brand-on/55 transition-transform duration-200",
                               expanded && "rotate-180"
                             )}
                           />
@@ -211,7 +228,7 @@ export function ProgramsList() {
                           }}
                           transition={{ duration: ok ? 0.35 : 0, ease: EASE_LUX }}
                         >
-                          <span className="block pt-2 text-[14px] leading-relaxed text-ws-muted">
+                          <span className="block pt-2 text-[14px] leading-relaxed text-ws-brand-on/75">
                             {program.blurb}
                           </span>
                         </motion.span>
@@ -226,7 +243,10 @@ export function ProgramsList() {
           {/* ── The framed panel (lg+), stretched to the list's height ── */}
           <div className="hidden lg:block">
             <Reveal className="h-full" delay={0.15} y={24}>
-              <div className="flex h-full flex-col overflow-hidden rounded-xl border border-ws-hairline bg-ws-surface">
+              {/* Stays dark on the gold field — the vignettes are dark-surface
+                  DS primitives, and a dark card on gold is the same figure/
+                  ground relationship the catalogue's course cards use. */}
+              <div className="flex h-full flex-col overflow-hidden rounded-xl border border-black/20 bg-ws-surface shadow-xl shadow-black/20">
                 {/* Vignette stage — centered, clipped by the frame. */}
                 <div className="relative flex-1">
                   <AnimatePresence initial={false}>
@@ -267,6 +287,8 @@ export function ProgramsList() {
                 </div>
               </div>
             </Reveal>
+          </div>
+        </div>
           </div>
         </div>
       </div>
