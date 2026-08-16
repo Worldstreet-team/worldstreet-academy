@@ -123,8 +123,12 @@ export function HeroWall({
           front of the scenery, not another tile in it. Anchored to the
           section's bottom edge and cropped by its overflow, so she rises out
           of it. She sits opposite the left-aligned copy, which is why she can
-          run large here without fighting the headline. Hidden below md: at
-          phone widths there is no column free of the text. */}
+          run large here without fighting the headline: 36rem from xl, 40rem
+          from 2xl — measured to clear the longest glyph run by 67px at 1280
+          and 111px at 1440. lg stays at 25rem deliberately: at exactly 1024
+          the subhead's first line reaches x=598, and a 28rem figure would
+          start at 576 and collide. Hidden below md, where no column is free
+          of the text. */}
       <div
         aria-hidden
         className="pointer-events-none absolute bottom-0 right-0 -z-[5] hidden select-none md:block"
@@ -135,7 +139,7 @@ export function HeroWall({
           width={509}
           height={491}
           priority
-          className="h-auto w-[20rem] drop-shadow-[0_24px_60px_rgba(0,0,0,0.55)] lg:w-[25rem] xl:w-[30rem]"
+          className="h-auto w-[20rem] drop-shadow-[0_24px_60px_rgba(0,0,0,0.55)] lg:w-[25rem] xl:w-[36rem] 2xl:w-[40rem]"
         />
       </div>
 
