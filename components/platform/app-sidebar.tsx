@@ -232,7 +232,7 @@ export function AppSidebar() {
                 one route back to the marketing page. */}
             <SidebarMenuButton
               size="lg"
-              render={<Link href="/home" aria-label="WorldStreet Academy home" />}
+              render={<Link href="/" aria-label="WorldStreet Academy home" />}
               className="rounded-md transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-chip"
             >
               {/* Unified ecosystem lockup (05-screens): gold wsa-mark 26px +

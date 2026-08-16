@@ -18,6 +18,7 @@ export type BrowseCourse = {
   instructorName: string
   instructorAvatarUrl: string | null
   level: "beginner" | "intermediate" | "advanced"
+  category: string
   pricing: "free" | "paid"
   price: number | null
   status: string
@@ -133,6 +134,7 @@ export async function fetchBrowseCourses(options?: {
         instructorName: `${instructor.firstName} ${instructor.lastName}`,
         instructorAvatarUrl: instructor.avatarUrl,
         level: course.level as "beginner" | "intermediate" | "advanced",
+        category: course.category || "",
         pricing: course.pricing as "free" | "paid",
         price: course.price,
         status: course.status,
@@ -414,6 +416,7 @@ export async function fetchOtherCourses(excludeCourseId: string): Promise<Browse
         instructorName: `${instructor.firstName} ${instructor.lastName}`,
         instructorAvatarUrl: instructor.avatarUrl,
         level: course.level as "beginner" | "intermediate" | "advanced",
+        category: course.category || "",
         pricing: course.pricing as "free" | "paid",
         price: course.price,
         status: course.status,

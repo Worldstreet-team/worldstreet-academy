@@ -465,3 +465,74 @@ async function updateCourseRating(courseId: string) {
     },
   })
 }
+
+// ============================================================================
+// LANDING TESTIMONIALS
+// ============================================================================
+
+export type LandingReview = {
+  id: string
+  rating: number
+  title: string | null
+  content: string
+  reviewerName: string
+  reviewerAvatarUrl: string | null
+  courseTitle: string
+  courseId: string
+}
+
+/**
+ * Real testimonials for the landing page: approved 4–5★ reviews that actually
+ * say something, best-first. The landing hides the section below 3 — the same
+ * floors principle as its stats. Nothing here is ever typed in by hand.
+ */
+export async function fetchLandingReviews(limit = 6): Promise<LandingReview[]> {
+  try {
+    await connectDB()
+
+    const reviews = await Review.find({
+      isApproved: true,
+      isHidden: false,
+      rating: { $gte: 4 },
+      content: { $nin: [null, ""] },
+    })
+      .populate("user", "firstName lastName avatarUrl")
+      .populate("course", "title status")
+      .sort({ rating: -1, helpfulCount: -1, createdAt: -1 })
+      .limit(limit * 2) // room to drop reviews of unpublished courses below
+      .lean()
+
+    return reviews
+      .map((r) => {
+        const user = r.user as unknown as {
+          firstName?: string
+          lastName?: string
+          avatarUrl?: string | null
+        } | null
+        const course = r.course as unknown as {
+          _id: { toString(): string }
+          title?: string
+          status?: string
+        } | null
+        if (!course || course.status !== "published") return null
+        const name = user
+          ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim()
+          : ""
+        return {
+          id: r._id.toString(),
+          rating: r.rating,
+          title: r.title ?? null,
+          content: r.content ?? "",
+          reviewerName: name || "WorldStreet learner",
+          reviewerAvatarUrl: user?.avatarUrl ?? null,
+          courseTitle: course.title ?? "",
+          courseId: course._id.toString(),
+        }
+      })
+      .filter((r): r is LandingReview => r !== null && r.content.length > 0)
+      .slice(0, limit)
+  } catch (error) {
+    console.error("Fetch landing reviews error:", error)
+    return []
+  }
+}
