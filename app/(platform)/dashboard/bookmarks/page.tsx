@@ -87,8 +87,6 @@ export default function BookmarksPage() {
                       href={`/dashboard/courses/${course.courseId}`}
                       title={course.courseTitle}
                       thumbnailUrl={course.courseThumbnail}
-                      instructorName={course.instructorName}
-                      instructorAvatarUrl={course.instructorAvatarUrl}
                       price={course.price}
                       pricing={course.pricing}
                       rating={course.rating}

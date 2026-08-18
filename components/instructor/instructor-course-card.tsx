@@ -53,6 +53,7 @@ export function InstructorCourseCard({
         rating={course.rating}
         level={course.level}
         totalLessons={course.totalLessons}
+        showLessonCount
         totalDuration={course.totalDuration}
         enrolledCount={course.enrolledCount}
       />

@@ -183,7 +183,7 @@ export default function BrowseCoursesPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{course.title}</p>
                     <p className="text-[11px] text-muted-foreground truncate">
-                      {course.instructorName} · {course.totalLessons} lessons · <span className="capitalize">{course.level}</span>
+                      {course.pricing === "free" ? "Free" : `$${course.price}`}
                     </p>
                   </div>
                   <Badge

@@ -173,7 +173,7 @@ function useCommandItems(courses: BrowseCourse[], isInstructor: boolean) {
   const courseItems: CommandItem[] = courses.slice(0, 8).map((c) => ({
     id: `course-${c.id}`,
     label: c.title,
-    description: `${c.instructorName} · ${c.totalLessons} lessons`,
+    description: c.pricing === "free" ? "Free" : `$${c.price}`,
     icon: BookOpenIcon,
     thumbnail: c.thumbnailUrl,
     action: () => router.push(`/dashboard/courses/${c.id}`),

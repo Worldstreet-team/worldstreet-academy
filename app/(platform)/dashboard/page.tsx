@@ -250,8 +250,6 @@ export default function DashboardPage() {
                     href={`/dashboard/courses/${enrollment.courseId}/learn/${enrollment.resumeLessonId ?? enrollment.firstLessonId ?? "first"}`}
                     title={enrollment.courseTitle}
                     thumbnailUrl={enrollment.courseThumbnail}
-                    instructorName={enrollment.instructorName}
-                    instructorAvatarUrl={enrollment.instructorAvatarUrl}
                     progress={enrollment.progress}
                   />
                 ))}
@@ -281,8 +279,6 @@ export default function DashboardPage() {
                     href={`/dashboard/courses/${course.id}`}
                     title={course.title}
                     thumbnailUrl={course.thumbnailUrl}
-                    instructorName={course.instructorName}
-                    instructorAvatarUrl={course.instructorAvatarUrl}
                     price={course.price}
                     pricing={course.pricing}
                     rating={course.rating}
@@ -317,8 +313,6 @@ export default function DashboardPage() {
                       href={`/dashboard/courses/${bookmark.courseId}`}
                       title={bookmark.courseTitle}
                       thumbnailUrl={bookmark.courseThumbnail}
-                      instructorName={bookmark.instructorName}
-                      instructorAvatarUrl={bookmark.instructorAvatarUrl}
                       price={bookmark.price}
                       pricing={bookmark.pricing}
                       rating={bookmark.rating}

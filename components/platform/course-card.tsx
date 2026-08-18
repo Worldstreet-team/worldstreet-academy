@@ -2,7 +2,6 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { levelChipStyle } from "@/components/shared/level-badge"
 import { AvailabilityCountdown } from "@/components/shared/availability-countdown"
 import { abbreviateCount } from "@/lib/utils"
@@ -16,8 +15,8 @@ import { ArrowRightIcon, BookmarkIcon, CheckIcon, PlayIcon, StarIcon } from "luc
  * - Cover 2:1 with a bottom scrim (imagery rule: 35% dark when text sits on
  *   imagery) carrying the lessons·duration pill, so the busy photographic
  *   covers stop fighting the body copy.
- * - Body: title SemiBold 15 (2-line slot so grid rows align), Avatar S +
- *   instructor caption.
+ * - Body: title SemiBold 15 (2-line slot so grid rows align). No instructor
+ *   caption and no lesson count — the catalogue has neither yet.
  * - Footer: enrolled → 4px brand progress rail + "N% complete" + gold action;
  *   browse → gold price, orange star (always #F97316 filled), level badge.
  *
@@ -34,22 +33,11 @@ function formatDuration(totalMinutes: number): string {
   return `${h}h ${m}m`
 }
 
-function initials(name: string) {
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase()
-}
-
 
 type CourseCardProps = {
   href: string
   title: string
   thumbnailUrl?: string | null
-  instructorName?: string
-  instructorAvatarUrl?: string | null
   /** Enrolled variant: 0–100 renders the progress rail + caption. */
   progress?: number
   /** Browse variant. */
@@ -58,6 +46,9 @@ type CourseCardProps = {
   rating?: number | null
   level?: string
   totalLessons?: number
+  /** Owner surfaces only (instructor/admin authoring). Student-facing
+   *  cards stay off: the new programs carry no curriculum yet. */
+  showLessonCount?: boolean
   /** Minutes. */
   totalDuration?: number
   enrolledCount?: number
@@ -72,14 +63,13 @@ export function CourseCard({
   href,
   title,
   thumbnailUrl,
-  instructorName,
-  instructorAvatarUrl,
   progress,
   price,
   pricing,
   rating,
   level,
   totalLessons,
+  showLessonCount = false,
   totalDuration,
   enrolledCount,
   isBookmarked,
@@ -89,8 +79,11 @@ export function CourseCard({
   const showProgress = typeof progress === "number" && !comingSoonAt
   const isComplete = progress === 100
   const duration = formatDuration(totalDuration ?? 0)
+  // Student-facing cards show no lesson count: the new programs carry no
+  // curriculum yet and "0 lessons" is worse than saying nothing. Owner
+  // surfaces opt back in, where the count is the point.
   const coverMeta = [
-    totalLessons ? `${totalLessons} lessons` : null,
+    showLessonCount && totalLessons ? `${totalLessons} lessons` : null,
     duration || null,
   ].filter(Boolean)
 
@@ -166,18 +159,6 @@ export function CourseCard({
           <h3 className="line-clamp-2 min-h-[2.6em] text-[15px] font-semibold leading-[1.3] text-ws-primary">
             {title}
           </h3>
-
-          {instructorName && (
-            <div className="mt-2.5 flex items-center gap-2">
-              <Avatar className="h-6 w-6 shrink-0 ring-1 ring-ws-hairline">
-                {instructorAvatarUrl && <AvatarImage src={instructorAvatarUrl} alt="" />}
-                <AvatarFallback className="bg-ws-chip text-[9px] text-ws-muted">
-                  {initials(instructorName)}
-                </AvatarFallback>
-              </Avatar>
-              <span className="truncate text-[13px] text-ws-muted">{instructorName}</span>
-            </div>
-          )}
 
           {/* Footer */}
           <div className="mt-auto pt-4">

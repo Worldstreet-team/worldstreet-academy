@@ -3,8 +3,8 @@ import connectDB from "@/lib/db"
 import { Meeting, User } from "@/lib/db/models"
 import { notifyUser } from "@/lib/notify"
 import { sendInterviewReminderEmail } from "@/lib/email"
+import { APP_URL } from "@/lib/app-url"
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://academy.worldstreetgold.com"
 
 /**
  * Scheduled-meeting reminders — T-24h and T-1h, for interviews and any other

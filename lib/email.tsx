@@ -15,6 +15,7 @@ import {
   Row,
   Column,
 } from "@react-email/components"
+import { APP_URL } from "@/lib/app-url"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -810,7 +811,6 @@ export async function sendMeetingInviteEmail(
 
 /* ─── Course enrollment lifecycle ─── */
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://academy.worldstreetgold.com"
 
 export type EnrollmentEmailData = {
   to: string

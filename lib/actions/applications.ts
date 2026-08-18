@@ -25,8 +25,8 @@ import {
   sendSlotsProposedEmail,
 } from "@/lib/email"
 import type { IScorecard, RejectionReason } from "@/lib/db/models"
+import { APP_URL } from "@/lib/app-url"
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://academy.worldstreetgold.com"
 const PAGE_SIZE = 20
 
 /* ═══════════════════════ Shared types ═══════════════════════ */

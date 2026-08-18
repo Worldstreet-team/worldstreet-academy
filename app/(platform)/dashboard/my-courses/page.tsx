@@ -138,8 +138,6 @@ export default function MyCoursesPage() {
                         }
                         title={course.courseTitle}
                         thumbnailUrl={course.courseThumbnail}
-                        instructorName={course.instructorName}
-                        instructorAvatarUrl={course.instructorAvatarUrl}
                         progress={course.progress}
                         comingSoonAt={preLaunch ? course.courseAvailableAt : null}
                       />
