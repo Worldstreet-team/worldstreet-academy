@@ -22,7 +22,8 @@ import { getCurrentUser } from "@/lib/auth/actions"
 import { courseAvailability } from "@/lib/types/course"
 import { sendEnrollmentConfirmationEmail } from "@/lib/email"
 import { notifyAdmins, notifyUser } from "@/lib/notify"
-import { PACKAGE_KEYS, packageFor } from "@/lib/entitlements"
+import { getCourseAccess } from "@/lib/course-access"
+import { PACKAGE_KEYS, canAccessLesson, packageFor } from "@/lib/entitlements"
 import {
   createWalletCharge,
   refundWalletCharge,
@@ -857,5 +858,107 @@ export async function getCourseStudents(
   } catch (error) {
     console.error("Get course students error:", error)
     return { success: false, error: "Failed to get students" }
+  }
+}
+
+// ============================================================================
+// CHECKOUT CONFIRMATION (spec §12, §17 "Enrollment confirmed")
+// ============================================================================
+
+export type CheckoutConfirmation = {
+  courseId: string
+  courseTitle: string
+  packageName: string | null
+  /** First lesson this package opens — "Start learning" lands there; null when the course has none. */
+  startLessonId: string | null
+  /** Executive buyers who haven't sent their onboarding intake yet (D4). */
+  needsIntake: boolean
+  /** Executive buyers whose intake is already with their mentor. */
+  intakeSent: boolean
+}
+
+/** What the success page confirms. null when the caller has no access-granting enrollment on the course. */
+export async function getCheckoutConfirmation(courseId: string): Promise<CheckoutConfirmation | null> {
+  try {
+    await connectDB()
+    const user = await getCurrentUser()
+    if (!user) return null
+
+    const access = await getCourseAccess(user.id, courseId)
+    if (!access) return null
+
+    const [course, enrollment, lessons] = await Promise.all([
+      Course.findById(courseId).select("title").lean(),
+      Enrollment.findById(access.enrollmentId).select("mentorshipIntake").lean(),
+      Lesson.find({ course: courseId }).sort({ order: 1 }).select("_id minPackageKey isFree").lean(),
+    ])
+    if (!course) return null
+
+    const start = lessons.find((lesson) => canAccessLesson(access.course, lesson, access))
+    const executive = access.packageKey === "executive" && access.entitlements.mentorship
+    return {
+      courseId,
+      courseTitle: course.title,
+      packageName: access.packageName,
+      startLessonId: start ? start._id.toString() : null,
+      needsIntake: executive && !enrollment?.mentorshipIntake,
+      intakeSent: executive && Boolean(enrollment?.mentorshipIntake),
+    }
+  } catch (error) {
+    console.error("Get checkout confirmation error:", error)
+    return null
+  }
+}
+
+const IntakeInput = z.object({
+  goals: z.string().trim().min(10, "Tell your mentor a little more about your goals").max(2000, "Keep your goals under 2,000 characters"),
+  availability: z.string().trim().min(2, "Share when you're usually available").max(500, "Keep availability under 500 characters"),
+})
+
+/**
+ * One-time Executive onboarding intake (D4). Goals and availability are stored
+ * on the enrollment and sent to the instructor, who schedules onboarding —
+ * session booking itself is Phase 7.
+ */
+export async function submitMentorshipIntake(
+  courseId: string,
+  input: { goals: string; availability: string }
+): Promise<{ success: true } | { success: false; error: string }> {
+  try {
+    await connectDB()
+    const user = await getCurrentUser()
+    if (!user) return { success: false, error: "You need to be signed in" }
+
+    const access = await getCourseAccess(user.id, courseId)
+    if (!access || access.packageKey !== "executive" || !access.entitlements.mentorship) {
+      return { success: false, error: "Your package doesn't include mentorship" }
+    }
+
+    const parsed = IntakeInput.safeParse(input)
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? "Check the form and try again" }
+    }
+
+    // The filter only matches an enrollment without an intake: one-time, race-safe.
+    const updated = await Enrollment.findOneAndUpdate(
+      { _id: access.enrollmentId, mentorshipIntake: null },
+      { $set: { mentorshipIntake: { ...parsed.data, submittedAt: new Date() } } },
+      { new: true }
+    )
+    if (!updated) return { success: false, error: "You've already sent your intake" }
+
+    const buyer = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.email
+    void notifyUser(access.course.instructorId, {
+      type: "course",
+      title: "Executive intake received",
+      body: `${buyer}: ${parsed.data.goals}`.slice(0, 500),
+      href: `/instructor/courses/${courseId}`,
+    })
+
+    revalidatePath("/dashboard/checkout/success")
+    return { success: true }
+  } catch (error) {
+    console.error("Submit mentorship intake error:", error)
+    return { success: false, error: "Couldn't send your intake — try again" }
   }
 }

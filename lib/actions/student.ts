@@ -331,95 +331,114 @@ const NO_ENTITLEMENTS: IPackageEntitlements = {
   prioritySupport: false,
 }
 
+/** Shared finder behind the program page (by slug) and checkout (by id). */
+async function findProgram(filter: { slug: string } | { _id: string }): Promise<ProgramDetail | null> {
+  const course = await Course.findOne({ ...filter, status: "published" })
+    .populate("instructor", "firstName lastName avatarUrl bio instructorProfile")
+    .lean()
+
+  if (!course) return null
+
+  const instructor = course.instructor as unknown as {
+    _id: { toString(): string }
+    firstName: string
+    lastName?: string
+    avatarUrl: string | null
+    bio: string | null
+    instructorProfile?: { headline: string | null; totalStudents: number }
+  } | null
+
+  // Guard against missing instructor (deleted user, etc.)
+  if (!instructor) return null
+
+  const whatYouWillLearn = course.whatYouWillLearn ?? []
+  const enabled = (course.packages ?? [])
+    .filter((p) => p.enabled)
+    .sort((a, b) => PACKAGE_RANK[a.key] - PACKAGE_RANK[b.key])
+
+  const packages: PublicPackage[] =
+    enabled.length > 0
+      ? enabled.map((p) => ({
+          key: p.key,
+          name: p.name,
+          tagline: p.tagline ?? "",
+          price: p.price,
+          features: p.features ?? [],
+          highlight: Boolean(p.highlight),
+          ctaLabel: p.ctaLabel ?? null,
+          entitlements: { ...NO_ENTITLEMENTS, ...p.entitlements },
+        }))
+      : [
+          {
+            key: "standard",
+            name: "Full program",
+            tagline: "",
+            price: course.pricing === "free" ? 0 : course.price ?? 0,
+            features: whatYouWillLearn,
+            highlight: false,
+            ctaLabel: null,
+            entitlements: FULL_ACCESS,
+          },
+        ]
+
+  return {
+    id: course._id.toString(),
+    title: course.title,
+    slug: course.slug,
+    description: course.description,
+    shortDescription: course.shortDescription ?? null,
+    thumbnailUrl: course.thumbnailUrl,
+    instructorId: instructor._id.toString(),
+    instructorName: `${instructor.firstName} ${instructor.lastName || ""}`.trim(),
+    instructorAvatarUrl: instructor.avatarUrl,
+    level: course.level as "beginner" | "intermediate" | "advanced",
+    category: course.category || "",
+    school: isSchoolSlug(course.school) ? course.school : null,
+    pricing: course.pricing as "free" | "paid",
+    price: course.price,
+    tierCount: enabled.length,
+    status: course.status,
+    availableAt: course.availableAt ? course.availableAt.toISOString() : null,
+    preEnrollEnabled: course.preEnrollEnabled ?? true,
+    totalLessons: course.totalLessons || 0,
+    totalDuration: course.totalDuration || 0,
+    enrolledCount: course.enrolledCount || 0,
+    rating: course.rating?.average || null,
+    ratingCount: course.rating?.count || 0,
+    whatYouWillLearn,
+    requirements: course.requirements ?? [],
+    targetAudience: course.targetAudience ?? [],
+    instructorHeadline: instructor.instructorProfile?.headline || null,
+    instructorBio: instructor.bio,
+    instructorTotalStudents: instructor.instructorProfile?.totalStudents || 0,
+    packages,
+  }
+}
+
 /**
  * Fetch one published program by slug for the public program page.
  */
 export async function fetchProgramBySlug(slug: string): Promise<ProgramDetail | null> {
   try {
     await connectDB()
-
-    const course = await Course.findOne({ slug, status: "published" })
-      .populate("instructor", "firstName lastName avatarUrl bio instructorProfile")
-      .lean()
-
-    if (!course) return null
-
-    const instructor = course.instructor as unknown as {
-      _id: { toString(): string }
-      firstName: string
-      lastName?: string
-      avatarUrl: string | null
-      bio: string | null
-      instructorProfile?: { headline: string | null; totalStudents: number }
-    } | null
-
-    // Guard against missing instructor (deleted user, etc.)
-    if (!instructor) return null
-
-    const whatYouWillLearn = course.whatYouWillLearn ?? []
-    const enabled = (course.packages ?? [])
-      .filter((p) => p.enabled)
-      .sort((a, b) => PACKAGE_RANK[a.key] - PACKAGE_RANK[b.key])
-
-    const packages: PublicPackage[] =
-      enabled.length > 0
-        ? enabled.map((p) => ({
-            key: p.key,
-            name: p.name,
-            tagline: p.tagline ?? "",
-            price: p.price,
-            features: p.features ?? [],
-            highlight: Boolean(p.highlight),
-            ctaLabel: p.ctaLabel ?? null,
-            entitlements: { ...NO_ENTITLEMENTS, ...p.entitlements },
-          }))
-        : [
-            {
-              key: "standard",
-              name: "Full program",
-              tagline: "",
-              price: course.pricing === "free" ? 0 : course.price ?? 0,
-              features: whatYouWillLearn,
-              highlight: false,
-              ctaLabel: null,
-              entitlements: FULL_ACCESS,
-            },
-          ]
-
-    return {
-      id: course._id.toString(),
-      title: course.title,
-      slug: course.slug,
-      description: course.description,
-      shortDescription: course.shortDescription ?? null,
-      thumbnailUrl: course.thumbnailUrl,
-      instructorId: instructor._id.toString(),
-      instructorName: `${instructor.firstName} ${instructor.lastName || ""}`.trim(),
-      instructorAvatarUrl: instructor.avatarUrl,
-      level: course.level as "beginner" | "intermediate" | "advanced",
-      category: course.category || "",
-      school: isSchoolSlug(course.school) ? course.school : null,
-      pricing: course.pricing as "free" | "paid",
-      price: course.price,
-      tierCount: enabled.length,
-      status: course.status,
-      availableAt: course.availableAt ? course.availableAt.toISOString() : null,
-      preEnrollEnabled: course.preEnrollEnabled ?? true,
-      totalLessons: course.totalLessons || 0,
-      totalDuration: course.totalDuration || 0,
-      enrolledCount: course.enrolledCount || 0,
-      rating: course.rating?.average || null,
-      ratingCount: course.rating?.count || 0,
-      whatYouWillLearn,
-      requirements: course.requirements ?? [],
-      targetAudience: course.targetAudience ?? [],
-      instructorHeadline: instructor.instructorProfile?.headline || null,
-      instructorBio: instructor.bio,
-      instructorTotalStudents: instructor.instructorProfile?.totalStudents || 0,
-      packages,
-    }
+    return await findProgram({ slug })
   } catch (error) {
     console.error("Fetch program by slug error:", error)
+    return null
+  }
+}
+
+/**
+ * The same program by course id — checkout's order summary and package
+ * switcher. Invalid ids and unpublished courses resolve to null.
+ */
+export async function fetchProgramById(courseId: string): Promise<ProgramDetail | null> {
+  try {
+    if (!mongoose.isValidObjectId(courseId)) return null
+    await connectDB()
+    return await findProgram({ _id: courseId })
+  } catch (error) {
+    console.error("Fetch program by id error:", error)
     return null
   }
 }

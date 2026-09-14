@@ -9,8 +9,23 @@ import { Separator } from "@/components/ui/separator"
 import { useUser } from "@/components/providers/user-provider"
 import { purchaseCourse, checkEnrollment } from "@/lib/actions/enrollments"
 import { getMyWalletBalance, type MyWalletBalance } from "@/lib/actions/wallet"
-import { fetchPublicCourse, type PublicCourse } from "@/lib/actions/student"
-import { BookOpenIcon, ChevronLeftIcon, CircleCheckIcon, ClockIcon, LoaderCircleIcon, ShieldCheckIcon, UsersIcon } from "lucide-react"
+import { fetchProgramById, type ProgramDetail, type PublicPackage } from "@/lib/actions/student"
+import { PACKAGE_LABEL } from "@/lib/entitlements"
+import { SCHOOL_BY_SLUG } from "@/lib/schools"
+import { cn } from "@/lib/utils"
+import {
+  BookOpenIcon,
+  CheckIcon,
+  ChevronLeftIcon,
+  CircleCheckIcon,
+  LoaderCircleIcon,
+  ShieldCheckIcon,
+} from "lucide-react"
+
+/** Package prices are whole dollars. */
+function dollars(price: number): string {
+  return price === 0 ? "Free" : `$${price.toLocaleString("en-US")}`
+}
 
 export default function CheckoutPage() {
   const router = useRouter()
@@ -18,7 +33,8 @@ export default function CheckoutPage() {
   const user = useUser()
 
   const courseId = searchParams.get("courseId")
-  const [course, setCourse] = useState<PublicCourse | null>(null)
+  const packageParam = searchParams.get("package")
+  const [program, setProgram] = useState<ProgramDetail | null>(null)
   const [wallet, setWallet] = useState<MyWalletBalance | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -31,22 +47,36 @@ export default function CheckoutPage() {
       setIsLoading(false)
       return
     }
-    // Fetch course, enrollment state and central wallet balance in parallel
+    // Fetch program, enrollment state and central wallet balance in parallel
     Promise.all([
-      fetchPublicCourse(courseId),
+      fetchProgramById(courseId),
       user ? checkEnrollment(user.id, courseId) : Promise.resolve({ isEnrolled: false }),
       getMyWalletBalance(),
-    ]).then(([c, enrollment, walletBalance]) => {
+    ]).then(([p, enrollment, walletBalance]) => {
       if (enrollment.isEnrolled) {
         // Already enrolled — skip checkout entirely
         router.replace(`/dashboard/checkout/success?courseId=${courseId}`)
         return
       }
-      setCourse(c)
+      setProgram(p)
       setWallet(walletBalance)
       setIsLoading(false)
     })
   }, [courseId, user, router])
+
+  // The URL carries the package, so the wallet-funding round trip (which
+  // returns to this exact URL) keeps the buyer's choice. A single-tier program
+  // needs no choice.
+  const packages = program?.packages ?? []
+  const selected: PublicPackage | null =
+    packages.length === 1 ? packages[0] : (packages.find((p) => p.key === packageParam) ?? null)
+
+  function choosePackage(key: PublicPackage["key"]) {
+    if (!courseId) return
+    setError(null)
+    setShortfallMinor(null)
+    router.replace(`/dashboard/checkout?courseId=${courseId}&package=${key}`, { scroll: false })
+  }
 
   function openFunding() {
     if (!wallet) return
@@ -69,20 +99,25 @@ export default function CheckoutPage() {
   }
 
   async function handlePurchase() {
-    if (!course || !user) return
+    if (!program || !user || !selected) return
     setIsProcessing(true)
     setError(null)
     setShortfallMinor(null)
 
     try {
-      // The server derives identity from the session and price from the course
-      // record; enrollment is only granted after the central Worldstreet wallet
-      // confirms the debit. No optimistic success.
-      const result = await purchaseCourse({ courseId: course.id })
+      // The server derives identity from the session and the price from the
+      // course's package; enrollment is only granted after the central
+      // Worldstreet wallet confirms the debit. No optimistic success. A program
+      // without a package ladder (tierCount 0) shows one synthesized tier — the
+      // server ignores a key there, so none is sent.
+      const result = await purchaseCourse({
+        courseId: program.id,
+        packageKey: program.tierCount > 0 ? selected.key : undefined,
+      })
 
       if (result.success) {
         setIsSuccess(true)
-        router.push(`/dashboard/checkout/success?courseId=${course.id}`)
+        router.push(`/dashboard/checkout/success?courseId=${program.id}`)
       } else {
         if (result.code === "insufficient_funds") {
           setShortfallMinor(result.shortfallMinor ?? null)
@@ -105,19 +140,19 @@ export default function CheckoutPage() {
       <>
         <Topbar title="Checkout" />
         <div className="flex-1 flex items-center justify-center">
-          <LoaderCircleIcon  size={24} className="animate-spin text-muted-foreground" />
+          <LoaderCircleIcon size={24} className="animate-spin text-ws-muted" />
         </div>
       </>
     )
   }
 
-  if (!course || !courseId) {
+  if (!program || !courseId) {
     return (
       <>
         <Topbar title="Checkout" />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center space-y-3">
-            <p className="text-sm text-muted-foreground">Course not found</p>
+            <p className="text-sm text-ws-muted">Program not found</p>
             <Button variant="outline" onClick={() => router.back()}>
               Go Back
             </Button>
@@ -127,10 +162,9 @@ export default function CheckoutPage() {
     )
   }
 
-  const price = course.pricing === "free" ? 0 : (course.price ?? 0)
-  const totalHours = Math.floor(course.totalDuration / 60)
-  const totalMins = course.totalDuration % 60
-  const durationLabel = totalHours > 0 ? `${totalHours}h ${totalMins}m` : `${totalMins}m`
+  const price = selected ? selected.price : null
+  const school = program.school ? SCHOOL_BY_SLUG[program.school] : null
+  const multiTier = packages.length > 1
 
   return (
     <>
@@ -140,90 +174,140 @@ export default function CheckoutPage() {
           {/* Back */}
           <button
             onClick={() => router.back()}
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="flex items-center gap-1.5 text-sm text-ws-muted hover:text-ws-primary transition-colors"
           >
-            <ChevronLeftIcon  size={14} />
-            Back to course
+            <ChevronLeftIcon size={14} />
+            Back
           </button>
 
-          {/* Course Summary Card */}
-          <div className="rounded-lg border border-ws-hairline bg-card overflow-hidden">
-            {/* Thumbnail */}
-            <div className="relative aspect-[21/9] bg-muted">
-              {course.thumbnailUrl ? (
-                <Image
-                  src={course.thumbnailUrl}
-                  alt={course.title}
-                  fill
-                  className="object-cover"
-                />
+          {/* Program */}
+          <div className="rounded-lg border border-ws-hairline bg-ws-surface overflow-hidden">
+            <div className="relative aspect-[21/9] bg-ws-raised">
+              {program.thumbnailUrl ? (
+                <Image src={program.thumbnailUrl} alt={program.title} fill className="object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <BookOpenIcon  size={32} className="text-muted-foreground/30" />
+                  <BookOpenIcon size={32} className="text-ws-subtle" />
                 </div>
               )}
             </div>
-
-            <div className="p-4 space-y-3">
-              <div>
-                <h1 className="text-base font-semibold">{course.title}</h1>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  by {course.instructorName}
-                </p>
-              </div>
-
-              <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <BookOpenIcon  size={12} />
-                  {course.totalLessons} lessons
-                </span>
-                <span className="flex items-center gap-1">
-                  <ClockIcon  size={12} />
-                  {durationLabel}
-                </span>
-                <span className="flex items-center gap-1">
-                  <UsersIcon  size={12} />
-                  {course.enrolledCount.toLocaleString()} students
-                </span>
-              </div>
+            <div className="p-4">
+              {school && (
+                <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-ws-muted">{school.short}</p>
+              )}
+              <h1 className="mt-1 text-base font-semibold text-ws-primary">{program.title}</h1>
+              <p className="mt-0.5 text-xs text-ws-muted">
+                by {program.instructorName} · <span className="tabular-nums">{program.totalLessons}</span> lessons
+              </p>
             </div>
           </div>
+
+          {/* Package switcher — doubles as the ladder when no package is chosen */}
+          {multiTier && (
+            <fieldset className="space-y-2">
+              <legend className="mb-2 text-sm font-semibold text-ws-primary">
+                {selected ? "Your package" : "Choose your package"}
+              </legend>
+              {packages.map((pkg) => {
+                const active = pkg.key === selected?.key
+                return (
+                  <label
+                    key={pkg.key}
+                    className={cn(
+                      "flex cursor-pointer items-center gap-3 rounded-lg border p-4 transition-colors duration-[var(--ws-motion-fast)] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ws-brand/40",
+                      active ? "border-ws-brand/40 bg-ws-raised" : "border-ws-hairline bg-ws-surface hover:bg-ws-raised"
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="package"
+                      value={pkg.key}
+                      checked={active}
+                      onChange={() => choosePackage(pkg.key)}
+                      className="sr-only"
+                    />
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border",
+                        active ? "border-ws-brand bg-ws-brand text-ws-brand-on" : "border-ws-hairline"
+                      )}
+                    >
+                      {active && <CheckIcon size={10} strokeWidth={3} />}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-ws-muted">
+                        {PACKAGE_LABEL[pkg.key]}
+                      </span>
+                      <span className="block truncate text-sm font-medium text-ws-primary">{pkg.name}</span>
+                      {pkg.tagline && <span className="block truncate text-xs text-ws-muted">{pkg.tagline}</span>}
+                    </span>
+                    <span className="font-display text-lg font-light tabular-nums text-ws-primary">
+                      {dollars(pkg.price)}
+                    </span>
+                  </label>
+                )
+              })}
+            </fieldset>
+          )}
+
+          {/* What the chosen package includes (collapsed) */}
+          {selected && selected.features.length > 0 && (
+            <details className="rounded-lg border border-ws-hairline bg-ws-surface px-4 py-3">
+              <summary className="cursor-pointer text-sm font-medium text-ws-primary">
+                What&apos;s included <span className="tabular-nums text-ws-muted">({selected.features.length})</span>
+              </summary>
+              <ul className="mt-3 space-y-2">
+                {selected.features.map((feature, i) => (
+                  <li key={`${selected.key}-${i}`} className="flex items-start gap-2 text-[13px] leading-relaxed text-ws-muted">
+                    <CheckIcon size={14} className="mt-0.5 shrink-0" aria-hidden />
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
 
           {/* Order Summary */}
-          <div className="rounded-lg border border-ws-hairline bg-card p-4 space-y-4">
-            <h2 className="text-sm font-semibold">Order Summary</h2>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Course price</span>
-                <span className="font-medium">
-                  {price === 0 ? "Free" : `$${price.toFixed(2)}`}
-                </span>
-              </div>
-              {price > 0 && wallet?.enabled && (
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Worldstreet balance</span>
-                  <span
-                    className={`font-medium ${wallet.usdAvailable >= price ? "" : "text-ws-danger"}`}
-                  >
-                    ${wallet.usdAvailable.toFixed(2)}
+          {selected && price !== null && (
+            <div className="rounded-lg border border-ws-hairline bg-ws-surface p-4 space-y-4">
+              <h2 className="text-sm font-semibold text-ws-primary">Order summary</h2>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="min-w-0 truncate text-ws-muted">
+                    {program.tierCount > 0 ? selected.name : "Program price"}
+                  </span>
+                  <span className="font-medium tabular-nums text-ws-primary">{dollars(price)}</span>
+                </div>
+                {price > 0 && wallet?.enabled && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-ws-muted">Worldstreet balance</span>
+                    <span
+                      className={cn(
+                        "font-medium tabular-nums",
+                        wallet.usdAvailable >= price ? "text-ws-primary" : "text-ws-danger"
+                      )}
+                    >
+                      ${wallet.usdAvailable.toFixed(2)}
+                    </span>
+                  </div>
+                )}
+                <Separator />
+                <div className="flex items-baseline justify-between">
+                  <span className="text-sm font-semibold text-ws-primary">Total</span>
+                  <span className="font-display text-3xl font-light tabular-nums tracking-[-0.02em] text-ws-primary">
+                    {dollars(price)}
                   </span>
                 </div>
-              )}
-              <Separator />
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-semibold">Total</span>
-                <span className="text-lg font-bold">
-                  ${price.toFixed(2)}
-                </span>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Secure checkout note */}
-          <div className="flex items-center gap-2 justify-center text-xs text-muted-foreground/60">
-            <ShieldCheckIcon  size={13} />
+          <div className="flex items-center gap-2 justify-center text-xs text-ws-subtle">
+            <ShieldCheckIcon size={13} />
             <span>
-              {price === 0
+              {!price
                 ? "Secure checkout"
                 : "Paid from your Worldstreet wallet — funding & withdrawals live on the Worldstreet dashboard"}
             </span>
@@ -232,13 +316,10 @@ export default function CheckoutPage() {
           {/* Insufficient funds */}
           {shortfallMinor !== null && (
             <div className="rounded-lg bg-ws-warning/10 border border-ws-warning/20 px-4 py-3 space-y-2">
-              <p className="text-sm font-medium text-ws-warning dark:text-ws-warning">
-                Insufficient balance
-              </p>
-              <p className="text-xs text-muted-foreground">
-                You need ${(shortfallMinor / 100).toFixed(2)} more in your Worldstreet wallet to buy
-                this course. Top up on the Worldstreet dashboard, then come back — your order will
-                still be here.
+              <p className="text-sm font-medium text-ws-warning">Insufficient balance</p>
+              <p className="text-xs text-ws-muted">
+                You need ${(shortfallMinor / 100).toFixed(2)} more in your Worldstreet wallet for this
+                package. Top up on the Worldstreet dashboard, then come back — your order will still be here.
               </p>
               <Button variant="outline" size="sm" className="w-full" onClick={openFunding}>
                 Fund my Worldstreet wallet
@@ -256,24 +337,26 @@ export default function CheckoutPage() {
           {/* CTA */}
           <Button
             onClick={handlePurchase}
-            disabled={isProcessing || isSuccess}
+            disabled={!selected || isProcessing || isSuccess}
             className="w-full h-12 text-sm font-semibold gap-2"
             size="lg"
           >
             {isSuccess ? (
               <>
-                <CircleCheckIcon  size={16} />
+                <CircleCheckIcon size={16} />
                 Enrolled! Redirecting...
               </>
             ) : isProcessing ? (
               <>
-                <LoaderCircleIcon  size={16} className="animate-spin" />
+                <LoaderCircleIcon size={16} className="animate-spin" />
                 Processing...
               </>
+            ) : !selected || price === null ? (
+              "Choose a package to continue"
             ) : (
               <>
-                <CircleCheckIcon  size={16} />
-                {price === 0 ? "Enroll for Free" : `Pay $${price.toFixed(2)}`}
+                <CircleCheckIcon size={16} />
+                {price === 0 ? "Enrol for free" : `Pay ${dollars(price)}`}
               </>
             )}
           </Button>
