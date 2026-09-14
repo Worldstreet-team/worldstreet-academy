@@ -9,7 +9,7 @@
 
 | Phase | Name | Est. | Status | Report line |
 |---|---|---|---|---|
-| 0 | Foundations — brand, schools taxonomy, package schema | 2–3 d | not started | — |
+| 0 | Foundations — brand, schools taxonomy, package schema | 2–3 d | **done** 2026-09-14 (branch `mastery/phase-0`, 6 code commits, tasks in `docs/plans/mastery-phase-0.md`) | Brand renamed with one shared lockup; 8-school taxonomy + `Course.school`; package/tier schema on course/lesson/enrollment/order + entitlements helper; save action validates school and packages (price derives from packages); catalogue script dry-runs clean and seeds the mock DB (12 programs). Not yet applied to production (Phase 8). |
 | 1 | Public site — homepage, schools index, school pages | 3–4 d | not started | — |
 | 2 | Program page + packages editor + catalogue content | 3–4 d | not started | — |
 | 3 | Checkout + tier commerce + entitlement enforcement | 3–4 d | not started | — |
@@ -67,6 +67,8 @@ Brand: "WorldStreet Academy" appears in 43 code locations; the lockup (mark + "W
 |---|---|---|
 | Phase 3 | Go (`worldstreet-academy/backend`) | Lesson list/detail: hide or lock lessons where `lesson.minPackageKey` outranks `enrollment.packageKey` (null packageKey = full access, grandfathered). Certificate endpoints: refuse when the enrollment's package has `entitlements.certificate === false`. Any mobile purchase path must accept `packageKey` and compute price from `course.packages` — verify whether one exists. |
 | Phase 0 | `../design-system/04-components` | Lockup eyebrow "ACADEMY" → "MASTERY ACADEMY" (D1). |
+| Phase 0 → 8 | Go (`worldstreet-academy/backend`) / mobile | `Course.category` changes vocabulary: the legacy 7-value list (Cryptocurrency, Trading, DeFi, …) becomes the school's short label ("Trading & Financial Markets", …) on every live row once `scripts/mastery-catalogue.mjs --apply` runs in Phase 8. Any mobile filter/grouping keyed on the old strings must switch to `Course.school` (or the new labels) in the same release. |
+| Phase 8 (ordering) | this repo / Coolify | `scripts/mastery-catalogue.mjs --apply` lowers Forex/Crypto scalar `price` to the cheapest package ($49) and raises AI to the spec's $199 — it must run **after** Phase 3's package-aware checkout is deployed (the script refuses price changes without `--allow-price-change`); AI's price change needs product sign-off (D3). |
 | Phase 3 | Coolify | Confirm `WALLET_*` env; add `POST /api/cron/course-live` scheduled task (already in code, not yet scheduled). |
 | Phase 8 | Coolify / Mongo | Run `scripts/mastery-catalogue.mjs --apply` against prod once; verify Go reads `school`/`packages` benignly. |
 | Never | all | Non-additive schema changes; new `role` values; changed Ably payload shapes. |
@@ -184,7 +186,7 @@ Brand: "WorldStreet Academy" appears in 43 code locations; the lockup (mark + "W
 - [ ] One `BrandLockup` component; zero inline lockups; zero "WorldStreet Academy" strings outside comments/docs.
 - [ ] `Course.school`, `Course.packages`, `Lesson.minPackageKey`, `Enrollment.packageKey/packageName`, `Order.packageKey` exist with defaults; existing rows unaffected.
 - [ ] `lib/schools.ts`, `lib/entitlements.ts`, `lib/brand.ts` exist and are the only sources of those facts.
-- [ ] Editor saves a school and packages; `price` auto-derives from packages.
+- [ ] Editor saves a school; the save action accepts `packages` and derives `price` from them (the packages UI itself is Phase 2.3).
 - [ ] `scripts/mastery-catalogue.mjs` dry-runs clean and seeds the mock DB.
 
 ---
