@@ -12,6 +12,7 @@ const STATUS: Record<MyAssessment["status"], { label: string; className: string 
   in_progress: { label: "In progress", className: "bg-ws-warning/10 text-ws-warning" },
   passed: { label: "Passed", className: "bg-ws-success/10 text-ws-success" },
   failed: { label: "Failed", className: "bg-ws-danger/10 text-ws-danger" },
+  locked: { label: "Finish lessons first", className: "bg-ws-chip text-ws-muted" },
 }
 
 /**

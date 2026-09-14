@@ -474,7 +474,7 @@ export type MyAssessment = {
   title: string
   scope: "final" | "lesson"
   lessonId: string | null
-  status: "not_started" | "in_progress" | "passed" | "failed"
+  status: "not_started" | "in_progress" | "passed" | "failed" | "locked"
   href: string
 }
 
@@ -482,7 +482,34 @@ const ASSESSMENT_STATUS_ORDER: Record<MyAssessment["status"], number> = {
   in_progress: 0,
   not_started: 1,
   failed: 2,
-  passed: 3,
+  locked: 3,
+  passed: 4,
+}
+
+type AssessmentAttempt = { _id: Types.ObjectId; status: AttemptStatus; submittedAt: Date | null; createdAt: Date }
+
+/**
+ * The attempt the exam runner itself would treat as authoritative: newest by
+ * `submittedAt` (falling back to `createdAt` for one with none — an in-flight
+ * attempt has neither, so it's filtered out first), ties broken by `_id`.
+ * Mirrors `getStudentExamStatus`'s own "last" lookup so a retake never
+ * disagrees between the tile and the runner.
+ */
+function latestFinishedAttempt(history: AssessmentAttempt[]): AssessmentAttempt | null {
+  let latest: AssessmentAttempt | null = null
+  for (const attempt of history) {
+    if (attempt.status === "in_progress") continue
+    if (!latest) {
+      latest = attempt
+      continue
+    }
+    const time = (attempt.submittedAt ?? attempt.createdAt).getTime()
+    const latestTime = (latest.submittedAt ?? latest.createdAt).getTime()
+    if (time > latestTime || (time === latestTime && attempt._id.toString() > latest._id.toString())) {
+      latest = attempt
+    }
+  }
+  return latest
 }
 
 /**
@@ -490,9 +517,11 @@ const ASSESSMENT_STATUS_ORDER: Record<MyAssessment["status"], number> = {
  * completed enrollments — the dashboard's Assignments tile (D7 lite: the
  * existing exam engine; file submissions are Phase 7). Knowledge checks follow
  * their lesson's tier and the final exam follows `certificate` (the rules
- * behind examPackageLock). Deliberately NOT gated on the `assignments`
- * entitlement, which is reserved for Phase 7 submissions. Four queries in
- * total, whatever the number of courses.
+ * behind examPackageLock); a final also needs 100% progress to start, exactly
+ * like `startExamAttempt` — short of that it's `locked`, never a false
+ * `not_started`. Deliberately NOT gated on the `assignments` entitlement,
+ * which is reserved for Phase 7 submissions. Five bulk queries at most (four
+ * when no knowledge checks), whatever the number of courses.
  */
 export async function getMyAssessments(): Promise<MyAssessment[]> {
   try {
@@ -500,7 +529,7 @@ export async function getMyAssessments(): Promise<MyAssessment[]> {
     if (!user) return []
 
     const enrollments = await Enrollment.find({ user: user.id, status: { $in: ["active", "completed"] } })
-      .select("course packageKey examPassed")
+      .select("course packageKey examPassed progress")
       .lean()
     if (enrollments.length === 0) return []
     const courseIds = enrollments.map((e) => e.course)
@@ -517,16 +546,15 @@ export async function getMyAssessments(): Promise<MyAssessment[]> {
         ? Lesson.find({ _id: { $in: quizLessonIds } }).select("course minPackageKey isFree").lean()
         : Promise.resolve([]),
       ExamAttempt.find({ user: user.id, exam: { $in: exams.map((exam) => exam._id) } })
-        .sort({ createdAt: -1 })
-        .select("exam status")
+        .select("exam status submittedAt createdAt")
         .lean(),
     ])
 
     const coursesById = new Map(courses.map((c) => [c._id.toString(), c]))
     const enrollmentsByCourse = new Map(enrollments.map((e) => [e.course.toString(), e]))
     const lessonsById = new Map(lessons.map((l) => [l._id.toString(), l]))
-    // Newest attempt first per exam (the query sorted by createdAt desc).
-    const attemptsByExam = new Map<string, { status: AttemptStatus }[]>()
+    // Grouped per exam; latestFinishedAttempt() below picks the authoritative one.
+    const attemptsByExam = new Map<string, AssessmentAttempt[]>()
     for (const attempt of attempts) {
       const key = attempt.exam.toString()
       const list = attemptsByExam.get(key) ?? []
@@ -553,15 +581,26 @@ export async function getMyAssessments(): Promise<MyAssessment[]> {
       }
 
       const history = attemptsByExam.get(exam._id.toString()) ?? []
-      const latestFinished = history.find((a) => a.status !== "in_progress")
-      const passed = isQuiz ? history.some((a) => a.status === "passed") : !!enrollment.examPassed
-      const status: MyAssessment["status"] = history.some((a) => a.status === "in_progress")
-        ? "in_progress"
-        : passed
-          ? "passed"
-          : latestFinished && latestFinished.status !== "passed"
-            ? "failed"
+      const inProgress = history.some((a) => a.status === "in_progress")
+      const finished = latestFinishedAttempt(history)
+
+      const status: MyAssessment["status"] = isQuiz
+        ? inProgress
+          ? "in_progress"
+          : finished
+            ? finished.status === "passed"
+              ? "passed"
+              : "failed"
             : "not_started"
+        : enrollment.examPassed
+          ? "passed"
+          : inProgress
+            ? "in_progress"
+            : (enrollment.progress ?? 0) < 100
+              ? "locked"
+              : finished && finished.status !== "passed"
+                ? "failed"
+                : "not_started"
 
       rows.push({
         courseId,
