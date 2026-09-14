@@ -479,6 +479,7 @@ export type LandingReview = {
   reviewerAvatarUrl: string | null
   courseTitle: string
   courseId: string
+  courseSlug: string
 }
 
 /**
@@ -497,7 +498,7 @@ export async function fetchLandingReviews(limit = 6): Promise<LandingReview[]> {
       content: { $nin: [null, ""] },
     })
       .populate("user", "firstName lastName avatarUrl")
-      .populate("course", "title status")
+      .populate("course", "title status slug")
       .sort({ rating: -1, helpfulCount: -1, createdAt: -1 })
       .limit(limit * 2) // room to drop reviews of unpublished courses below
       .lean()
@@ -513,6 +514,7 @@ export async function fetchLandingReviews(limit = 6): Promise<LandingReview[]> {
           _id: { toString(): string }
           title?: string
           status?: string
+          slug?: string
         } | null
         if (!course || course.status !== "published") return null
         const name = user
@@ -527,6 +529,7 @@ export async function fetchLandingReviews(limit = 6): Promise<LandingReview[]> {
           reviewerAvatarUrl: user?.avatarUrl ?? null,
           courseTitle: course.title ?? "",
           courseId: course._id.toString(),
+          courseSlug: course.slug ?? "",
         }
       })
       .filter((r): r is LandingReview => r !== null && r.content.length > 0)

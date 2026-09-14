@@ -50,3 +50,17 @@ export function pricingFromPackages(
   const price = Math.min(...enabled.map((p) => p.price))
   return { pricing: price > 0 ? "paid" : "free", price }
 }
+
+/** Ladder order — also the order the program page renders tiers in. */
+export const PACKAGE_KEYS = ["basic", "standard", "executive"] as const
+
+export function isPackageKey(value: unknown): value is PackageKey {
+  return typeof value === "string" && (PACKAGE_KEYS as readonly string[]).includes(value)
+}
+
+/** Spec §6 tier labels as the program page and editor print them. */
+export const PACKAGE_LABEL: Record<PackageKey, string> = {
+  basic: "Basic",
+  standard: "Standard",
+  executive: "Executive 101",
+}

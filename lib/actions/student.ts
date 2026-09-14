@@ -2,9 +2,10 @@
 
 import mongoose from "mongoose"
 import connectDB from "@/lib/db"
-import { Course, Enrollment, Bookmark, User, Lesson } from "@/lib/db/models"
+import { Course, Enrollment, Bookmark, User, Lesson, type IPackageEntitlements, type PackageKey } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth"
 import { isSchoolSlug, type SchoolSlug } from "@/lib/schools"
+import { FULL_ACCESS, PACKAGE_RANK } from "@/lib/entitlements"
 
 // ============================================================================
 // TYPES
@@ -13,6 +14,8 @@ import { isSchoolSlug, type SchoolSlug } from "@/lib/schools"
 export type BrowseCourse = {
   id: string
   title: string
+  /** Public URL key: `/programs/${slug}`. */
+  slug: string
   description: string
   /** Spec §5 program blurb; null on legacy courses (fall back to `description`). */
   shortDescription: string | null
@@ -139,6 +142,7 @@ export async function fetchBrowseCourses(options?: {
       return {
         id: course._id.toString(),
         title: course.title,
+        slug: course.slug,
         description: course.description,
         shortDescription: course.shortDescription ?? null,
         thumbnailUrl: course.thumbnailUrl,
@@ -287,6 +291,156 @@ export async function fetchPublicCourse(courseId: string): Promise<PublicCourse 
 }
 
 // ============================================================================
+// PROGRAM PAGE (spec §6–§9) — /programs/[slug]
+// ============================================================================
+
+/** One purchasable tier as the public program page shows it (packages are public; nothing is stripped but `enabled`). */
+export type PublicPackage = {
+  key: PackageKey
+  name: string
+  tagline: string
+  price: number
+  features: string[]
+  highlight: boolean
+  ctaLabel: string | null
+  entitlements: IPackageEntitlements
+}
+
+export type ProgramDetail = BrowseCourse & {
+  ratingCount: number
+  whatYouWillLearn: string[]
+  requirements: string[]
+  targetAudience: string[]
+  instructorHeadline: string | null
+  instructorBio: string | null
+  instructorTotalStudents: number
+  /**
+   * Enabled tiers in ladder order (basic → standard → executive). Never empty:
+   * a course without a ladder gets one synthesized "Full program" tier at the
+   * course's own price, so every program renders the same components.
+   */
+  packages: PublicPackage[]
+}
+
+const NO_ENTITLEMENTS: IPackageEntitlements = {
+  liveClasses: false,
+  instructorQa: false,
+  assignments: false,
+  certificate: false,
+  mentorship: false,
+  prioritySupport: false,
+}
+
+/**
+ * Fetch one published program by slug for the public program page.
+ */
+export async function fetchProgramBySlug(slug: string): Promise<ProgramDetail | null> {
+  try {
+    await connectDB()
+
+    const course = await Course.findOne({ slug, status: "published" })
+      .populate("instructor", "firstName lastName avatarUrl bio instructorProfile")
+      .lean()
+
+    if (!course) return null
+
+    const instructor = course.instructor as unknown as {
+      _id: { toString(): string }
+      firstName: string
+      lastName?: string
+      avatarUrl: string | null
+      bio: string | null
+      instructorProfile?: { headline: string | null; totalStudents: number }
+    } | null
+
+    // Guard against missing instructor (deleted user, etc.)
+    if (!instructor) return null
+
+    const whatYouWillLearn = course.whatYouWillLearn ?? []
+    const enabled = (course.packages ?? [])
+      .filter((p) => p.enabled)
+      .sort((a, b) => PACKAGE_RANK[a.key] - PACKAGE_RANK[b.key])
+
+    const packages: PublicPackage[] =
+      enabled.length > 0
+        ? enabled.map((p) => ({
+            key: p.key,
+            name: p.name,
+            tagline: p.tagline ?? "",
+            price: p.price,
+            features: p.features ?? [],
+            highlight: Boolean(p.highlight),
+            ctaLabel: p.ctaLabel ?? null,
+            entitlements: { ...NO_ENTITLEMENTS, ...p.entitlements },
+          }))
+        : [
+            {
+              key: "standard",
+              name: "Full program",
+              tagline: "",
+              price: course.price ?? 0,
+              features: whatYouWillLearn,
+              highlight: false,
+              ctaLabel: null,
+              entitlements: FULL_ACCESS,
+            },
+          ]
+
+    return {
+      id: course._id.toString(),
+      title: course.title,
+      slug: course.slug,
+      description: course.description,
+      shortDescription: course.shortDescription ?? null,
+      thumbnailUrl: course.thumbnailUrl,
+      instructorId: instructor._id.toString(),
+      instructorName: `${instructor.firstName} ${instructor.lastName || ""}`.trim(),
+      instructorAvatarUrl: instructor.avatarUrl,
+      level: course.level as "beginner" | "intermediate" | "advanced",
+      category: course.category || "",
+      school: isSchoolSlug(course.school) ? course.school : null,
+      pricing: course.pricing as "free" | "paid",
+      price: course.price,
+      tierCount: enabled.length,
+      status: course.status,
+      availableAt: course.availableAt ? course.availableAt.toISOString() : null,
+      preEnrollEnabled: course.preEnrollEnabled ?? true,
+      totalLessons: course.totalLessons || 0,
+      totalDuration: course.totalDuration || 0,
+      enrolledCount: course.enrolledCount || 0,
+      rating: course.rating?.average || null,
+      ratingCount: course.rating?.count || 0,
+      whatYouWillLearn,
+      requirements: course.requirements ?? [],
+      targetAudience: course.targetAudience ?? [],
+      instructorHeadline: instructor.instructorProfile?.headline || null,
+      instructorBio: instructor.bio,
+      instructorTotalStudents: instructor.instructorProfile?.totalStudents || 0,
+      packages,
+    }
+  } catch (error) {
+    console.error("Fetch program by slug error:", error)
+    return null
+  }
+}
+
+/**
+ * Slug for a published course id — the old `/courses/[id]` route redirects
+ * through this. Non-ObjectId input and unpublished courses resolve to null.
+ */
+export async function fetchProgramSlug(courseId: string): Promise<string | null> {
+  try {
+    if (!mongoose.isValidObjectId(courseId)) return null
+    await connectDB()
+    const course = await Course.findOne({ _id: courseId, status: "published" }).select("slug").lean()
+    return course?.slug ?? null
+  } catch (error) {
+    console.error("Fetch program slug error:", error)
+    return null
+  }
+}
+
+// ============================================================================
 // LEARN PAGE - Course content with full lesson details
 // ============================================================================
 
@@ -424,6 +578,7 @@ export async function fetchOtherCourses(excludeCourseId: string): Promise<Browse
       return {
         id: course._id.toString(),
         title: course.title,
+        slug: course.slug,
         description: course.description,
         shortDescription: course.shortDescription ?? null,
         thumbnailUrl: course.thumbnailUrl,
