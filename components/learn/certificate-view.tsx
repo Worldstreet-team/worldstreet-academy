@@ -95,7 +95,7 @@ function CertificatePreview({
        ws-* classes resolve to ink-on-paper regardless of the app theme. */
     <div
       data-ws-theme="platform-light"
-      className="relative w-full aspect-[1.414/1] bg-ws-surface text-ws-primary overflow-hidden"
+      className="relative w-full aspect-[1.414/1] bg-ws-surface text-ws-primary overflow-clip"
       id="certificate-preview"
     >
       {/* ── Decorative borders ─────────────────────────────────── */}
@@ -139,7 +139,13 @@ function CertificatePreview({
       )}
 
       {/* ── Content ────────────────────────────────────────────── */}
-      <div className="relative h-full flex flex-col items-center justify-between px-8 py-10 sm:px-10 sm:py-12 md:px-20 md:py-14">
+      {/* The card keeps its 1.414 ratio but grows when this column needs more
+          height (min-h-full + overflow-clip, which unlike overflow-hidden keeps
+          the ratio's content-based minimum) — a narrow card with md type (the
+          sidebar band) never clips or overlaps. Below sm the certificate ID
+          line stays in flow under the signatures; from sm up it sits at the
+          card's bottom, just inside the frame — never on its lines. */}
+      <div className="relative min-h-full flex flex-col items-center justify-between gap-4 sm:gap-0 px-8 py-10 sm:px-10 sm:py-12 md:px-20 md:py-14">
         {/* Header — Logo + Institution */}
         <div className="flex flex-col items-center gap-2 sm:gap-3">
           <Image
@@ -269,7 +275,7 @@ function CertificatePreview({
         </div>
 
         {/* Certificate ID + where to verify it (spec §13) */}
-        <p className="absolute bottom-3 sm:bottom-4 md:bottom-5 inset-x-0 flex flex-wrap justify-center gap-x-2 px-8 text-center text-[6px] sm:text-[7px] md:text-[8px] text-ws-subtle tracking-wider tabular-nums">
+        <p className="sm:absolute sm:bottom-7 md:bottom-9 sm:inset-x-0 flex flex-wrap justify-center gap-x-2 sm:px-8 text-center text-[6px] sm:text-[7px] md:text-[8px] text-ws-subtle tracking-wider tabular-nums">
           <span>{`Certificate ID ${certificateId}`}</span>
           {verifyLabel && <span>{`Verify at ${verifyLabel}`}</span>}
         </p>
