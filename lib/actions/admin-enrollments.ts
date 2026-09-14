@@ -1,12 +1,14 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import mongoose from "mongoose"
 import connectDB from "@/lib/db"
-import { Course, Enrollment, User } from "@/lib/db/models"
+import { Course, Enrollment, PaymentEvent, User, type ICoursePackage, type PackageKey } from "@/lib/db/models"
 import type { EnrollmentStatus } from "@/lib/db/models/enrollment"
 import { requireAdmin } from "@/lib/auth/admin"
 import { courseAvailability } from "@/lib/types/course"
 import type { CourseStatus } from "@/lib/types/course"
+import { PACKAGE_RANK, isPackageKey, packageFor } from "@/lib/entitlements"
 
 const PAGE_SIZE = 20
 
@@ -35,6 +37,10 @@ export type AdminEnrollmentRow = {
   customerEmail: string
   status: EnrollmentStatus
   payment: AdminEnrollmentPayment
+  packageKey: PackageKey | null
+  packageName: string | null
+  /** Enabled tiers on the course, in ladder order — the choices for "Change package". */
+  coursePackages: { key: PackageKey; name: string }[]
   pricePaid: number
   enrolledAt: string
   preEnrolledAt: string | null
@@ -62,6 +68,7 @@ export async function adminListEnrollments(filters?: {
   course?: string
   status?: string
   payment?: string
+  package?: string
   search?: string
   page?: number
 }): Promise<{
@@ -80,6 +87,9 @@ export async function adminListEnrollments(filters?: {
     const query: Record<string, unknown> = {}
     if (filters?.course) query.course = filters.course
     if (filters?.status && filters.status !== "all") query.status = filters.status
+    const packageFilter = filters?.package
+    if (packageFilter === "none") query.packageKey = null
+    else if (isPackageKey(packageFilter)) query.packageKey = packageFilter
 
     // Name/email search resolves to user ids first — enrollment stores refs.
     if (filters?.search?.trim()) {
@@ -99,7 +109,7 @@ export async function adminListEnrollments(filters?: {
         .skip((page - 1) * PAGE_SIZE)
         .limit(PAGE_SIZE * 3) // payment filter happens post-query; over-fetch, trim below
         .populate("user", "firstName lastName email username")
-        .populate("course", "title pricing status availableAt")
+        .populate("course", "title pricing status availableAt packages")
         .lean(),
       Enrollment.countDocuments(query),
       filters?.course ? Course.findById(filters.course).select("title").lean() : null,
@@ -118,6 +128,7 @@ export async function adminListEnrollments(filters?: {
         pricing?: string
         status?: string
         availableAt?: Date | null
+        packages?: ICoursePackage[] | null
       } | null
       const payment = paymentOf({
         status: e.status,
@@ -143,6 +154,12 @@ export async function adminListEnrollments(filters?: {
         customerEmail: user?.email ?? "",
         status: e.status,
         payment,
+        packageKey: e.packageKey ?? null,
+        packageName: e.packageName ?? null,
+        coursePackages: (course?.packages ?? [])
+          .filter((p) => p.enabled)
+          .sort((a, b) => PACKAGE_RANK[a.key] - PACKAGE_RANK[b.key])
+          .map((p) => ({ key: p.key, name: p.name })),
         pricePaid: e.pricePaid ?? 0,
         enrolledAt: e.createdAt.toISOString(),
         preEnrolledAt: e.preEnrolledAt ? new Date(e.preEnrolledAt).toISOString() : null,
@@ -213,11 +230,69 @@ export async function adminSetEnrollmentStatus(
   }
 }
 
+/**
+ * Move one enrollment to another package (D5 — no self-serve upgrades in v1).
+ * No money moves: refunds and charges stay in Payments. The change is logged
+ * as a `package_changed` PaymentEvent so the payment trail explains why access
+ * differs from what was bought. Only enabled tiers on the course are valid —
+ * never "no package", which would silently grant full access.
+ */
+export async function adminSetEnrollmentPackage(
+  enrollmentId: string,
+  packageKey: PackageKey
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await connectDB()
+    const admin = await requireAdmin()
+
+    if (!mongoose.isValidObjectId(enrollmentId)) return { success: false, error: "Enrollment not found" }
+    if (!isPackageKey(packageKey)) return { success: false, error: "Unknown package" }
+
+    const enrollment = await Enrollment.findById(enrollmentId)
+    if (!enrollment) return { success: false, error: "Enrollment not found" }
+
+    const course = await Course.findById(enrollment.course).select("packages").lean()
+    const pkg = course ? packageFor(course, packageKey) : null
+    if (!pkg) return { success: false, error: "This course doesn't sell that package" }
+
+    const from = enrollment.packageKey ?? null
+    if (from === pkg.key) return { success: true }
+
+    enrollment.packageKey = pkg.key
+    enrollment.packageName = pkg.name
+    await enrollment.save()
+
+    try {
+      await PaymentEvent.create({
+        order: null,
+        reference: `academy_package_${enrollment._id.toString()}`,
+        type: "package_changed",
+        payload: {
+          enrollmentId: enrollment._id.toString(),
+          courseId: enrollment.course.toString(),
+          from,
+          to: pkg.key,
+          adminId: admin.id,
+        },
+      })
+    } catch (err) {
+      console.error("[Payments] failed to log package change", err)
+    }
+
+    revalidatePath("/admin/enrollments")
+    return { success: true }
+  } catch (error) {
+    console.error("Admin set enrollment package error:", error)
+    return { success: false, error: "Failed to change the package" }
+  }
+}
+
 /** Same filters as the list, no pagination — rows for a CSV download. */
 export async function adminExportEnrollments(filters?: {
   course?: string
   status?: string
   payment?: string
+  package?: string
   search?: string
 }): Promise<{ success: boolean; csv?: string; error?: string }> {
   try {
@@ -238,6 +313,7 @@ export async function adminExportEnrollments(filters?: {
       "Email",
       "Enrollment status",
       "Payment status",
+      "Package",
       "Price paid",
       "Enrolled at",
       "Pre-enrolled at",
@@ -257,6 +333,7 @@ export async function adminExportEnrollments(filters?: {
           r.customerEmail,
           r.status,
           r.payment,
+          r.packageName,
           r.pricePaid,
           r.enrolledAt,
           r.preEnrolledAt,

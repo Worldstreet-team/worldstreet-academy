@@ -2,6 +2,7 @@
 
 import connectDB from "@/lib/db"
 import { Order, PaymentEvent, Enrollment, Earning } from "@/lib/db/models"
+import type { PackageKey } from "@/lib/db/models"
 import { requireAdmin } from "@/lib/auth/admin"
 import { getWalletCharge, walletEnabled } from "@/lib/wallet"
 
@@ -14,6 +15,7 @@ export type AdminOrderRow = {
   amountMinor: number
   currency: string
   chargeId: string | null
+  packageKey: PackageKey | null
   buyerName: string
   buyerEmail: string
   courseTitle: string
@@ -55,6 +57,7 @@ export async function adminListOrders(filters?: {
           amountMinor: o.amountMinor,
           currency: o.currency,
           chargeId: o.chargeId,
+          packageKey: o.packageKey ?? null,
           buyerName: buyer ? `${buyer.firstName ?? ""} ${buyer.lastName ?? ""}`.trim() || "Unknown" : "Unknown",
           buyerEmail: buyer?.email ?? "",
           courseTitle: course?.title ?? "Course",
@@ -109,6 +112,7 @@ export async function adminGetOrderDetail(orderId: string): Promise<AdminOrderDe
       amountMinor: o.amountMinor,
       currency: o.currency,
       chargeId: o.chargeId,
+      packageKey: o.packageKey ?? null,
       buyerName: buyer ? `${buyer.firstName ?? ""} ${buyer.lastName ?? ""}`.trim() || "Unknown" : "Unknown",
       buyerEmail: buyer?.email ?? "",
       courseTitle: course?.title ?? "Course",

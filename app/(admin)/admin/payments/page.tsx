@@ -35,6 +35,7 @@ import {
 } from "@/lib/actions/admin-payments"
 import { refundEnrollment } from "@/lib/actions/earnings"
 import { queryKeys } from "@/lib/hooks/queries/keys"
+import { PACKAGE_LABEL } from "@/lib/entitlements"
 import {
   money,
   formatDateTime,
@@ -132,6 +133,9 @@ function OrdersTab() {
                   <TableRow key={o.id} className="cursor-pointer" onClick={() => setSelectedId(o.id)}>
                     <TableCell>
                       <p className="font-medium truncate max-w-[180px]">{o.courseTitle}</p>
+                      {o.packageKey && (
+                        <p className="text-[10px] text-muted-foreground">{PACKAGE_LABEL[o.packageKey]}</p>
+                      )}
                       <p className="text-[10px] text-muted-foreground tabular-nums truncate max-w-[180px]">
                         {o.reference}
                       </p>
@@ -171,7 +175,7 @@ function OrdersTab() {
                   <StatusBadge status={detail.status} />
                 </DialogTitle>
                 <DialogDescription>
-                  {detail.buyerName} · {detail.buyerEmail}
+                  {detail.buyerName} · {detail.buyerEmail}{detail.packageKey ? ` · ${PACKAGE_LABEL[detail.packageKey]}` : ""}
                 </DialogDescription>
               </DialogHeader>
 

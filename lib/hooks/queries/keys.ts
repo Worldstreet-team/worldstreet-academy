@@ -54,6 +54,7 @@ export const queryKeys = {
     course?: string
     status?: string
     payment?: string
+    package?: string
     search?: string
     page?: number
   }) =>

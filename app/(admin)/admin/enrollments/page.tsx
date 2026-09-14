@@ -35,8 +35,16 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   adminListEnrollments,
   adminSetEnrollmentStatus,
+  adminSetEnrollmentPackage,
   adminExportEnrollments,
 } from "@/lib/actions/admin-enrollments"
 import { queryKeys } from "@/lib/hooks/queries/keys"
@@ -46,6 +54,8 @@ import {
   FilterChips,
   Pagination,
 } from "@/components/admin/shared"
+import { PACKAGE_KEYS, PACKAGE_LABEL } from "@/lib/entitlements"
+import type { PackageKey } from "@/lib/db/models"
 import { DownloadIcon, GraduationCapIcon, MoreHorizontal, XIcon } from "lucide-react"
 
 const ENROLLMENT_FILTERS = [
@@ -66,6 +76,12 @@ const PAYMENT_FILTERS = [
   { value: "refunded", label: "Refunded" },
 ]
 
+const PACKAGE_FILTERS = [
+  { value: "all", label: "Any package" },
+  { value: "none", label: "No package" },
+  ...PACKAGE_KEYS.map((key) => ({ value: key, label: PACKAGE_LABEL[key] })),
+]
+
 function AdminEnrollmentsInner() {
   const queryClient = useQueryClient()
   const searchParams = useSearchParams()
@@ -73,6 +89,14 @@ function AdminEnrollmentsInner() {
 
   const [status, setStatus] = React.useState("all")
   const [payment, setPayment] = React.useState("all")
+  const [pkgFilter, setPkgFilter] = React.useState("all")
+  const [packageTarget, setPackageTarget] = React.useState<{
+    id: string
+    name: string
+    current: PackageKey | null
+    options: { key: PackageKey; name: string }[]
+  } | null>(null)
+  const [packageChoice, setPackageChoice] = React.useState<PackageKey | null>(null)
   const [search, setSearch] = React.useState("")
   const [debouncedSearch, setDebouncedSearch] = React.useState("")
   const [page, setPage] = React.useState(1)
@@ -89,6 +113,7 @@ function AdminEnrollmentsInner() {
     course: courseId,
     status,
     payment,
+    package: pkgFilter,
     search: debouncedSearch || undefined,
     page,
   }
@@ -108,6 +133,15 @@ function AdminEnrollmentsInner() {
     },
   })
 
+  const setEnrollmentPackage = useMutation({
+    mutationFn: ({ id, key }: { id: string; key: PackageKey }) => adminSetEnrollmentPackage(id, key),
+    onSuccess: (res) => {
+      setActionError(res.success ? null : (res.error ?? "Failed"))
+      if (res.success) setPackageTarget(null)
+      queryClient.invalidateQueries({ queryKey: ["admin", "enrollments"] })
+    },
+  })
+
   async function exportCsv() {
     setExporting(true)
     try {
@@ -115,6 +149,7 @@ function AdminEnrollmentsInner() {
         course: courseId,
         status,
         payment,
+        package: pkgFilter,
         search: debouncedSearch || undefined,
       })
       if (!res.success || !res.csv) {
@@ -197,6 +232,14 @@ function AdminEnrollmentsInner() {
               }}
               options={ENROLLMENT_FILTERS}
             />
+            <FilterChips
+              value={pkgFilter}
+              onChange={(v) => {
+                setPkgFilter(v)
+                setPage(1)
+              }}
+              options={PACKAGE_FILTERS}
+            />
           </div>
 
           {actionError && <p className="text-xs text-ws-danger">{actionError}</p>}
@@ -221,6 +264,7 @@ function AdminEnrollmentsInner() {
                     <TableRow>
                       <TableHead>Customer</TableHead>
                       <TableHead>Course</TableHead>
+                      <TableHead>Package</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Payment</TableHead>
                       <TableHead>Enrolled</TableHead>
@@ -245,6 +289,16 @@ function AdminEnrollmentsInner() {
                           <p className="text-[10px] text-muted-foreground capitalize">
                             {e.courseAvailability.replace(/_/g, " ")}
                           </p>
+                        </TableCell>
+                        <TableCell>
+                          {e.packageKey ? (
+                            <>
+                              <p className="text-sm">{e.packageName ?? PACKAGE_LABEL[e.packageKey]}</p>
+                              <p className="text-[10px] text-muted-foreground">{PACKAGE_LABEL[e.packageKey]}</p>
+                            </>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">—</p>
+                          )}
                         </TableCell>
                         <TableCell>
                           <StatusBadge status={e.status} />
@@ -297,6 +351,21 @@ function AdminEnrollmentsInner() {
                                   Restore
                                 </DropdownMenuItem>
                               )}
+                              {e.coursePackages.length > 0 && (
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setPackageChoice(e.packageKey)
+                                    setPackageTarget({
+                                      id: e.id,
+                                      name: e.customerName,
+                                      current: e.packageKey,
+                                      options: e.coursePackages,
+                                    })
+                                  }}
+                                >
+                                  Change package…
+                                </DropdownMenuItem>
+                              )}
                               {e.status !== "cancelled" && (
                                 <DropdownMenuItem
                                   variant="destructive"
@@ -345,6 +414,55 @@ function AdminEnrollmentsInner() {
               }}
             >
               {setEnrollmentStatus.isPending ? "Cancelling…" : "Cancel enrollment"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!packageTarget} onOpenChange={(open) => !open && setPackageTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change {packageTarget?.name}&rsquo;s package</DialogTitle>
+            <DialogDescription>
+              Moves this enrollment&rsquo;s access to another package. No money moves — charges and
+              refunds live in Payments. The change is recorded in the payment log.
+            </DialogDescription>
+          </DialogHeader>
+          <Select
+            items={(packageTarget?.options ?? []).map((o) => ({
+              value: o.key,
+              label: `${PACKAGE_LABEL[o.key]} · ${o.name}`,
+            }))}
+            value={packageChoice}
+            onValueChange={(v) => setPackageChoice((v as PackageKey | null) ?? null)}
+          >
+            <SelectTrigger className="w-full" aria-label="Package">
+              <SelectValue placeholder="Choose a package" />
+            </SelectTrigger>
+            <SelectContent>
+              {(packageTarget?.options ?? []).map((o) => (
+                <SelectItem key={o.key} value={o.key}>
+                  {PACKAGE_LABEL[o.key]} · {o.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setPackageTarget(null)}>
+              Keep package
+            </Button>
+            <Button
+              size="sm"
+              disabled={
+                !packageChoice || packageChoice === packageTarget?.current || setEnrollmentPackage.isPending
+              }
+              onClick={() => {
+                if (packageTarget && packageChoice) {
+                  setEnrollmentPackage.mutate({ id: packageTarget.id, key: packageChoice })
+                }
+              }}
+            >
+              {setEnrollmentPackage.isPending ? "Saving…" : "Change package"}
             </Button>
           </DialogFooter>
         </DialogContent>
