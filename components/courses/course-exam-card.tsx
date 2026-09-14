@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { getStudentExamStatus } from "@/lib/actions/exams"
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import { ClockIcon, FileBadgeIcon } from "lucide-react"
+import { PackageLockNotice } from "@/components/learn/package-lock-notice"
 
 /**
  * Exam entry card on the course detail page — renders only for enrolled
@@ -21,6 +22,20 @@ export function CourseExamCard({ courseId }: { courseId: string }) {
   })
 
   if (!status?.hasExam) return null
+
+  if (status.packageLock) {
+    return (
+      <Card>
+        <CardContent className="p-4">
+          <PackageLockNotice
+            compact
+            title={status.title || "Course exam"}
+            requiredLabel={status.packageLock.requiredLabel}
+          />
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <Card className={status.examPassed ? "border-ws-success/30" : "border-primary/25"}>

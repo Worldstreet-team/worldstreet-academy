@@ -1,8 +1,9 @@
 "use server"
 
 import connectDB from "@/lib/db"
-import { Enrollment, Course, User } from "@/lib/db/models"
+import { Enrollment, Course, User, type ICoursePackage } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth"
+import { entitlementsFor } from "@/lib/entitlements"
 
 // ============================================================================
 // TYPES
@@ -80,6 +81,9 @@ export async function fetchCertificate(courseId: string): Promise<CertificateDat
 
     if (!course) return null
 
+    // Packages without assessment & certificate (Basic) complete, but never certify.
+    if (!entitlementsFor(course, enrollment).certificate) return null
+
     const instructor = course.instructor as unknown as {
       firstName: string
       lastName: string
@@ -121,7 +125,7 @@ export async function fetchMyCertificates(): Promise<StudentCertificate[]> {
     })
       .populate({
         path: "course",
-        select: "title thumbnailUrl instructor",
+        select: "title thumbnailUrl instructor packages",
         populate: {
           path: "instructor",
           select: "firstName lastName avatarUrl",
@@ -131,7 +135,11 @@ export async function fetchMyCertificates(): Promise<StudentCertificate[]> {
       .lean()
 
     return enrollments
-      .filter((e) => e.course)
+      .filter(
+        (e) =>
+          e.course &&
+          entitlementsFor(e.course as unknown as { packages?: ICoursePackage[] | null }, e).certificate
+      )
       .map((enrollment) => {
         const course = enrollment.course as unknown as {
           _id: { toString(): string }

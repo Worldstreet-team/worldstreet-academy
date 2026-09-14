@@ -20,7 +20,7 @@ export function LessonQuizCard({ courseId, lessonId }: { courseId: string; lesso
     staleTime: 30_000,
   })
 
-  if (!status?.hasExam) return null
+  if (!status?.hasExam || status.packageLock) return null
 
   const passed = status.examPassed
 

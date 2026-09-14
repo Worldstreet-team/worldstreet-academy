@@ -10,12 +10,16 @@ import {
   ExamAttempt,
   Course,
   Enrollment,
+  Lesson,
   type IExamSettings,
   type QuestionType,
   type AttemptStatus,
+  type ICoursePackage,
+  type PackageKey,
 } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth/actions"
 import { notifyUser } from "@/lib/notify"
+import { PACKAGE_LABEL, canAccessLesson, effectiveLessonTier, entitlementsFor, lowestPackageWith } from "@/lib/entitlements"
 
 /* ═══════════════════ helpers ═══════════════════ */
 
@@ -341,6 +345,27 @@ export async function setCourseExamRequired(courseId: string, required: boolean)
 
 /* ═══════════════════ student: status + runner ═══════════════════ */
 
+/**
+ * Package gate for an assessment. A final exam belongs to the assessment &
+ * certificate entitlement (Basic has neither); a knowledge check follows its
+ * lesson's tier. null = open.
+ */
+async function examPackageLock(
+  course: { packages?: ICoursePackage[] | null },
+  enrollment: { packageKey?: PackageKey | null },
+  lessonId: string | null | undefined
+): Promise<{ requiredLabel: string | null } | null> {
+  if (lessonId) {
+    const lesson = await Lesson.findById(lessonId).select("minPackageKey isFree").lean()
+    if (!lesson || canAccessLesson(course, lesson, enrollment)) return null
+    const tier = effectiveLessonTier(course, lesson)
+    return { requiredLabel: tier ? PACKAGE_LABEL[tier] : null }
+  }
+  if (entitlementsFor(course, enrollment).certificate) return null
+  const tier = lowestPackageWith(course, "certificate")
+  return { requiredLabel: tier ? PACKAGE_LABEL[tier] : null }
+}
+
 export type StudentExamStatus = {
   hasExam: boolean
   examRequired: boolean
@@ -359,6 +384,8 @@ export type StudentExamStatus = {
   progress: number
   activeAttemptId: string | null
   lastResult: { status: AttemptStatus; scorePercent: number | null } | null
+  /** Set when the student's package doesn't include this assessment — show a lock notice, never a start button. */
+  packageLock: { requiredLabel: string | null } | null
 }
 
 export async function getStudentExamStatus(
@@ -370,16 +397,20 @@ export async function getStudentExamStatus(
     if (!user) return null
 
     const [course, exam, enrollment] = await Promise.all([
-      Course.findById(courseId).select("examRequired").lean(),
+      Course.findById(courseId).select("examRequired packages").lean(),
       Exam.findOne({ ...examFilter(courseId, lessonId), status: "published" }).lean(),
       Enrollment.findOne({ user: user.id, course: courseId, status: { $in: ["active", "completed"] } }).lean(),
     ])
     if (!course) return null
     const isLessonQuiz = !!lessonId
+    const packageLock = enrollment ? await examPackageLock(course, enrollment, lessonId) : null
+    // A package without the assessment & certificate completes on its lessons:
+    // the exam gate doesn't apply to it.
+    const examRequired = !isLessonQuiz && !!course.examRequired && !packageLock
     if (!exam || !enrollment) {
       return {
         hasExam: !!exam,
-        examRequired: !isLessonQuiz && !!course.examRequired,
+        examRequired,
         title: exam?.title ?? "",
         instructions: exam?.instructions ?? "",
         durationMinutes: exam?.settings.durationMinutes ?? 0,
@@ -394,6 +425,7 @@ export async function getStudentExamStatus(
         progress: enrollment?.progress ?? 0,
         activeAttemptId: null,
         lastResult: null,
+        packageLock,
       }
     }
 
@@ -409,7 +441,7 @@ export async function getStudentExamStatus(
     const max = exam.settings.maxAttempts
     return {
       hasExam: true,
-      examRequired: !isLessonQuiz && !!course.examRequired,
+      examRequired,
       title: exam.title,
       instructions: exam.instructions ?? "",
       durationMinutes: exam.settings.durationMinutes,
@@ -421,10 +453,11 @@ export async function getStudentExamStatus(
       examPassed: isLessonQuiz ? (last?.status === "passed") : !!enrollment.examPassed,
       bestScorePercent: isLessonQuiz ? (last?.scorePercent ?? null) : (enrollment.bestScorePercent ?? null),
       // Final exams unlock at 100% progress; knowledge checks just need enrollment.
-      eligible: isLessonQuiz ? true : (enrollment.progress ?? 0) >= 100,
+      eligible: packageLock ? false : isLessonQuiz ? true : (enrollment.progress ?? 0) >= 100,
       progress: enrollment.progress ?? 0,
       activeAttemptId: active ? active._id.toString() : null,
       lastResult: last ? { status: last.status, scorePercent: last.scorePercent ?? null } : null,
+      packageLock,
     }
   } catch (error) {
     console.error("Get exam status error:", error)
@@ -510,7 +543,7 @@ export async function startExamAttempt(
   lessonId?: string | null
 ): Promise<
   | { success: true; runner: RunnerPayload; resumed: boolean }
-  | { success: false; error: string }
+  | { success: false; error: string; code?: "package_locked" }
 > {
   try {
     const user = await initAction()
@@ -526,6 +559,16 @@ export async function startExamAttempt(
       status: { $in: ["active", "completed"] },
     })
     if (!enrollment) return { success: false, error: "You're not enrolled in this course" }
+    const course = await Course.findById(courseId).select("packages").lean()
+    if (course && (await examPackageLock(course, enrollment, lessonId))) {
+      return {
+        success: false,
+        code: "package_locked",
+        error: lessonId
+          ? "This knowledge check belongs to a lesson outside your package"
+          : "Your package doesn't include the assessment and certificate",
+      }
+    }
     if (!lessonId && (enrollment.progress ?? 0) < 100) {
       return { success: false, error: "Finish all lessons first — the exam unlocks at 100% progress" }
     }

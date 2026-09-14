@@ -29,6 +29,7 @@ import {
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import { CircleCheckBigIcon, ClockIcon, XIcon } from "lucide-react"
 import { RenderIcon } from "@/components/shared/render-icon"
+import { PackageLockNotice } from "@/components/learn/package-lock-notice"
 
 function fmtClock(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000))
@@ -450,7 +451,12 @@ function CourseExamPageInner() {
                   </p>
                 )}
 
-                {!status.eligible ? (
+                {status.packageLock ? (
+                  <PackageLockNotice
+                    title="Not included in your package"
+                    requiredLabel={status.packageLock.requiredLabel}
+                  />
+                ) : !status.eligible ? (
                   <div className="text-center space-y-2">
                     <p className="text-xs text-muted-foreground">
                       Finish all lessons to unlock the exam — you&apos;re at {status.progress}%.
