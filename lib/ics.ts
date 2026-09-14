@@ -33,7 +33,7 @@ export function buildInterviewIcs(input: {
   return [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//WorldStreet Academy//Interview//EN",
+    "PRODID:-//WorldStreet Mastery Academy//Interview//EN",
     "METHOD:PUBLISH",
     "BEGIN:VEVENT",
     `UID:${input.uid}@academy.worldstreetgold.com`,

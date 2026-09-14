@@ -8,6 +8,7 @@ import type { BrowseCourse } from "@/lib/actions/student"
 import { LineMask } from "@/components/marketing/motion/line-mask"
 import { EASE_INERTIA } from "@/components/marketing/motion/ease"
 import { addFrame, useMotionOK } from "@/components/marketing/motion/bus"
+import { BRAND } from "@/lib/brand"
 
 /** Row drift speeds, px/s — alternating directions, deliberately unequal so
  *  the five rows never phase-lock into a visible grid. */
@@ -65,7 +66,7 @@ export function HeroWall({
   return (
     <section
       className="relative isolate -mt-[4.25rem] flex min-h-[92svh] items-center overflow-hidden sm:-mt-[5.25rem]"
-      aria-label="WorldStreet Academy"
+      aria-label={BRAND.name}
     >
       {/* ── The wall ── */}
       {rows.length > 0 && (
@@ -151,7 +152,7 @@ export function HeroWall({
           animate={{ opacity: 1 }}
           transition={{ duration: 0.3 }}
         >
-          WorldStreet Academy
+          {BRAND.name}
         </motion.p>
         <LineMask
           as="h1"

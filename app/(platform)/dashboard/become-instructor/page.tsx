@@ -29,6 +29,7 @@ import {
 import { getVideoUploadUrl, getDocumentUploadUrl } from "@/lib/actions/upload"
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import { CircleCheckBigIcon, GraduationCapIcon, XIcon } from "lucide-react"
+import { BRAND } from "@/lib/brand"
 
 /* ── Upload-or-paste field (sample video / CV) ── */
 
@@ -447,7 +448,7 @@ function ApplicationForm({ onSubmitted }: { onSubmitted: () => void }) {
                   className="mt-0.5 accent-primary"
                 />
                 <span className="text-[11px] text-muted-foreground leading-relaxed">
-                  I agree to the WorldStreet Academy instructor terms: original content only,
+                  I agree to the {BRAND.name} instructor terms: original content only,
                   85/15 revenue share, refund-window clawbacks, and course quality standards.
                 </span>
               </label>

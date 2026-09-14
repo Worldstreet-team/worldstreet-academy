@@ -1,9 +1,9 @@
 import type { Metadata } from "next"
 import { Landing } from "@/components/marketing/landing"
+import { BRAND } from "@/lib/brand"
 
 export const metadata: Metadata = {
-  description:
-    "Learn crypto trading, DeFi and risk management from instructors who trade for a living. Structured courses, live classes, real exams and signed certificates on WorldStreet Academy.",
+  description: `Learn crypto trading, DeFi and risk management from instructors who trade for a living. Structured courses, live classes, real exams and signed certificates on ${BRAND.name}.`,
 }
 
 /**

@@ -1,5 +1,5 @@
 import Link from "next/link"
-import Image from "next/image"
+import { BrandLockup } from "@/components/shared/brand-lockup"
 
 export function Footer() {
   return (
@@ -10,17 +10,7 @@ export function Footer() {
             {/* Unified ecosystem lockup (05-screens): gold wsa-mark 26px +
                 "WorldStreet" Poppins SemiBold 15 + gold app eyebrow. */}
             <Link href="/" className="flex items-center gap-2 mb-4">
-              <Image
-                src="/brand/wsa-mark.png"
-                alt=""
-                width={26}
-                height={26}
-                className="h-[26px] w-[26px] object-contain"
-              />
-              <span className="grid text-left leading-tight">
-                <span className="font-display text-[15px] font-semibold tracking-tight">WorldStreet</span>
-                <span className="font-sans text-[10px] font-semibold uppercase tracking-[2px] text-ws-gold">Academy</span>
-              </span>
+              <BrandLockup alt="" />
             </Link>
             <p className="text-sm text-muted-foreground">
               Learn, trade, and grow with the WorldStreet ecosystem.

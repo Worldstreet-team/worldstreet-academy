@@ -8,6 +8,7 @@ import {
 } from "lucide-react"
 import { LineMask } from "@/components/marketing/motion/line-mask"
 import { Reveal, RevealGroup } from "@/components/marketing/motion/reveal"
+import { BRAND } from "@/lib/brand"
 
 /**
  * ABOUT — set directly on the page, not in a panel. The statement sits left
@@ -58,7 +59,7 @@ export function AboutBand() {
 
             <div className="lg:pt-2">
               <p className="max-w-xl text-[16px] leading-relaxed text-ws-muted md:text-[17px]">
-                WorldStreet Academy is structured trading education: courses
+                {BRAND.name} is structured trading education: courses
                 built and taught by working traders, live sessions where you ask
                 in the moment, and a timed exam standing between the last lesson
                 and your signed certificate.

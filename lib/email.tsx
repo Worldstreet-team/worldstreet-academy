@@ -16,10 +16,11 @@ import {
   Column,
 } from "@react-email/components"
 import { APP_URL } from "@/lib/app-url"
+import { BRAND } from "@/lib/brand"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
-const FROM_EMAIL = process.env.EMAIL_FROM || "WorldStreet Academy <noreply@worldstreet.academy>"
+const FROM_EMAIL = process.env.EMAIL_FROM || BRAND.fromEmail
 
 export type MeetingEmailData = {
   meetingTitle: string
@@ -250,7 +251,7 @@ function MeetingNotificationEmail({ data }: { data: MeetingEmailData }) {
         </Container>
 
         <Section style={footer}>
-          <Text style={footerText}>WorldStreet Academy</Text>
+          <Text style={footerText}>{BRAND.name}</Text>
         </Section>
       </Body>
     </Html>
@@ -301,7 +302,7 @@ function MeetingInviteEmail({
         </Container>
 
         <Section style={footer}>
-          <Text style={footerText}>WorldStreet Academy</Text>
+          <Text style={footerText}>{BRAND.name}</Text>
         </Section>
       </Body>
     </Html>
@@ -354,7 +355,7 @@ function ApplicationReceivedEmail({ data }: { data: ApplicationEmailData }) {
         </Container>
 
         <Section style={footer}>
-          <Text style={footerText}>WorldStreet Academy</Text>
+          <Text style={footerText}>{BRAND.name}</Text>
         </Section>
       </Body>
     </Html>
@@ -408,7 +409,7 @@ function ApplicationDecisionEmail({ data }: { data: ApplicationEmailData }) {
         </Container>
 
         <Section style={footer}>
-          <Text style={footerText}>WorldStreet Academy</Text>
+          <Text style={footerText}>{BRAND.name}</Text>
         </Section>
       </Body>
     </Html>
@@ -472,7 +473,7 @@ function InterviewInviteEmail({ data }: { data: InterviewEmailData }) {
         </Container>
 
         <Section style={footer}>
-          <Text style={footerText}>WorldStreet Academy</Text>
+          <Text style={footerText}>{BRAND.name}</Text>
         </Section>
       </Body>
     </Html>
@@ -523,7 +524,7 @@ function SimplePipelineEmail({
           </Section>
         </Container>
         <Section style={footer}>
-          <Text style={footerText}>WorldStreet Academy</Text>
+          <Text style={footerText}>{BRAND.name}</Text>
         </Section>
       </Body>
     </Html>
@@ -881,7 +882,7 @@ function EnrollmentConfirmationEmail({ data }: { data: EnrollmentEmailData }) {
         </Container>
 
         <Section style={footer}>
-          <Text style={footerText}>WorldStreet Academy</Text>
+          <Text style={footerText}>{BRAND.name}</Text>
         </Section>
       </Body>
     </Html>
@@ -952,7 +953,7 @@ function CourseLiveEmail({ data }: { data: CourseLiveEmailData }) {
         </Container>
 
         <Section style={footer}>
-          <Text style={footerText}>WorldStreet Academy</Text>
+          <Text style={footerText}>{BRAND.name}</Text>
         </Section>
       </Body>
     </Html>

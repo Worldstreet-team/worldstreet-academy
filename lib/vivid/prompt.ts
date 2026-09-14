@@ -7,6 +7,8 @@
  * context-awareness, session management, and graceful defaults.
  */
 
+import { BRAND } from "@/lib/brand"
+
 interface PromptUser {
   id: string
   firstName?: string
@@ -84,7 +86,7 @@ export function buildAcademyPrompt(
   const pageHints = getPageHints(pathname)
 
   return `
-You are **Vivid**, the AI voice assistant embedded inside WorldStreet Academy.
+You are **Vivid**, the AI voice assistant embedded inside ${BRAND.name}.
 
 ═══════════════════════════════════════════════════════════════
  IDENTITY & VOICE

@@ -1,7 +1,6 @@
 "use client"
 
 import Link from "next/link"
-import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect } from "react"
 import {
@@ -35,6 +34,8 @@ import {
 } from "lucide-react"
 import { useUser } from "@/components/providers/user-provider"
 import { LogoutConfirmDialog } from "@/components/shared/logout-confirm-dialog"
+import { BRAND } from "@/lib/brand"
+import { BrandLockup } from "@/components/shared/brand-lockup"
 
 /**
  * Admin rail — mirrors the platform sidebar recipe (app-sidebar.tsx): 40px
@@ -152,17 +153,7 @@ export function AdminSidebar() {
             >
               {/* Unified ecosystem lockup (05-screens): gold wsa-mark 26px +
                   "WorldStreet" Poppins SemiBold 15 + gold app eyebrow. */}
-              <Image
-                src="/brand/wsa-mark.png"
-                alt="WorldStreet Academy"
-                width={26}
-                height={26}
-                className="h-[26px] w-[26px] shrink-0 object-contain"
-              />
-              <div className="grid flex-1 text-left leading-tight">
-                <span className="truncate font-display text-[15px] font-semibold">WorldStreet</span>
-                <span className="truncate font-sans text-[10px] font-semibold uppercase tracking-[2px] text-ws-gold">Admin</span>
-              </div>
+              <BrandLockup truncate eyebrow="Admin" alt={BRAND.name} />
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

@@ -21,6 +21,7 @@ import {
   STONE_TEXT,
 } from "./ds"
 import { LoaderCircleIcon } from "lucide-react"
+import { BRAND } from "@/lib/brand"
 
 type OnboardingModalProps = {
   userName: string
@@ -161,7 +162,7 @@ export function OnboardingModal({ userName }: OnboardingModalProps) {
                   borderRadius: RADIUS_SM,
                 }}
               >
-                WorldStreet Academy
+                {BRAND.name}
               </span>
             )}
 

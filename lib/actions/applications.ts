@@ -26,6 +26,7 @@ import {
 } from "@/lib/email"
 import type { IScorecard, RejectionReason } from "@/lib/db/models"
 import { APP_URL } from "@/lib/app-url"
+import { BRAND } from "@/lib/brand"
 
 const PAGE_SIZE = 20
 
@@ -592,7 +593,7 @@ async function scheduleInterviewCore(
 
     meetingDoc = await Meeting.create({
       title: `Instructor Interview — ${applicantName}`,
-      description: "Interview call for a WorldStreet Academy instructor application.",
+      description: `Interview call for a ${BRAND.name} instructor application.`,
       hostId: new Types.ObjectId(host.id),
       status: "scheduled",
       scheduledAt,
@@ -653,7 +654,7 @@ async function scheduleInterviewCore(
   if (applicant.email) {
     const ics = buildInterviewIcs({
       uid: meetingDoc._id.toString(),
-      title: "WorldStreet Academy — Instructor Interview",
+      title: `${BRAND.name} — Instructor Interview`,
       description: `Interview with ${host.name} about your instructor application.`,
       startsAt: scheduledAt,
       durationMinutes: 30,

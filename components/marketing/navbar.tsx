@@ -1,10 +1,11 @@
 import Link from "next/link"
-import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { MarketingMobileNav, type MarketingNavLink } from "@/components/marketing/mobile-nav"
 import { NavbarShell } from "@/components/marketing/navbar-shell"
 import { getCurrentUser } from "@/lib/auth/actions"
+import { BRAND } from "@/lib/brand"
+import { BrandLockup } from "@/components/shared/brand-lockup"
 
 const isLocalDev = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_")
 const LOGIN_URL = isLocalDev ? "/login" : "https://worldstreetgold.com/login"
@@ -34,17 +35,7 @@ export async function Navbar() {
           {/* Unified ecosystem lockup (05-screens): gold wsa-mark 26px +
               "WorldStreet" Poppins SemiBold 15 + gold app eyebrow. */}
           <Link href="/" className="flex shrink-0 items-center gap-2">
-            <Image
-              src="/brand/wsa-mark.png"
-              alt="WorldStreet Academy"
-              width={26}
-              height={26}
-              className="h-[26px] w-[26px] object-contain"
-            />
-            <span className="grid text-left leading-tight">
-              <span className="font-display text-[15px] font-semibold tracking-tight">WorldStreet</span>
-              <span className="font-sans text-[10px] font-semibold uppercase tracking-[2px] text-ws-gold">Academy</span>
-            </span>
+            <BrandLockup alt={BRAND.name} />
           </Link>
           <nav className="hidden items-center gap-1 md:flex">
             <Link

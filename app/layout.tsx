@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Public_Sans, Dancing_Script, Poppins } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "@/components/theme-provider";
+import { BRAND } from "@/lib/brand";
 import "./globals.css";
 
 const publicSans = Public_Sans({subsets:['latin'],variable:'--font-sans'});
@@ -36,8 +37,8 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: {
-    default: "WorldStreet Academy",
-    template: "%s | WorldStreet Academy",
+    default: BRAND.name,
+    template: `%s | ${BRAND.name}`,
   },
   description:
     "Learn cryptocurrency trading, DeFi, risk management, and blockchain development from industry experts.",

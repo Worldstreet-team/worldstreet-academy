@@ -8,6 +8,7 @@ import type { CertificateData } from "@/lib/actions/certificates"
 import { SignatureCanvas } from "@/components/shared/signature-canvas"
 import { useTheme } from "next-themes"
 import { CheckIcon, ChevronLeftIcon, DownloadIcon } from "lucide-react"
+import { BRAND } from "@/lib/brand"
 
 // ── Helper: fetch image as base64 data URL ───────────────────────────────────
 
@@ -131,7 +132,7 @@ function CertificatePreview({
         <div className="flex flex-col items-center gap-2 sm:gap-3">
           <Image
             src={logoPath}
-            alt="WorldStreet Academy"
+            alt={BRAND.name}
             width={48}
             height={48}
             className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 object-contain"
@@ -139,7 +140,7 @@ function CertificatePreview({
           <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
             <div className="h-px w-8 sm:w-12 md:w-20 bg-ws-track" />
             <p className="text-[9px] sm:text-[10px] md:text-xs tracking-[0.35em] uppercase text-ws-subtle font-medium">
-              WorldStreet Academy
+              {BRAND.name}
             </p>
             <div className="h-px w-8 sm:w-12 md:w-20 bg-ws-track" />
           </div>
@@ -202,7 +203,7 @@ function CertificatePreview({
           <div className="flex flex-col items-center">
             <Image
               src={logoPath}
-              alt="WorldStreet Academy"
+              alt={BRAND.name}
               width={64}
               height={64}
               className="w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 object-contain"
@@ -354,7 +355,7 @@ export function CertificateClient({ data }: { data: CertificateData }) {
     doc.setFont("helvetica", "normal")
     doc.setFontSize(7)
     doc.setTextColor(160, 160, 160)
-    doc.text("WORLDSTREET ACADEMY", cx, 39, { align: "center" })
+    doc.text(BRAND.name.toUpperCase(), cx, 39, { align: "center" })
 
     // ── "Certificate" title ──────────────────────────────────────
     doc.setFont("helvetica", "normal")

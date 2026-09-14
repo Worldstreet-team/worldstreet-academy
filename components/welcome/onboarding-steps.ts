@@ -2,11 +2,13 @@
  * Onboarding carousel copy. Shared so the step content lives in one place
  * regardless of how it's presented.
  */
+import { BRAND } from "@/lib/brand"
+
 export const onboardingSteps = [
   {
     /** Key into the modal's art map — the old teal PNGs are retired. */
     art: "mascot",
-    tagline: "Welcome to WorldStreet Academy",
+    tagline: `Welcome to ${BRAND.name}`,
     subtitleMobile: "Your journey to mastering the markets starts here.",
     subtitleDesktop:
       "We bring together expert instructors, structured courses, and a global community — everything you need to go from beginner to confident trader.",

@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import Link from "next/link"
-import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
 import {
   Sidebar,
@@ -37,6 +36,8 @@ import { LogoutConfirmDialog } from "@/components/shared/logout-confirm-dialog"
 import { useUnreadCount } from "@/lib/hooks/use-unread-count"
 import { useOngoingCall } from "@/components/providers/call-provider"
 import { useSidebarActivity } from "@/lib/hooks/use-sidebar-activity"
+import { BRAND } from "@/lib/brand"
+import { BrandLockup } from "@/components/shared/brand-lockup"
 
 /**
  * Instructor sidebar — same 260px rail recipe as the student AppSidebar
@@ -206,22 +207,12 @@ export function InstructorSidebar() {
             {/* Brand mark matches the student sidebar: logo → public landing. */}
             <SidebarMenuButton
               size="lg"
-              render={<Link href="/" aria-label="WorldStreet Academy home" />}
+              render={<Link href="/" aria-label={`${BRAND.name} home`} />}
               className="rounded-md transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-chip"
             >
               {/* Unified ecosystem lockup (05-screens): gold wsa-mark 26px +
                   "WorldStreet" Poppins SemiBold 15 + gold app eyebrow. */}
-              <Image
-                src="/brand/wsa-mark.png"
-                alt=""
-                width={26}
-                height={26}
-                className="h-[26px] w-[26px] shrink-0 object-contain"
-              />
-              <div className="grid flex-1 text-left leading-tight">
-                <span className="truncate font-display text-[15px] font-semibold">WorldStreet</span>
-                <span className="truncate font-sans text-[10px] font-semibold uppercase tracking-[2px] text-ws-gold">Academy</span>
-              </div>
+              <BrandLockup truncate />
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

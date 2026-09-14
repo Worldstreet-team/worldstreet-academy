@@ -30,6 +30,7 @@ import {
   EASE_LUX,
 } from "@/components/marketing/motion/ease"
 import { useMotionOK } from "@/components/marketing/motion/bus"
+import { BRAND } from "@/lib/brand"
 
 /**
  * §1 — HERO + HERO BAND. A contained split header (display headline left,
@@ -66,7 +67,7 @@ export function Hero({
   return (
     <section
       className="relative isolate flex min-h-[82svh] items-center overflow-hidden"
-      aria-label="WorldStreet Academy"
+      aria-label={BRAND.name}
     >
       <div
         aria-hidden
@@ -87,7 +88,7 @@ export function Hero({
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3 }}
           >
-            WorldStreet Academy
+            {BRAND.name}
           </motion.p>
           <LineMask
             as="h1"

@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 import { Reveal, RevealGroup } from "@/components/marketing/motion/reveal"
 import { EASE_LUX } from "@/components/marketing/motion/ease"
 import { useMotionOK } from "@/components/marketing/motion/bus"
+import { BRAND } from "@/lib/brand"
 
 /**
  * §9 — FAQ. Split layout: sticky heading column left, accordion right.
@@ -42,7 +43,7 @@ const FAQS = [
     a: "Some courses are published ahead of their release date. When pre-enrollment is on, you reserve a seat free before launch — you only pay when it goes live and you start.",
   },
   {
-    q: "Can I teach on WorldStreet Academy?",
+    q: `Can I teach on ${BRAND.name}?`,
     a: "Yes — apply from the Become an Instructor page in your dashboard. Once approved, you can build courses and run live sessions of your own.",
   },
 ] as const
