@@ -1,6 +1,6 @@
 # Worldstreet Mastery Academy — Phased Implementation Plan
 
-**Date:** 2026-09-14 · **Status:** IN PROGRESS — Phases 0–1 done (unmerged branches), Phase 2 next · **Spec:** `docs/mastery-academy-blueprint.md`
+**Date:** 2026-09-14 · **Status:** IN PROGRESS — Phases 0–2 done (unmerged branches), Phase 3 next · **Spec:** `docs/mastery-academy-blueprint.md`
 **Predecessor:** `docs/academy-update-plan.md` (July — admin, instructor pipeline, wallet, CBT exams; all built). Its hard constraints (Part 1) still bind this plan and are restated in §0.3.
 
 > **How to drive this plan.** Say **"start phase N"**. The executor reads this file + the spec, opens a branch `mastery/phase-N`, expands the phase into bite-sized tasks (superpowers:subagent-driven-development), and reports against the phase's **Exit criteria** checklist — those are the sentences to read out in a status meeting. Phases are ordered by dependency; the "Parallel tracks" table in §0.5 shows what can overlap. Each phase ends with `pnpm lint`, `npx tsc --noEmit`, and a walk through the affected routes in `pnpm dev:mock` (mock Clerk, local Mongo, persona cookie `mock_persona=student|instructor|admin|guest`).
@@ -11,7 +11,7 @@
 |---|---|---|---|---|
 | 0 | Foundations — brand, schools taxonomy, package schema | 2–3 d | **done** 2026-09-14 (branch `mastery/phase-0`, 6 code commits, tasks in `docs/plans/mastery-phase-0.md`) | Brand renamed with one shared lockup; 8-school taxonomy + `Course.school`; package/tier schema on course/lesson/enrollment/order + entitlements helper; save action validates school and packages (price derives from packages); catalogue script dry-runs clean and seeds the mock DB (12 programs). Not yet applied to production (Phase 8). |
 | 1 | Public site — homepage, schools index, school pages | 3–4 d | **done** 2026-09-14 (branch `mastery/phase-1` off `mastery/phase-0`, 9 code commits, tasks in `docs/plans/mastery-phase-1.md`) | Homepage rebuilt to §1–4/11/14–16 (eleven sections; one How-it-works timeline replaces the old Programs index + Rooms timeline; `hero-slider.tsx` and its orphans deleted); `/schools` and `/schools/[slug]` live with program counts and "View program" → `/courses/[id]`; navbar/footer/sidebar point at Schools · Programs · How it works; phone width verified (no overflow at 400px). Open product items: §16 says "Create Your Future" while the tagline says "Own"; "Explore programs" CTAs land on `/schools` while nav "Programs" lands on `/courses`; programs have no thumbnails yet (school icon fallback shown). |
-| 2 | Program page + packages editor + catalogue content | 3–4 d | not started | — |
+| 2 | Program page + packages editor + catalogue content | 3–4 d | **done** 2026-09-14 (branch `mastery/phase-2` off `mastery/phase-1`, 10 code commits, tasks in `docs/plans/mastery-phase-2.md`) | `/programs/[slug]` live: hero, what you'll learn, a 1–3-package ladder with a checkout link per package, what's included, instructor, FAQ and a phone price bar. `/programs` lists every program by school; `/courses` and `/courses/[id]` redirect (308). Instructors and admins edit packages (validated server-side, course price follows the cheapest tier) and per-lesson minimum packages limited to the tiers a course sells. Guests who sign in from a program page return to it. Checkout still charges the course price, so this ships with Phase 3 (carry-overs written into Phase 3). Content debt for product: intros for 7 schools; curricula, descriptions and package ladders for the 9 single-price programs; thumbnails for all 12; instructor bios; §6 per-package description sentences; Crypto's top tier label ("Executive 1-on-1" in §7 vs "Executive 101"); legal pages. |
 | 3 | Checkout + tier commerce + entitlement enforcement | 3–4 d | not started | — |
 | 4 | Student dashboard per blueprint | 3–4 d | not started | — |
 | 5 | Faculty — profiles, public pages, editor | 2–3 d | not started | — |
@@ -282,10 +282,10 @@ Brand: "WorldStreet Academy" appears in 43 code locations; the lockup (mark + "W
 - `pnpm lint`, `npx tsc --noEmit`.
 
 ### Exit criteria
-- [ ] `/programs`, `/programs/[slug]` live; old `/courses*` URLs redirect.
-- [ ] Package ladder renders 1–3 packages from data; every CTA resolves to checkout with `package=`.
-- [ ] Editors (instructor + admin) manage packages and lesson tiers with server-side validation.
-- [ ] Content-debt list handed to product.
+- [x] `/programs`, `/programs/[slug]` live; old `/courses*` URLs redirect.
+- [x] Package ladder renders 1–3 packages from data; every CTA resolves to checkout with `package=`.
+- [x] Editors (instructor + admin) manage packages and lesson tiers with server-side validation.
+- [x] Content-debt list handed to product.
 
 ---
 
