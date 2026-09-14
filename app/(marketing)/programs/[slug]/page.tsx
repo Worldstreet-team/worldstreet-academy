@@ -74,7 +74,7 @@ export default async function ProgramPage({ params }: Params) {
     program.whatYouWillLearn.length + program.requirements.length + program.targetAudience.length > 0
 
   return (
-    <article className="pb-24 md:pb-32">
+    <article className={access.kind === "open" ? "md:pb-32" : "pb-24 md:pb-32"}>
       <ProgramHero
         program={program}
         access={access}
