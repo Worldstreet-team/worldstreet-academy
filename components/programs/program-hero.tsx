@@ -7,7 +7,6 @@ import { levelChipStyle } from "@/components/shared/level-badge"
 import { AvailabilityCountdown } from "@/components/shared/availability-countdown"
 import { CourseSchedulingCta } from "@/components/shared/course-scheduling-cta"
 import { WishlistButton } from "@/components/marketing/wishlist-button"
-import { programPriceLabel } from "@/components/marketing/program-row"
 import type { ProgramAccess } from "@/components/programs/access"
 
 /**
@@ -21,12 +20,17 @@ export function ProgramHero({
   access,
   scheduling,
   signedIn,
+  fromPrice,
+  multiTier,
 }: {
   program: ProgramDetail
   access: ProgramAccess
-  /** Present only while the course is coming soon or the visitor holds a pre-launch reservation. */
+  /** Present only while the course is coming soon. */
   scheduling: { isComingSoon: boolean; isPreEnrolled: boolean } | null
   signedIn: boolean
+  /** Cheapest tier the ladder renders, whole USD — the page's one price source. */
+  fromPrice: number
+  multiTier: boolean
 }) {
   const school = program.school ? SCHOOL_BY_SLUG[program.school] : null
   const linkClass =
@@ -77,7 +81,9 @@ export function ProgramHero({
                 {program.level}
               </span>
             </li>
-            <li className="font-semibold tabular-nums text-ws-primary">{programPriceLabel(program)}</li>
+            <li className="font-semibold tabular-nums text-ws-primary">
+              {fromPrice === 0 ? "Free" : `${multiTier ? "From " : ""}$${fromPrice.toLocaleString("en-US")}`}
+            </li>
             {program.ratingCount > 0 && program.rating !== null && (
               <li className="inline-flex items-center gap-1">
                 <StarIcon size={13} className="text-ws-rating" fill="currentColor" aria-hidden />
@@ -136,7 +142,7 @@ export function ProgramHero({
                   href="#packages"
                   className="flex h-11 w-full items-center justify-center rounded-sm bg-ws-brand px-5 text-sm font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90"
                 >
-                  {program.packages.length > 1 ? "Choose your package" : "Enrol now"}
+                  {multiTier ? "Choose your package" : "Enrol now"}
                 </a>
                 <WishlistButton courseId={program.id} signedIn={signedIn} variant="full" />
               </div>

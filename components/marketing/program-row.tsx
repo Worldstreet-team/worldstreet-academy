@@ -6,20 +6,7 @@ import { courseAvailability } from "@/lib/types/course"
 import { levelChipStyle } from "@/components/shared/level-badge"
 import { SCHOOL_BY_SLUG } from "@/lib/schools"
 import { SchoolIcon } from "@/components/shared/school-icon"
-
-/**
- * Price line for a program row. `Course.price` is whole USD and, for
- * package ladders, already the cheapest enabled tier (Phase 0 rule) — so a
- * ladder reads "From $49", a single package or legacy course reads the
- * scalar, and free stays free.
- */
-export function programPriceLabel(
-  course: Pick<BrowseCourse, "pricing" | "price" | "tierCount">
-): string {
-  if (course.pricing === "free" || !course.price) return "Free"
-  const usd = `$${course.price.toLocaleString("en-US")}`
-  return course.tierCount > 1 ? `From ${usd}` : usd
-}
+import { programPriceLabel } from "@/lib/program-price"
 
 /**
  * One program on a school page (spec §5): title, blurb, level, price and the

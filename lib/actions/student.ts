@@ -378,7 +378,7 @@ export async function fetchProgramBySlug(slug: string): Promise<ProgramDetail | 
               key: "standard",
               name: "Full program",
               tagline: "",
-              price: course.price ?? 0,
+              price: course.pricing === "free" ? 0 : course.price ?? 0,
               features: whatYouWillLearn,
               highlight: false,
               ctaLabel: null,

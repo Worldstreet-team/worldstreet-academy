@@ -85,20 +85,22 @@ export function PackageLadder({
                     key={`${pkg.key}-${i}`}
                     className="flex items-start gap-2.5 text-[14px] leading-relaxed text-ws-muted"
                   >
-                    <CheckIcon size={15} className="mt-0.5 shrink-0 text-ws-gold" aria-hidden />
+                    <CheckIcon size={15} className="mt-0.5 shrink-0 text-ws-muted" aria-hidden />
                     {feature}
                   </li>
                 ))}
               </ul>
             )}
-            <div className="mt-auto pt-8">
-              <PackageCta
-                courseId={courseId}
-                pkg={pkg}
-                access={access}
-                primary={pkg.highlight || !multiTier}
-              />
-            </div>
+            {access.kind !== "enrolled" && (
+              <div className="mt-auto pt-8">
+                <PackageCta
+                  courseId={courseId}
+                  pkg={pkg}
+                  access={access}
+                  primary={pkg.highlight || !multiTier}
+                />
+              </div>
+            )}
           </li>
         ))}
       </ul>
@@ -107,10 +109,11 @@ export function PackageLadder({
 }
 
 /**
- * One card's action. Enrolled → continue; coming soon → nothing to buy yet
- * (the hero carries the countdown / pre-enrol button); otherwise the checkout
- * link carrying the package key. Guests hit the same link — middleware sends
- * them to sign in with this URL as the return address.
+ * One card's action. Enrolled visitors get none — the hero's "Continue
+ * learning" is the page's one CTA. Coming soon → nothing to buy yet (the hero
+ * carries the countdown / pre-enrol button); otherwise the checkout link
+ * carrying the package key. Guests hit the same link — middleware sends them
+ * to sign in with this URL as the return address.
  */
 function PackageCta({
   courseId,
@@ -120,19 +123,12 @@ function PackageCta({
 }: {
   courseId: string
   pkg: PublicPackage
-  access: ProgramAccess
+  access: Exclude<ProgramAccess, { kind: "enrolled" }>
   primary: boolean
 }) {
   const base =
     "flex h-11 w-full items-center justify-center rounded-sm px-5 text-sm font-semibold transition-opacity duration-[var(--ws-motion-fast)]"
 
-  if (access.kind === "enrolled") {
-    return (
-      <Link href={access.continueHref} className={cn(base, "bg-ws-brand text-ws-brand-on hover:opacity-90")}>
-        Continue learning
-      </Link>
-    )
-  }
   if (access.kind === "coming_soon") {
     return <p className={cn(base, "bg-ws-chip text-ws-muted")}>Available at launch</p>
   }

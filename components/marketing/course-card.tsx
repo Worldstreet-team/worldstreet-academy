@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 import { levelChipStyle } from "@/components/shared/level-badge"
 import { WishlistButton, autoBookmark } from "@/components/marketing/wishlist-button"
 import type { BrowseCourse } from "@/lib/actions/student"
+import { programPriceLabel } from "@/lib/program-price"
 
 export function formatDuration(totalMinutes: number): string {
   if (!totalMinutes || totalMinutes <= 0) return ""
@@ -16,12 +17,6 @@ export function formatDuration(totalMinutes: number): string {
   if (h === 0) return `${m}m`
   if (m === 0) return `${h}h`
   return `${h}h ${m}m`
-}
-
-export function formatPrice(pricing: string, price: number | null): string {
-  if (pricing === "free") return "Free"
-  if (price == null) return ""
-  return `$${price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 export function initials(name: string): string {
@@ -123,8 +118,8 @@ export function MarketingCourseCard({
                 Drops {dropDateLabel(course.availableAt)}
               </span>
             ) : (
-              <span className="text-[13px] font-semibold tabular-nums text-ws-gold">
-                {formatPrice(course.pricing, course.price)}
+              <span className="text-[13px] font-semibold tabular-nums text-ws-primary">
+                {programPriceLabel(course)}
               </span>
             )}
           </div>

@@ -86,8 +86,8 @@ const fullClasses =
   "text-sm font-semibold transition-opacity hover:opacity-90 " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40"
 
-/** Idle (not yet saved) reads as the page's primary action. */
-const fullIdleClasses = "bg-ws-brand text-ws-brand-on"
+/** Idle is a secondary action beside the page's primary CTA. */
+const fullIdleClasses = "border border-ws-hairline text-ws-primary"
 /** Saved steps back to a confirmed, secondary state — same height, no shift. */
 const fullSavedClasses = "border border-ws-hairline bg-ws-chip text-ws-primary"
 

@@ -1,7 +1,8 @@
 import type { Metadata } from "next"
 import { cache } from "react"
-import { notFound } from "next/navigation"
+import { notFound, permanentRedirect } from "next/navigation"
 import { fetchProgramBySlug } from "@/lib/actions/student"
+import { appUrl } from "@/lib/app-url"
 import { checkEnrollment } from "@/lib/actions/enrollments"
 import { getCachedUser } from "@/lib/auth/cached"
 import { courseAvailability } from "@/lib/types/course"
@@ -30,6 +31,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   return {
     title: program.title,
     description: program.shortDescription ?? program.description.slice(0, 160),
+    alternates: { canonical: appUrl(`/programs/${program.slug}`) },
   }
 }
 
@@ -40,6 +42,8 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
  */
 export default async function ProgramPage({ params }: Params) {
   const { slug } = await params
+  // Slugs are stored lowercase; any other casing redirects to the one URL.
+  if (slug !== slug.toLowerCase()) permanentRedirect(`/programs/${slug.toLowerCase()}`)
   const program = await getProgram(slug)
   if (!program) notFound()
 
@@ -61,22 +65,33 @@ export default async function ProgramPage({ params }: Params) {
     : isComingSoon
       ? { kind: "coming_soon" }
       : { kind: "open" }
-  const scheduling = !isEnrolled && (isComingSoon || isPreEnrolled) ? { isComingSoon, isPreEnrolled } : null
+  // Only while coming soon: a live reservation buys through the ladder, whose links carry the package.
+  const scheduling = !isEnrolled && isComingSoon ? { isComingSoon, isPreEnrolled } : null
+  // One price source for the hero and the sticky bar: the tiers the ladder renders.
+  const fromPrice = Math.min(...program.packages.map((p) => p.price))
+  const multiTier = program.packages.length > 1
   const hasOutcomes =
     program.whatYouWillLearn.length + program.requirements.length + program.targetAudience.length > 0
 
   return (
     <article className="pb-24 md:pb-32">
-      <ProgramHero program={program} access={access} scheduling={scheduling} signedIn={Boolean(user)} />
+      <ProgramHero
+        program={program}
+        access={access}
+        scheduling={scheduling}
+        signedIn={Boolean(user)}
+        fromPrice={fromPrice}
+        multiTier={multiTier}
+      />
       <div className="mx-auto max-w-7xl px-6">
         {hasOutcomes && (
-          <section className="mt-16" aria-label="What you will learn">
+          <div className="mt-16">
             <CourseOutcomes
               whatYouWillLearn={program.whatYouWillLearn}
               requirements={program.requirements}
               targetAudience={program.targetAudience}
             />
-          </section>
+          </div>
         )}
         <PackageLadder courseId={program.id} packages={program.packages} access={access} />
         <WhatsIncluded />
@@ -92,10 +107,7 @@ export default async function ProgramPage({ params }: Params) {
       </div>
       <Faq />
       {access.kind === "open" && (
-        <ProgramStickyBar
-          fromPrice={Math.min(...program.packages.map((p) => p.price))}
-          multiTier={program.packages.length > 1}
-        />
+        <ProgramStickyBar fromPrice={fromPrice} multiTier={multiTier} />
       )}
     </article>
   )

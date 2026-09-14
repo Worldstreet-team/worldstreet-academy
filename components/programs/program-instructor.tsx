@@ -49,7 +49,7 @@ export function ProgramInstructor({
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-1.5 font-display text-lg font-semibold text-ws-primary">
             {name}
-            <BadgeCheckIcon size={16} className="shrink-0 text-ws-gold" aria-label="Verified instructor" />
+            <BadgeCheckIcon size={16} className="shrink-0 text-ws-gold" role="img" aria-label="Verified instructor" />
           </p>
           {headline && <p className="mt-0.5 text-[14px] text-ws-muted">{headline}</p>}
           {totalStudents > 0 && (
