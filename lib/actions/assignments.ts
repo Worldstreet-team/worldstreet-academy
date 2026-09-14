@@ -6,7 +6,15 @@ import connectDB from "@/lib/db"
 import { Assignment, Course, Submission, User } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth/actions"
 import { notifyUser } from "@/lib/notify"
-import { generatePresignedDownloadUrl, hasPrivateResourceBucket, R2_RESOURCE_BUCKET } from "@/lib/r2"
+import { getCourseAccess } from "@/lib/course-access"
+import {
+  generatePresignedDownloadUrl,
+  generatePresignedUploadUrl,
+  generateSubmissionKey,
+  hasPrivateResourceBucket,
+  R2_RESOURCE_BUCKET,
+  submissionKeyPrefix,
+} from "@/lib/r2"
 
 /*
  * Practical assignments (spec §6, D7 v2). Instructors (course owner or admin)
@@ -286,5 +294,242 @@ export async function getSubmissionFileUrl(
   } catch (error) {
     console.error("Get submission file URL error:", error)
     return { success: false, error: "Couldn't prepare the download — try again" }
+  }
+}
+
+/* ═══════════════════ student ═══════════════════ */
+
+const MAX_SUBMISSION_BYTES = 25 * 1024 * 1024
+const MAX_SUBMISSION_FILES = 3
+const SUBMISSION_MIME = new Set([
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/csv",
+  "text/plain",
+  "application/zip",
+  "image/png",
+  "image/jpeg",
+])
+const MIME_ERROR = "Upload a PDF, Word, Excel, PowerPoint, CSV, text, PNG, JPEG or zip file"
+
+function isDuplicateKey(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === 11000
+}
+
+export type StudentSubmissionFile = SubmissionFileView & { key: string; mimeType: string }
+
+export type StudentAssignment = {
+  id: string
+  courseId: string
+  courseTitle: string
+  title: string
+  instructions: string
+  dueAt: string | null
+  submission: {
+    id: string
+    text: string
+    /** The student's own files — keys included so a resubmission can keep them (submitAssignment re-checks the prefix). */
+    files: StudentSubmissionFile[]
+    submittedAt: string
+    status: "submitted" | "graded"
+    grade: number | null
+    feedback: string
+  } | null
+}
+
+/** A published assignment on a course where the student's access-granting package includes assignments. */
+async function studentAssignmentGate(userId: string, assignmentId: string) {
+  const assignment = await Assignment.findOne({ _id: assignmentId, status: "published" }).lean()
+  if (!assignment) return { ok: false as const, error: "Assignment not found" }
+  const access = await getCourseAccess(userId, assignment.course.toString())
+  if (!access) return { ok: false as const, error: "Assignment not found" }
+  if (!access.entitlements.assignments) return { ok: false as const, error: "Assignments aren't included in your package" }
+  return { ok: true as const, assignment, access }
+}
+
+export async function getAssignmentForStudent(
+  assignmentId: string
+): Promise<{ success: true; data: StudentAssignment } | { success: false; error: string }> {
+  try {
+    await connectDB()
+    const user = await getCurrentUser()
+    if (!user) return { success: false, error: "You need to be signed in" }
+    if (!OBJECT_ID.test(assignmentId)) return { success: false, error: "Assignment not found" }
+
+    const gate = await studentAssignmentGate(user.id, assignmentId)
+    if (!gate.ok) return { success: false, error: gate.error }
+
+    const [course, submission] = await Promise.all([
+      Course.findById(gate.assignment.course).select("title").lean(),
+      Submission.findOne({ assignment: gate.assignment._id, user: user.id }).lean(),
+    ])
+
+    return {
+      success: true,
+      data: {
+        id: gate.assignment._id.toString(),
+        courseId: gate.assignment.course.toString(),
+        courseTitle: course?.title ?? "",
+        title: gate.assignment.title,
+        instructions: gate.assignment.instructions ?? "",
+        dueAt: gate.assignment.dueAt ? gate.assignment.dueAt.toISOString() : null,
+        submission: submission
+          ? {
+              id: submission._id.toString(),
+              text: submission.text ?? "",
+              files: (submission.files ?? []).map((file, index) => ({
+                index,
+                key: file.key,
+                filename: file.filename || `File ${index + 1}`,
+                mimeType: file.mimeType ?? "",
+                sizeBytes: file.sizeBytes ?? 0,
+              })),
+              submittedAt: submission.submittedAt.toISOString(),
+              status: submission.status,
+              grade: submission.grade ?? null,
+              feedback: submission.feedback ?? "",
+            }
+          : null,
+      },
+    }
+  } catch (error) {
+    console.error("Get assignment for student error:", error)
+    return { success: false, error: "Couldn't load the assignment — try again" }
+  }
+}
+
+const UploadInput = z.object({
+  assignmentId: z.string().regex(OBJECT_ID, "Assignment not found"),
+  filename: z.string().trim().min(1, "Choose a file").max(200, "Rename the file to under 200 characters"),
+  contentType: z.string().max(200),
+  sizeBytes: z.number().int().min(1, "Choose a file").max(MAX_SUBMISSION_BYTES, "Files can be up to 25 MB"),
+})
+
+/**
+ * A presigned PUT into the PRIVATE resources bucket, inside this student's
+ * folder for this assignment. The file goes straight from the browser to R2;
+ * refused outright when the private bucket isn't configured.
+ */
+export async function getSubmissionUploadUrl(
+  assignmentId: string,
+  filename: string,
+  contentType: string,
+  sizeBytes: number
+): Promise<{ success: true; data: { uploadUrl: string; storageKey: string } } | { success: false; error: string }> {
+  try {
+    await connectDB()
+    const user = await getCurrentUser()
+    if (!user) return { success: false, error: "You need to be signed in" }
+
+    const parsed = UploadInput.safeParse({ assignmentId, filename, contentType, sizeBytes })
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? "Choose a file" }
+    }
+
+    const gate = await studentAssignmentGate(user.id, parsed.data.assignmentId)
+    if (!gate.ok) return { success: false, error: gate.error }
+    const existing = await Submission.findOne({ assignment: gate.assignment._id, user: user.id }).select("status").lean()
+    if (existing?.status === "graded") return { success: false, error: "This assignment has already been graded" }
+    if (!SUBMISSION_MIME.has(parsed.data.contentType)) return { success: false, error: MIME_ERROR }
+    if (!hasPrivateResourceBucket()) return { success: false, error: "File uploads aren't available right now" }
+
+    const storageKey = generateSubmissionKey(parsed.data.assignmentId, user.id, parsed.data.filename)
+    const { uploadUrl } = await generatePresignedUploadUrl(storageKey, parsed.data.contentType, 900, R2_RESOURCE_BUCKET)
+    return { success: true, data: { uploadUrl, storageKey } }
+  } catch (error) {
+    console.error("Submission upload URL error:", error)
+    return { success: false, error: "Couldn't prepare the upload — try again" }
+  }
+}
+
+const SubmitInput = z
+  .object({
+    assignmentId: z.string().regex(OBJECT_ID, "Assignment not found"),
+    text: z.string().trim().max(10000, "Keep your answer under 10,000 characters"),
+    files: z
+      .array(
+        z.object({
+          key: z.string().min(1, "Upload your files again").max(300, "Upload your files again"),
+          filename: z.string().trim().min(1, "Upload your files again").max(200, "Upload your files again"),
+          mimeType: z.string().max(200),
+          sizeBytes: z.number().int().min(0).max(MAX_SUBMISSION_BYTES, "Files can be up to 25 MB"),
+        })
+      )
+      .max(MAX_SUBMISSION_FILES, "Attach up to three files"),
+  })
+  .refine((value) => value.text.length > 0 || value.files.length > 0, {
+    message: "Write an answer or attach a file",
+  })
+
+/**
+ * Submit or resubmit (until graded). Files must already be uploaded through
+ * getSubmissionUploadUrl — only keys inside this student's own folder are accepted.
+ */
+export async function submitAssignment(input: {
+  assignmentId: string
+  text: string
+  files: { key: string; filename: string; mimeType: string; sizeBytes: number }[]
+}): Promise<{ success: true; data: { submittedAt: string } } | { success: false; error: string }> {
+  try {
+    await connectDB()
+    const user = await getCurrentUser()
+    if (!user) return { success: false, error: "You need to be signed in" }
+
+    const parsed = SubmitInput.safeParse(input)
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? "Check your submission and try again" }
+    }
+
+    const gate = await studentAssignmentGate(user.id, parsed.data.assignmentId)
+    if (!gate.ok) return { success: false, error: gate.error }
+
+    const prefix = submissionKeyPrefix(parsed.data.assignmentId, user.id)
+    const files = parsed.data.files
+    if (files.some((file) => !file.key.startsWith(prefix) || file.key.includes(".."))) {
+      return { success: false, error: "Upload your files again" }
+    }
+    if (files.some((file) => !SUBMISSION_MIME.has(file.mimeType))) return { success: false, error: MIME_ERROR }
+    if (files.length > 0 && !hasPrivateResourceBucket()) {
+      return { success: false, error: "File uploads aren't available right now" }
+    }
+
+    const existing = await Submission.findOne({ assignment: gate.assignment._id, user: user.id }).select("status").lean()
+    if (existing?.status === "graded") return { success: false, error: "This assignment has already been graded" }
+
+    const submittedAt = new Date()
+    try {
+      // One row per student per assignment. A graded row can't match the filter,
+      // so a race with grading hits the unique index instead of overwriting a grade.
+      await Submission.findOneAndUpdate(
+        { assignment: gate.assignment._id, user: user.id, status: { $ne: "graded" } },
+        {
+          $set: { text: parsed.data.text, files, status: "submitted", submittedAt },
+          $setOnInsert: { course: gate.assignment.course, enrollment: gate.access.enrollmentId },
+        },
+        { upsert: true, new: true, runValidators: true }
+      )
+    } catch (error) {
+      if (isDuplicateKey(error)) return { success: false, error: "This assignment has already been graded" }
+      throw error
+    }
+
+    void notifyUser(gate.access.course.instructorId, {
+      type: "course",
+      title: "New assignment submission",
+      body: `${fullName(user, "A student")} submitted ${gate.assignment.title}.`.slice(0, 500),
+      href: `/instructor/courses/${gate.assignment.course.toString()}/assignments`,
+    })
+
+    revalidatePath(`/dashboard/assignments/${parsed.data.assignmentId}`)
+    revalidatePath(`/instructor/courses/${gate.assignment.course.toString()}/assignments`)
+    return { success: true, data: { submittedAt: submittedAt.toISOString() } }
+  } catch (error) {
+    console.error("Submit assignment error:", error)
+    return { success: false, error: "Couldn't submit — try again" }
   }
 }

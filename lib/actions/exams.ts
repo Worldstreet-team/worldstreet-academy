@@ -11,6 +11,8 @@ import {
   Course,
   Enrollment,
   Lesson,
+  Assignment,
+  Submission,
   type IExamSettings,
   type QuestionType,
   type AttemptStatus,
@@ -469,13 +471,16 @@ export async function getStudentExamStatus(
 /* ═══════════════════ student: assignments (spec §12, D7 lite) ═══════════════════ */
 
 export type MyAssessment = {
+  /** Exam id — or assignment id when scope is "assignment". */
+  id: string
   courseId: string
   courseTitle: string
-  examId: string
   title: string
-  scope: "final" | "lesson"
+  scope: "final" | "lesson" | "assignment"
   lessonId: string | null
-  status: "not_started" | "in_progress" | "passed" | "failed" | "locked"
+  status: "not_started" | "in_progress" | "passed" | "failed" | "locked" | "submitted" | "graded"
+  /** Assignments only: due date (ISO) when set. */
+  dueAt: string | null
   href: string
 }
 
@@ -484,8 +489,13 @@ const ASSESSMENT_STATUS_ORDER: Record<MyAssessment["status"], number> = {
   not_started: 1,
   failed: 2,
   locked: 3,
-  passed: 4,
+  submitted: 4,
+  passed: 5,
+  graded: 6,
 }
+
+/** Within a course: knowledge checks, then the final exam, then assignments. */
+const ASSESSMENT_SCOPE_ORDER: Record<MyAssessment["scope"], number> = { lesson: 0, final: 1, assignment: 2 }
 
 type AssessmentAttempt = { _id: Types.ObjectId; status: AttemptStatus; submittedAt: Date | null; createdAt: Date }
 
@@ -514,15 +524,18 @@ function latestFinishedAttempt(history: AssessmentAttempt[]): AssessmentAttempt 
 }
 
 /**
- * Every published assessment the student can take across their active /
- * completed enrollments — the dashboard's Assignments tile (D7 lite: the
- * existing exam engine; file submissions are Phase 7). Knowledge checks follow
- * their lesson's tier and the final exam follows `certificate` (the rules
- * behind examPackageLock); a final also needs 100% progress to start, exactly
- * like `startExamAttempt` — short of that it's `locked`, never a false
- * `not_started`. Deliberately NOT gated on the `assignments` entitlement,
- * which is reserved for Phase 7 submissions. Five bulk queries at most (four
- * when no knowledge checks), whatever the number of courses.
+ * Everything the student can take or submit across their active / completed
+ * enrollments — the dashboard's Assignments tile and /dashboard/assignments.
+ *
+ * Exams (D7 lite): knowledge checks follow their lesson's tier and the final
+ * exam follows `certificate` (the rules behind examPackageLock); a final also
+ * needs 100% progress to start, exactly like `startExamAttempt` — short of that
+ * it's `locked`, never a false `not_started`. Exams are NOT gated on the
+ * `assignments` entitlement.
+ *
+ * Practical assignments (Phase 7): published ones on programs whose package
+ * includes `assignments`, with the student's submission state. Bulk queries
+ * only, whatever the number of courses.
  */
 export async function getMyAssessments(): Promise<MyAssessment[]> {
   try {
@@ -539,20 +552,28 @@ export async function getMyAssessments(): Promise<MyAssessment[]> {
       Course.find({ _id: { $in: courseIds } }).select("title packages").lean(),
       Exam.find({ course: { $in: courseIds }, status: "published" }).select("course scope lesson title").lean(),
     ])
-    if (exams.length === 0) return []
+    const coursesById = new Map(courses.map((c) => [c._id.toString(), c]))
+    const enrollmentsByCourse = new Map(enrollments.map((e) => [e.course.toString(), e]))
+    // Assignments are a package service: only programs whose package includes them.
+    const assignmentCourseIds = enrollments.flatMap((e) => {
+      const course = coursesById.get(e.course.toString())
+      return course && entitlementsFor(course, e).assignments ? [e.course] : []
+    })
 
     const quizLessonIds = exams.flatMap((exam) => (exam.scope === "lesson" && exam.lesson ? [exam.lesson] : []))
-    const [lessons, attempts] = await Promise.all([
-      quizLessonIds.length > 0
-        ? Lesson.find({ _id: { $in: quizLessonIds } }).select("course minPackageKey isFree").lean()
-        : Promise.resolve([]),
+    const [lessons, attempts, assignments] = await Promise.all([
+      Lesson.find({ _id: { $in: quizLessonIds } }).select("course minPackageKey isFree").lean(),
       ExamAttempt.find({ user: user.id, exam: { $in: exams.map((exam) => exam._id) } })
         .select("exam status submittedAt createdAt")
         .lean(),
+      Assignment.find({ course: { $in: assignmentCourseIds }, status: "published" })
+        .select("course title dueAt")
+        .lean(),
     ])
+    const submissions = await Submission.find({ user: user.id, assignment: { $in: assignments.map((a) => a._id) } })
+      .select("assignment status")
+      .lean()
 
-    const coursesById = new Map(courses.map((c) => [c._id.toString(), c]))
-    const enrollmentsByCourse = new Map(enrollments.map((e) => [e.course.toString(), e]))
     const lessonsById = new Map(lessons.map((l) => [l._id.toString(), l]))
     // Grouped per exam; latestFinishedAttempt() below picks the authoritative one.
     const attemptsByExam = new Map<string, AssessmentAttempt[]>()
@@ -604,14 +625,32 @@ export async function getMyAssessments(): Promise<MyAssessment[]> {
                 : "not_started"
 
       rows.push({
+        id: exam._id.toString(),
         courseId,
         courseTitle: course.title,
-        examId: exam._id.toString(),
         title: exam.title,
         scope: isQuiz ? "lesson" : "final",
         lessonId,
         status,
+        dueAt: null,
         href: isQuiz ? `/dashboard/courses/${courseId}/learn/${lessonId}` : `/dashboard/courses/${courseId}/exam`,
+      })
+    }
+
+    const submissionStatus = new Map(submissions.map((s) => [s.assignment.toString(), s.status]))
+    for (const assignment of assignments) {
+      const courseId = assignment.course.toString()
+      const id = assignment._id.toString()
+      rows.push({
+        id,
+        courseId,
+        courseTitle: coursesById.get(courseId)?.title ?? "",
+        title: assignment.title,
+        scope: "assignment",
+        lessonId: null,
+        status: submissionStatus.get(id) ?? "not_started",
+        dueAt: assignment.dueAt ? assignment.dueAt.toISOString() : null,
+        href: `/dashboard/assignments/${id}`,
       })
     }
 
@@ -619,7 +658,8 @@ export async function getMyAssessments(): Promise<MyAssessment[]> {
       (a, b) =>
         ASSESSMENT_STATUS_ORDER[a.status] - ASSESSMENT_STATUS_ORDER[b.status] ||
         a.courseTitle.localeCompare(b.courseTitle) ||
-        (a.scope === b.scope ? a.title.localeCompare(b.title) : a.scope === "lesson" ? -1 : 1)
+        ASSESSMENT_SCOPE_ORDER[a.scope] - ASSESSMENT_SCOPE_ORDER[b.scope] ||
+        a.title.localeCompare(b.title)
     )
   } catch (error) {
     console.error("Get my assessments error:", error)
