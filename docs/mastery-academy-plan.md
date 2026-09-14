@@ -10,7 +10,7 @@
 | Phase | Name | Est. | Status | Report line |
 |---|---|---|---|---|
 | 0 | Foundations — brand, schools taxonomy, package schema | 2–3 d | **done** 2026-09-14 (branch `mastery/phase-0`, 6 code commits, tasks in `docs/plans/mastery-phase-0.md`) | Brand renamed with one shared lockup; 8-school taxonomy + `Course.school`; package/tier schema on course/lesson/enrollment/order + entitlements helper; save action validates school and packages (price derives from packages); catalogue script dry-runs clean and seeds the mock DB (12 programs). Not yet applied to production (Phase 8). |
-| 1 | Public site — homepage, schools index, school pages | 3–4 d | not started | — |
+| 1 | Public site — homepage, schools index, school pages | 3–4 d | **done** 2026-09-14 (branch `mastery/phase-1` off `mastery/phase-0`, 9 code commits, tasks in `docs/plans/mastery-phase-1.md`) | Homepage rebuilt to §1–4/11/14–16 (eleven sections; one How-it-works timeline replaces the old Programs index + Rooms timeline; `hero-slider.tsx` and its orphans deleted); `/schools` and `/schools/[slug]` live with program counts and "View program" → `/courses/[id]`; navbar/footer/sidebar point at Schools · Programs · How it works; phone width verified (no overflow at 400px). Open product items: §16 says "Create Your Future" while the tagline says "Own"; "Explore programs" CTAs land on `/schools` while nav "Programs" lands on `/courses`; programs have no thumbnails yet (school icon fallback shown). |
 | 2 | Program page + packages editor + catalogue content | 3–4 d | not started | — |
 | 3 | Checkout + tier commerce + entitlement enforcement | 3–4 d | not started | — |
 | 4 | Student dashboard per blueprint | 3–4 d | not started | — |
@@ -230,9 +230,9 @@ Brand: "WorldStreet Academy" appears in 43 code locations; the lockup (mark + "W
 - `pnpm lint`, `npx tsc --noEmit`.
 
 ### Exit criteria
-- [ ] `/`, `/schools`, `/schools/[slug]` live with blueprint copy; §17 journey works through "View program".
-- [ ] `programs-list.tsx` and `rooms-timeline.tsx` removed; one `HowItWorks`.
-- [ ] Navbar/footer/sidebar labels updated; no dead links.
+- [x] `/`, `/schools`, `/schools/[slug]` live with blueprint copy; §17 journey works through "View program".
+- [x] `programs-list.tsx` and `rooms-timeline.tsx` removed; one `HowItWorks`.
+- [x] Navbar/footer/sidebar labels updated; no dead links.
 
 ---
 
