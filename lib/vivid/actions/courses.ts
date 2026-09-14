@@ -203,7 +203,7 @@ export async function vividEnrollInCourse(p: { courseId: string }) {
     const existing = await Enrollment.findOne({ user: currentUser.id, course: course._id })
     if (existing) return { success: true, already: true, message: "Already enrolled" }
 
-    const sellsPackages = (course.packages ?? []).some((p) => p.enabled)
+    const sellsPackages = (course.packages ?? []).some((pkg) => pkg.enabled)
 
     if (course.pricing === "free" && !sellsPackages) {
       // Route through the shared purchase action so enrollment side-effects

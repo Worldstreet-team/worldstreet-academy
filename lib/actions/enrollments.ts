@@ -22,7 +22,7 @@ import { getCurrentUser } from "@/lib/auth/actions"
 import { courseAvailability } from "@/lib/types/course"
 import { sendEnrollmentConfirmationEmail } from "@/lib/email"
 import { notifyAdmins, notifyUser } from "@/lib/notify"
-import { packageFor } from "@/lib/entitlements"
+import { PACKAGE_KEYS, packageFor } from "@/lib/entitlements"
 import {
   createWalletCharge,
   refundWalletCharge,
@@ -78,7 +78,7 @@ export type PurchaseResult =
 
 const PurchaseInput = z.object({
   courseId: z.string().regex(/^[a-f0-9]{24}$/),
-  packageKey: z.enum(["basic", "standard", "executive"]).optional(),
+  packageKey: z.enum(PACKAGE_KEYS).optional(),
 })
 
 async function transitionOrder(order: IOrder, status: OrderStatus, note?: string) {
@@ -243,7 +243,7 @@ export async function purchaseCourse(input: { courseId: string; packageKey?: Pac
           metadata: {
             courseId: course._id.toString(),
             courseSlug: course.slug ?? "",
-            packageKey: packageFields.packageKey,
+            ...(packageFields.packageKey ? { packageKey: packageFields.packageKey } : {}),
           },
           idempotencyKey: reference,
         })
@@ -329,10 +329,15 @@ export async function purchaseCourse(input: { courseId: string; packageKey?: Pac
         })
       }
     } catch (err: unknown) {
-      const isDuplicate = typeof err === "object" && err !== null && (err as { code?: number }).code === 11000
-      const winner = isDuplicate
-        ? await Enrollment.findOne({ user: user.id, course: courseId, status: { $in: ["active", "completed"] } })
-        : null
+      // Whatever went wrong, first ask whether an access-granting row already
+      // holds THIS request's charge — a same-reference sibling, or our own
+      // write, may have committed even though this call errored. Refunding that
+      // charge would leave access on a refunded debit.
+      const winner = await Enrollment.findOne({
+        user: user.id,
+        course: courseId,
+        status: { $in: ["active", "completed"] },
+      }).catch(() => null)
       // Raced with another request for the same user+course. Same package →
       // same reference → the wallet replayed ONE charge, so the winner holds our
       // charge (or nobody charged) and there is nothing to undo.
@@ -349,9 +354,19 @@ export async function purchaseCourse(input: { courseId: string; packageKey?: Pac
       // reconciliation job surfaces it.
       if (isPaid && chargeId) {
         try {
-          await refundWalletCharge(user.authUserId, chargeId, "enrollment creation failed")
+          await refundWalletCharge(
+            user.authUserId,
+            chargeId,
+            winner ? "lost a concurrent purchase" : "enrollment creation failed"
+          )
           if (order) {
-            await transitionOrder(order, "refunded", "compensating refund after enroll failure")
+            await transitionOrder(
+              order,
+              "refunded",
+              winner
+                ? "compensating refund — a concurrent purchase took the enrollment"
+                : "compensating refund after enroll failure"
+            )
             await logPaymentEvent(order._id, reference, "charge_refunded", { chargeId })
           }
         } catch (refundErr) {
