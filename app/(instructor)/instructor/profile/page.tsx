@@ -2,12 +2,16 @@ import { Topbar } from "@/components/platform/topbar"
 import { PageHeader } from "@/components/shared/page-header"
 import { getCurrentUser } from "@/lib/auth"
 import { getMySignature } from "@/lib/actions/signature"
+import { getMyFacultyProfile } from "@/lib/actions/profile"
+import { countryOptions } from "@/lib/countries"
 import { InstructorProfileClient } from "./instructor-profile-client"
+import { FacultyProfileCard } from "./faculty-profile-card"
 
 export default async function InstructorProfilePage() {
-  const [currentUser, currentSignature] = await Promise.all([
+  const [currentUser, currentSignature, faculty] = await Promise.all([
     getCurrentUser(),
     getMySignature(),
+    getMyFacultyProfile(),
   ])
 
   return (
@@ -17,13 +21,17 @@ export default async function InstructorProfilePage() {
         <div className="mx-auto w-full max-w-2xl space-y-8">
           <PageHeader
             title="My Profile"
-            subline="Manage your instructor profile and signature."
+            subline="Manage your instructor profile, faculty page and signature."
           />
 
           <InstructorProfileClient
             user={currentUser}
             currentSignatureUrl={currentSignature}
-          />
+          >
+            {/* Country names are computed here, on the server, so the select's
+                server-rendered label matches hydration. */}
+            {faculty && <FacultyProfileCard initial={faculty} countries={countryOptions()} />}
+          </InstructorProfileClient>
         </div>
       </div>
     </>

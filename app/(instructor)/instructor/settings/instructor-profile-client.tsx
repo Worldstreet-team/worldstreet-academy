@@ -173,6 +173,7 @@ export function InstructorProfileClient({
               id="bio"
               value={bio}
               onChange={(e) => setBio(e.target.value)}
+              maxLength={1000}
               className="min-h-20"
               placeholder="Describe your teaching background…"
             />

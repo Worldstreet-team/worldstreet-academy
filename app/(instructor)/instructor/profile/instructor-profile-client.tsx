@@ -1,11 +1,10 @@
 "use client"
 
-import { useRef, useState, useTransition } from "react"
+import { useRef, useState, useTransition, type ReactNode } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { SignatureCanvas } from "@/components/shared/signature-canvas"
 import { updateAvatar, updateProfile } from "@/lib/actions/profile"
@@ -17,9 +16,12 @@ import { CameraIcon, CheckIcon } from "lucide-react"
 export function InstructorProfileClient({
   user,
   currentSignatureUrl,
+  children,
 }: {
   user: LocalUser | null
   currentSignatureUrl: string | null
+  /** Rendered between the account card and the signature card — the faculty profile card. */
+  children?: ReactNode
 }) {
   const avatarInputRef = useRef<HTMLInputElement>(null)
 
@@ -30,7 +32,6 @@ export function InstructorProfileClient({
 
   const [firstName, setFirstName] = useState(user?.firstName ?? "")
   const [lastName, setLastName] = useState(user?.lastName ?? "")
-  const [bio, setBio] = useState(user?.bio ?? "")
   const [isPending, startTransition] = useTransition()
   const [saved, setSaved] = useState(false)
 
@@ -69,7 +70,7 @@ export function InstructorProfileClient({
 
   const handleSaveProfile = () => {
     startTransition(async () => {
-      const result = await updateProfile({ firstName, lastName, bio })
+      const result = await updateProfile({ firstName, lastName })
       if (result.success) {
         setSaved(true)
         setTimeout(() => setSaved(false), 2500)
@@ -175,16 +176,6 @@ export function InstructorProfileClient({
               />
             </div>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="bio">Bio</Label>
-            <Textarea
-              id="bio"
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-              className="min-h-24"
-              placeholder="Share your teaching experience and expertise…"
-            />
-          </div>
 
           <div className="flex items-center gap-3">
             <Button size="sm" onClick={handleSaveProfile} disabled={isPending}>
@@ -199,6 +190,8 @@ export function InstructorProfileClient({
           </div>
         </CardContent>
       </Card>
+
+      {children}
 
       {/* ── Signature card ────────────────────────────────────── */}
       <Card>
