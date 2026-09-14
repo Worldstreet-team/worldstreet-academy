@@ -2,9 +2,10 @@
 
 import { Types } from "mongoose"
 import connectDB from "@/lib/db"
-import { Message, Conversation, User, type IMessage, type IConversation, type IUser } from "@/lib/db/models"
+import { Message, Conversation, User, Course, Enrollment, type IMessage, type IConversation, type IUser } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth"
 import { emitEvent, type MessageEventPayload } from "@/lib/call-events"
+import { entitlementsFor } from "@/lib/entitlements"
 
 export type ConversationWithDetails = {
   id: string
@@ -346,6 +347,30 @@ export async function getOrCreateConversation(userId: string): Promise<{
     })
 
     if (!conversation) {
+      // Instructor Q&A is a package entitlement: a student whose enrollments
+      // with this instructor all lack it can't open a new thread with them.
+      // Existing threads stay; people with no enrollment with them are unaffected.
+      if (currentUser.role === "USER") {
+        const taught = await Course.find({ instructor: recipientId }).select("_id packages").lean()
+        if (taught.length > 0) {
+          const enrollments = await Enrollment.find({
+            user: senderId,
+            course: { $in: taught.map((c) => c._id) },
+            status: { $in: ["active", "completed"] },
+          })
+            .select("course packageKey")
+            .lean()
+          const coursesById = new Map(taught.map((c) => [c._id.toString(), c]))
+          const includesQa = enrollments.some((e) => {
+            const course = coursesById.get(e.course.toString())
+            return course ? entitlementsFor(course, e).instructorQa : false
+          })
+          if (enrollments.length > 0 && !includesQa) {
+            return { success: false, error: "Instructor Q&A isn't included in your package" }
+          }
+        }
+      }
+
       conversation = await Conversation.create({
         participants: [senderId, recipientId],
         lastMessageAt: new Date(),

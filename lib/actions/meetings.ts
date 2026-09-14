@@ -8,6 +8,8 @@ import { getCurrentUser } from "@/lib/auth"
 import { createMeeting as createRTKMeeting, addParticipant } from "@/lib/realtime"
 import { emitEvent, emitEventToMany, type MeetingEventPayload } from "@/lib/call-events"
 import { sendMeetingNotificationEmail, sendMeetingInviteEmail } from "@/lib/email"
+import { getCourseAccess } from "@/lib/course-access"
+import { entitlementsFor } from "@/lib/entitlements"
 
 // ── Helpers ──
 
@@ -195,6 +197,19 @@ export async function joinMeeting(meetingId: string): Promise<{
           createdAt: meeting.createdAt.toISOString(),
           startedAt: meeting.startedAt?.toISOString(),
         },
+      }
+    }
+
+    // Course classes: admins, direct invitees, and students whose package
+    // includes live classes. A class link is not a way into paid content.
+    if (meeting.courseId && currentUser.role !== "ADMIN") {
+      const invited = (meeting.invites ?? []).some((inv) => inv.userId?.toString() === currentUser.id)
+      if (!invited) {
+        const access = await getCourseAccess(currentUser.id, meeting.courseId.toString())
+        if (!access) return { success: false, error: "This live class is for students enrolled in the course" }
+        if (!access.entitlements.liveClasses) {
+          return { success: false, error: "Live classes aren't included in your package" }
+        }
       }
     }
 
@@ -1787,16 +1802,19 @@ export async function createCourseMeeting(
     const meetingLink = `${protocol}://${host}/dashboard/meetings?join=${meeting._id.toString()}`
     const hostName = `${currentUser.firstName} ${currentUser.lastName}`.trim()
 
+    // Only packages with live classes hear about — and may join — a class.
+    const classEnrollments = (
+      await Enrollment.find({
+        course: new Types.ObjectId(courseId),
+        status: { $in: ["active", "completed"] },
+      })
+        .select("user packageKey")
+        .lean()
+    ).filter((e) => entitlementsFor(course, e).liveClasses)
+
     backgroundSave(
       (async () => {
-        const enrollments = await Enrollment.find({
-          course: new Types.ObjectId(courseId),
-          status: { $in: ["active", "completed"] },
-        })
-          .select("user")
-          .lean()
-
-        const studentIds = enrollments.map((e) => e.user.toString())
+        const studentIds = classEnrollments.map((e) => e.user.toString())
         if (studentIds.length === 0) return
 
         const students = await User.find({ _id: { $in: studentIds } })
@@ -1818,16 +1836,10 @@ export async function createCourseMeeting(
       })()
     )
 
-    // Count enrolled students for UI feedback
-    const enrolledCount = await Enrollment.countDocuments({
-      course: new Types.ObjectId(courseId),
-      status: { $in: ["active", "completed"] },
-    })
-
     return {
       success: true,
       authToken: hostParticipant.authToken,
-      notifiedCount: enrolledCount,
+      notifiedCount: classEnrollments.length,
       meeting: {
         id: meeting._id.toString(),
         title: meeting.title,
@@ -2057,11 +2069,22 @@ export async function getMyMeetingInvites(): Promise<{
         user: new Types.ObjectId(currentUser.id),
         status: { $in: ["active", "completed"] },
       })
-        .select("course")
+        .select("course packageKey")
         .lean(),
     ])
 
-    const enrolledCourseIds = enrollments.map((e) => e.course)
+    // A course's classes show only for enrollments whose package includes live classes.
+    const enrolledCourses =
+      enrollments.length > 0
+        ? await Course.find({ _id: { $in: enrollments.map((e) => e.course) } }).select("packages").lean()
+        : []
+    const coursesById = new Map(enrolledCourses.map((c) => [c._id.toString(), c]))
+    const enrolledCourseIds = enrollments
+      .filter((e) => {
+        const course = coursesById.get(e.course.toString())
+        return course ? entitlementsFor(course, e).liveClasses : false
+      })
+      .map((e) => e.course)
 
     const courseMeetings =
       enrolledCourseIds.length > 0

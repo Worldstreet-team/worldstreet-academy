@@ -110,6 +110,7 @@ export default function MeetingsPage() {
   const [gridPage, setGridPage] = useState(0)
   const swipeTouchRef = useRef<{ x: number; y: number; time: number } | null>(null)
   const [setupMessage, setSetupMessage] = useState<string | null>(null)
+  const [joinError, setJoinError] = useState<string | null>(null)
   const [waitingForApproval, setWaitingForApproval] = useState<string | null>(null)
 
   const [activeTab, setActiveTab] = useState<ActiveTab | null>(null)
@@ -996,7 +997,7 @@ export default function MeetingsPage() {
       }
     } else {
       setSetupMessage(null)
-      console.error("[Meeting] Join failed:", result.error)
+      setJoinError(result.error ?? "Couldn't join this meeting")
     }
   }
 
@@ -1037,7 +1038,7 @@ export default function MeetingsPage() {
       }
     } else {
       setSetupMessage(null)
-      console.error("[Meeting] Rejoin failed:", result.error)
+      setJoinError(result.error ?? "Couldn't join this meeting")
     }
   }
 
@@ -1772,6 +1773,21 @@ export default function MeetingsPage() {
   return (
     <div className="relative flex flex-col h-dvh min-h-0">
       {setupMessage && <SetupOverlay message={setupMessage} />}
+      {joinError && (
+        <div
+          role="alert"
+          className="fixed inset-x-4 top-4 z-50 mx-auto flex max-w-md items-start gap-3 rounded-lg border border-ws-hairline bg-ws-surface px-4 py-3 shadow-lg"
+        >
+          <p className="flex-1 text-sm text-ws-primary">{joinError}</p>
+          <button
+            type="button"
+            onClick={() => setJoinError(null)}
+            className="text-xs font-medium text-ws-muted transition-colors hover:text-ws-primary"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
       {waitingForApproval && (
         <WaitingRoom
           meetingTitle={waitingForApproval}

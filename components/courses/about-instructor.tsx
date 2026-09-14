@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useTransition } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -20,6 +20,8 @@ interface AboutInstructorProps {
   enrolledCourses: InstructorCourse[]
   totalStudents?: number
   averageRating?: number
+  /** False when the viewer's package has no instructor Q&A — Message buttons are hidden. */
+  canMessage?: boolean
 }
 
 export function AboutInstructor({
@@ -32,6 +34,7 @@ export function AboutInstructor({
   enrolledCourses,
   totalStudents,
   averageRating,
+  canMessage = true,
 }: AboutInstructorProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -83,16 +86,18 @@ export function AboutInstructor({
                 >
                   View profile
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 gap-1 text-xs"
-                  onClick={handleMessage}
-                  disabled={isPending}
-                >
-                  <MessageSquareIcon  size={12} />
-                  Message
-                </Button>
+                {canMessage && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 gap-1 text-xs"
+                    onClick={handleMessage}
+                    disabled={isPending}
+                  >
+                    <MessageSquareIcon  size={12} />
+                    Message
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -175,16 +180,18 @@ export function AboutInstructor({
             View full profile
             <ChevronRightIcon  size={13} />
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            onClick={handleMessage}
-            disabled={isPending}
-          >
-            <MessageSquareIcon  size={14} />
-            Message
-          </Button>
+          {canMessage && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={handleMessage}
+              disabled={isPending}
+            >
+              <MessageSquareIcon  size={14} />
+              Message
+            </Button>
+          )}
         </div>
       </div>
 

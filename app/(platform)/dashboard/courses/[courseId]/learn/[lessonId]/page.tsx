@@ -283,7 +283,13 @@ export default async function LessonPage({
                     Course Instructor
                   </p>
                 </div>
-                <MessageInstructorButton instructorId={course.instructorId} />
+                {course.entitlements.instructorQa ? (
+                  <MessageInstructorButton instructorId={course.instructorId} />
+                ) : (
+                  <p className="max-w-40 text-right text-[11px] leading-snug text-ws-muted">
+                    Instructor Q&amp;A isn&apos;t in your package
+                  </p>
+                )}
               </div>
               
               {/* Rating */}

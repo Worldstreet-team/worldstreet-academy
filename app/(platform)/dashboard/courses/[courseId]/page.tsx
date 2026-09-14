@@ -13,6 +13,7 @@ import {
   fetchOtherCourses,
 } from "@/lib/actions/student"
 import { checkEnrollment } from "@/lib/actions/enrollments"
+import { getCourseAccess } from "@/lib/course-access"
 import { CourseSchedulingCta } from "@/components/shared/course-scheduling-cta"
 import { courseAvailability } from "@/lib/types/course"
 import { getCurrentUser } from "@/lib/auth"
@@ -59,6 +60,9 @@ export default async function CourseDetailPage({
       fetchOtherCourses(courseId),
     ])
   const isEnrolled = enrollmentStatus.isEnrolled
+
+  // Q&A follows the package; visitors without an enrollment keep today's behaviour.
+  const courseAccess = currentUser ? await getCourseAccess(currentUser.id, courseId) : null
 
   // Calculate instructor's average rating across all their courses
   const ratedInstructorCourses = instructorCourses.filter((c) => c.rating != null && c.rating > 0)
@@ -304,6 +308,7 @@ export default async function CourseDetailPage({
                 enrolledCourses={enrolledFromInstructor}
                 totalStudents={course.instructorTotalStudents}
                 averageRating={instructorAvgRating}
+                canMessage={courseAccess ? courseAccess.entitlements.instructorQa : true}
               />
             </div>
 
