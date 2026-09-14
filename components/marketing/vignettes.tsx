@@ -222,7 +222,7 @@ export function SchoolsVignette() {
               {school.short}
             </span>
             {i === 0 && (
-              <span className="mt-auto inline-flex w-fit rounded-full bg-ws-brand px-2 py-0.5 text-[10px] font-semibold text-ws-brand-on">
+              <span className="mt-auto hidden w-fit rounded-full bg-ws-brand px-2 py-0.5 text-[10px] font-semibold text-ws-brand-on sm:inline-flex">
                 Explore school
               </span>
             )}
