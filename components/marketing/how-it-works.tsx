@@ -113,7 +113,7 @@ export function HowItWorks() {
                   </span>
 
                   {/* Label — sticky while its frame scrolls by on desktop. */}
-                  <div className={flip ? "md:order-2 md:pl-16" : "md:pr-16 md:text-right"}>
+                  <div className={flip ? "min-w-0 md:order-2 md:pl-16" : "min-w-0 md:pr-16 md:text-right"}>
                     <div className="md:sticky md:top-28">
                       <Reveal y={18} duration={0.6}>
                         <span className="font-display text-[13px] font-bold tracking-[0.14em] text-ws-gold">
@@ -135,7 +135,7 @@ export function HowItWorks() {
                   </div>
 
                   {/* The product moment */}
-                  <div className={flip ? "md:order-1 md:pr-16" : "md:pl-16"}>
+                  <div className={flip ? "min-w-0 md:order-1 md:pr-16" : "min-w-0 md:pl-16"}>
                     <Reveal y={28} duration={0.75}>
                       <div className="h-[24rem] md:h-[28rem]">
                         <BrowserFrame route={step.route}>

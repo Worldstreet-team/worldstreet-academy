@@ -2,7 +2,6 @@ import Link from "next/link"
 import { ArrowRightIcon } from "lucide-react"
 import type { School } from "@/lib/schools"
 import { SchoolIcon } from "@/components/shared/school-icon"
-import { cn } from "@/lib/utils"
 
 /**
  * One school card (spec §4): icon in a gold wash, name, blurb, program count
@@ -14,22 +13,17 @@ export function SchoolCard({
   school,
   count,
   headingLevel = "h3",
-  className,
 }: {
   school: School
   count: number
   /** h3 under a section h2 (landing); h2 under the page h1 (/schools). */
   headingLevel?: "h2" | "h3"
-  className?: string
 }) {
   const Heading = headingLevel
   return (
     <Link
       href={`/schools/${school.slug}`}
-      className={cn(
-        "group flex h-full flex-col rounded-lg border border-ws-hairline bg-ws-surface p-6 transition-colors duration-[var(--ws-motion-base)] hover:border-ws-brand/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40",
-        className
-      )}
+      className="group flex h-full flex-col rounded-lg border border-ws-hairline bg-ws-surface p-6 transition-colors duration-[var(--ws-motion-base)] hover:border-ws-brand/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40"
     >
       <span className="flex h-10 w-10 items-center justify-center rounded-full bg-ws-brand/10 text-ws-gold">
         <SchoolIcon name={school.icon} size={18} />

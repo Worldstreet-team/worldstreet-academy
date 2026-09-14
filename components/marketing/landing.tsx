@@ -69,13 +69,13 @@ export async function Landing() {
         } as React.CSSProperties
       }
     >
-      {/* §1 — Hero: type and CTAs on the open stage */}
+      {/* Hero — claim and the two CTAs (spec §1) */}
       <HeroWall courses={published} signedIn={signedIn} registerUrl={REGISTER_URL} />
 
-      {/* §2 — The band of words */}
+      {/* The band of words — the eight schools' vocabulary */}
       <WordsMarquee />
 
-      {/* §3 — About, set on the page itself */}
+      {/* About (spec §2) */}
       <AboutBand />
 
       {/* Why learn here — six pillars (spec §3) */}
@@ -87,19 +87,19 @@ export async function Landing() {
       {/* How it works — the four-step journey (spec §11) */}
       <HowItWorks />
 
-      {/* §6 — The catalogue grid (the ONLY course-art section; hides below 3) */}
+      {/* Featured programs — the catalogue grid (the ONLY course-art section; hides below 3) */}
       <CatalogueGrid courses={gridCourses} signedIn={signedIn} />
 
-      {/* §7 — Upcoming drops (renders only when something is scheduled) */}
+      {/* Upcoming drops (renders only when something is scheduled) */}
       {drops.length > 0 && <UpcomingDrops drops={drops} />}
 
-      {/* §8 — From the floor (real reviews; hides only at zero) */}
+      {/* Testimonials — real reviews only; hides at zero (spec §14) */}
       <Testimonials reviews={reviews} />
 
-      {/* §9 — FAQ (static, truthful) */}
+      {/* FAQ (spec §15) */}
       <Faq />
 
-      {/* §10 — Compact finale CTA */}
+      {/* Finale CTA (spec §16) */}
       <FinaleCta signedIn={signedIn} registerUrl={REGISTER_URL} />
     </div>
   )

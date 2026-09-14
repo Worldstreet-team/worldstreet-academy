@@ -8,7 +8,7 @@ import { Reveal, RevealGroup } from "@/components/marketing/motion/reveal"
 import type { BrowseCourse } from "@/lib/actions/student"
 
 /**
- * §6 — THE CATALOGUE. One near-full-bleed gold panel (the page's only
+ * FEATURED PROGRAMS — the catalogue. One near-full-bleed gold panel (the page's only
  * primary-background surface): hero copy + tagline + a black CTA on the left,
  * and the live course cards in a TWO-ROW carousel on the right —
  * grid-flow-col, so cards fill down then march sideways. Prev/next controls

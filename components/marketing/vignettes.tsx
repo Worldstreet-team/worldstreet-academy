@@ -27,7 +27,7 @@ export function BrowserFrame({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-ws-hairline bg-ws-surface shadow-2xl shadow-black/50">
+    <div aria-hidden className="flex h-full flex-col overflow-hidden rounded-xl border border-ws-hairline bg-ws-surface shadow-2xl shadow-black/50">
       <div className="flex shrink-0 items-center border-b border-ws-hairline px-4 py-2.5">
         <span className="flex w-16 gap-1.5" aria-hidden>
           <span className="h-2.5 w-2.5 rounded-full bg-ws-chip" />
@@ -120,8 +120,8 @@ export function ClassroomVignette() {
               }}
               className={
                 lesson.state === "active"
-                  ? "flex items-center gap-3 border-l-2 border-ws-brand bg-ws-raised px-4 py-2.5 md:py-3"
-                  : "flex items-center gap-3 border-l-2 border-transparent px-4 py-2.5 md:py-3"
+                  ? "flex min-w-0 items-center gap-3 border-l-2 border-ws-brand bg-ws-raised px-4 py-2.5 md:py-3"
+                  : "flex min-w-0 items-center gap-3 border-l-2 border-transparent px-4 py-2.5 md:py-3"
               }
             >
               {lesson.state === "done" ? (
@@ -197,8 +197,10 @@ export function SchoolsVignette() {
           Choose the school that matches your goals.
         </p>
       </div>
+      {/* Phones: a 2×2 of the first four schools — eight tiles at two columns
+          cannot fit the frame and were squashing to blank boxes. sm+: all eight. */}
       <motion.ul
-        className="grid min-h-0 flex-1 grid-cols-2 gap-2.5 overflow-hidden p-4 sm:grid-cols-4 sm:gap-3 sm:p-5"
+        className="grid min-h-0 flex-1 grid-cols-2 gap-2.5 overflow-hidden p-4 sm:grid-cols-4 sm:gap-3 sm:p-5 [&>li:nth-child(n+5)]:hidden sm:[&>li:nth-child(n+5)]:flex"
         initial="hidden"
         animate="show"
         variants={STAGGER}
@@ -271,7 +273,7 @@ export function ProgramVignette() {
               <motion.li
                 key={module}
                 variants={itemVariants(ok)}
-                className="flex items-center gap-3 border-b border-ws-hairline px-5 py-2.5 md:py-3"
+                className="flex min-w-0 items-center gap-3 border-b border-ws-hairline px-5 py-2.5 md:py-3"
               >
                 <span className="font-display text-[11px] font-bold tracking-[0.1em] text-ws-gold">0{i + 1}</span>
                 <span className="truncate text-[13px] text-ws-primary">{module}</span>
@@ -325,8 +327,10 @@ export function PackagesVignette() {
           Forex Trading Mastery · packages
         </p>
       </div>
+      {/* Phones: three compact rows (name + price left, CTA right). sm+: three
+          columns with the feature lines. Either way all three tiers fit the frame. */}
       <motion.div
-        className="grid min-h-0 flex-1 gap-3 overflow-hidden p-4 sm:grid-cols-3 sm:p-5"
+        className="grid min-h-0 flex-1 gap-2.5 overflow-hidden p-4 sm:grid-cols-3 sm:gap-3 sm:p-5"
         initial="hidden"
         animate="show"
         variants={STAGGER}
@@ -337,17 +341,21 @@ export function PackagesVignette() {
             variants={itemVariants(ok)}
             className={
               tier.highlight
-                ? "relative flex min-h-0 flex-col rounded-md border border-ws-brand/70 bg-ws-surface p-4"
-                : "flex min-h-0 flex-col rounded-md border border-ws-hairline bg-ws-surface p-4"
+                ? "relative flex min-h-0 min-w-0 items-center gap-3 rounded-md border border-ws-brand/70 bg-ws-surface p-3 sm:flex-col sm:items-stretch sm:p-4"
+                : "flex min-h-0 min-w-0 items-center gap-3 rounded-md border border-ws-hairline bg-ws-surface p-3 sm:flex-col sm:items-stretch sm:p-4"
             }
           >
             {tier.highlight && (
-              <span className="absolute right-3 top-3 rounded-full bg-ws-brand px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-ws-brand-on">
+              <span className="absolute right-3 top-3 hidden rounded-full bg-ws-brand px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-ws-brand-on sm:inline-flex">
                 Popular
               </span>
             )}
-            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-ws-muted">{tier.name}</p>
-            <p className="mt-1 font-display text-2xl font-semibold tabular-nums text-ws-primary">${tier.price}</p>
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-ws-muted">{tier.name}</p>
+              <p className="mt-0.5 font-display text-xl font-semibold tabular-nums text-ws-primary sm:mt-1 sm:text-2xl">
+                ${tier.price}
+              </p>
+            </div>
             <ul className="mt-3 hidden space-y-1.5 sm:block">
               {tier.lines.map((line) => (
                 <li key={line} className="flex items-center gap-2 text-[11px] text-ws-muted">
@@ -359,8 +367,8 @@ export function PackagesVignette() {
             <span
               className={
                 tier.highlight
-                  ? "mt-auto inline-flex h-8 items-center justify-center rounded-sm bg-ws-brand text-[11px] font-semibold text-ws-brand-on"
-                  : "mt-auto inline-flex h-8 items-center justify-center rounded-sm border border-ws-hairline text-[11px] font-semibold text-ws-primary"
+                  ? "ml-auto inline-flex h-8 shrink-0 items-center justify-center rounded-sm bg-ws-brand px-3 text-[11px] font-semibold text-ws-brand-on sm:ml-0 sm:mt-auto sm:px-0"
+                  : "ml-auto inline-flex h-8 shrink-0 items-center justify-center rounded-sm border border-ws-hairline px-3 text-[11px] font-semibold text-ws-primary sm:ml-0 sm:mt-auto sm:px-0"
               }
             >
               {tier.highlight ? "Enrol now" : "Choose"}

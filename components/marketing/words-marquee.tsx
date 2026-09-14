@@ -3,7 +3,7 @@
 import * as React from "react"
 import { addFrame, useMotionOK } from "@/components/marketing/motion/bus"
 
-/** What the academy actually trades in. Words, not claims. */
+/** The eight schools' vocabulary. Words, not claims. */
 const WORDS = [
   "Trading",
   "Blockchain",

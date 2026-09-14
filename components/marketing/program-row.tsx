@@ -4,6 +4,8 @@ import { ArrowRightIcon } from "lucide-react"
 import type { BrowseCourse } from "@/lib/actions/student"
 import { courseAvailability } from "@/lib/types/course"
 import { levelChipStyle } from "@/components/shared/level-badge"
+import { SCHOOL_BY_SLUG } from "@/lib/schools"
+import { SchoolIcon } from "@/components/shared/school-icon"
 
 /**
  * Price line for a program row. `Course.price` is whole USD and, for
@@ -34,8 +36,8 @@ export function ProgramRow({ course }: { course: BrowseCourse }) {
         href={`/courses/${course.id}`}
         className="group grid gap-5 rounded-lg border border-ws-hairline bg-ws-surface p-5 transition-colors duration-[var(--ws-motion-base)] hover:border-ws-brand/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40 sm:grid-cols-[9rem_1fr] sm:p-6"
       >
-        <div className="relative aspect-video overflow-hidden rounded-md bg-ws-sunken sm:aspect-[4/3]">
-          {course.thumbnailUrl && (
+        <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-md bg-ws-sunken sm:aspect-[4/3]">
+          {course.thumbnailUrl ? (
             <Image
               src={course.thumbnailUrl}
               alt=""
@@ -43,6 +45,14 @@ export function ProgramRow({ course }: { course: BrowseCourse }) {
               sizes="(max-width: 640px) 100vw, 9rem"
               className="object-cover"
             />
+          ) : (
+            // No art yet: the school's icon in a gold wash, never an empty box.
+            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-ws-brand/10 text-ws-gold">
+              <SchoolIcon
+                name={course.school ? SCHOOL_BY_SLUG[course.school].icon : "graduation-cap"}
+                size={20}
+              />
+            </span>
           )}
         </div>
         <div className="flex min-w-0 flex-col">

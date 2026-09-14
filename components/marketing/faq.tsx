@@ -10,7 +10,7 @@ import { useMotionOK } from "@/components/marketing/motion/bus"
 import { BRAND } from "@/lib/brand"
 
 /**
- * §9 — FAQ. Split layout: sticky heading column left, accordion right.
+ * FAQ (spec §15). Split layout: sticky heading column left, accordion right.
  * Native button rows over hairline dividers; answers are height-animated
  * (instant under reduced motion) and the plus icon rotates 45° into an ×.
  *

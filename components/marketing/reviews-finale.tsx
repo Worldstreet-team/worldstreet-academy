@@ -8,7 +8,7 @@ import type { LandingReview } from "@/lib/actions/reviews"
 import { BRAND } from "@/lib/brand"
 
 /**
- * §8 — FROM THE FLOOR. Real reviews only (`fetchLandingReviews` verbatim,
+ * TESTIMONIALS (spec §14). Real reviews only (`fetchLandingReviews` verbatim,
  * clamp-only), as a static card grid: up to six cards, 1 / 2 / 3 columns,
  * centered and narrower when there are fewer. Renders from the FIRST review
  * up — below one review the section vanishes entirely, never an empty shell.
@@ -56,7 +56,7 @@ export function Testimonials({ reviews }: { reviews: LandingReview[] }) {
 }
 
 /**
- * §10 — FINALE. A compact CTA band: hairline top border, an always-reachable
+ * FINALE (spec §16). A compact CTA band: hairline top border, an always-reachable
  * heading (plain fade-up at viewport amount 0.2, once — it can never
  * dead-end the way the old masked-line reveal did), one supporting line, and
  * the two CTAs. The glow is absolutely positioned, so it adds zero height —
