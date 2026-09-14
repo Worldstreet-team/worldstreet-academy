@@ -43,13 +43,41 @@
  * self-heals). Forex/Crypto resolve to 49 (their `basic` package); AI & AI
  * Automation resolves to 199 (its only package).
  *
- * Slug: if the clean slugify(title) isn't held by any *other* course, it is
- * $set; otherwise the existing slug is kept and a warning is printed.
+ * Slug: on MATCH, if the clean slugify(title) isn't held by any *other*
+ * course, it is $set; otherwise the existing slug is kept and a warning is
+ * printed. On INSERT, a clean-slug collision is treated as a title-drift
+ * signal (see below) and aborts the run instead of falling back to a
+ * timestamped slug — a silent fallback would hide the exact case this guards
+ * against.
  *
  * updatedAt is deliberately NOT bumped on a no-op $set (raw collection
  * writes bypass Mongoose's timestamps middleware anyway) — bumping it on
  * every idempotent re-run would make modifiedCount nonzero forever and
  * break the idempotency check the brief requires.
+ *
+ * ---------------------------------------------------------------------
+ * Production-safety guards (final review, Important #3 / #4):
+ *
+ * - PRICE: applying this before checkout is package-aware would sell
+ *   Forex/Crypto full access at their `basic` price (199 -> 49) and raise
+ *   AI & AI Automation's price (99 -> 199) — see the boxed WARNING printed
+ *   at the top of every run. Any --apply that would change an *existing*
+ *   row's price (mock DBs included) requires --allow-price-change; without
+ *   it the affected rows are printed and the process exits 1 before any
+ *   write. A re-run with no pending price change never needs the flag.
+ * - IDENTITY: title matching is scoped to `instructor: owner._id` first,
+ *   falling back to an unscoped title match only with a printed
+ *   `WARN adopted row owned by <email>`. A title held by more than one
+ *   course prints `WARN duplicate title` and that program is skipped
+ *   entirely (no write). Every MATCH/RENAME line echoes the row's `_id`,
+ *   `status`, owner email and current `price` so an operator can confirm
+ *   it is the right document. Before an INSERT, a pre-existing course
+ *   already holding the clean slug aborts the whole run
+ *   (`ABORT: slug <x> exists on "<title>" — title drift?`) rather than
+ *   silently creating a second copy.
+ *
+ *   node scripts/mastery-catalogue.mjs --apply --allow-price-change
+ * ---------------------------------------------------------------------
  */
 import mongoose from "mongoose"
 import { config } from "dotenv"
@@ -57,6 +85,7 @@ config({ path: ".env.local" })
 config()
 
 const APPLY = process.argv.includes("--apply")
+const ALLOW_PRICE_CHANGE = process.argv.includes("--allow-price-change")
 
 if (!process.env.MONGODB_URI) {
   console.error("MONGODB_URI is not set — refusing to run.")
@@ -295,27 +324,58 @@ async function resolveSlug(title, existingId) {
 }
 
 // ---------------------------------------------------------------------------
-// Per-program plan + (optionally) write.
+// Identity resolution (Important #4): scope title matching to the catalogue
+// owner first; fall back to an unscoped match only with a printed warning;
+// refuse to guess (skip, no write) when a title is ambiguous.
 // ---------------------------------------------------------------------------
 
-const counts = { matched: 0, renamed: 0, inserted: 0, modified: 0, warnings: 0 }
+const emailCache = new Map([[String(owner._id), owner.email]])
+async function ownerEmail(instructorId) {
+  const key = String(instructorId)
+  if (emailCache.has(key)) return emailCache.get(key)
+  const user = await db.collection("users").findOne({ _id: instructorId })
+  const email = user?.email ?? `unknown user (${key})`
+  emailCache.set(key, email)
+  return email
+}
+
+async function resolveExisting(program) {
+  for (const t of [program.title, ...program.legacyTitles]) {
+    const dupCount = await db.collection("courses").countDocuments({ title: t })
+    if (dupCount > 1) return { kind: "duplicate", title: t, dupCount }
+
+    const ownerMatch = await db.collection("courses").findOne({ title: t, instructor: owner._id })
+    if (ownerMatch) return { kind: "match", existing: ownerMatch, matchedOnTitle: t, adopted: false }
+
+    const anyMatch = await db.collection("courses").findOne({ title: t })
+    if (anyMatch) return { kind: "match", existing: anyMatch, matchedOnTitle: t, adopted: true }
+  }
+  return { kind: "none" }
+}
+
+// ---------------------------------------------------------------------------
+// Pass 1 (read-only): resolve every program's plan before printing or
+// writing anything, so the WARNING block and the price-change gate below
+// can see the whole run up front.
+// ---------------------------------------------------------------------------
+
+const counts = { matched: 0, renamed: 0, inserted: 0, skipped: 0, modified: 0, warnings: 0 }
+const plans = []
 
 for (const program of PROGRAMS) {
   const school = SCHOOLS[program.school]
-  const titleCandidates = [program.title, ...program.legacyTitles]
+  const resolution = await resolveExisting(program)
 
-  let existing = null
-  let matchedOnTitle = null
-  for (const t of titleCandidates) {
-    existing = await db.collection("courses").findOne({ title: t })
-    if (existing) {
-      matchedOnTitle = t
-      break
-    }
+  if (resolution.kind === "duplicate") {
+    plans.push({ program, kind: "skip", title: resolution.title, dupCount: resolution.dupCount })
+    continue
   }
 
-  if (existing) {
+  if (resolution.kind === "match") {
+    const { existing, matchedOnTitle, adopted } = resolution
     const isRename = matchedOnTitle !== program.title
+    const email = adopted ? await ownerEmail(existing.instructor) : owner.email
+
     const packages = program.buildPackages(existing.price)
     const setDoc = {
       title: program.title,
@@ -324,8 +384,9 @@ for (const program of PROGRAMS) {
       packages,
     }
     let priceLine
+    let derivedPrice = null
     if (program.derivePriceFromPackages) {
-      const derivedPrice = minEnabledPrice(packages)
+      derivedPrice = minEnabledPrice(packages)
       setDoc.price = derivedPrice
       setDoc.pricing = "paid"
       priceLine = `${derivedPrice} (derived: min enabled package price; existing scalar was ${existing.price})`
@@ -340,6 +401,145 @@ for (const program of PROGRAMS) {
 
     const slugResult = await resolveSlug(program.title, existing._id)
     if (slugResult.slug) setDoc.slug = slugResult.slug
+
+    plans.push({
+      program, kind: "match", existing, matchedOnTitle, isRename, adopted, ownerEmail: email,
+      setDoc, slugResult, priceLine, derivedPrice,
+    })
+    continue
+  }
+
+  // resolution.kind === "none" — would insert. A pre-existing course already
+  // holding the clean slug is a title-drift signal (Important #4d): abort
+  // the whole run rather than silently creating a second live copy.
+  const cleanSlug = slugify(program.title)
+  const slugConflict = await db.collection("courses").findOne({ slug: cleanSlug })
+  if (slugConflict) {
+    console.error(`\nABORT: slug "${cleanSlug}" exists on "${slugConflict.title}" (_id ${slugConflict._id}) — title drift?`)
+    console.error("No documents were written. Investigate before re-running.")
+    await mongoose.disconnect()
+    process.exit(1)
+  }
+
+  const status = program.newInsertDraft ? "draft" : "published"
+  const description = program.spec ? program.spec.description : school.blurb
+  const shortDescription = program.spec ? program.spec.shortDescription : null
+  const whatYouWillLearn = program.spec ? program.spec.whatYouWillLearn : []
+  const packages = program.buildPackages(program.price)
+  const price = program.derivePriceFromPackages ? minEnabledPrice(packages) : program.price
+  const priceLine = program.derivePriceFromPackages ? `${price} (derived: min enabled package price)` : `${price} (table)`
+
+  const now = new Date()
+  const doc = {
+    title: program.title,
+    slug: cleanSlug,
+    description,
+    shortDescription,
+    thumbnailUrl: null,
+    thumbnailPublicId: null,
+    previewVideoUrl: null,
+    instructor: owner._id,
+    level: "beginner",
+    pricing: "paid",
+    price,
+    currency: "USD",
+    status,
+    category: school.short,
+    school: program.school,
+    tags: [],
+    totalLessons: 0,
+    totalDuration: 0,
+    enrolledCount: 0,
+    rating: { average: 0, count: 0, distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } },
+    whatYouWillLearn,
+    requirements: [],
+    targetAudience: [],
+    examRequired: false,
+    packages,
+    publishedAt: status === "published" ? now : null,
+    availableAt: null,
+    preEnrollEnabled: true,
+    liveNotifiedAt: null,
+    createdAt: now,
+    updatedAt: now,
+  }
+
+  plans.push({ program, kind: "insert", doc, priceLine })
+}
+
+// ---------------------------------------------------------------------------
+// WARNING block (Important #3): loud and unmissable, printed before any
+// per-program output, in both dry-run and --apply.
+// ---------------------------------------------------------------------------
+
+function boxed(lines) {
+  const width = Math.max(...lines.map((l) => l.length))
+  const bar = `+${"-".repeat(width + 2)}+`
+  const body = lines.map((l) => `| ${l}${" ".repeat(width - l.length)} |`)
+  return [bar, ...body, bar].join("\n")
+}
+
+const ladderPlans = plans.filter((p) => p.program.derivePriceFromPackages)
+console.log(
+  "\n" +
+    boxed([
+      "WARNING — price-derivation script",
+      "",
+      "Do NOT --apply against production until package-aware checkout",
+      "(Phase 3) is deployed; AI's price change needs product sign-off",
+      "(plan D3).",
+      "",
+      "Per spec-ladder program, current scalar price -> derived price:",
+      ...ladderPlans.map((p) => {
+        const current = p.kind === "match" ? p.existing.price : "(new insert)"
+        const derived = p.kind === "match" ? p.derivedPrice : p.doc.price
+        return `  - ${p.program.title}: ${current} -> ${derived}`
+      }),
+    ])
+)
+
+// ---------------------------------------------------------------------------
+// Price-change gate (Important #3): refuse to --apply a price change on an
+// existing row (mock DBs included) without an explicit flag. An idempotent
+// re-run with no pending price change never needs it.
+// ---------------------------------------------------------------------------
+
+const priceChanges = plans.filter(
+  (p) => p.kind === "match" && p.program.derivePriceFromPackages && p.derivedPrice !== p.existing.price
+)
+
+if (APPLY && priceChanges.length > 0 && !ALLOW_PRICE_CHANGE) {
+  console.error("\nABORT: --apply would change the price of existing course(s) — re-run with --allow-price-change to confirm:")
+  for (const p of priceChanges) {
+    console.error(`  - ${p.program.title} (_id ${p.existing._id}): ${p.existing.price} -> ${p.derivedPrice}`)
+  }
+  console.error("No documents were written.")
+  await mongoose.disconnect()
+  process.exit(1)
+}
+
+// ---------------------------------------------------------------------------
+// Pass 2: print each program's plan (with the operator-identity fields from
+// Important #4) and, if --apply, write it.
+// ---------------------------------------------------------------------------
+
+for (const plan of plans) {
+  const { program } = plan
+
+  if (plan.kind === "skip") {
+    console.warn(`\nWARN duplicate title: "${plan.title}" matches ${plan.dupCount} courses — skipping "${program.title}" (no write)`)
+    counts.warnings++
+    counts.skipped++
+    continue
+  }
+
+  if (plan.kind === "match") {
+    const { existing, matchedOnTitle, isRename, adopted, ownerEmail: email, setDoc, slugResult, priceLine } = plan
+
+    if (adopted) {
+      console.warn(`\nWARN adopted row owned by ${email}: "${matchedOnTitle}" (_id ${existing._id}) is not owned by the catalogue owner (${owner.email})`)
+      counts.warnings++
+    }
     if (slugResult.warning) {
       console.warn(`  WARNING: ${slugResult.warning}`)
       counts.warnings++
@@ -352,6 +552,7 @@ for (const program of PROGRAMS) {
       console.log(`\nMATCH ${program.title}`)
     }
     counts.matched++
+    console.log(`  _id: ${existing._id} · status: ${existing.status} · owner: ${email} · price: ${existing.price}`)
     console.log(`  slug: ${slugResult.slug ? `-> "${slugResult.slug}"` : `unchanged ("${existing.slug}")`}`)
     console.log(`  price: ${priceLine}`)
     console.log(`  $set: ${Object.keys(setDoc).join(", ")}`)
@@ -361,70 +562,34 @@ for (const program of PROGRAMS) {
       counts.modified += res.modifiedCount
       console.log(`  modifiedCount: ${res.modifiedCount}`)
     }
-  } else {
-    const status = program.newInsertDraft ? "draft" : "published"
-    const description = program.spec ? program.spec.description : school.blurb
-    const shortDescription = program.spec ? program.spec.shortDescription : null
-    const whatYouWillLearn = program.spec ? program.spec.whatYouWillLearn : []
-    const packages = program.buildPackages(program.price)
-    const price = program.derivePriceFromPackages ? minEnabledPrice(packages) : program.price
-    const priceLine = program.derivePriceFromPackages ? `${price} (derived: min enabled package price)` : `${price} (table)`
+    continue
+  }
 
-    const slugResult = await resolveSlug(program.title, null)
-    if (slugResult.warning) {
-      console.warn(`  WARNING: ${slugResult.warning}`)
-      counts.warnings++
-    }
+  // plan.kind === "insert"
+  const { doc, priceLine } = plan
+  console.log(`\nINSERT ${program.title}`)
+  counts.inserted++
+  console.log(`  slug: "${doc.slug}"`)
+  console.log(`  price: ${priceLine}, status: ${doc.status}, school: ${program.school}`)
+  console.log(`  fields: ${Object.keys(doc).join(", ")}`)
 
-    const now = new Date()
-    const doc = {
-      title: program.title,
-      slug: slugResult.slug,
-      description,
-      shortDescription,
-      thumbnailUrl: null,
-      thumbnailPublicId: null,
-      previewVideoUrl: null,
-      instructor: owner._id,
-      level: "beginner",
-      pricing: "paid",
-      price,
-      currency: "USD",
-      status,
-      category: school.short,
-      school: program.school,
-      tags: [],
-      totalLessons: 0,
-      totalDuration: 0,
-      enrolledCount: 0,
-      rating: { average: 0, count: 0, distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } },
-      whatYouWillLearn,
-      requirements: [],
-      targetAudience: [],
-      examRequired: false,
-      packages,
-      publishedAt: status === "published" ? now : null,
-      availableAt: null,
-      preEnrollEnabled: true,
-      liveNotifiedAt: null,
-      createdAt: now,
-      updatedAt: now,
-    }
-
-    console.log(`\nINSERT ${program.title}`)
-    counts.inserted++
-    console.log(`  slug: "${slugResult.slug}"`)
-    console.log(`  price: ${priceLine}, status: ${status}, school: ${program.school}`)
-    console.log(`  fields: ${Object.keys(doc).join(", ")}`)
-
-    if (APPLY) {
-      await db.collection("courses").insertOne(doc)
-    }
+  if (APPLY) {
+    await db.collection("courses").insertOne(doc)
   }
 }
 
+// ---------------------------------------------------------------------------
+// Summary: actual outcome, and a sanity check against the expected total
+// (Important #4e) — every program must land as exactly one of
+// matched/inserted/skipped.
+// ---------------------------------------------------------------------------
+
 console.log(`\n${"-".repeat(60)}`)
-console.log(`Matched: ${counts.matched} (renamed: ${counts.renamed}) · Inserted: ${counts.inserted} · Warnings: ${counts.warnings}`)
+console.log(`matched ${counts.matched} / renamed ${counts.renamed} / inserted ${counts.inserted} / skipped ${counts.skipped} · warnings: ${counts.warnings}`)
+const planned = counts.matched + counts.inserted + counts.skipped
+if (planned !== PROGRAMS.length) {
+  console.warn(`WARN: planned actions (${planned}) do not add up to the ${PROGRAMS.length} programs defined — investigate before trusting this run`)
+}
 
 if (APPLY) {
   console.log(`Inserted ${counts.inserted}`)

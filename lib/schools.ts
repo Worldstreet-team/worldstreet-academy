@@ -97,5 +97,5 @@ export const SCHOOL_BY_SLUG = Object.fromEntries(SCHOOLS.map((s) => [s.slug, s])
 export const SCHOOL_SLUGS = SCHOOLS.map((s) => s.slug) as [SchoolSlug, ...SchoolSlug[]]
 
 export function isSchoolSlug(value: unknown): value is SchoolSlug {
-  return typeof value === "string" && value in SCHOOL_BY_SLUG
+  return typeof value === "string" && SCHOOLS.some((s) => s.slug === value)
 }
