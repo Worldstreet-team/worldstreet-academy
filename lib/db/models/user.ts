@@ -23,9 +23,19 @@ export interface IUser extends Document {
   walletBalance: number
   hasOnboarded: boolean
   preferredLanguage: string | null
+  /** ISO 3166-1 alpha-2 code (lib/countries.ts); null = not shown. Faculty pages now; testimonials reuse it in Phase 6. */
+  country: string | null
   // For instructors
   instructorProfile?: {
     headline: string | null
+    /** Area of specialization (spec §10), distinct from the one-line headline. */
+    specialization: string | null
+    /** Professional experience (spec §10), ≤ 2,000 chars; seeded from the approved application. */
+    experience: string | null
+    /** Credentials and achievements (spec §10), ≤ 10 items × 120 chars. */
+    credentials: string[]
+    /** Admin-curated: featured faculty are listed first on /faculty and the homepage. */
+    featured: boolean
     expertise: string[]
     socialLinks: {
       twitter?: string
@@ -116,8 +126,16 @@ const UserSchema = new Schema<IUser>(
       type: String,
       default: null,
     },
+    country: {
+      type: String,
+      default: null,
+    },
     instructorProfile: {
       headline: { type: String, default: null },
+      specialization: { type: String, default: null },
+      experience: { type: String, default: null },
+      credentials: [{ type: String }],
+      featured: { type: Boolean, default: false },
       expertise: [{ type: String }],
       socialLinks: {
         twitter: String,
