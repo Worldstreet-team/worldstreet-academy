@@ -2032,6 +2032,78 @@ export async function searchUsersByEmail(
   }
 }
 
+// ── Upcoming classes (student-side, spec §12) ──
+
+export type UpcomingClass = {
+  id: string
+  title: string
+  courseTitle: string
+  /** ISO start time. */
+  scheduledAt: string
+  joinHref: string
+}
+
+/** How many upcoming classes the dashboard tile and the meetings page can list. */
+const UPCOMING_CLASSES_LIMIT = 10
+
+/**
+ * Scheduled course classes the student can attend: status "scheduled", start
+ * time still ahead, on a course where they hold an active/completed enrollment
+ * whose package includes live classes. Soonest first. When the host starts a
+ * class it turns "active" and moves to Course Sessions (getMyMeetingInvites).
+ */
+export async function getUpcomingClasses(): Promise<UpcomingClass[]> {
+  try {
+    const currentUser = await initAction()
+    if (!currentUser) return []
+
+    const enrollments = await Enrollment.find({
+      user: new Types.ObjectId(currentUser.id),
+      status: { $in: ["active", "completed"] },
+    })
+      .select("course packageKey")
+      .lean()
+    if (enrollments.length === 0) return []
+
+    const courses = await Course.find({ _id: { $in: enrollments.map((e) => e.course) } })
+      .select("title packages")
+      .lean()
+    const coursesById = new Map(courses.map((c) => [c._id.toString(), c]))
+    const classCourseIds = enrollments
+      .filter((e) => {
+        const course = coursesById.get(e.course.toString())
+        return course ? entitlementsFor(course, e).liveClasses : false
+      })
+      .map((e) => e.course)
+    if (classCourseIds.length === 0) return []
+
+    const meetings = await Meeting.find({
+      courseId: { $in: classCourseIds },
+      status: "scheduled",
+      scheduledAt: { $gte: new Date() },
+    })
+      .sort({ scheduledAt: 1 })
+      .limit(UPCOMING_CLASSES_LIMIT)
+      .select("title courseId scheduledAt")
+      .lean()
+
+    return meetings.map((m) => {
+      const id = m._id.toString()
+      return {
+        id,
+        title: m.title,
+        courseTitle: (m.courseId && coursesById.get(m.courseId.toString())?.title) || "",
+        // The query filtered on scheduledAt, so it is set.
+        scheduledAt: (m.scheduledAt as Date).toISOString(),
+        joinHref: `/dashboard/meetings?join=${id}`,
+      }
+    })
+  } catch (error) {
+    console.error("Error fetching upcoming classes:", error)
+    return []
+  }
+}
+
 // ── Get meeting invites for current user (user-side) ──
 
 export type MeetingInviteItem = {
@@ -2090,7 +2162,8 @@ export async function getMyMeetingInvites(): Promise<{
       enrolledCourseIds.length > 0
         ? await Meeting.find({
             courseId: { $in: enrolledCourseIds },
-            status: { $in: ["active", "waiting", "scheduled"] },
+            // Scheduled classes are listed under Upcoming classes until the host starts them.
+            status: { $in: ["active", "waiting"] },
             hostId: { $ne: new Types.ObjectId(currentUser.id) },
           })
             .select("title hostId courseId courseThumbnailUrl status createdAt")

@@ -14,6 +14,7 @@ export const queryKeys = {
   meetingHistory: ["meeting-history"] as const,
   meetingInvites: ["meeting-invites"] as const,
   instructorMeetingCourses: ["instructor-meeting-courses"] as const,
+  upcomingClasses: ["upcoming-classes"] as const,
 
   // ── Messages ──
   conversations: ["conversations"] as const,

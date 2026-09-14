@@ -6,9 +6,11 @@ import {
   getMeetingHistory,
   getMyMeetingInvites,
   getInstructorCoursesForMeeting,
+  getUpcomingClasses,
   type MeetingWithDetails,
   type MeetingHistoryEntry,
   type MeetingInviteItem,
+  type UpcomingClass,
 } from "@/lib/actions/meetings"
 import { queryKeys } from "./keys"
 
@@ -47,6 +49,15 @@ export function useMeetingInvites() {
   })
 }
 
+export function useUpcomingClasses() {
+  return useQuery<UpcomingClass[]>({
+    queryKey: queryKeys.upcomingClasses,
+    queryFn: () => getUpcomingClasses(),
+    staleTime: 60 * 1000,
+    refetchInterval: 60 * 1000, // a class leaves the list once it starts
+  })
+}
+
 export function useInstructorMeetingCourses() {
   return useQuery({
     queryKey: queryKeys.instructorMeetingCourses,
@@ -65,5 +76,6 @@ export function useInvalidateMeetings() {
     qc.invalidateQueries({ queryKey: queryKeys.meetings })
     qc.invalidateQueries({ queryKey: queryKeys.meetingHistory })
     qc.invalidateQueries({ queryKey: queryKeys.meetingInvites })
+    qc.invalidateQueries({ queryKey: queryKeys.upcomingClasses })
   }
 }

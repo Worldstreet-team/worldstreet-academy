@@ -69,6 +69,7 @@ import { CircleCheckIcon, LinkIcon, Minimize2Icon } from "lucide-react"
 import { RenderIcon } from "@/components/shared/render-icon"
 import type { ActiveTab, ChatMessage, Poll, PollVoter } from "@/components/meetings"
 import { MeetingInvitesList } from "@/components/meetings/meeting-invites"
+import { UpcomingClassesList } from "@/components/meetings/upcoming-classes-list"
 
 const TILES_PER_PAGE = 4
 
@@ -1833,6 +1834,9 @@ export default function MeetingsPage() {
             onCreateNew={() => setShowCreate(true)}
             onJoin={handleJoinByLink}
           />
+
+          {/* Scheduled course classes (spec §12) */}
+          <UpcomingClassesList onJoin={handleJoinByLink} />
 
           {/* Course live session invites */}
           <MeetingInvitesList onJoin={handleJoinByLink} />
