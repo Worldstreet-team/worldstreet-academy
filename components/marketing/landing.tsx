@@ -1,10 +1,13 @@
 import { fetchBrowseCourses, type BrowseCourse } from "@/lib/actions/student"
 import { fetchLandingReviews } from "@/lib/actions/reviews"
 import { getCurrentUser } from "@/lib/auth/actions"
+import { countProgramsBySchool } from "@/lib/schools"
 import { HeroWall } from "@/components/marketing/hero-wall"
 import { HowItWorks } from "@/components/marketing/how-it-works"
 import { WordsMarquee } from "@/components/marketing/words-marquee"
 import { AboutBand } from "@/components/marketing/about-band"
+import { WhyBand } from "@/components/marketing/why-band"
+import { SchoolsGrid } from "@/components/marketing/schools-grid"
 import { CatalogueGrid } from "@/components/marketing/catalogue-rail"
 import { UpcomingDrops } from "@/components/marketing/upcoming-drops"
 import { Testimonials, FinaleCta } from "@/components/marketing/reviews-finale"
@@ -27,11 +30,10 @@ function futureDrops(published: BrowseCourse[]): BrowseCourse[] {
 
 /**
  * The Academy landing at `/` — clean editorial composition, in order: hero,
- * the band of words, the About statement, the interactive Programs index, the
- * product-frame walkthrough (pure DS vignettes, no course art), the catalogue
- * card grid (the ONLY section allowed to show course thumbnails), Upcoming
- * drops (hidden when nothing is scheduled), testimonials (real reviews, from
- * the first one up), the static FAQ, and the compact finale CTA.
+ * the band of words, the About statement, the Why pillars, the Schools grid,
+ * the How-it-works timeline, the catalogue card grid (the ONLY section
+ * allowed to show course thumbnails), Upcoming drops (hidden when nothing is
+ * scheduled), testimonials (real reviews), the FAQ, and the finale CTA.
  *
  * This server component is the ONLY fetch point; sections are client leaves
  * that receive data as props. Every fetch already falls back to `[]`/null,
@@ -55,6 +57,9 @@ export async function Landing() {
   // ── Upcoming drops (hidden when nothing is queued).
   const drops = futureDrops(published)
 
+  // ── Schools grid: program counts from the same published list.
+  const schoolCounts = countProgramsBySchool(published)
+
   return (
     <div
       style={
@@ -72,6 +77,12 @@ export async function Landing() {
 
       {/* §3 — About, set on the page itself */}
       <AboutBand />
+
+      {/* Why learn here — six pillars (spec §3) */}
+      <WhyBand />
+
+      {/* Our schools — eight cards with live program counts (spec §4) */}
+      <SchoolsGrid counts={schoolCounts} />
 
       {/* How it works — the four-step journey (spec §11) */}
       <HowItWorks />
