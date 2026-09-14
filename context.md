@@ -123,3 +123,12 @@ Online education platform for cryptocurrency/trading courses. Instructor portal 
 - Shadcn Nova uses `render` prop for composition: `<Button render={<Link href="..." />}>`
 - DropdownMenu = `@base-ui/react/menu` (Menu.Root, Trigger, Portal, Positioner, Popup, Item)
 - Components with hooks (Badge uses `useRender`) are client components internally
+
+## Decision Log
+
+### 2026-09-14 — Launch prep (Mastery Academy Phase 8)
+- **SEO:** `app/sitemap.ts` (home, schools, published programs, faculty; never `/verify` or the signed-in apps), `app/robots.ts` (disallows `/dashboard`, `/instructor`, `/admin`, `/api/`, `/login`, `/register`; `/verify` stays crawlable so its noindex is read), `app/opengraph-image.tsx` (lockup on stone, next/og's bundled font). The root layout sets `metadataBase` from `lib/app-url.ts`; marketing pages carry canonicals; a program with a thumbnail shares it, every other page shares the site card.
+- **Legal:** the footer links the hub's documents (Terms of Business, Privacy Policy, Cookie Policy, `worldstreetgold.com/legal`). No `/terms` or `/privacy` in this app.
+- **Removed** `link-tmp.cjs` and `link-mobile-identity.cjs` (one-off Clerk-id linking; `lib/auth/sync.ts` links by email).
+- **Launch:** env, crons, catalogue, certificate backfill, §17 QA and rollback live in `docs/launch-runbook.md`.
+- The sections above predate the Mastery rebuild (`/courses` routes, Hugeicons, `#44A08E`) — `CLAUDE.md` and `design-system/` are current.

@@ -7,8 +7,11 @@
  * survives restarts), seeds it if empty, then starts `next dev` with MOCK_AUTH=1
  * so next.config.ts aliases @clerk/nextjs to the stub in mocks/clerk.
  *
- * Everything else (R2, Ably, RealtimeKit, OpenAI, Resend, wallet) stays
- * unconfigured — those features degrade at call time, they don't block boot.
+ * NOT credential-free: only MONGODB_URI and Clerk are replaced. `next dev`
+ * still loads .env.local, so a live RESEND_API_KEY, CLOUDFLARE_REALTIME_*,
+ * ABLY_API_KEY, OPENAI_API_KEY, R2_* or WALLET_* there is used — local checks
+ * can send real email and create real RealtimeKit rooms. Export placeholders
+ * before launching (Next never overrides a variable already set); see CLAUDE.md.
  */
 
 import { spawn } from "node:child_process"
