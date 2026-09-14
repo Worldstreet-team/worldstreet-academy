@@ -465,6 +465,128 @@ export async function getStudentExamStatus(
   }
 }
 
+/* ═══════════════════ student: assignments (spec §12, D7 lite) ═══════════════════ */
+
+export type MyAssessment = {
+  courseId: string
+  courseTitle: string
+  examId: string
+  title: string
+  scope: "final" | "lesson"
+  lessonId: string | null
+  status: "not_started" | "in_progress" | "passed" | "failed"
+  href: string
+}
+
+const ASSESSMENT_STATUS_ORDER: Record<MyAssessment["status"], number> = {
+  in_progress: 0,
+  not_started: 1,
+  failed: 2,
+  passed: 3,
+}
+
+/**
+ * Every published assessment the student can take across their active /
+ * completed enrollments — the dashboard's Assignments tile (D7 lite: the
+ * existing exam engine; file submissions are Phase 7). Knowledge checks follow
+ * their lesson's tier and the final exam follows `certificate` (the rules
+ * behind examPackageLock). Deliberately NOT gated on the `assignments`
+ * entitlement, which is reserved for Phase 7 submissions. Four queries in
+ * total, whatever the number of courses.
+ */
+export async function getMyAssessments(): Promise<MyAssessment[]> {
+  try {
+    const user = await initAction()
+    if (!user) return []
+
+    const enrollments = await Enrollment.find({ user: user.id, status: { $in: ["active", "completed"] } })
+      .select("course packageKey examPassed")
+      .lean()
+    if (enrollments.length === 0) return []
+    const courseIds = enrollments.map((e) => e.course)
+
+    const [courses, exams] = await Promise.all([
+      Course.find({ _id: { $in: courseIds } }).select("title packages").lean(),
+      Exam.find({ course: { $in: courseIds }, status: "published" }).select("course scope lesson title").lean(),
+    ])
+    if (exams.length === 0) return []
+
+    const quizLessonIds = exams.flatMap((exam) => (exam.scope === "lesson" && exam.lesson ? [exam.lesson] : []))
+    const [lessons, attempts] = await Promise.all([
+      quizLessonIds.length > 0
+        ? Lesson.find({ _id: { $in: quizLessonIds } }).select("course minPackageKey isFree").lean()
+        : Promise.resolve([]),
+      ExamAttempt.find({ user: user.id, exam: { $in: exams.map((exam) => exam._id) } })
+        .sort({ createdAt: -1 })
+        .select("exam status")
+        .lean(),
+    ])
+
+    const coursesById = new Map(courses.map((c) => [c._id.toString(), c]))
+    const enrollmentsByCourse = new Map(enrollments.map((e) => [e.course.toString(), e]))
+    const lessonsById = new Map(lessons.map((l) => [l._id.toString(), l]))
+    // Newest attempt first per exam (the query sorted by createdAt desc).
+    const attemptsByExam = new Map<string, { status: AttemptStatus }[]>()
+    for (const attempt of attempts) {
+      const key = attempt.exam.toString()
+      const list = attemptsByExam.get(key) ?? []
+      list.push(attempt)
+      attemptsByExam.set(key, list)
+    }
+
+    const rows: MyAssessment[] = []
+    for (const exam of exams) {
+      const courseId = exam.course.toString()
+      const course = coursesById.get(courseId)
+      const enrollment = enrollmentsByCourse.get(courseId)
+      if (!course || !enrollment) continue
+
+      // Legacy exams without a scope are finals (the schema default).
+      const isQuiz = exam.scope === "lesson"
+      let lessonId: string | null = null
+      if (isQuiz) {
+        const lesson = exam.lesson ? lessonsById.get(exam.lesson.toString()) : undefined
+        if (!lesson || lesson.course.toString() !== courseId || !canAccessLesson(course, lesson, enrollment)) continue
+        lessonId = lesson._id.toString()
+      } else if (!entitlementsFor(course, enrollment).certificate) {
+        continue
+      }
+
+      const history = attemptsByExam.get(exam._id.toString()) ?? []
+      const latestFinished = history.find((a) => a.status !== "in_progress")
+      const passed = isQuiz ? history.some((a) => a.status === "passed") : !!enrollment.examPassed
+      const status: MyAssessment["status"] = history.some((a) => a.status === "in_progress")
+        ? "in_progress"
+        : passed
+          ? "passed"
+          : latestFinished && latestFinished.status !== "passed"
+            ? "failed"
+            : "not_started"
+
+      rows.push({
+        courseId,
+        courseTitle: course.title,
+        examId: exam._id.toString(),
+        title: exam.title,
+        scope: isQuiz ? "lesson" : "final",
+        lessonId,
+        status,
+        href: isQuiz ? `/dashboard/courses/${courseId}/learn/${lessonId}` : `/dashboard/courses/${courseId}/exam`,
+      })
+    }
+
+    return rows.sort(
+      (a, b) =>
+        ASSESSMENT_STATUS_ORDER[a.status] - ASSESSMENT_STATUS_ORDER[b.status] ||
+        a.courseTitle.localeCompare(b.courseTitle) ||
+        (a.scope === b.scope ? a.title.localeCompare(b.title) : a.scope === "lesson" ? -1 : 1)
+    )
+  } catch (error) {
+    console.error("Get my assessments error:", error)
+    return []
+  }
+}
+
 export type RunnerQuestion = {
   id: string
   type: QuestionType

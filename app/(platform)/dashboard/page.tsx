@@ -7,6 +7,7 @@ import { ArrowRight } from "lucide-react"
 import { Topbar } from "@/components/platform/topbar"
 import { CourseCard, CourseCardSkeleton } from "@/components/platform/course-card"
 import { EnrollmentCard } from "@/components/platform/enrollment-card"
+import { AssignmentsTile } from "@/components/dashboard/assignments-tile"
 import { Mascot } from "@/components/platform/mascot"
 import { Button } from "@/components/ui/button"
 import {
@@ -184,6 +185,7 @@ export default function DashboardPage() {
             <CurrentCourseTile enrollment={current} isLoading={isLoadingEnrollments} />
             <ProgressTile enrollments={enrollments} isLoading={isLoadingEnrollments} />
             {showUpcomingClasses && <UpcomingClassesTile />}
+            <AssignmentsTile />
             {showCertificates && <CertificatesTile />}
             {instructors.length > 0 && <InstructorsTile rows={instructors} />}
             <CommunityTile />
