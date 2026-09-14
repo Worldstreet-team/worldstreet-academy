@@ -25,7 +25,7 @@ export default async function EditCoursePage({
     pricing: data.course.pricing,
     price: data.course.price,
     status: data.course.status,
-    category: data.course.category,
+    school: data.course.school,
     whatYouWillLearn: data.course.whatYouWillLearn,
     availableAt: data.course.availableAt,
     preEnrollEnabled: data.course.preEnrollEnabled,

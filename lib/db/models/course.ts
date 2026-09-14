@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose"
+import type { SchoolSlug } from "@/lib/schools"
 
 export type CourseLevel = "beginner" | "intermediate" | "advanced"
 export type CoursePricing = "free" | "paid"
@@ -28,6 +29,8 @@ export interface ICourse extends Document {
   currency: string
   status: CourseStatus
   category: string
+  /** School this program belongs to (lib/schools.ts). null only on legacy rows not yet re-saved. */
+  school: SchoolSlug | null
   tags: string[]
   // Computed/cached values (updated via hooks)
   totalLessons: number
@@ -138,6 +141,11 @@ const CourseSchema = new Schema<ICourse>(
     category: {
       type: String,
       required: true,
+      index: true,
+    },
+    school: {
+      type: String,
+      default: null,
       index: true,
     },
     tags: [{ type: String }],

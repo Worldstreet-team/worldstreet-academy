@@ -1,7 +1,8 @@
+import type { SchoolSlug } from "@/lib/schools"
+
 export type CourseLevel = "beginner" | "intermediate" | "advanced"
 export type CoursePricing = "free" | "paid"
 export type CourseStatus = "draft" | "published" | "suspended" | "closed" | "archived"
-export type CourseCategory = "Cryptocurrency" | "Trading" | "DeFi" | "NFTs" | "Development" | "Blockchain" | "Other"
 
 /**
  * What a customer can DO with a course right now — derived, never stored.
@@ -50,7 +51,8 @@ export type Course = {
   status: CourseStatus
   availableAt: string | null
   preEnrollEnabled: boolean
-  category?: CourseCategory
+  category?: string
+  school: SchoolSlug | null
   totalLessons: number
   totalDuration: number // in minutes
   enrolledCount: number

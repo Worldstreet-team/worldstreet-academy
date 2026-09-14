@@ -38,9 +38,10 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
 import { useUser } from "@/components/providers/user-provider"
-import type { Lesson, CourseLevel, CoursePricing, CourseStatus, CourseCategory } from "@/lib/types"
+import type { Lesson, CourseLevel, CoursePricing, CourseStatus } from "@/lib/types"
 import { CheckIcon, ChevronDownIcon, ChevronLeftIcon, EyeIcon, FileIcon, PlusIcon, SquarePenIcon, Trash2Icon, VideoIcon } from "lucide-react"
 import { RenderIcon } from "@/components/shared/render-icon"
+import { SCHOOLS, type SchoolSlug } from "@/lib/schools"
 
 // Minimal course data for editing
 type EditableCourse = {
@@ -53,21 +54,11 @@ type EditableCourse = {
   pricing: CoursePricing
   price: number | null
   status: CourseStatus
-  category?: CourseCategory
+  school: SchoolSlug | null
   whatYouWillLearn?: string[]
   availableAt?: string | null
   preEnrollEnabled?: boolean
 }
-
-const CATEGORIES: CourseCategory[] = [
-  "Cryptocurrency",
-  "Trading",
-  "DeFi",
-  "NFTs",
-  "Development",
-  "Blockchain",
-  "Other",
-]
 
 /** ISO string → value for a datetime-local input, in the viewer's timezone. */
 function isoToLocalInput(iso: string | null | undefined): string {
@@ -180,7 +171,7 @@ export function CourseEditor({
   const [shortDescription, setShortDescription] = useState(course?.shortDescription ?? "")
   const [thumbnailUrl, setThumbnailUrl] = useState(course?.thumbnailUrl ?? "")
   const [level, setLevel] = useState(course?.level ?? "beginner")
-  const [category, setCategory] = useState(course?.category ?? "Cryptocurrency")
+  const [school, setSchool] = useState<SchoolSlug | "">(course?.school ?? "")
   const [pricing, setPricing] = useState(course?.pricing ?? "free")
   const [price, setPrice] = useState(course?.price?.toString() ?? "")
   const [status, setStatus] = useState(course?.status ?? "draft")
@@ -283,7 +274,7 @@ export function CourseEditor({
             <input type="hidden" name="shortDescription" value={shortDescription} />
             <input type="hidden" name="thumbnailUrl" value={thumbnailUrl} />
             <input type="hidden" name="level" value={level} />
-            <input type="hidden" name="category" value={category} />
+            <input type="hidden" name="school" value={school} />
             <input type="hidden" name="pricing" value={pricing} />
             <input type="hidden" name="price" value={price} />
             <input type="hidden" name="status" value={status} />
@@ -485,20 +476,23 @@ export function CourseEditor({
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Category</Label>
+              <Label>School</Label>
               <Select
-                defaultValue={category}
-                onValueChange={(v) => setCategory((v ?? "Cryptocurrency") as typeof category)}
+                defaultValue={school}
+                onValueChange={(v) => setSchool((v ?? "") as SchoolSlug | "")}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue />
+                  <SelectValue placeholder="Choose a school" />
                 </SelectTrigger>
                 <SelectContent>
-                  {CATEGORIES.map((c) => (
-                    <SelectItem value={c} key={c}>{c}</SelectItem>
+                  {SCHOOLS.map((s) => (
+                    <SelectItem value={s.slug} key={s.slug}>{s.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {state.fieldErrors.school && (
+                <p className="text-xs text-destructive">{state.fieldErrors.school}</p>
+              )}
             </div>
             <div className="space-y-1.5 col-span-2">
               <Label>Status</Label>

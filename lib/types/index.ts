@@ -6,7 +6,6 @@ export type {
   CourseLevel,
   CoursePricing,
   CourseStatus,
-  CourseCategory,
 } from "./course"
 export type {
   Enrollment,

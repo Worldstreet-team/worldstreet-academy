@@ -6,8 +6,9 @@ import type mongoose from "mongoose"
 import connectDB from "@/lib/db"
 import { Course, Lesson, User, ICourse } from "@/lib/db/models"
 import { uploadThumbnail, deleteFromCloudinary } from "@/lib/cloudinary"
-import type { CourseLevel, CoursePricing, CourseStatus, CourseCategory } from "@/lib/types"
+import type { CourseLevel, CoursePricing, CourseStatus } from "@/lib/types"
 import { getCurrentUser } from "@/lib/auth"
+import { SCHOOL_BY_SLUG, isSchoolSlug, type SchoolSlug } from "@/lib/schools"
 
 // ---- Types for form state ----
 export type CourseFormState = {
@@ -161,7 +162,8 @@ export async function fetchCourseForEdit(courseId: string) {
         pricing: course.pricing as CoursePricing,
         price: course.price,
         status: course.status as CourseStatus,
-        category: (course.category || "Cryptocurrency") as CourseCategory,
+        category: course.category ?? "",
+        school: (course.school ?? null) as SchoolSlug | null,
         whatYouWillLearn: course.whatYouWillLearn ?? [],
         availableAt: course.availableAt ? course.availableAt.toISOString() : null,
         preEnrollEnabled: course.preEnrollEnabled ?? true,
@@ -197,7 +199,7 @@ export async function createCourse(
   const pricing = formData.get("pricing") as CoursePricing
   const price = formData.get("price") as string
   const status = formData.get("status") as CourseStatus
-  const category = formData.get("category") as string
+  const school = formData.get("school") as SchoolSlug
   const lessonsJson = formData.get("lessons") as string
   const whatYouWillLearn = parseStringArray(formData.get("whatYouWillLearn"))
   const availableAt = parseAvailableAt(formData.get("availableAt"))
@@ -214,6 +216,9 @@ export async function createCourse(
   }
   if (!level) {
     fieldErrors.level = "Please select a level"
+  }
+  if (!isSchoolSlug(school)) {
+    fieldErrors.school = "Choose a school"
   }
   if (pricing === "paid" && (!price || parseFloat(price) <= 0)) {
     fieldErrors.price = "Please enter a valid price"
@@ -250,7 +255,8 @@ export async function createCourse(
       pricing,
       price: pricing === "paid" ? parseFloat(price) : 0,
       status: requestedStatus,
-      category: category || "Cryptocurrency",
+      school,
+      category: SCHOOL_BY_SLUG[school].short,
       whatYouWillLearn,
       availableAt: availableAt === "invalid" ? null : availableAt,
       preEnrollEnabled,
@@ -327,7 +333,7 @@ export async function updateCourse(
   const pricing = formData.get("pricing") as CoursePricing
   const price = formData.get("price") as string
   const status = formData.get("status") as CourseStatus
-  const category = formData.get("category") as string
+  const school = formData.get("school") as SchoolSlug
   const lessonsJson = formData.get("lessons") as string
   const whatYouWillLearn = parseStringArray(formData.get("whatYouWillLearn"))
   const availableAt = parseAvailableAt(formData.get("availableAt"))
@@ -340,6 +346,9 @@ export async function updateCourse(
   }
   if (!description || description.trim().length < 10) {
     fieldErrors.description = "Description must be at least 10 characters"
+  }
+  if (!isSchoolSlug(school)) {
+    fieldErrors.school = "Choose a school"
   }
   if (pricing === "paid" && (!price || parseFloat(price) <= 0)) {
     fieldErrors.price = "Please enter a valid price"
@@ -387,7 +396,8 @@ export async function updateCourse(
       pricing,
       price: pricing === "paid" ? parseFloat(price) : 0,
       status,
-      category: category || existingCourse.category,
+      school,
+      category: SCHOOL_BY_SLUG[school].short,
       whatYouWillLearn,
       availableAt: availableAt === "invalid" ? existingCourse.availableAt : availableAt,
       preEnrollEnabled,
