@@ -1,0 +1,85 @@
+import Link from "next/link"
+import Image from "next/image"
+import { ArrowRightIcon } from "lucide-react"
+import type { BrowseCourse } from "@/lib/actions/student"
+import { courseAvailability } from "@/lib/types/course"
+import { levelChipStyle } from "@/components/shared/level-badge"
+
+/**
+ * Price line for a program row. `Course.price` is whole USD and, for
+ * package ladders, already the cheapest enabled tier (Phase 0 rule) — so a
+ * ladder reads "From $49", a single package or legacy course reads the
+ * scalar, and free stays free.
+ */
+export function programPriceLabel(
+  course: Pick<BrowseCourse, "pricing" | "price" | "tierCount">
+): string {
+  if (course.pricing === "free" || !course.price) return "Free"
+  const usd = `$${course.price.toLocaleString("en-US")}`
+  return course.tierCount > 1 ? `From ${usd}` : usd
+}
+
+/**
+ * One program on a school page (spec §5): title, blurb, level, price and the
+ * [VIEW PROGRAM] affordance. The whole row is the link. Links to the existing
+ * course page until Phase 2 ships `/programs/[slug]`.
+ */
+export function ProgramRow({ course }: { course: BrowseCourse }) {
+  const comingSoon =
+    courseAvailability({ status: "published", availableAt: course.availableAt }) === "coming_soon"
+
+  return (
+    <li>
+      <Link
+        href={`/courses/${course.id}`}
+        className="group grid gap-5 rounded-lg border border-ws-hairline bg-ws-surface p-5 transition-colors duration-[var(--ws-motion-base)] hover:border-ws-brand/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40 sm:grid-cols-[9rem_1fr] sm:p-6"
+      >
+        <div className="relative aspect-video overflow-hidden rounded-md bg-ws-sunken sm:aspect-[4/3]">
+          {course.thumbnailUrl && (
+            <Image
+              src={course.thumbnailUrl}
+              alt=""
+              fill
+              sizes="(max-width: 640px) 100vw, 9rem"
+              className="object-cover"
+            />
+          )}
+        </div>
+        <div className="flex min-w-0 flex-col">
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className="rounded-full px-2 py-0.5 text-[11px] font-medium capitalize"
+              style={levelChipStyle(course.level)}
+            >
+              {course.level}
+            </span>
+            {comingSoon && (
+              <span className="rounded-full bg-ws-chip px-2 py-0.5 text-[11px] font-medium text-ws-muted">
+                Coming soon
+              </span>
+            )}
+          </div>
+          <h3 className="mt-3 font-display text-xl font-semibold tracking-[-0.01em] text-ws-primary">
+            {course.title}
+          </h3>
+          <p className="mt-2 line-clamp-2 text-[14px] leading-relaxed text-ws-muted">
+            {course.shortDescription ?? course.description}
+          </p>
+          <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-5">
+            <span className="text-[14px] font-semibold tabular-nums text-ws-primary">
+              {programPriceLabel(course)}
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-ws-gold">
+              View program
+              <ArrowRightIcon
+                size={14}
+                aria-hidden
+                className="transition-transform duration-200 group-hover:translate-x-0.5"
+              />
+            </span>
+          </div>
+        </div>
+      </Link>
+    </li>
+  )
+}
