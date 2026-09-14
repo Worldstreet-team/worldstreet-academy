@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import connectDB from "@/lib/db"
 import { Course, Enrollment, Meeting, User } from "@/lib/db/models"
 import { notifyUser } from "@/lib/notify"
-import { sendClassReminderEmail, sendInterviewReminderEmail } from "@/lib/email"
+import { formatUtcDateTime, sendClassReminderEmail, sendInterviewReminderEmail } from "@/lib/email"
 import { entitlementsFor } from "@/lib/entitlements"
 import { APP_URL } from "@/lib/app-url"
 
@@ -37,10 +37,15 @@ export async function POST(request: NextRequest) {
   await connectDB()
   const now = Date.now()
 
+  // Soonest first, and only meetings with a reminder still unsent — meetings
+  // already fully reminded can't crowd a due one past the limit.
   const upcoming = await Meeting.find({
     status: "scheduled",
     scheduledAt: { $gt: new Date(now), $lte: new Date(now + 24 * 3600 * 1000) },
-  }).limit(100)
+    $or: [{ "reminders.h1SentAt": null }, { "reminders.h24SentAt": null }],
+  })
+    .sort({ scheduledAt: 1 })
+    .limit(100)
 
   let sent24 = 0
   let sent1 = 0
@@ -67,9 +72,15 @@ export async function POST(request: NextRequest) {
         .filter((i) => i.userId)
         .map((i) => i.userId!.toString())
 
+      // A class first seen in the 24h window may well be later today — never "tomorrow".
       const title =
-        window === "1h" ? "Starting in ~1 hour" : "Reminder: scheduled for tomorrow"
-      const bodyLine = `${meeting.title} — ${when.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}`
+        window === "1h"
+          ? "Starting in ~1 hour"
+          : meeting.courseId
+            ? "Class coming up"
+            : "Reminder: scheduled for tomorrow"
+      // Rendered on the server (UTC in Docker), so the time names its zone.
+      const bodyLine = `${meeting.title} — ${formatUtcDateTime(when)}`
 
       const jobs: Promise<unknown>[] = []
 

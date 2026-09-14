@@ -1829,7 +1829,15 @@ export async function createCourseMeeting(
       courseId: new Types.ObjectId(courseId),
       courseThumbnailUrl: course.thumbnailUrl || undefined,
       ...(scheduledAt
-        ? { scheduledAt, reminders: { h24SentAt: null, h1SentAt: null } }
+        ? {
+            scheduledAt,
+            reminders: {
+              // A class within 24 h was just announced by the creation email, so
+              // its 24h reminder counts as sent; the 1h reminder still fires.
+              h24SentAt: scheduledAt.getTime() - Date.now() <= 24 * 3600 * 1000 ? new Date() : null,
+              h1SentAt: null,
+            },
+          }
         : { startedAt: new Date() }),
       participants: [
         {

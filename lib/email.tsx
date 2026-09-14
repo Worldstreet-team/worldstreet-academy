@@ -22,6 +22,28 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 
 const FROM_EMAIL = process.env.EMAIL_FROM || BRAND.fromEmail
 
+const UTC_PARTS = {
+  year: "numeric",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  timeZone: "UTC",
+  timeZoneName: "short",
+} as const satisfies Intl.DateTimeFormatOptions
+
+/**
+ * A class or interview time rendered on the server (UTC in Docker) — so it names
+ * its zone: "Sep 14, 2026, 1:00 PM UTC" (medium) or "Monday, September 14, 2026
+ * at 1:00 PM UTC" (full). Built from parts like `formatLaunch`, because
+ * `dateStyle`/`timeStyle` throw when combined with `timeZoneName`.
+ */
+export function formatUtcDateTime(when: string | Date, style: "medium" | "full" = "medium"): string {
+  return new Date(when).toLocaleString(
+    "en-US",
+    style === "full" ? { ...UTC_PARTS, weekday: "long", month: "long" } : { ...UTC_PARTS, month: "short" }
+  )
+}
+
 export type MeetingEmailData = {
   meetingTitle: string
   hostName: string
@@ -224,11 +246,7 @@ function MeetingNotificationEmail({ data }: { data: MeetingEmailData }) {
 
             {data.scheduledAt ? (
               <Text style={{ ...muted, color: "#837A72" }}>
-                Scheduled for{" "}
-                {new Date(data.scheduledAt).toLocaleString("en-US", {
-                  dateStyle: "medium",
-                  timeStyle: "short",
-                })}
+                Scheduled for {formatUtcDateTime(data.scheduledAt)}
               </Text>
             ) : (
               <Text style={{ ...muted, color: "#047857", fontWeight: 500 }}>
@@ -644,10 +662,7 @@ export async function sendInterviewReminderEmail(
     window: "24h" | "1h"
   }
 ) {
-  const when = new Date(data.scheduledAt).toLocaleString("en-US", {
-    dateStyle: "full",
-    timeStyle: "short",
-  })
+  const when = formatUtcDateTime(data.scheduledAt, "full")
   try {
     const { error } = await resend.emails.send({
       from: FROM_EMAIL,
@@ -688,10 +703,7 @@ export async function sendClassReminderEmail(
     window: "24h" | "1h"
   }
 ) {
-  const when = new Date(data.scheduledAt).toLocaleString("en-US", {
-    dateStyle: "full",
-    timeStyle: "short",
-  })
+  const when = formatUtcDateTime(data.scheduledAt, "full")
   const what = data.courseTitle ? `${data.classTitle} (${data.courseTitle})` : data.classTitle
   try {
     const { error } = await resend.emails.send({
