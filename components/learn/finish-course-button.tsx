@@ -5,15 +5,18 @@ import { useRouter } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { getStudentExamStatus } from "@/lib/actions/exams"
-import { markCourseComplete } from "@/lib/actions/student"
+import { markCourseComplete, markLessonComplete } from "@/lib/actions/student"
 import { queryKeys } from "@/lib/hooks/queries/keys"
 
 interface FinishCourseButtonProps {
   courseId: string
+  /** The open, not-yet-completed lesson on screen — marked done before finishing. */
+  pendingLessonId?: string | null
 }
 
 export function FinishCourseButton({
   courseId,
+  pendingLessonId = null,
 }: FinishCourseButtonProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -37,6 +40,9 @@ export function FinishCourseButton({
         router.push(`/dashboard/courses/${courseId}/exam`)
         return
       }
+      // Finishing requires every open lesson done; the one on screen counts as
+      // read once the student clicks Finish.
+      if (pendingLessonId) await markLessonComplete(courseId, pendingLessonId)
       const res = await markCourseComplete(courseId)
       if (res.success && res.requiresExam) {
         router.push(`/dashboard/courses/${courseId}/exam`)

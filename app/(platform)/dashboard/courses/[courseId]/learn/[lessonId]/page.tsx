@@ -229,6 +229,7 @@ export default async function LessonPage({
               ) : (
                 <FinishCourseButton
                   courseId={courseId}
+                  pendingLessonId={!currentLesson.locked && !isLessonCompleted ? actualLessonId : null}
                 />
               )}
             </div>

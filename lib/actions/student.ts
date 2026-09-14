@@ -6,7 +6,7 @@ import { Course, Enrollment, Bookmark, User, Lesson, type IPackageEntitlements, 
 import { getCurrentUser } from "@/lib/auth"
 import { isSchoolSlug, type SchoolSlug } from "@/lib/schools"
 import { FULL_ACCESS, PACKAGE_RANK, canAccessLesson, effectiveLessonTier, entitlementsFor } from "@/lib/entitlements"
-import { getCourseAccess, lockedLessonIds } from "@/lib/course-access"
+import { getCourseAccess, lockedLessonIds, openPublishedLessonIds } from "@/lib/course-access"
 
 // ============================================================================
 // TYPES
@@ -911,7 +911,7 @@ export async function getCompletedLessons(courseId: string): Promise<string[]> {
  */
 export async function markCourseComplete(
   courseId: string
-): Promise<{ success: boolean; requiresExam?: boolean }> {
+): Promise<{ success: boolean; requiresExam?: boolean; error?: string }> {
   "use server"
   try {
     await connectDB()
@@ -933,7 +933,16 @@ export async function markCourseComplete(
       Course.findById(courseId).select("examRequired").lean(),
       getCourseAccess(user._id.toString(), courseId),
     ])
-    const examGates = !!course?.examRequired && (access?.entitlements.certificate ?? true)
+    if (!access) return { success: false }
+    const examGates = !!course?.examRequired && access.entitlements.certificate
+
+    // Finishing needs every published lesson the package opens — the same set
+    // completeLesson counts — or a student could certify from the last lesson.
+    const open = await openPublishedLessonIds(access)
+    const completed = new Set(enrollment.completedLessons.map((id: { toString(): string }) => id.toString()))
+    if (open.size === 0 || [...open].some((id) => !completed.has(id))) {
+      return { success: false, error: "Finish all lessons first" }
+    }
 
     enrollment.progress = 100
     enrollment.lastAccessedAt = new Date()

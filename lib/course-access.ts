@@ -101,6 +101,18 @@ export async function lockedLessonIds(access: CourseAccess | null): Promise<Set<
   )
 }
 
+/**
+ * Ids of the course's PUBLISHED lessons this enrollment's package opens — the
+ * progress and completion denominator (the same set `completeLesson` counts).
+ */
+export async function openPublishedLessonIds(access: CourseAccess): Promise<Set<string>> {
+  const [locked, published] = await Promise.all([
+    lockedLessonIds(access),
+    Lesson.find({ course: access.course.id, isPublished: true }).select("_id").lean(),
+  ])
+  return new Set(published.map((lesson) => lesson._id.toString()).filter((id) => !locked.has(id)))
+}
+
 /** True only when the user is enrolled on the lesson's course and their package can't open it. */
 export async function isLessonLockedFor(userId: string, lessonId: string): Promise<boolean> {
   if (!mongoose.isValidObjectId(lessonId)) return false

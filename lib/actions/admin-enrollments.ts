@@ -9,6 +9,7 @@ import { requireAdmin } from "@/lib/auth/admin"
 import { courseAvailability } from "@/lib/types/course"
 import type { CourseStatus } from "@/lib/types/course"
 import { PACKAGE_RANK, isPackageKey, packageFor } from "@/lib/entitlements"
+import { getCourseAccess, openPublishedLessonIds } from "@/lib/course-access"
 
 const PAGE_SIZE = 20
 
@@ -257,7 +258,7 @@ export async function adminSetEnrollmentPackage(
       return { success: false, error: "Only active or completed enrollments can change package" }
     }
 
-    const course = await Course.findById(enrollment.course).select("packages").lean()
+    const course = await Course.findById(enrollment.course).select("packages examRequired").lean()
     const pkg = course ? packageFor(course, packageKey) : null
     if (!pkg) return { success: false, error: "This course doesn't sell that package" }
 
@@ -267,6 +268,27 @@ export async function adminSetEnrollmentPackage(
     enrollment.packageKey = pkg.key
     enrollment.packageName = pkg.name
     await enrollment.save()
+
+    // Progress and completion follow the NEW package: the same denominator as
+    // completeLesson (published lessons the package opens). A completion the
+    // new package hasn't earned — lessons it opens still to do, or a final exam
+    // it now requires — goes back to active. Never promotes: finishing stays
+    // the student's own action.
+    const progressFrom = enrollment.progress ?? 0
+    const statusFrom = enrollment.status
+    const access = await getCourseAccess(enrollment.user.toString(), enrollment.course.toString())
+    if (access) {
+      const open = await openPublishedLessonIds(access)
+      const done = enrollment.completedLessons.filter((id: { toString(): string }) => open.has(id.toString())).length
+      enrollment.progress = open.size > 0 ? Math.min(100, Math.round((done / open.size) * 100)) : 0
+      const allDone = open.size > 0 && done === open.size
+      const examGates = !!course?.examRequired && access.entitlements.certificate && !enrollment.examPassed
+      if (enrollment.status === "completed" && (!allDone || examGates)) {
+        enrollment.status = "active"
+        enrollment.completedAt = null
+      }
+      await enrollment.save()
+    }
 
     try {
       await PaymentEvent.create({
@@ -279,6 +301,8 @@ export async function adminSetEnrollmentPackage(
           courseId: enrollment.course.toString(),
           from,
           to: pkg.key,
+          progress: { from: progressFrom, to: enrollment.progress ?? 0 },
+          status: { from: statusFrom, to: enrollment.status },
           adminId: admin.id,
         },
       })
