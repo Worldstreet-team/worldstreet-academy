@@ -27,9 +27,21 @@
  * On MATCH this $sets title, school, category and packages unconditionally,
  * plus shortDescription/description/whatYouWillLearn only for the 3 programs
  * the spec gives copy for (Forex, Crypto, AI & AI Automation) — every other
- * program's existing copy is left untouched. It NEVER overwrites price,
- * thumbnailUrl, status, instructor, enrolledCount or rating on an existing
- * row, and never deletes or archives anything.
+ * program's existing copy is left untouched. It never touches thumbnailUrl,
+ * status, instructor, enrolledCount or rating on an existing row, and never
+ * deletes or archives anything.
+ *
+ * Price (fix round 1 / controller ruling): the 9 single-package programs
+ * keep the original rule — the course's scalar `price` is never overwritten
+ * on MATCH, and the one package's price always mirrors it (existing price on
+ * MATCH, table price on INSERT). The 3 spec-ladder programs (Forex, Crypto,
+ * AI & AI Automation) are different: their packages are a fixed ladder, not
+ * derived from the course price, so the course's scalar `price` and
+ * `pricing` are DERIVED from the packages instead — `price` = the cheapest
+ * *enabled* package price, `pricing` = "paid" — and that derivation is
+ * $set on MATCH too (so an old row inserted with the wrong scalar price
+ * self-heals). Forex/Crypto resolve to 49 (their `basic` package); AI & AI
+ * Automation resolves to 199 (its only package).
  *
  * Slug: if the clean slugify(title) isn't held by any *other* course, it is
  * $set; otherwise the existing slug is kept and a warning is printed.
@@ -105,6 +117,13 @@ function genericPackage(price) {
   return [pkg("standard", "Full program", "", price, [], FULL)]
 }
 
+/** Course-level price for the 3 spec-ladder programs: the cheapest enabled package. */
+function minEnabledPrice(packages) {
+  const enabled = packages.filter((p) => p.enabled)
+  if (enabled.length === 0) throw new Error("minEnabledPrice: no enabled packages to derive a price from")
+  return Math.min(...enabled.map((p) => p.price))
+}
+
 const slugify = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "")
 
 // ---------------------------------------------------------------------------
@@ -172,7 +191,8 @@ const aiPackages = [
 
 const PROGRAMS = [
   {
-    title: "Forex Trading Mastery", legacyTitles: [], school: "trading-financial-markets", price: 199,
+    // No table `price` here: price is derived from the packages (min enabled) — see derivePriceFromPackages below.
+    title: "Forex Trading Mastery", legacyTitles: [], school: "trading-financial-markets", derivePriceFromPackages: true,
     newInsertDraft: false,
     spec: {
       shortDescription: "Learn the fundamentals and advanced concepts of Forex trading through a structured learning pathway.",
@@ -182,7 +202,7 @@ const PROGRAMS = [
     buildPackages: () => forexPackages,
   },
   {
-    title: "Crypto Trading Mastery", legacyTitles: [], school: "trading-financial-markets", price: 199,
+    title: "Crypto Trading Mastery", legacyTitles: [], school: "trading-financial-markets", derivePriceFromPackages: true,
     newInsertDraft: false,
     spec: {
       shortDescription: "Understand digital assets, crypto markets, analysis, security and responsible trading principles.",
@@ -196,7 +216,7 @@ const PROGRAMS = [
     newInsertDraft: false, spec: null, buildPackages: genericPackage,
   },
   {
-    title: "AI & AI Automation", legacyTitles: ["Artificial Intelligence & AI Automation"], school: "ai-automation", price: 199,
+    title: "AI & AI Automation", legacyTitles: ["Artificial Intelligence & AI Automation"], school: "ai-automation", derivePriceFromPackages: true,
     newInsertDraft: false,
     spec: {
       shortDescription: "Turn Artificial Intelligence into a practical skill.",
@@ -296,11 +316,21 @@ for (const program of PROGRAMS) {
 
   if (existing) {
     const isRename = matchedOnTitle !== program.title
+    const packages = program.buildPackages(existing.price)
     const setDoc = {
       title: program.title,
       school: program.school,
       category: school.short,
-      packages: program.buildPackages(existing.price),
+      packages,
+    }
+    let priceLine
+    if (program.derivePriceFromPackages) {
+      const derivedPrice = minEnabledPrice(packages)
+      setDoc.price = derivedPrice
+      setDoc.pricing = "paid"
+      priceLine = `${derivedPrice} (derived: min enabled package price; existing scalar was ${existing.price})`
+    } else {
+      priceLine = `unchanged (${existing.price})`
     }
     if (program.spec) {
       setDoc.shortDescription = program.spec.shortDescription
@@ -323,6 +353,7 @@ for (const program of PROGRAMS) {
     }
     counts.matched++
     console.log(`  slug: ${slugResult.slug ? `-> "${slugResult.slug}"` : `unchanged ("${existing.slug}")`}`)
+    console.log(`  price: ${priceLine}`)
     console.log(`  $set: ${Object.keys(setDoc).join(", ")}`)
 
     if (APPLY) {
@@ -335,6 +366,9 @@ for (const program of PROGRAMS) {
     const description = program.spec ? program.spec.description : school.blurb
     const shortDescription = program.spec ? program.spec.shortDescription : null
     const whatYouWillLearn = program.spec ? program.spec.whatYouWillLearn : []
+    const packages = program.buildPackages(program.price)
+    const price = program.derivePriceFromPackages ? minEnabledPrice(packages) : program.price
+    const priceLine = program.derivePriceFromPackages ? `${price} (derived: min enabled package price)` : `${price} (table)`
 
     const slugResult = await resolveSlug(program.title, null)
     if (slugResult.warning) {
@@ -354,7 +388,7 @@ for (const program of PROGRAMS) {
       instructor: owner._id,
       level: "beginner",
       pricing: "paid",
-      price: program.price,
+      price,
       currency: "USD",
       status,
       category: school.short,
@@ -368,7 +402,7 @@ for (const program of PROGRAMS) {
       requirements: [],
       targetAudience: [],
       examRequired: false,
-      packages: program.buildPackages(program.price),
+      packages,
       publishedAt: status === "published" ? now : null,
       availableAt: null,
       preEnrollEnabled: true,
@@ -380,7 +414,7 @@ for (const program of PROGRAMS) {
     console.log(`\nINSERT ${program.title}`)
     counts.inserted++
     console.log(`  slug: "${slugResult.slug}"`)
-    console.log(`  status: ${status}, price: ${program.price}, school: ${program.school}`)
+    console.log(`  price: ${priceLine}, status: ${status}, school: ${program.school}`)
     console.log(`  fields: ${Object.keys(doc).join(", ")}`)
 
     if (APPLY) {
