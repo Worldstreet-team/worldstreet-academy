@@ -2,6 +2,20 @@ import Link from "next/link"
 import { BrandLockup } from "@/components/shared/brand-lockup"
 import { BRAND } from "@/lib/brand"
 
+/**
+ * The ecosystem's legal documents, published by the WorldStreet hub
+ * (https://www.worldstreetgold.com/legal — "each one applies across all nine
+ * platforms on a single login"). The Academy links them and keeps no copy of
+ * its own. These are the hub footer's own hrefs, URL-encoded; if the hub
+ * renames a file, update it here and in docs/launch-runbook.md §4.
+ */
+const LEGAL_LINKS = [
+  { label: "Terms of Business", href: "https://www.worldstreetgold.com/legal-docs/WS%20Terms%20of%20Business.pdf" },
+  { label: "Privacy Policy", href: "https://www.worldstreetgold.com/legal-docs/Privacy%20Policy.pdf" },
+  { label: "Cookie Policy", href: "https://www.worldstreetgold.com/legal-docs/WS%20Cookie%20Policy%201.pdf" },
+  { label: "All legal documents", href: "https://www.worldstreetgold.com/legal" },
+] as const
+
 export function Footer({ showFaculty }: { showFaculty: boolean }) {
   return (
     <footer className="border-t bg-muted/40">
@@ -68,12 +82,18 @@ export function Footer({ showFaculty }: { showFaculty: boolean }) {
           <div>
             <h4 className="text-sm font-semibold mb-3">Legal</h4>
             <ul className="space-y-2">
-              <li>
-                <span className="text-sm text-muted-foreground">Terms of Service</span>
-              </li>
-              <li>
-                <span className="text-sm text-muted-foreground">Privacy Policy</span>
-              </li>
+              {LEGAL_LINKS.map((link) => (
+                <li key={link.href}>
+                  <a
+                    href={link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {link.label}
+                  </a>
+                </li>
+              ))}
             </ul>
           </div>
         </div>
