@@ -269,6 +269,7 @@ export function ActiveMeetingsList({
     <div className="space-y-2">
       {meetings.map((meeting) => {
         const isActive = meeting.status === "active"
+        const isScheduled = meeting.status === "scheduled"
         const thumbnailUrl = (meeting as MeetingWithDetails & { courseThumbnailUrl?: string }).courseThumbnailUrl
         const isHostMe = meeting.hostId === userId
         const hostName = isHostMe ? "You" : meeting.hostName
@@ -299,6 +300,14 @@ export function ActiveMeetingsList({
                       <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-ws-success" />
                     </span>
                     Active
+                  </span>
+                )}
+                {isScheduled && (
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-ws-chip px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-ws-muted">
+                    <CalendarDaysIcon size={10} aria-hidden />
+                    {meeting.scheduledAt
+                      ? new Date(meeting.scheduledAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })
+                      : "Scheduled"}
                   </span>
                 )}
               </div>
@@ -344,9 +353,9 @@ export function ActiveMeetingsList({
                 </span>
               </div>
             </div>
-            <div className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className={cn("shrink-0 transition-opacity", isScheduled && isHostMe ? "opacity-100" : "opacity-0 group-hover:opacity-100")}>
               <div className="flex items-center gap-1 text-[11px] font-medium text-foreground">
-                Rejoin
+                {isScheduled && isHostMe ? "Start" : "Rejoin"}
                 <ChevronRightIcon  size={11} />
               </div>
             </div>

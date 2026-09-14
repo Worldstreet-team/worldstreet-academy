@@ -44,6 +44,7 @@ import { RenderIcon } from "@/components/shared/render-icon"
 import { SCHOOLS, type SchoolSlug } from "@/lib/schools"
 import type { ICoursePackage, PackageKey } from "@/lib/db/models"
 import { PACKAGE_KEYS, PACKAGE_LABEL } from "@/lib/entitlements"
+import { isoToLocalInput, localInputToIso } from "@/lib/datetime-local"
 import {
   PackageEditor,
   ladderPrice,
@@ -68,22 +69,6 @@ type EditableCourse = {
   availableAt?: string | null
   preEnrollEnabled?: boolean
   packages?: ICoursePackage[]
-}
-
-/** ISO string → value for a datetime-local input, in the viewer's timezone. */
-function isoToLocalInput(iso: string | null | undefined): string {
-  if (!iso) return ""
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ""
-  const pad = (n: number) => String(n).padStart(2, "0")
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-
-/** datetime-local value → ISO string for the wire ("" stays ""). */
-function localInputToIso(local: string): string {
-  if (!local) return ""
-  const d = new Date(local)
-  return Number.isNaN(d.getTime()) ? "" : d.toISOString()
 }
 
 /* ─── Duration helpers (stored in seconds) ─── */

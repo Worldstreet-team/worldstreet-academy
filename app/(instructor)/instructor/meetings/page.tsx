@@ -162,6 +162,7 @@ export default function InstructorMeetingsPage() {
   const { data: instructorCourses = [], isLoading: isLoadingCourses } = useInstructorMeetingCourses()
   const [showCourseMeetingModal, setShowCourseMeetingModal] = useState(false)
   const [selectedCourse, setSelectedCourse] = useState<CourseSummary | null>(null)
+  const [scheduleNotice, setScheduleNotice] = useState<string | null>(null)
   const [showInviteDialog, setShowInviteDialog] = useState(false)
   useEffect(() => {
     setIsMobile(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent))
@@ -920,9 +921,32 @@ export default function InstructorMeetingsPage() {
     }
   }
 
-  async function handleCreateCourseMeeting(courseId: string, title: string) {
+  async function handleCreateCourseMeeting(courseId: string, title: string, scheduledAtISO?: string) {
     setShowCourseMeetingModal(false)
     setSelectedCourse(null)
+
+    if (scheduledAtISO) {
+      // A scheduled class is a record + notifications — no RTK join until the
+      // host starts it from Active Meetings (joinMeeting flips it live).
+      setSetupMessage("Scheduling your class...")
+      const result = await createCourseMeeting(courseId, title, undefined, scheduledAtISO)
+      setSetupMessage(null)
+      if (result.success && result.meeting?.scheduledAt) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.meetings })
+        const when = new Date(result.meeting.scheduledAt).toLocaleString("en-US", {
+          dateStyle: "medium",
+          timeStyle: "short",
+        })
+        const count = result.notifiedCount ?? 0
+        setScheduleNotice(
+          `Class scheduled for ${when}. ${count} student${count === 1 ? "" : "s"} notified — start it from Active Meetings when it's time.`
+        )
+      } else {
+        setScheduleNotice(result.error ?? "Couldn't schedule the class")
+      }
+      return
+    }
+
     setSetupMessage("Setting up your live session...")
     playMeetingCreating()
     const result = await createCourseMeeting(courseId, title)
@@ -1793,6 +1817,21 @@ export default function InstructorMeetingsPage() {
               Dismiss
             </Button>
           </div>
+        </div>
+      )}
+      {scheduleNotice && (
+        <div
+          role="status"
+          className="fixed inset-x-4 top-4 z-50 mx-auto flex max-w-md items-start gap-3 rounded-lg border border-ws-hairline bg-ws-surface px-4 py-3 shadow-lg"
+        >
+          <p className="flex-1 text-sm text-ws-primary">{scheduleNotice}</p>
+          <button
+            type="button"
+            onClick={() => setScheduleNotice(null)}
+            className="text-xs font-medium text-ws-muted transition-colors hover:text-ws-primary"
+          >
+            Dismiss
+          </button>
         </div>
       )}
       <Topbar title="Meetings" variant="instructor" />

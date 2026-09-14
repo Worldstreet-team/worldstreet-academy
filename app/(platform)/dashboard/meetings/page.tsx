@@ -75,6 +75,15 @@ const TILES_PER_PAGE = 4
 
 type ScreenSharer = { id: string; name: string; isLocal: boolean }
 
+/** A class that hasn't started names its start time in the viewer's timezone. */
+function joinErrorMessage(result: { error?: string; startsAt?: string }): string {
+  if (result.startsAt) {
+    const when = new Date(result.startsAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })
+    return `This class hasn't started yet — it begins ${when}`
+  }
+  return result.error ?? "Couldn't join this meeting"
+}
+
 export default function MeetingsPage() {
   const user = useUser()
   const searchParams = useSearchParams()
@@ -999,7 +1008,7 @@ export default function MeetingsPage() {
       }
     } else {
       setSetupMessage(null)
-      setJoinError(result.error ?? "Couldn't join this meeting")
+      setJoinError(joinErrorMessage(result))
     }
   }
 
@@ -1041,7 +1050,7 @@ export default function MeetingsPage() {
       }
     } else {
       setSetupMessage(null)
-      setJoinError(result.error ?? "Couldn't join this meeting")
+      setJoinError(joinErrorMessage(result))
     }
   }
 

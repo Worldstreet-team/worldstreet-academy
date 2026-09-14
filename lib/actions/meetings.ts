@@ -50,6 +50,8 @@ export type MeetingWithDetails = {
   settings: MeetingSettings
   createdAt: string
   startedAt?: string
+  /** Scheduled classes and interviews: when it's due to start (ISO). */
+  scheduledAt?: string
   courseId?: string
   courseThumbnailUrl?: string
   /** First few admitted participant avatars for sidebar display */
@@ -159,6 +161,8 @@ export async function joinMeeting(meetingId: string): Promise<{
   role?: MeetingRole
   requiresApproval?: boolean
   error?: string
+  /** Sent with the not-started refusal so the client can show the start time in the viewer's timezone. */
+  startsAt?: string
 }> {
   try {
     const currentUser = await initAction()
@@ -210,6 +214,18 @@ export async function joinMeeting(meetingId: string): Promise<{
         if (!access.entitlements.liveClasses) {
           return { success: false, error: "Live classes aren't included in your package" }
         }
+      }
+    }
+
+    // A class that hasn't started: only the host's join (above) starts it, so
+    // nobody else sits in an unstarted room. Runs after the package gate, so a
+    // student without live classes hears that first. Interviews (no courseId)
+    // keep their waiting room.
+    if (meeting.courseId && meeting.status === "scheduled") {
+      return {
+        success: false,
+        error: "This class hasn't started yet",
+        startsAt: meeting.scheduledAt?.toISOString(),
       }
     }
 
@@ -732,6 +748,7 @@ export async function getMyMeetings(): Promise<{
           settings: serializeSettings(m.settings),
           createdAt: m.createdAt.toISOString(),
           startedAt: m.startedAt?.toISOString(),
+          scheduledAt: m.scheduledAt?.toISOString(),
           participantAvatars,
         }
       }),
@@ -1740,9 +1757,12 @@ export async function createCourseMeeting(
   courseId: string,
   title: string,
   description?: string,
+  /** A future start (ISO) schedules the class instead of starting it now. */
+  scheduledAtISO?: string,
 ): Promise<{
   success: boolean
   meeting?: MeetingWithDetails
+  /** Host token for a class that starts now. A scheduled class has none — the host joins at start time. */
   authToken?: string
   notifiedCount?: number
   error?: string
@@ -1750,6 +1770,16 @@ export async function createCourseMeeting(
   try {
     const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
+
+    // Scheduling: a real future time only — the interview scheduler's rule.
+    let scheduledAt: Date | null = null
+    if (scheduledAtISO) {
+      scheduledAt = new Date(scheduledAtISO)
+      if (Number.isNaN(scheduledAt.getTime())) return { success: false, error: "Invalid class time" }
+      if (scheduledAt.getTime() <= Date.now() + 60_000) {
+        return { success: false, error: "Class time must be in the future" }
+      }
+    }
 
     // Verify instructor owns this course
     const course = await Course.findOne({
@@ -1759,7 +1789,8 @@ export async function createCourseMeeting(
     }).lean()
     if (!course) return { success: false, error: "Course not found" }
 
-    // Create RTK meeting room
+    // Create the RTK room up front — for a scheduled class too, like interviews,
+    // so the host's join at start time is instant (joinMeeting flips it live).
     const rtkMeetingId = await createRTKMeeting(`Meeting: ${title}`)
     const hostParticipant = await addParticipant(rtkMeetingId, {
       name: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
@@ -1772,12 +1803,14 @@ export async function createCourseMeeting(
       title,
       description,
       hostId: new Types.ObjectId(currentUser.id),
-      status: "active",
+      status: scheduledAt ? "scheduled" : "active",
       meetingId: rtkMeetingId,
       hostToken: hostParticipant.authToken,
       courseId: new Types.ObjectId(courseId),
       courseThumbnailUrl: course.thumbnailUrl || undefined,
-      startedAt: new Date(),
+      ...(scheduledAt
+        ? { scheduledAt, reminders: { h24SentAt: null, h1SentAt: null } }
+        : { startedAt: new Date() }),
       participants: [
         {
           userId: new Types.ObjectId(currentUser.id),
@@ -1830,6 +1863,8 @@ export async function createCourseMeeting(
             meetingLink,
             courseName: course.title,
             courseThumbnailUrl: course.thumbnailUrl || undefined,
+            // Renders "Scheduled for …" instead of "Happening right now".
+            scheduledAt: scheduledAt ? scheduledAt.toISOString() : undefined,
           })
         )
         await Promise.allSettled(emailPromises)
@@ -1838,7 +1873,7 @@ export async function createCourseMeeting(
 
     return {
       success: true,
-      authToken: hostParticipant.authToken,
+      authToken: scheduledAt ? undefined : hostParticipant.authToken,
       notifiedCount: classEnrollments.length,
       meeting: {
         id: meeting._id.toString(),
@@ -1854,6 +1889,7 @@ export async function createCourseMeeting(
         settings: serializeSettings(meeting.settings),
         createdAt: meeting.createdAt.toISOString(),
         startedAt: meeting.startedAt?.toISOString(),
+        scheduledAt: meeting.scheduledAt?.toISOString(),
         courseId: courseId,
         courseThumbnailUrl: course.thumbnailUrl || undefined,
       },

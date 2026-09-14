@@ -12,8 +12,9 @@ import {
   searchUsersByEmail,
   type InviteResult,
 } from "@/lib/actions/meetings"
-import { ChevronLeftIcon, ChevronRightIcon, CircleCheckIcon, CopyIcon, LoaderCircleIcon, SearchIcon, UserIcon, UsersIcon, VideoIcon, XIcon } from "lucide-react"
+import { CalendarClockIcon, ChevronLeftIcon, ChevronRightIcon, CircleCheckIcon, CopyIcon, LoaderCircleIcon, SearchIcon, UserIcon, UsersIcon, VideoIcon, XIcon } from "lucide-react"
 import { RenderIcon } from "@/components/shared/render-icon"
+import { isoToLocalInput, localInputToIso } from "@/lib/datetime-local"
 
 /* ═══════════════════════════════════════════════════════════
    INSTRUCTOR INVITE DIALOG
@@ -424,23 +425,44 @@ export function CreateCourseMeetingModal({
   open: boolean
   onOpenChange: (open: boolean) => void
   course: CourseSummary | null
-  onCreate: (courseId: string, title: string) => void
+  /** `scheduledAtISO` set → schedule the class for later instead of starting it now. */
+  onCreate: (courseId: string, title: string, scheduledAtISO?: string) => void
 }) {
   const [title, setTitle] = useState(course ? `${course.title} — Session` : "")
   const [isCreating, setIsCreating] = useState(false)
+  const [scheduleLater, setScheduleLater] = useState(false)
+  const [scheduledLocal, setScheduledLocal] = useState("")
+  const [minLocal, setMinLocal] = useState("")
+  const [scheduleError, setScheduleError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (open && course) {
       setTimeout(() => {
         setTitle(`${course.title} — Session`)
+        // Earliest pickable start, in the viewer's timezone.
+        setMinLocal(isoToLocalInput(new Date(Date.now() + 5 * 60_000).toISOString()))
         inputRef.current?.focus()
       }, 100)
     }
   }, [open, course])
 
-  async function handleCreate() {
+  function handleCreate() {
     if (!title.trim() || !course) return
+    if (scheduleLater) {
+      const iso = localInputToIso(scheduledLocal)
+      if (!iso) {
+        setScheduleError("Pick a date and time")
+        return
+      }
+      if (new Date(iso).getTime() <= Date.now() + 60_000) {
+        setScheduleError("Class time must be in the future")
+        return
+      }
+      setScheduleError(null)
+      onCreate(course.id, title.trim(), iso)
+      return
+    }
     setIsCreating(true)
     onCreate(course.id, title.trim())
     setIsCreating(false)
@@ -514,6 +536,42 @@ export function CreateCourseMeetingModal({
             />
           </div>
 
+          {/* Schedule for later (spec §12 Upcoming classes) */}
+          <div className="space-y-2">
+            <label className="flex cursor-pointer items-center gap-2 text-[13px] text-ws-primary">
+              <input
+                type="checkbox"
+                checked={scheduleLater}
+                onChange={(e) => {
+                  setScheduleLater(e.target.checked)
+                  setScheduleError(null)
+                }}
+                className="h-4 w-4 accent-ws-brand"
+              />
+              <CalendarClockIcon size={14} className="text-ws-muted" aria-hidden />
+              Schedule for later
+            </label>
+            {scheduleLater && (
+              <div className="space-y-1.5">
+                <Input
+                  type="datetime-local"
+                  aria-label="Class date and time"
+                  value={scheduledLocal}
+                  min={minLocal}
+                  onChange={(e) => {
+                    setScheduledLocal(e.target.value)
+                    setScheduleError(null)
+                  }}
+                  className="h-11 text-sm bg-muted/20 border-ws-hairline rounded-lg"
+                />
+                <p className="text-[11px] text-ws-muted">
+                  Students whose package includes live classes see it on their dashboard and get a reminder before it starts.
+                </p>
+                {scheduleError && <p className="text-xs text-ws-danger">{scheduleError}</p>}
+              </div>
+            )}
+          </div>
+
           {/* Action buttons */}
           <div className="flex gap-2 pt-1">
             <button
@@ -524,13 +582,18 @@ export function CreateCourseMeetingModal({
             </button>
             <Button
               onClick={handleCreate}
-              disabled={!title.trim() || isCreating}
+              disabled={!title.trim() || isCreating || (scheduleLater && !scheduledLocal)}
               className="flex-1 gap-2 h-11 bg-foreground hover:bg-foreground/90 text-background text-sm font-medium rounded-lg"
             >
               {isCreating ? (
                 <>
                   <LoaderCircleIcon  size={15} className="animate-spin" />
                   Starting...
+                </>
+              ) : scheduleLater ? (
+                <>
+                  <CalendarClockIcon size={15} />
+                  Schedule class
                 </>
               ) : (
                 <>
