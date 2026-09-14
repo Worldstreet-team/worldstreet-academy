@@ -68,6 +68,7 @@ import {
 import { LinkIcon, Minimize2Icon } from "lucide-react"
 import type { ActiveTab, ChatMessage, Poll, PollVoter } from "@/components/meetings"
 import { useMyMeetings, useMeetingHistory, useInstructorMeetingCourses, queryKeys } from "@/lib/hooks/queries"
+import { MentorshipPanel } from "@/components/mentorship/mentorship-panel"
 import {
   InstructorInviteDialog,
   CourseMeetingCards,
@@ -1862,6 +1863,9 @@ export default function InstructorMeetingsPage() {
             onCreateNew={() => setShowCreate(true)}
             onJoin={handleJoinByLink}
           />
+
+          {/* Executive mentorship — requests, booked sessions, roadmaps (Phase 7) */}
+          <MentorshipPanel />
 
           {/* Course cards - Go Live from your courses */}
           <CourseMeetingCards

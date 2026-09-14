@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { Types } from "mongoose"
 import { z } from "zod/v4"
 import connectDB from "@/lib/db"
 import {
@@ -17,6 +18,7 @@ import { includesMentorship } from "@/lib/entitlements"
 import { notifyUser } from "@/lib/notify"
 import { formatUtcDateTime, sendMentorshipEmail } from "@/lib/email"
 import { APP_URL } from "@/lib/app-url"
+import { createMeeting as createRTKMeeting, addParticipant } from "@/lib/realtime"
 
 /*
  * Executive mentorship (spec §6): the student proposes times, the course
@@ -379,5 +381,266 @@ export async function cancelMentorshipSession(
   } catch (error) {
     console.error("Cancel mentorship session error:", error)
     return { success: false, error: "Couldn't update the session — try again" }
+  }
+}
+
+/* ═══════════════════ instructor ═══════════════════ */
+
+export type MenteeView = {
+  enrollmentId: string
+  courseId: string
+  courseTitle: string
+  studentName: string
+  /** The Executive onboarding intake from checkout (D4), when sent. */
+  intake: { goals: string; availability: string } | null
+  roadmap: { text: string; updatedAt: string } | null
+}
+
+export type MentorshipQueue = {
+  /** Unanswered requests, oldest first. */
+  requests: MentorshipSessionView[]
+  /** Confirmed sessions not yet past, soonest first. */
+  upcoming: MentorshipSessionView[]
+  /** Access-granting Executive enrollments with mentorship on courses you teach. */
+  mentees: MenteeView[]
+}
+
+/** The signed-in instructor's mentorship work: requests, booked sessions, mentees. */
+export async function getMentorshipQueue(): Promise<MentorshipQueue> {
+  const empty: MentorshipQueue = { requests: [], upcoming: [], mentees: [] }
+  try {
+    await connectDB()
+    const user = await getCurrentUser()
+    if (!user || (user.role !== "INSTRUCTOR" && user.role !== "ADMIN")) return empty
+
+    const courses = await Course.find({ instructor: user.id }).select("title packages").lean()
+    const [enrollments, sessions] = await Promise.all([
+      Enrollment.find({
+        course: { $in: courses.map((c) => c._id) },
+        status: { $in: ["active", "completed"] },
+        packageKey: "executive",
+      })
+        .select("user course packageKey mentorshipIntake mentorRoadmap")
+        .sort({ createdAt: 1 })
+        .lean(),
+      MentorshipSession.find({ instructor: user.id, status: { $in: ["requested", "confirmed"] } })
+        .sort({ createdAt: 1 })
+        .limit(100)
+        .lean(),
+    ])
+    const coursesById = new Map(courses.map((c) => [c._id.toString(), c]))
+    const mentored = enrollments.flatMap((enrollment) => {
+      const course = coursesById.get(enrollment.course.toString())
+      return course && includesMentorship(course, enrollment) ? [{ enrollment, course }] : []
+    })
+    const [students, views] = await Promise.all([
+      User.find({ _id: { $in: mentored.map((m) => m.enrollment.user) } }).select("firstName lastName").lean(),
+      toViews(sessions),
+    ])
+    const studentsById = new Map(students.map((s) => [s._id.toString(), s]))
+
+    return {
+      requests: views.filter((v) => v.status === "requested"),
+      upcoming: views
+        .filter((v) => v.status === "upcoming")
+        .sort((a, b) => (a.scheduledAt ?? "").localeCompare(b.scheduledAt ?? "")),
+      mentees: mentored.map(({ enrollment, course }) => ({
+        enrollmentId: enrollment._id.toString(),
+        courseId: course._id.toString(),
+        courseTitle: course.title,
+        studentName: fullName(studentsById.get(enrollment.user.toString()), "Student"),
+        intake: enrollment.mentorshipIntake
+          ? { goals: enrollment.mentorshipIntake.goals, availability: enrollment.mentorshipIntake.availability }
+          : null,
+        roadmap: enrollment.mentorRoadmap
+          ? { text: enrollment.mentorRoadmap.text, updatedAt: enrollment.mentorRoadmap.updatedAt.toISOString() }
+          : null,
+      })),
+    }
+  } catch (error) {
+    console.error("Get mentorship queue error:", error)
+    return empty
+  }
+}
+
+const ConfirmInput = z.object({
+  sessionId: z.string().regex(OBJECT_ID, "Session not found"),
+  slot: z.string().min(1, "Pick one of the proposed times"),
+})
+
+/**
+ * The course instructor confirms one proposed time. The RTK room is minted first
+ * (scheduled classes and interviews do the same), then the Meeting, then the
+ * request is claimed atomically. A RealtimeKit failure writes nothing — the
+ * request stays open; a lost claim deletes the unused Meeting row.
+ */
+export async function confirmMentorshipSession(
+  sessionId: string,
+  slotISO: string
+): Promise<{ success: true; data: { meetingId: string; scheduledAt: string } } | { success: false; error: string }> {
+  try {
+    await connectDB()
+    const user = await getCurrentUser()
+    if (!user) return { success: false, error: "You need to be signed in" }
+
+    const parsed = ConfirmInput.safeParse({ sessionId, slot: slotISO })
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? "Check the form and try again" }
+    }
+
+    const session = await MentorshipSession.findOne({ _id: parsed.data.sessionId, instructor: user.id }).lean()
+    if (!session) return { success: false, error: "Session not found" }
+    if (session.status !== "requested") return { success: false, error: "This request was already answered" }
+
+    const wanted = new Date(parsed.data.slot).getTime()
+    const picked = (session.proposedSlots ?? []).find((slot) => slot.at.getTime() === wanted)
+    if (!picked) return { success: false, error: "Pick one of the proposed times" }
+    if (picked.at.getTime() <= Date.now() + 60_000) {
+      return { success: false, error: "That time has passed — decline it and ask the student for new times" }
+    }
+
+    // The student must still hold Executive mentorship (a refund or package change closes the door).
+    const access = await getCourseAccess(session.student.toString(), session.course.toString())
+    if (!access || !includesMentorship(access.course, access)) {
+      return { success: false, error: "This student's package no longer includes mentorship" }
+    }
+
+    const [student, course] = await Promise.all([
+      User.findById(session.student).select("firstName lastName email").lean(),
+      Course.findById(session.course).select("title").lean(),
+    ])
+    if (!student) return { success: false, error: "Session not found" }
+    const studentName = fullName(student, "Student")
+    const hostName = fullName(user, "Your mentor")
+    const courseTitle = course?.title ?? "the program"
+    const scheduledAt = picked.at
+
+    let rtkMeetingId: string
+    let hostToken: string
+    try {
+      rtkMeetingId = await createRTKMeeting(`Mentorship: ${studentName}`)
+      const hostParticipant = await addParticipant(rtkMeetingId, {
+        name: hostName,
+        customParticipantId: user.id,
+        presetName: "group_call_host",
+      })
+      hostToken = hostParticipant.authToken
+    } catch (error) {
+      console.error("[Mentorship] room setup failed:", error)
+      return { success: false, error: "Couldn't open a room for this session — try again" }
+    }
+
+    // Interview-shaped on purpose: no courseId (that would reach every live-class student).
+    const meeting = await Meeting.create({
+      title: `Mentorship session · ${courseTitle} · ${studentName}`,
+      description: `Private mentorship session for ${courseTitle}.`,
+      hostId: new Types.ObjectId(user.id),
+      status: "scheduled",
+      scheduledAt,
+      meetingId: rtkMeetingId,
+      hostToken,
+      mentorshipSessionId: session._id,
+      reminders: {
+        // Within 24 h the confirmation itself is the heads-up; the 1h reminder still fires.
+        h24SentAt: scheduledAt.getTime() - Date.now() <= 24 * 3600 * 1000 ? new Date() : null,
+        h1SentAt: null,
+      },
+      participants: [
+        { userId: new Types.ObjectId(user.id), role: "host", status: "admitted", joinedAt: new Date() },
+      ],
+      invites: [{ userId: student._id, email: student.email ?? "", status: "sent", sentAt: new Date() }],
+      settings: {
+        allowScreenShare: true,
+        muteOnEntry: false,
+        requireApproval: true,
+        // joinMeeting's privacy gate admits only this session's student, so no waiting room.
+        guestAccess: true,
+        maxParticipants: 10,
+      },
+    })
+
+    const claimed = await MentorshipSession.findOneAndUpdate(
+      { _id: session._id, status: "requested" },
+      { $set: { status: "confirmed", scheduledAt, meetingId: meeting._id } },
+      { new: true }
+    )
+    if (!claimed) {
+      await Meeting.deleteOne({ _id: meeting._id })
+      return { success: false, error: "This request was already answered" }
+    }
+
+    void notifyUser(student._id.toString(), {
+      type: "meeting",
+      title: "Mentorship session confirmed",
+      body: `${hostName} confirmed ${formatUtcDateTime(scheduledAt)} for ${courseTitle}.`,
+      href: STUDENT_PATH,
+    })
+    if (mailable(student.email)) {
+      void sendMentorshipEmail(student.email, {
+        subject: "Your mentorship session is confirmed",
+        title: "Session confirmed",
+        bodyText: `${student.firstName || "Hi"}, ${hostName} confirmed your private session for ${courseTitle} on ${formatUtcDateTime(scheduledAt, "full")}. Open it from Mentorship when it's time — you can join once your mentor starts it.`,
+        ctaLabel: "View session",
+        ctaUrl: `${APP_URL}${STUDENT_PATH}`,
+        recipientName: student.firstName || undefined,
+      })
+    }
+
+    revalidatePath(STUDENT_PATH)
+    revalidatePath(INSTRUCTOR_PATH)
+    return { success: true, data: { meetingId: meeting._id.toString(), scheduledAt: scheduledAt.toISOString() } }
+  } catch (error) {
+    console.error("Confirm mentorship session error:", error)
+    return { success: false, error: "Couldn't confirm the session — try again" }
+  }
+}
+
+const RoadmapInput = z.object({
+  enrollmentId: z.string().regex(OBJECT_ID, "Student not found"),
+  text: z.string().trim().max(5000, "Keep the roadmap under 5,000 characters"),
+})
+
+/** The course instructor writes (or, with empty text, clears) a mentee's plain-text roadmap. */
+export async function saveMentorRoadmap(
+  enrollmentId: string,
+  text: string
+): Promise<{ success: true; data: { updatedAt: string | null } } | { success: false; error: string }> {
+  try {
+    await connectDB()
+    const user = await getCurrentUser()
+    if (!user) return { success: false, error: "You need to be signed in" }
+
+    const parsed = RoadmapInput.safeParse({ enrollmentId, text })
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? "Check the roadmap and try again" }
+    }
+
+    const enrollment = await Enrollment.findById(parsed.data.enrollmentId).select("user course packageKey status").lean()
+    if (!enrollment) return { success: false, error: "Student not found" }
+    const course = await Course.findById(enrollment.course).select("instructor packages title").lean()
+    if (!course || course.instructor.toString() !== user.id) return { success: false, error: "Student not found" }
+    if ((enrollment.status !== "active" && enrollment.status !== "completed") || !includesMentorship(course, enrollment)) {
+      return { success: false, error: "This student's package doesn't include mentorship" }
+    }
+
+    const roadmap = parsed.data.text
+      ? { text: parsed.data.text, updatedAt: new Date(), updatedBy: new Types.ObjectId(user.id) }
+      : null
+    await Enrollment.updateOne({ _id: enrollment._id }, { $set: { mentorRoadmap: roadmap } })
+
+    if (roadmap) {
+      void notifyUser(enrollment.user.toString(), {
+        type: "course",
+        title: "Your roadmap was updated",
+        body: `${fullName(user, "Your mentor")} updated your personal roadmap for ${course.title}.`,
+        href: STUDENT_PATH,
+      })
+    }
+
+    revalidatePath(STUDENT_PATH)
+    return { success: true, data: { updatedAt: roadmap ? roadmap.updatedAt.toISOString() : null } }
+  } catch (error) {
+    console.error("Save mentor roadmap error:", error)
+    return { success: false, error: "Couldn't save the roadmap — try again" }
   }
 }
