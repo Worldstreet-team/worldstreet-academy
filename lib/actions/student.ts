@@ -7,6 +7,8 @@ import { getCurrentUser } from "@/lib/auth"
 import { isSchoolSlug, type SchoolSlug } from "@/lib/schools"
 import { FULL_ACCESS, PACKAGE_RANK, canAccessLesson, effectiveLessonTier, entitlementsFor } from "@/lib/entitlements"
 import { getCourseAccess, lockedLessonIds, openPublishedLessonIds } from "@/lib/course-access"
+import { isCountryCode } from "@/lib/countries"
+import { FACULTY_ROLES, safeWebUrl } from "@/lib/faculty"
 
 // ============================================================================
 // TYPES
@@ -118,6 +120,8 @@ export async function fetchBrowseCourses(options?: {
   pricing?: string
   search?: string
   school?: SchoolSlug
+  /** Only this instructor's programs — "Courses taught" on /faculty/[username]. */
+  instructorId?: string
 }): Promise<BrowseCourse[]> {
   try {
     await connectDB()
@@ -133,6 +137,9 @@ export async function fetchBrowseCourses(options?: {
     }
     if (options?.school) {
       query.school = options.school
+    }
+    if (options?.instructorId) {
+      query.instructor = options.instructorId
     }
     if (options?.search) {
       query.$or = [
@@ -1162,5 +1169,139 @@ export async function fetchEnrolledCoursesFromInstructor(instructorId: string): 
   } catch (error) {
     console.error("Fetch enrolled courses from instructor error:", error)
     return []
+  }
+}
+
+// ============================================================================
+// FACULTY (spec §10) — /faculty, /faculty/[username], homepage teaser, nav
+// ============================================================================
+
+export type FacultyMember = {
+  id: string
+  /** Unique on User — the public URL key (`facultyHref`). */
+  username: string
+  name: string
+  avatarUrl: string | null
+  headline: string | null
+  /** Area of specialization (spec §10). */
+  specialization: string | null
+  expertise: string[]
+  /** ISO 3166-1 alpha-2; print it with `countryName`. */
+  country: string | null
+  featured: boolean
+  /** Published programs they teach — at least 1, or they aren't faculty. */
+  courseCount: number
+}
+
+export type FacultyProfile = FacultyMember & {
+  bio: string | null
+  experience: string | null
+  credentials: string[]
+  /** Only safe http(s) addresses; anything else stored reads as null. */
+  socialLinks: { website: string | null; linkedin: string | null; twitter: string | null }
+}
+
+const FACULTY_FIELDS = "username firstName lastName avatarUrl bio country instructorProfile"
+
+type FacultyUserDoc = {
+  _id: { toString(): string }
+  username: string
+  firstName: string
+  lastName?: string | null
+  avatarUrl?: string | null
+  country?: string | null
+  instructorProfile?: {
+    headline?: string | null
+    specialization?: string | null
+    expertise?: string[] | null
+    featured?: boolean | null
+  } | null
+}
+
+/**
+ * Published-program count per instructor id — the course half of "who is
+ * faculty" (role INSTRUCTOR or ADMIN is the other half, applied by each caller).
+ */
+async function publishedCourseCounts(): Promise<Map<string, number>> {
+  const rows = await Course.aggregate<{ _id: mongoose.Types.ObjectId; count: number }>([
+    { $match: { status: "published" } },
+    { $group: { _id: "$instructor", count: { $sum: 1 } } },
+  ])
+  return new Map(rows.map((row) => [row._id.toString(), row.count]))
+}
+
+function toFacultyMember(user: FacultyUserDoc, courseCount: number): FacultyMember {
+  const profile = user.instructorProfile
+  return {
+    id: user._id.toString(),
+    username: user.username,
+    name: `${user.firstName} ${user.lastName ?? ""}`.trim(),
+    avatarUrl: user.avatarUrl ?? null,
+    headline: profile?.headline?.trim() || null,
+    specialization: profile?.specialization?.trim() || null,
+    expertise: profile?.expertise ?? [],
+    country: isCountryCode(user.country) ? user.country : null,
+    featured: profile?.featured ?? false,
+    courseCount,
+  }
+}
+
+/** Every faculty member — featured first, then most students, then by name. */
+export async function fetchFaculty(): Promise<FacultyMember[]> {
+  try {
+    await connectDB()
+    const counts = await publishedCourseCounts()
+    if (counts.size === 0) return []
+
+    const users = await User.find({ _id: { $in: Array.from(counts.keys()) }, role: { $in: [...FACULTY_ROLES] } })
+      .select(FACULTY_FIELDS)
+      .lean()
+
+    return users
+      .sort(
+        (a, b) =>
+          Number(b.instructorProfile?.featured ?? false) - Number(a.instructorProfile?.featured ?? false) ||
+          (b.instructorProfile?.totalStudents ?? 0) - (a.instructorProfile?.totalStudents ?? 0) ||
+          `${a.firstName} ${a.lastName ?? ""}`.localeCompare(`${b.firstName} ${b.lastName ?? ""}`)
+      )
+      .map((user) => toFacultyMember(user, counts.get(user._id.toString()) ?? 0))
+  } catch (error) {
+    console.error("Fetch faculty error:", error)
+    return []
+  }
+}
+
+/**
+ * One public faculty profile by username. null — so the page 404s — for
+ * unknown usernames, students, and instructors with no published program.
+ */
+export async function fetchFacultyProfile(username: string): Promise<FacultyProfile | null> {
+  try {
+    if (typeof username !== "string" || username.length === 0 || username.length > 100) return null
+    await connectDB()
+
+    const user = await User.findOne({ username, role: { $in: [...FACULTY_ROLES] } })
+      .select(FACULTY_FIELDS)
+      .lean()
+    if (!user) return null
+
+    const courseCount = await Course.countDocuments({ instructor: user._id, status: "published" })
+    if (courseCount === 0) return null
+
+    const profile = user.instructorProfile
+    return {
+      ...toFacultyMember(user, courseCount),
+      bio: user.bio?.trim() || null,
+      experience: profile?.experience?.trim() || null,
+      credentials: profile?.credentials ?? [],
+      socialLinks: {
+        website: safeWebUrl(profile?.socialLinks?.website),
+        linkedin: safeWebUrl(profile?.socialLinks?.linkedin),
+        twitter: safeWebUrl(profile?.socialLinks?.twitter),
+      },
+    }
+  } catch (error) {
+    console.error("Fetch faculty profile error:", error)
+    return null
   }
 }
