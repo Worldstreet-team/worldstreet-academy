@@ -8,11 +8,14 @@ import { ArtCertificate } from "@/components/shared/illustrations"
 interface CourseCompletionClientProps {
   courseTitle: string
   courseId: string
+  /** False when the package has no certificate (Basic) — no certificate actions. */
+  hasCertificate: boolean
 }
 
 export function CourseCompletionClient({
   courseTitle,
   courseId,
+  hasCertificate,
 }: CourseCompletionClientProps) {
   return (
     <div className="min-h-[100dvh] flex items-center justify-center p-4">
@@ -44,18 +47,22 @@ export function CourseCompletionClient({
         </div>
 
         {/* Action Buttons */}
+        {/* Gold stays on the one primary action: the certificate when the
+            package includes one, otherwise the way back to the course. */}
         <div className="space-y-3 pt-4">
-          <Button
-            size="lg"
-            className="w-full gap-2"
-            render={<Link href={`/dashboard/courses/${courseId}/certificate`} />}
-          >
-            <Award className="h-5 w-5" />
-            View Certificate
-          </Button>
+          {hasCertificate && (
+            <Button
+              size="lg"
+              className="w-full gap-2"
+              render={<Link href={`/dashboard/courses/${courseId}/certificate`} />}
+            >
+              <Award className="h-5 w-5" />
+              View Certificate
+            </Button>
+          )}
 
           <Button
-            variant="outline"
+            variant={hasCertificate ? "outline" : "default"}
             size="lg"
             className="w-full gap-2"
             render={<Link href={`/dashboard/courses/${courseId}`} />}
@@ -64,15 +71,17 @@ export function CourseCompletionClient({
             Back to Course
           </Button>
 
-          <Button
-            variant="ghost"
-            size="lg"
-            className="w-full gap-2 text-ws-muted hover:text-ws-primary"
-            render={<Link href="/dashboard/certificates" />}
-          >
-            <GraduationCap className="h-5 w-5" />
-            All My Certificates
-          </Button>
+          {hasCertificate && (
+            <Button
+              variant="ghost"
+              size="lg"
+              className="w-full gap-2 text-ws-muted hover:text-ws-primary"
+              render={<Link href="/dashboard/certificates" />}
+            >
+              <GraduationCap className="h-5 w-5" />
+              All My Certificates
+            </Button>
+          )}
         </div>
       </div>
     </div>

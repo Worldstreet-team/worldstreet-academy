@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation"
 import { fetchCourseForLearning } from "@/lib/actions/student"
 import { checkEnrollment } from "@/lib/actions/enrollments"
 import { getCurrentUser } from "@/lib/auth"
+import { getCourseAccess } from "@/lib/course-access"
 import { CourseCompletionClient } from "./completion-client"
 
 /**
@@ -28,10 +29,16 @@ export default async function CourseCompletedPage({
     redirect(`/dashboard/courses/${courseId}`)
   }
 
+  // Packages without a certificate (Basic) complete but never certify — don't
+  // offer a certificate page that would 404.
+  const access = await getCourseAccess(currentUser.id, courseId)
+  const hasCertificate = access ? access.entitlements.certificate : true
+
   return (
     <CourseCompletionClient
       courseTitle={course.title}
       courseId={courseId}
+      hasCertificate={hasCertificate}
     />
   )
 }
