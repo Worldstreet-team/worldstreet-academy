@@ -8,7 +8,7 @@ import type { EnrollmentStatus } from "@/lib/db/models/enrollment"
 import { requireAdmin } from "@/lib/auth/admin"
 import { courseAvailability } from "@/lib/types/course"
 import type { CourseStatus } from "@/lib/types/course"
-import { PACKAGE_RANK, isPackageKey, packageFor } from "@/lib/entitlements"
+import { PACKAGE_RANK, entitlementsFor, isPackageKey, packageFor } from "@/lib/entitlements"
 import { getCourseAccess, openPublishedLessonIds } from "@/lib/course-access"
 
 const PAGE_SIZE = 20
@@ -265,30 +265,35 @@ export async function adminSetEnrollmentPackage(
     const from = enrollment.packageKey ?? null
     if (from === pkg.key) return { success: true }
 
-    enrollment.packageKey = pkg.key
-    enrollment.packageName = pkg.name
-    await enrollment.save()
-
     // Progress and completion follow the NEW package: the same denominator as
     // completeLesson (published lessons the package opens). A completion the
     // new package hasn't earned — lessons it opens still to do, or a final exam
     // it now requires — goes back to active. Never promotes: finishing stays
-    // the student's own action.
+    // the student's own action. Everything is computed first and written in ONE
+    // save, so the package can never move without its completion re-check.
     const progressFrom = enrollment.progress ?? 0
     const statusFrom = enrollment.status
-    const access = await getCourseAccess(enrollment.user.toString(), enrollment.course.toString())
-    if (access) {
-      const open = await openPublishedLessonIds(access)
+    const current = await getCourseAccess(enrollment.user.toString(), enrollment.course.toString())
+    if (current) {
+      const next = {
+        ...current,
+        packageKey: pkg.key,
+        packageName: pkg.name,
+        entitlements: entitlementsFor({ packages: current.course.packages }, { packageKey: pkg.key }),
+      }
+      const open = await openPublishedLessonIds(next)
       const done = enrollment.completedLessons.filter((id: { toString(): string }) => open.has(id.toString())).length
       enrollment.progress = open.size > 0 ? Math.min(100, Math.round((done / open.size) * 100)) : 0
       const allDone = open.size > 0 && done === open.size
-      const examGates = !!course?.examRequired && access.entitlements.certificate && !enrollment.examPassed
+      const examGates = !!course?.examRequired && next.entitlements.certificate && !enrollment.examPassed
       if (enrollment.status === "completed" && (!allDone || examGates)) {
         enrollment.status = "active"
         enrollment.completedAt = null
       }
-      await enrollment.save()
     }
+    enrollment.packageKey = pkg.key
+    enrollment.packageName = pkg.name
+    await enrollment.save()
 
     try {
       await PaymentEvent.create({
