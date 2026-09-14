@@ -11,6 +11,13 @@ const isLocalDev = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk
 const LOGIN_URL = isLocalDev ? "/login" : "https://worldstreetgold.com/login"
 const REGISTER_URL = isLocalDev ? "/register" : "https://worldstreetgold.com/register"
 
+/** Public destinations, in journey order (spec §17). Shared by the md+ link row and the mobile sheet. */
+const PUBLIC_LINKS: MarketingNavLink[] = [
+  { href: "/schools", label: "Schools" },
+  { href: "/courses", label: "Programs" },
+  { href: "/#how-it-works", label: "How it works" },
+]
+
 export async function Navbar() {
   // Server-side auth check: signed-in users get one gold path back into the
   // app; guests get the acquisition pair. "My Learning" is signed-in only —
@@ -21,7 +28,7 @@ export async function Navbar() {
   // Same destinations as the md+ link row, plus the secondary auth action —
   // below md those all live in the sheet so the bar fits a 320px viewport.
   const mobileLinks: MarketingNavLink[] = [
-    { href: "/courses", label: "Courses" },
+    ...PUBLIC_LINKS,
     ...(user ? [{ href: "/dashboard", label: "My Learning" }] : []),
     ...(isInstructor ? [{ href: "/instructor", label: "Instructor Dashboard" }] : []),
     ...(user ? [] : [{ href: LOGIN_URL, label: "Sign In", external: true }]),
@@ -38,12 +45,15 @@ export async function Navbar() {
             <BrandLockup alt={BRAND.name} />
           </Link>
           <nav className="hidden items-center gap-1 md:flex">
-            <Link
-              href="/courses"
-              className="rounded-full px-3 py-1.5 text-sm font-medium text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-chip hover:text-ws-primary"
-            >
-              Courses
-            </Link>
+            {PUBLIC_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="rounded-full px-3 py-1.5 text-sm font-medium text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-chip hover:text-ws-primary"
+              >
+                {link.label}
+              </Link>
+            ))}
             {user && (
               <Link
                 href="/dashboard"

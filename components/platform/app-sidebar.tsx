@@ -70,7 +70,7 @@ const learnItems: NavItem[] = [
       (p.startsWith("/dashboard/courses/") && p.includes("/learn")),
   },
   {
-    title: "Browse courses",
+    title: "Programs",
     href: "/dashboard/courses",
     icon: Search,
     match: (p) => p === "/dashboard/courses",

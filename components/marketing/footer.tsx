@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { BrandLockup } from "@/components/shared/brand-lockup"
+import { BRAND } from "@/lib/brand"
 
 export function Footer() {
   return (
@@ -13,15 +14,25 @@ export function Footer() {
               <BrandLockup alt="" />
             </Link>
             <p className="text-sm text-muted-foreground">
-              Learn, trade, and grow with the WorldStreet ecosystem.
+              {BRAND.tagline}
             </p>
           </div>
           <div>
             <h4 className="text-sm font-semibold mb-3">Academy</h4>
             <ul className="space-y-2">
               <li>
+                <Link href="/schools" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  Schools
+                </Link>
+              </li>
+              <li>
                 <Link href="/courses" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                  Browse Courses
+                  Programs
+                </Link>
+              </li>
+              <li>
+                <Link href="/#faq" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  FAQ
                 </Link>
               </li>
               <li>

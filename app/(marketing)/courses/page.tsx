@@ -2,6 +2,7 @@ import { CourseGrid } from "@/components/courses/course-grid"
 import { fetchBrowseCourses } from "@/lib/actions/student"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { BRAND } from "@/lib/brand"
 
 // Force dynamic rendering to show fresh instructor avatars
 export const revalidate = 0
@@ -12,9 +13,9 @@ export default async function CoursesPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8 space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight">All Courses</h1>
+        <h1 className="text-3xl font-bold tracking-tight">All programs</h1>
         <p className="text-muted-foreground">
-          Browse our catalog of courses across crypto, trading, and blockchain.
+          Browse every program across the eight schools of {BRAND.name}.
         </p>
       </div>
 
