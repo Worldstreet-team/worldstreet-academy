@@ -1,6 +1,6 @@
 # Worldstreet Mastery Academy — Phased Implementation Plan
 
-**Date:** 2026-09-14 · **Status:** PLANNED — no phase started · **Spec:** `docs/mastery-academy-blueprint.md`
+**Date:** 2026-09-14 · **Status:** IN PROGRESS — Phases 0–1 done (unmerged branches), Phase 2 next · **Spec:** `docs/mastery-academy-blueprint.md`
 **Predecessor:** `docs/academy-update-plan.md` (July — admin, instructor pipeline, wallet, CBT exams; all built). Its hard constraints (Part 1) still bind this plan and are restated in §0.3.
 
 > **How to drive this plan.** Say **"start phase N"**. The executor reads this file + the spec, opens a branch `mastery/phase-N`, expands the phase into bite-sized tasks (superpowers:subagent-driven-development), and reports against the phase's **Exit criteria** checklist — those are the sentences to read out in a status meeting. Phases are ordered by dependency; the "Parallel tracks" table in §0.5 shows what can overlap. Each phase ends with `pnpm lint`, `npx tsc --noEmit`, and a walk through the affected routes in `pnpm dev:mock` (mock Clerk, local Mongo, persona cookie `mock_persona=student|instructor|admin|guest`).
