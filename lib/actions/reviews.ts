@@ -6,6 +6,7 @@ import connectDB from "@/lib/db"
 import { Review, Course, Enrollment } from "@/lib/db/models"
 import { z } from "zod/v4"
 import { countryName } from "@/lib/countries"
+import { getCurrentUser } from "@/lib/auth"
 
 // ============================================================================
 // VALIDATION SCHEMAS
@@ -52,6 +53,12 @@ export type CourseRatingSummary = {
 // REVIEW ACTIONS
 // ============================================================================
 
+/** Server actions are callable with any arguments: a userId from the browser must be the signed-in user. */
+async function isSignedInAs(userId: string): Promise<boolean> {
+  const user = await getCurrentUser()
+  return !!user && user.id === userId
+}
+
 /**
  * Submit a review for a course
  */
@@ -62,6 +69,7 @@ export async function submitReview(
 ) {
   try {
     await connectDB()
+    if (!(await isSignedInAs(userId))) return { success: false, error: "Unauthorized" }
 
     const validated = CreateReviewSchema.parse(data)
 
@@ -122,6 +130,7 @@ export async function updateReview(
 ) {
   try {
     await connectDB()
+    if (!(await isSignedInAs(userId))) return { success: false, error: "Unauthorized" }
 
     const validated = UpdateReviewSchema.parse(data)
 
@@ -163,6 +172,7 @@ export async function updateReview(
 export async function deleteReview(userId: string, reviewId: string) {
   try {
     await connectDB()
+    if (!(await isSignedInAs(userId))) return { success: false, error: "Unauthorized" }
 
     const review = await Review.findOne({
       _id: reviewId,
@@ -363,6 +373,7 @@ export async function checkUserReview(
 ): Promise<{ hasReviewed: boolean; reviewId?: string }> {
   try {
     await connectDB()
+    if (!(await isSignedInAs(userId))) return { hasReviewed: false }
 
     const review = await Review.findOne({
       user: userId,
@@ -388,6 +399,7 @@ export async function getUserReview(
 ): Promise<ReviewItem | null> {
   try {
     await connectDB()
+    if (!(await isSignedInAs(userId))) return null
 
     const review = await Review.findOne({
       user: userId,
