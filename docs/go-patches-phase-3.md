@@ -93,3 +93,27 @@ Otherwise the lesson is **locked**, and Go must:
 2. Which endpoints return lesson media (`videoUrl`, `content`)? Each needs R3.
 3. Does Go render or return certificates, or start exam attempts? Each needs R4.
 4. Does Go list or join course meetings, or create conversations? If yes, R6 and R7 apply.
+
+---
+
+## 5. Added by Phases 5–6 (ship in the same Go release)
+
+**R8 — Faculty profile fields (Phase 5).** New, additive fields on `users`:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `country` (top level) | ISO 3166-1 alpha-2 string \| `null` | Shown on faculty profiles and homepage testimonials. |
+| `instructorProfile.specialization` | string \| `null` | Area of specialization (public faculty card). |
+| `instructorProfile.experience` | string \| `null` | Professional experience (≤ 2,000 characters). |
+| `instructorProfile.credentials` | string[] | Credentials and achievements (≤ 10). |
+| `instructorProfile.featured` | bool | Admin-curated: listed first on `/faculty`. |
+
+If Go ever writes `instructorProfile`, write dotted paths (`instructorProfile.headline`) or carry these four fields: a whole-object `$set: { instructorProfile: {...} }` drops them.
+
+**R9 — Certificate IDs (Phase 6).** `enrollments.certificateId: string | null`, under a **partial unique** index `{ certificateId: 1 }` with `partialFilterExpression: { certificateId: { $type: "string" } }`.
+- **Never write `certificateId: ""`.** Every string is indexed, so a second empty string fails with E11000 and that whole write fails. Omit the field or write `null`.
+- The web stamps an ID when an enrollment becomes `completed` and its package includes the certificate (R1, R4): `WSA-` + 8 Crockford base32 symbols (`0-9A-Z` without I, L, O, U) from 5 random bytes, retried once on a duplicate. An enrollment that was already completed without an ID gets its legacy value instead. Go completions don't stamp one yet; until they do, those certificates become verifiable when the web backfill (`scripts/backfill-certificate-ids.mjs`) is re-run.
+- Rendering a certificate on mobile: print `certificateId`; when it is `null`, print the legacy value `WSA-<last 8 characters of the enrollment _id, uppercased>` — what certificates have always printed.
+- Public check: `https://academy.worldstreetgold.com/verify/<certificateId>` answers only for a `completed`, certificate-entitled enrollment, so a refund or an admin status change away from `completed` takes the certificate off that page.
+
+**R10 — Other additive changes.** `reviews.featured: bool` (web-only homepage curation; Go may ignore it). Once `scripts/mastery-catalogue.mjs --apply` runs, `courses.category` holds the school's short label ("Trading & Financial Markets", …) on every catalogue row: a mobile filter or grouping keyed on the old strings (Cryptocurrency, Trading, DeFi, …) must switch to `courses.school` in the same release.
