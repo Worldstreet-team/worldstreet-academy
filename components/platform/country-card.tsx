@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState, useTransition } from "react"
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react"
 import { CheckIcon } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -9,16 +9,18 @@ import { getMyCountry, updateMyCountry } from "@/lib/actions/profile"
 import { countryOptions } from "@/lib/countries"
 import { BRAND } from "@/lib/brand"
 
+const noSubscribe = () => () => {}
+
 /**
  * The student's country (spec §14): shown next to their name when one of their
  * reviews appears in the homepage testimonials. Saves on selection.
  *
  * `countryOptions()` is Phase 5's (`lib/countries.ts`) — same sorted
- * value/label list the faculty editor uses, not reimplemented here. Its own
- * doc comment prefers a server-computed call (Node's ICU data can name a
- * country slightly differently from the browser's); calling it client-side
- * here is a deliberate, cosmetic-risk-only exception so this card stays a
- * self-contained, prop-free component.
+ * value/label list the faculty editor uses, not reimplemented here. The profile
+ * page is a client component, so the labels can't be computed on the server and
+ * passed down; they are built only after mount instead (Phase 5 ruling 16) — the
+ * browser's ICU data can name a country differently from Node's, so labels in
+ * the server render would mismatch on hydration.
  */
 export function CountryCard() {
   const [country, setCountry] = useState<string | null>(null)
@@ -26,23 +28,34 @@ export function CountryCard() {
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const latestRequest = useRef(0)
 
-  const items = useMemo(() => countryOptions(), [])
+  // false on the server and during hydration, true once mounted in the browser.
+  const mounted = useSyncExternalStore(noSubscribe, () => true, () => false)
+  const items = useMemo(() => (mounted ? countryOptions() : []), [mounted])
 
   useEffect(() => {
-    getMyCountry().then((code) => {
-      setCountry(code)
-      setLoaded(true)
-    })
+    getMyCountry()
+      .then((code) => {
+        setCountry(code)
+        setLoaded(true)
+      })
+      .catch(() => {
+        setError("Couldn't load your country — reload to try again")
+        setLoaded(true)
+      })
   }, [])
 
   function save(next: string | null) {
+    const request = ++latestRequest.current
     const previous = country
     setCountry(next)
     setSaved(false)
     setError(null)
     startTransition(async () => {
       const result = await updateMyCountry(next)
+      // A newer selection supersedes this one: only the latest request updates state.
+      if (request !== latestRequest.current) return
       if (result.success) {
         setSaved(true)
       } else {
