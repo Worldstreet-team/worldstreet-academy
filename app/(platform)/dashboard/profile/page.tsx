@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { useUser } from "@/components/providers/user-provider"
 import { SignatureCanvas } from "@/components/shared/signature-canvas"
+import { CountryCard } from "@/components/platform/country-card"
 import { updateAvatar, updateProfile } from "@/lib/actions/profile"
 import { getImageUploadUrl } from "@/lib/actions/upload"
 import { cn } from "@/lib/utils"
@@ -266,6 +267,9 @@ export default function ProfilePage() {
             )}
           </CardContent>
         </Card>
+
+        {/* ── Country card (spec §14 testimonials) ─────────────── */}
+        <CountryCard />
 
         {/* ── Signature card ──────────────────────────────────── */}
         <Card>

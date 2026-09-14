@@ -164,15 +164,19 @@ function ReviewCard({ review }: { review: LandingReview }) {
               .toUpperCase()}
           </span>
         )}
+        {/* Spec §14: Name · Country · Program — country only when the student set one. */}
         <span className="min-w-0">
           <span className="block truncate text-[13px] font-medium text-ws-primary">
             {review.reviewerName}
+            {review.country && (
+              <span className="font-normal text-ws-muted">{` · ${review.country}`}</span>
+            )}
           </span>
           <Link
             href={`/programs/${review.courseSlug}`}
             className="block truncate text-[12px] text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:text-ws-gold"
           >
-            on {review.courseTitle}
+            {review.courseTitle}
           </Link>
         </span>
       </figcaption>

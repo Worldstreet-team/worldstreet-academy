@@ -4,6 +4,8 @@ import connectDB from "@/lib/db"
 import { User } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth"
 import { revalidatePath } from "next/cache"
+import { z } from "zod/v4"
+import { COUNTRY_CODES } from "@/lib/countries"
 import {
   FACULTY_LIMITS,
   FacultyProfileSchema,
@@ -121,5 +123,57 @@ export async function updateFacultyProfile(
   } catch (error) {
     console.error("Update faculty profile error:", error)
     return { success: false, error: "Failed to update faculty profile" }
+  }
+}
+
+/**
+ * The current user's country (ISO-3166 alpha-2). Null when unset or signed out.
+ */
+export async function getMyCountry(): Promise<string | null> {
+  try {
+    await connectDB()
+    const currentUser = await getCurrentUser()
+    if (!currentUser) return null
+
+    const user = await User.findById(currentUser.id).select("country").lean()
+    return user?.country ?? null
+  } catch (error) {
+    console.error("Get country error:", error)
+    return null
+  }
+}
+
+const CountryInput = z
+  .string()
+  // Widened: Phase 5 may type the list as a literal tuple, whose .includes() rejects a plain string.
+  .refine((code) => (COUNTRY_CODES as readonly string[]).includes(code), "Choose a country from the list")
+  .nullable()
+
+/**
+ * Set or clear the current user's country — shown next to their name on
+ * homepage testimonials (spec §14). Kept apart from updateProfile, which the
+ * faculty editor extends.
+ */
+export async function updateMyCountry(
+  country: string | null
+): Promise<{ success: true } | { success: false; error: string }> {
+  try {
+    await connectDB()
+    const currentUser = await getCurrentUser()
+    if (!currentUser) return { success: false, error: "Not authenticated" }
+
+    const parsed = CountryInput.safeParse(country)
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? "Choose a country from the list" }
+    }
+
+    await User.findByIdAndUpdate(currentUser.id, { $set: { country: parsed.data } })
+
+    revalidatePath("/dashboard/profile")
+    revalidatePath("/")
+    return { success: true }
+  } catch (error) {
+    console.error("Update country error:", error)
+    return { success: false, error: "Failed to update country" }
   }
 }

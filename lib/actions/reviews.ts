@@ -5,6 +5,7 @@ import mongoose from "mongoose"
 import connectDB from "@/lib/db"
 import { Review, Course, Enrollment } from "@/lib/db/models"
 import { z } from "zod/v4"
+import { countryName } from "@/lib/countries"
 
 // ============================================================================
 // VALIDATION SCHEMAS
@@ -477,6 +478,8 @@ export type LandingReview = {
   content: string
   reviewerName: string
   reviewerAvatarUrl: string | null
+  /** Reviewer's country as an English display name ("Nigeria"); null when they haven't set one (spec §14). */
+  country: string | null
   courseTitle: string
   courseId: string
   courseSlug: string
@@ -497,7 +500,7 @@ export async function fetchLandingReviews(limit = 6): Promise<LandingReview[]> {
       rating: { $gte: 4 },
       content: { $nin: [null, ""] },
     })
-      .populate("user", "firstName lastName avatarUrl")
+      .populate("user", "firstName lastName avatarUrl country")
       .populate("course", "title status slug")
       .sort({ rating: -1, helpfulCount: -1, createdAt: -1 })
       .limit(limit * 2) // room to drop reviews of unpublished courses below
@@ -509,6 +512,7 @@ export async function fetchLandingReviews(limit = 6): Promise<LandingReview[]> {
           firstName?: string
           lastName?: string
           avatarUrl?: string | null
+          country?: string | null
         } | null
         const course = r.course as unknown as {
           _id: { toString(): string }
@@ -527,6 +531,7 @@ export async function fetchLandingReviews(limit = 6): Promise<LandingReview[]> {
           content: r.content ?? "",
           reviewerName: name || "WorldStreet learner",
           reviewerAvatarUrl: user?.avatarUrl ?? null,
+          country: countryName(user?.country),
           courseTitle: course.title ?? "",
           courseId: course._id.toString(),
           courseSlug: course.slug ?? "",
