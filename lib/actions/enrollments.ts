@@ -531,7 +531,8 @@ export async function completeLesson(
     if (enrollment.progress >= 100) {
       const gatedCourse = await Course.findById(courseId).select("examRequired").lean()
       const examGates = !!gatedCourse?.examRequired && (access?.entitlements.certificate ?? true)
-      if (!examGates || enrollment.examPassed) {
+      // Only the transition stamps the date — an already-completed enrollment keeps it.
+      if ((!examGates || enrollment.examPassed) && enrollment.status !== "completed") {
         enrollment.status = "completed"
         enrollment.completedAt = new Date()
       }

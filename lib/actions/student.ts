@@ -1020,8 +1020,12 @@ export async function markCourseComplete(
       await enrollment.save()
       return { success: true, requiresExam: true }
     }
-    enrollment.status = "completed"
-    enrollment.completedAt = new Date()
+    // Only the transition stamps the date: finishing again must never move it,
+    // or /verify stops matching a certificate already downloaded.
+    if (enrollment.status !== "completed") {
+      enrollment.status = "completed"
+      enrollment.completedAt = new Date()
+    }
     // A completion and its certificate ID (when the package certifies) land together.
     await saveWithCertificateId(enrollment)
 
