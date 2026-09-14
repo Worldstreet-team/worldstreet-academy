@@ -23,6 +23,7 @@ import { courseAvailability } from "@/lib/types/course"
 import { sendEnrollmentConfirmationEmail } from "@/lib/email"
 import { notifyAdmins, notifyUser } from "@/lib/notify"
 import { getCourseAccess, isLessonLockedFor, lockedLessonIds } from "@/lib/course-access"
+import { saveWithCertificateId } from "@/lib/certificate-id"
 import { PACKAGE_KEYS, canAccessLesson, packageFor, sellsPackages } from "@/lib/entitlements"
 import {
   createWalletCharge,
@@ -536,7 +537,8 @@ export async function completeLesson(
       }
     }
 
-    await enrollment.save()
+    // A completion and its certificate ID (when the package certifies) land together.
+    await saveWithCertificateId(enrollment)
 
     revalidatePath(`/courses/${courseId}/learn/${lessonId}`)
     revalidatePath("/dashboard/my-courses")

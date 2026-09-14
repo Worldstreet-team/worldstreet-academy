@@ -20,6 +20,7 @@ import {
 import { getCurrentUser } from "@/lib/auth/actions"
 import { notifyUser } from "@/lib/notify"
 import { PACKAGE_LABEL, canAccessLesson, effectiveLessonTier, entitlementsFor, lowestPackageWith } from "@/lib/entitlements"
+import { saveWithCertificateId } from "@/lib/certificate-id"
 
 /* ═══════════════════ helpers ═══════════════════ */
 
@@ -693,7 +694,8 @@ async function gradeAttempt(attempt: HydratedDocument<import("@/lib/db/models").
         enrollment.completedAt = new Date()
       }
     }
-    await enrollment.save()
+    // A pass that completes the course also issues its certificate ID.
+    await saveWithCertificateId(enrollment)
   }
 
   return { passed, scorePercent, pointsEarned, pointsTotal, showResults: exam.settings.showResults }

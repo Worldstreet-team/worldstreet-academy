@@ -40,6 +40,12 @@ export interface IEnrollment extends Document {
   packageName: string | null
   /** Executive onboarding answers, sent once from the checkout success page (D4). */
   mentorshipIntake: { goals: string; availability: string; submittedAt: Date } | null
+  /**
+   * Stable certificate ID (spec §13), e.g. "WSA-7K2M9QXD". Stamped once, when a
+   * completion's package includes the certificate (lib/certificate-id.ts);
+   * null for Basic completions and for rows that aren't complete.
+   */
+  certificateId: string | null
   // Progress tracking
   progress: number // 0-100 percentage
   completedLessons: Types.ObjectId[] // Array of completed lesson IDs
@@ -114,6 +120,7 @@ const EnrollmentSchema = new Schema<IEnrollment>(
       ),
       default: null,
     },
+    certificateId: { type: String, default: null },
     progress: {
       type: Number,
       default: 0,
@@ -165,6 +172,15 @@ EnrollmentSchema.index({ user: 1, status: 1 })
 
 // Index for course analytics
 EnrollmentSchema.index({ course: 1, status: 1 })
+
+// Certificate IDs are unique among the enrollments that hold one. A partial
+// filter, NOT `sparse`: Mongoose stores certificateId: null on every new row,
+// and a sparse index still indexes explicit nulls — the second null would be a
+// duplicate-key error on every enrollment create.
+EnrollmentSchema.index(
+  { certificateId: 1 },
+  { unique: true, partialFilterExpression: { certificateId: { $type: "string" } } }
+)
 
 export const Enrollment: Model<IEnrollment> =
   mongoose.models.Enrollment || mongoose.model<IEnrollment>("Enrollment", EnrollmentSchema)

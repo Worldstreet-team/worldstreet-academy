@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth"
 import { isSchoolSlug, type SchoolSlug } from "@/lib/schools"
 import { FULL_ACCESS, PACKAGE_RANK, canAccessLesson, effectiveLessonTier, entitlementsFor } from "@/lib/entitlements"
 import { getCourseAccess, lockedLessonIds, openPublishedLessonIds } from "@/lib/course-access"
+import { saveWithCertificateId } from "@/lib/certificate-id"
 import { isCountryCode } from "@/lib/countries"
 import { FACULTY_ROLES, isFacultyRole, safeWebUrl } from "@/lib/faculty"
 
@@ -1021,7 +1022,8 @@ export async function markCourseComplete(
     }
     enrollment.status = "completed"
     enrollment.completedAt = new Date()
-    await enrollment.save()
+    // A completion and its certificate ID (when the package certifies) land together.
+    await saveWithCertificateId(enrollment)
 
     return { success: true }
   } catch (error) {
