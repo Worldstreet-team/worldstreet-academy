@@ -72,7 +72,7 @@ Brand: "WorldStreet Academy" appears in 43 code locations; the lockup (mark + "W
 | Phase 3 | Coolify | Confirm `WALLET_*` env; add `POST /api/cron/course-live` scheduled task (already in code, not yet scheduled). |
 | Phase 8 | Coolify / Mongo | Run `scripts/mastery-catalogue.mjs --apply` against prod once; verify Go reads `school`/`packages` benignly. |
 | Phase 5 → 8 | Go (`worldstreet-academy/backend`) | `users.country` and `users.instructorProfile.{specialization, experience, credentials, featured}` are additive; if Go writes `instructorProfile` it writes dotted paths or carries them (Phase 5 ruling 22; Go doc R8). |
-| Phase 6 → 8 | Go / mobile | Never write `enrollments.certificateId: ""` (partial unique index); Go completions don't stamp an ID until patched — a backfill re-run covers them; mobile certificates print `certificateId`, else `WSA-<last 8 of _id>` (Go doc R9). `reviews.featured` is additive; category vocabulary per R10. |
+| Phase 6 → 8 | Go / mobile | Never write `enrollments.certificateId: ""` (partial unique index); Go completions don't stamp an ID until patched — the web stores one when the certificate is opened on the web, and a backfill re-run covers the rest; mobile certificates print `certificateId`, else `WSA-<last 8 of _id>` (Go doc R9). `reviews.featured` is additive; category vocabulary per R10. |
 | Phase 8 | Owner | Production order — Go, env, deploy, crons, catalogue, certificate backfill, §17 QA, rollback: `docs/launch-runbook.md`. |
 | Never | all | Non-additive schema changes; new `role` values; changed Ably payload shapes. |
 

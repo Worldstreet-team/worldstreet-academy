@@ -256,5 +256,5 @@ Then:
 | The §8 test purchase | A real debit on the QA account. | Refund it from `/admin/payments` (re-credits the wallet, revokes access, reverses the instructor's pending earning), or keep the enrollment. |
 | Identity scripts in git history | `link-tmp.cjs` and `link-mobile-identity.cjs` were removed in Phase 8 but stay in history with two Clerk user ids (identifiers, not credentials). | Leave (recommended), or rewrite history. |
 | `scripts/_swap-catalogue.mjs` | Superseded by `mastery-catalogue.mjs`. If run with `--apply` it archives courses and inserts the old 10-program catalogue. | Delete it, or keep it with its history. |
-| Certificate IDs for mobile completions | Go doesn't stamp `certificateId` yet (Go doc R9). | Re-run §7 after mobile completions happen, until Go stamps IDs. |
+| Certificate IDs for mobile completions | Go doesn't stamp `certificateId` yet (Go doc R9). The web stores one the first time the student opens that certificate on the web. | Re-run §7 now and then for mobile completions nobody has opened on the web, until Go stamps IDs. |
 | Product debt | School intros, program curricula, thumbnails and instructor bios (Phase 2); the Academy signatory name and signature file (D9); a surface for §13's "LEARN. COMPLETE. GET RECOGNIZED." (Phase 6); real RealtimeKit scheduling run on staging (Phase 4). | Schedule with product. |
