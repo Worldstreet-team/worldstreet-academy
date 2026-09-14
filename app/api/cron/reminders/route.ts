@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import connectDB from "@/lib/db"
 import { Course, Enrollment, Meeting, User } from "@/lib/db/models"
 import { notifyUser } from "@/lib/notify"
-import { formatUtcDateTime, sendClassReminderEmail, sendInterviewReminderEmail } from "@/lib/email"
+import { formatUtcDateTime, sendClassReminderEmail, sendInterviewReminderEmail, sendMentorshipEmail } from "@/lib/email"
 import { entitlementsFor } from "@/lib/entitlements"
 import { APP_URL } from "@/lib/app-url"
 
@@ -20,6 +20,8 @@ const HOST_CLASS_PATH = "/instructor/meetings"
  * - Course classes (meeting.courseId): the host, invitees, and every student
  *   whose active/completed enrollment's package includes live classes — the
  *   same audience that may join (joinMeeting) — with class wording.
+ * - Mentorship sessions (meeting.mentorshipSessionId): the host and the invited
+ *   student only, session wording.
  * - Every other scheduled meeting (instructor interviews): host + invitees,
  *   interview wording, exactly as before.
  *
@@ -76,15 +78,48 @@ export async function POST(request: NextRequest) {
       const title =
         window === "1h"
           ? "Starting in ~1 hour"
-          : meeting.courseId
-            ? "Class coming up"
-            : "Reminder: scheduled for tomorrow"
+          : meeting.mentorshipSessionId
+            ? "Mentorship session coming up"
+            : meeting.courseId
+              ? "Class coming up"
+              : "Reminder: scheduled for tomorrow"
       // Rendered on the server (UTC in Docker), so the time names its zone.
       const bodyLine = `${meeting.title} — ${formatUtcDateTime(when)}`
 
       const jobs: Promise<unknown>[] = []
 
-      if (meeting.courseId) {
+      if (meeting.mentorshipSessionId) {
+        // Mentorship session: the host and the invited student — never a course audience.
+        const hostId = meeting.hostId.toString()
+        const recipients = await User.find({ _id: { $in: [...new Set([hostId, ...inviteeIds])] } })
+          .select("firstName email")
+          .lean()
+        const whenFull = formatUtcDateTime(when, "full")
+
+        for (const recipient of recipients) {
+          const recipientId = recipient._id.toString()
+          const isHost = recipientId === hostId
+          const href = isHost ? HOST_CLASS_PATH : joinPath
+          jobs.push(notifyUser(recipientId, { type: "meeting", title, body: bodyLine, href }))
+          if (recipient.email && !recipient.email.endsWith("@users.noemail")) {
+            jobs.push(
+              sendMentorshipEmail(recipient.email, {
+                subject:
+                  window === "1h"
+                    ? "Your mentorship session starts in about an hour"
+                    : "Reminder: your mentorship session is coming up",
+                title: window === "1h" ? "Session starting soon" : "Session coming up",
+                bodyText: isHost
+                  ? `${recipient.firstName || "Hi"}, ${meeting.title} is scheduled for ${whenFull}. Start it from Meetings — your student can join once you're in.`
+                  : `${recipient.firstName || "Hi"}, your private session with ${hostName} is scheduled for ${whenFull}. You can join as soon as your mentor starts it.`,
+                ctaLabel: isHost ? "Open meetings" : "View session",
+                ctaUrl: `${APP_URL}${href}`,
+                recipientName: recipient.firstName || undefined,
+              })
+            )
+          }
+        }
+      } else if (meeting.courseId) {
         // Course class: host + invitees + students whose package includes live classes.
         const [course, enrollments] = await Promise.all([
           Course.findById(meeting.courseId).select("title packages").lean(),

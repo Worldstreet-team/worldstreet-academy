@@ -75,12 +75,18 @@ const TILES_PER_PAGE = 4
 
 type ScreenSharer = { id: string; name: string; isLocal: boolean }
 
-/** A class that hasn't started names its start time in the viewer's timezone — or, once that has passed, the late host. */
+/**
+ * A class or mentorship session that hasn't started names its start time in the
+ * viewer's timezone — or, once that has passed, the late host.
+ */
 function joinErrorMessage(result: { error?: string; startsAt?: string }): string {
   if (result.startsAt) {
-    if (new Date(result.startsAt).getTime() <= Date.now()) return "Your instructor hasn't started this class yet"
+    const isSession = result.error === "This session hasn't started yet"
+    if (new Date(result.startsAt).getTime() <= Date.now()) {
+      return isSession ? "Your mentor hasn't started this session yet" : "Your instructor hasn't started this class yet"
+    }
     const when = new Date(result.startsAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })
-    return `This class hasn't started yet — it begins ${when}`
+    return `${isSession ? "This session" : "This class"} hasn't started yet — it begins ${when}`
   }
   return result.error ?? "Couldn't join this meeting"
 }

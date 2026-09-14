@@ -3,13 +3,13 @@
 import { headers } from "next/headers"
 import { Types } from "mongoose"
 import connectDB from "@/lib/db"
-import { Meeting, User, Course, Enrollment, type IMeeting, type IMeetingParticipant, type MeetingStatus } from "@/lib/db/models"
+import { Meeting, MentorshipSession, User, Course, Enrollment, type IMeeting, type IMeetingParticipant, type MeetingStatus } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth"
 import { createMeeting as createRTKMeeting, addParticipant } from "@/lib/realtime"
 import { emitEvent, emitEventToMany, type MeetingEventPayload } from "@/lib/call-events"
 import { sendMeetingNotificationEmail, sendMeetingInviteEmail } from "@/lib/email"
 import { getCourseAccess } from "@/lib/course-access"
-import { entitlementsFor } from "@/lib/entitlements"
+import { entitlementsFor, includesMentorship } from "@/lib/entitlements"
 
 // ── Helpers ──
 
@@ -178,11 +178,12 @@ export async function joinMeeting(meetingId: string): Promise<{
 
     // Host already has access — use currentUser directly (skip DB lookup)
     if (meeting.hostId.toString() === currentUser.id) {
-      // A scheduled course class can't be started more than HOST_EARLY_START_MS
-      // ahead — a reminder tap a day early must not open the room. Interviews
-      // (no courseId) keep starting whenever the host joins.
+      // A scheduled course class or mentorship session can't be started more than
+      // HOST_EARLY_START_MS ahead — a reminder tap a day early must not open the
+      // room. Interviews keep starting whenever the host joins. The refusal text
+      // stays class-worded: the instructor page matches it exactly.
       if (
-        meeting.courseId &&
+        (meeting.courseId || meeting.mentorshipSessionId) &&
         meeting.status === "scheduled" &&
         meeting.scheduledAt &&
         meeting.scheduledAt.getTime() - Date.now() > HOST_EARLY_START_MS
@@ -235,14 +236,29 @@ export async function joinMeeting(meetingId: string): Promise<{
       }
     }
 
+    // Mentorship sessions are private: only the confirmed session's student (or
+    // an admin) gets in, and only while their package still includes mentorship.
+    if (meeting.mentorshipSessionId && currentUser.role !== "ADMIN") {
+      const session = await MentorshipSession.findById(meeting.mentorshipSessionId)
+        .select("student course status")
+        .lean()
+      if (!session || session.status !== "confirmed" || session.student.toString() !== currentUser.id) {
+        return { success: false, error: "This mentorship session is private" }
+      }
+      const access = await getCourseAccess(currentUser.id, session.course.toString())
+      if (!access || !includesMentorship(access.course, access)) {
+        return { success: false, error: "Private mentorship isn't included in your package" }
+      }
+    }
+
     // A class that hasn't started: only the host's join (above) starts it, so
     // nobody else sits in an unstarted room. Runs after the package gate, so a
     // student without live classes hears that first. Interviews (no courseId)
-    // keep their waiting room.
-    if (meeting.courseId && meeting.status === "scheduled") {
+    // keep their waiting room; mentorship sessions follow the class rule.
+    if ((meeting.courseId || meeting.mentorshipSessionId) && meeting.status === "scheduled") {
       return {
         success: false,
-        error: "This class hasn't started yet",
+        error: meeting.courseId ? "This class hasn't started yet" : "This session hasn't started yet",
         startsAt: meeting.scheduledAt?.toISOString(),
       }
     }
@@ -2201,7 +2217,12 @@ export async function getMyMeetingInvites(): Promise<{
     const [directInvites, enrollments] = await Promise.all([
       Meeting.find({
         "invites.userId": new Types.ObjectId(currentUser.id),
-        status: { $in: ["active", "waiting", "scheduled"] },
+        // A booked mentorship session is listed on /dashboard/mentorship until
+        // the host starts it — an invite row would show a live dot and Join.
+        $or: [
+          { status: { $in: ["active", "waiting"] } },
+          { status: "scheduled", mentorshipSessionId: { $exists: false } },
+        ],
       })
         .select("title hostId courseId courseThumbnailUrl status createdAt invites")
         .lean(),
