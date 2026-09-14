@@ -426,7 +426,7 @@ const markLessonComplete: VividFunctionConfig = {
 
 const markCourseComplete: VividFunctionConfig = {
   name: "markCourseComplete",
-  description: "Mark an entire course as completed. This triggers certificate generation. Use when ALL lessons are done or user explicitly asks to complete the course.",
+  description: "Mark an entire course as completed. This triggers certificate generation when the student's package includes a certificate. Use when ALL lessons are done or user explicitly asks to complete the course.",
   parameters: params({
     courseId: str("Course ID to mark complete", true),
   }),

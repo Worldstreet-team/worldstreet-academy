@@ -843,7 +843,10 @@ export async function checkCoursesBookmarked(courseIds: string[]): Promise<Recor
 /**
  * Mark a lesson as completed
  */
-export async function markLessonComplete(courseId: string, lessonId: string): Promise<{ success: boolean }> {
+export async function markLessonComplete(
+  courseId: string,
+  lessonId: string
+): Promise<{ success: boolean; error?: string }> {
   "use server"
   try {
     await connectDB()
@@ -858,13 +861,13 @@ export async function markLessonComplete(courseId: string, lessonId: string): Pr
       course: courseId,
       status: { $in: ["active", "completed"] },
     })
-    if (!enrollment) return { success: false }
+    if (!enrollment) return { success: false, error: "Not enrolled in this course" }
 
     const lessonIds = (await Lesson.find({ course: courseId }).select("_id").lean()).map((l) => l._id.toString())
-    if (!lessonIds.includes(lessonId)) return { success: false }
+    if (!lessonIds.includes(lessonId)) return { success: false, error: "Lesson not found" }
 
     const locked = await lockedLessonIds(await getCourseAccess(user._id.toString(), courseId))
-    if (locked.has(lessonId)) return { success: false }
+    if (locked.has(lessonId)) return { success: false, error: "This lesson isn't included in your package" }
 
     if (!enrollment.completedLessons.some((id: { toString(): string }) => id.toString() === lessonId)) {
       enrollment.completedLessons.push(new mongoose.Types.ObjectId(lessonId))
@@ -924,7 +927,7 @@ export async function markCourseComplete(
       course: courseId,
       status: { $in: ["active", "completed"] },
     })
-    if (!enrollment) return { success: false }
+    if (!enrollment) return { success: false, error: "Not enrolled in this course" }
 
     // CBT gate: when the course requires an exam, completion only happens
     // through a passing attempt (lib/actions/exams.ts) — unless the package has
@@ -933,7 +936,7 @@ export async function markCourseComplete(
       Course.findById(courseId).select("examRequired").lean(),
       getCourseAccess(user._id.toString(), courseId),
     ])
-    if (!access) return { success: false }
+    if (!access) return { success: false, error: "Course not found" }
     const examGates = !!course?.examRequired && access.entitlements.certificate
 
     // Finishing needs every published lesson the package opens — the same set
@@ -957,7 +960,7 @@ export async function markCourseComplete(
     return { success: true }
   } catch (error) {
     console.error("Mark course complete error:", error)
-    return { success: false }
+    return { success: false, error: "Failed to mark course complete" }
   }
 }
 

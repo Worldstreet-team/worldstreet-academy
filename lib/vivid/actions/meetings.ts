@@ -86,6 +86,8 @@ export async function vividJoinMeeting(p: { meetingId: string }) {
 
     const { joinMeeting } = await import("@/lib/actions/meetings")
     const result = await joinMeeting(p.meetingId)
+    // Relay a refusal (package without live classes, ended meeting, removed…).
+    if (!result.success) return { success: false, error: result.error ?? "Failed to join meeting" }
 
     return {
       success: true,

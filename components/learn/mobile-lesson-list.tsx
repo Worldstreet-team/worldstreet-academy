@@ -99,7 +99,7 @@ export function MobileLessonList({
                   "absolute bottom-0.5 right-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-semibold",
                   !lesson.locked && isCompleted && !isCurrent
                     ? "bg-ws-success text-white"
-                    : isCurrent
+                    : !lesson.locked && isCurrent
                       ? "bg-primary text-primary-foreground"
                       : "bg-black/70 text-white"
                 )}

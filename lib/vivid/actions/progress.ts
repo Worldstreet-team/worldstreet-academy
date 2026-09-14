@@ -2,6 +2,7 @@
 
 import { Enrollment, Lesson } from "@/lib/db/models"
 import { Types } from "mongoose"
+import { getCourseAccess } from "@/lib/course-access"
 import { initAction } from "./helpers"
 
 export async function vividMarkLessonComplete(p: { courseId: string; lessonId: string }) {
@@ -10,7 +11,8 @@ export async function vividMarkLessonComplete(p: { courseId: string; lessonId: s
     if (!currentUser) return { success: false, error: "Not authenticated" }
 
     const { markLessonComplete } = await import("@/lib/actions/student")
-    await markLessonComplete(p.courseId, p.lessonId)
+    const result = await markLessonComplete(p.courseId, p.lessonId)
+    if (!result.success) return { success: false, error: result.error ?? "Failed to mark lesson complete" }
     return { success: true, message: "Lesson marked as complete!" }
   } catch (error) {
     console.error("[Vivid] markLessonComplete error:", error)
@@ -24,8 +26,22 @@ export async function vividMarkCourseComplete(p: { courseId: string }) {
     if (!currentUser) return { success: false, error: "Not authenticated" }
 
     const { markCourseComplete } = await import("@/lib/actions/student")
-    await markCourseComplete(p.courseId)
-    return { success: true, message: "Course completed! Your certificate is ready." }
+    const result = await markCourseComplete(p.courseId)
+    if (!result.success) return { success: false, error: result.error ?? "Failed to mark course complete" }
+    if (result.requiresExam) {
+      return {
+        success: true,
+        requiresExam: true,
+        message: "All lessons are done. Pass the final exam to complete the course.",
+      }
+    }
+    // Only packages that include a certificate get one (Basic completes without).
+    const access = await getCourseAccess(currentUser.id, p.courseId)
+    const hasCertificate = access ? access.entitlements.certificate : true
+    return {
+      success: true,
+      message: hasCertificate ? "Course completed! Your certificate is ready." : "Course completed!",
+    }
   } catch (error) {
     console.error("[Vivid] markCourseComplete error:", error)
     return { success: false, error: "Failed to mark course complete" }

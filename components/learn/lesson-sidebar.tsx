@@ -117,7 +117,7 @@ export function LessonSidebar({
                           "absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold",
                           !lesson.locked && isCompleted && !isCurrent
                             ? "bg-ws-success text-white"
-                            : isCurrent
+                            : !lesson.locked && isCurrent
                               ? "bg-primary text-primary-foreground"
                               : "bg-black/70 text-white"
                         )}
