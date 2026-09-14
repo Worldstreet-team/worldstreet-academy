@@ -10,6 +10,7 @@ import { updateLastAccessed } from "@/lib/actions/enrollments"
 import { getCourseRatingSummary, getUserReview } from "@/lib/actions/reviews"
 import { getCourseWatchProgress } from "@/lib/actions/watch-progress"
 import { getCurrentUser } from "@/lib/auth"
+import { getCourseAccess, openPublishedLessonIds } from "@/lib/course-access"
 import { MarkCompleteButton } from "@/components/learn/mark-complete-button"
 import { MessageInstructorButton } from "@/app/(platform)/dashboard/instructor/[instructorId]/message-instructor-button"
 import { LessonVideoPlayer } from "@/components/learn/lesson-video-player"
@@ -77,8 +78,15 @@ export default async function LessonPage({
   }
 
   const isLessonCompleted = completedLessonIds.includes(actualLessonId)
-  // Progress is measured over the lessons this package opens.
-  const openLessonIds = new Set(lessons.filter((l) => !l.locked).map((l) => l.id))
+  // Progress is measured over the published lessons this package opens
+  // (docs/go-patches-phase-3.md R3) — the same set `fetchMyEnrollments`'s
+  // `openLessons` counts. Course staff (admin, or the course's own instructor)
+  // have no enrollment, so `getCourseAccess` reads null for them; they see
+  // progress over every published lesson, same fallback as `fetchMyEnrollments`.
+  const access = currentUser ? await getCourseAccess(currentUser.id, courseId) : null
+  const openLessonIds = access
+    ? await openPublishedLessonIds(access)
+    : new Set(lessons.filter((l) => l.isPublished).map((l) => l.id))
   const courseProgressPercent =
     openLessonIds.size > 0
       ? Math.min(100, Math.round((completedLessonIds.filter((id) => openLessonIds.has(id)).length / openLessonIds.size) * 100))

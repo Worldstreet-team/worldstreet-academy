@@ -49,7 +49,7 @@ Otherwise the lesson is **locked**, and Go must:
 - **Lesson detail / stream URL:** refuse.
 - **Mark complete, watch progress, "last accessed":** refuse for locked lessons.
 - **Progress %:** completed open lessons ÷ **published** lessons the package opens. Locked and unpublished lessons count in neither number. Cap at 100. The same set gates completion: a course finishes only when every published lesson the package opens is completed (web: `completeLesson`, `markCourseComplete`, and an admin package change, which re-evaluates progress and completion).
-  - Two web call sites (`learn/[lessonId]/page.tsx`, `markLessonComplete`) still count unpublished lessons; they will be aligned in Phase 4.
+  - Both web call sites (`learn/[lessonId]/page.tsx`, `markLessonComplete`) were aligned to the published-open set in Phase 4.
 - **Resources attached to a locked lesson:** locked, no download URL — except resources marked `isFree`, which stay unlocked even on a locked lesson (a free resource skips both the enrollment check and the lesson lock).
 
 **R4 — Assessment and certificate.**

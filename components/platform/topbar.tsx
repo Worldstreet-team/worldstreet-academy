@@ -37,7 +37,7 @@ import { GaugeIcon, GraduationCapIcon, LogOutIcon, SettingsIcon, UserIcon } from
 const labelMap: Record<string, string> = {
   dashboard: "Dashboard",
   courses: "Courses",
-  "my-courses": "My Courses",
+  "my-courses": "My programs",
   bookmarks: "Bookmarks",
   profile: "Profile",
   settings: "Settings",

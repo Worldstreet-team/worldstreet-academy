@@ -57,6 +57,10 @@ type CourseCardProps = {
   /** ISO date: renders the "Not live yet" face — chip on the cover, countdown
    *  in the footer — replacing progress/price until the course launches. */
   comingSoonAt?: string | null
+  /** Enrolled cards: the package bought, as a chip under the title. */
+  packageName?: string | null
+  /** Enrolled cards whose status doesn't open the player ("Refunded", "Suspended"…): a neutral cover chip and a "View" footer. */
+  statusLabel?: string | null
 }
 
 export function CourseCard({
@@ -75,9 +79,11 @@ export function CourseCard({
   isBookmarked,
   onToggleBookmark,
   comingSoonAt,
+  packageName,
+  statusLabel,
 }: CourseCardProps) {
   const showProgress = typeof progress === "number" && !comingSoonAt
-  const isComplete = progress === 100
+  const isComplete = progress === 100 && !statusLabel
   const duration = formatDuration(totalDuration ?? 0)
   // Student-facing cards show no lesson count: the new programs carry no
   // curriculum yet and "0 lessons" is worse than saying nothing. Owner
@@ -109,11 +115,15 @@ export function CourseCard({
           {/* Bottom scrim so overlaid chips read against any photo */}
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/60 to-transparent" />
 
-          {comingSoonAt && (
+          {statusLabel ? (
+            <span className="absolute left-3 top-2.5 z-10 inline-flex items-center rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+              {statusLabel}
+            </span>
+          ) : comingSoonAt ? (
             <span className="absolute left-3 top-2.5 z-10 inline-flex items-center rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ws-gold">
               Not live yet
             </span>
-          )}
+          ) : null}
 
           {/* Lessons · duration — the reference's cover pill */}
           {coverMeta.length > 0 && (
@@ -160,6 +170,12 @@ export function CourseCard({
             {title}
           </h3>
 
+          {packageName && (
+            <span className="mt-2 inline-block max-w-full self-start truncate rounded-full bg-ws-chip px-2 py-0.5 text-[11px] font-medium text-ws-muted">
+              {packageName}
+            </span>
+          )}
+
           {/* Footer */}
           <div className="mt-auto pt-4">
             {comingSoonAt ? (
@@ -173,6 +189,16 @@ export function CourseCard({
                   />
                 </span>
                 <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-ws-gold">
+                  View
+                  <ArrowRightIcon size={13} aria-hidden />
+                </span>
+              </div>
+            ) : statusLabel ? (
+              <div className="flex items-center justify-between gap-2 border-t border-ws-hairline pt-3">
+                <span className="text-[13px] tabular-nums text-ws-muted">
+                  {typeof progress === "number" ? `${progress}% complete` : ""}
+                </span>
+                <span className="inline-flex items-center gap-1 text-[13px] font-medium text-ws-muted">
                   View
                   <ArrowRightIcon size={13} aria-hidden />
                 </span>

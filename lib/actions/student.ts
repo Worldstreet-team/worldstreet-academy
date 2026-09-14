@@ -2,7 +2,7 @@
 
 import mongoose from "mongoose"
 import connectDB from "@/lib/db"
-import { Course, Enrollment, Bookmark, User, Lesson, type IPackageEntitlements, type PackageKey } from "@/lib/db/models"
+import { Course, Enrollment, Bookmark, User, Lesson, type ICoursePackage, type IPackageEntitlements, type PackageKey } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth"
 import { isSchoolSlug, type SchoolSlug } from "@/lib/schools"
 import { FULL_ACCESS, PACKAGE_RANK, canAccessLesson, effectiveLessonTier, entitlementsFor } from "@/lib/entitlements"
@@ -56,6 +56,20 @@ export type StudentEnrollment = {
   firstLessonId: string | null
   /** Lesson to resume at — last accessed lesson, falling back to the first. */
   resumeLessonId: string | null
+  /** Title of `resumeLessonId`; null when that lesson no longer exists. */
+  resumeLessonTitle: string | null
+  /** Package bought; null for legacy, free and pre-enrolled rows. */
+  packageKey: PackageKey | null
+  /** Package name snapshot taken at purchase. */
+  packageName: string | null
+  instructorId: string
+  instructorHeadline: string | null
+  /** What the package includes. Legacy rows read FULL_ACCESS — that is access, never a label. */
+  entitlements: IPackageEntitlements
+  /** True only when `packageKey` is set AND the course still has that package. Badges require it. */
+  explicitPackage: boolean
+  /** Published lessons on the course this package opens — `openPublishedLessonIds`'s size, the set `progress` is measured over. */
+  openLessons: number
 }
 
 export type StudentBookmark = {
@@ -476,6 +490,8 @@ export type LearnLesson = {
   duration: number | null
   order: number
   isFree: boolean
+  /** Draft lessons never count toward progress (docs/go-patches-phase-3.md R3). */
+  isPublished: boolean
   /** The student's package can't open this lesson — media is withheld and the page shows a lock notice. */
   locked: boolean
   /** Tier that opens a locked lesson; null when the lesson is open. */
@@ -581,6 +597,7 @@ export async function fetchCourseForLearning(courseId: string): Promise<LearnCou
           duration: l.videoDuration ? Math.round(l.videoDuration / 60) : null,
           order: l.order,
           isFree: l.isFree,
+          isPublished: l.isPublished,
           locked,
           requiredPackage: locked ? effectiveLessonTier({ packages }, l) : null,
         }
@@ -651,47 +668,79 @@ export async function fetchOtherCourses(excludeCourseId: string): Promise<Browse
 // ============================================================================
 
 /**
- * Fetch user's enrolled courses
+ * Fetch user's enrolled courses — every status, most recently accessed first.
  */
 export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
   try {
     await connectDB()
     const user = await getAuthenticatedUser()
-    
-    const { Lesson } = await import("@/lib/db/models")
-    
+
     const enrollments = await Enrollment.find({ user: user._id })
       .populate({
         path: "course",
-        select: "title thumbnailUrl instructor totalLessons availableAt status",
+        select: "title thumbnailUrl instructor totalLessons availableAt status packages",
         populate: {
           path: "instructor",
-          select: "firstName lastName avatarUrl",
+          select: "firstName lastName avatarUrl instructorProfile.headline",
         },
       })
       .sort({ lastAccessedAt: -1 })
       .lean()
-    
-    // Get first lesson for each enrolled course
-    const results = await Promise.all(
+
+    type PopulatedCourse = {
+      _id: { toString(): string }
+      title: string
+      thumbnailUrl: string
+      totalLessons?: number
+      availableAt?: Date | null
+      packages?: ICoursePackage[] | null
+      instructor: {
+        _id: { toString(): string }
+        firstName: string
+        lastName: string
+        avatarUrl: string | null
+        instructorProfile?: { headline?: string | null }
+      }
+    }
+
+    // One lesson read for every enrolled course (was one query per enrollment).
+    const courseIds = enrollments.map((e) => (e.course as unknown as PopulatedCourse)._id.toString())
+    const lessons = await Lesson.find({ course: { $in: courseIds } })
+      .sort({ order: 1 })
+      .select("_id course title order minPackageKey isFree isPublished")
+      .lean()
+    const lessonsByCourse = new Map<string, typeof lessons>()
+    for (const lesson of lessons) {
+      const key = lesson.course.toString()
+      const list = lessonsByCourse.get(key)
+      if (list) list.push(lesson)
+      else lessonsByCourse.set(key, [lesson])
+    }
+
+    return await Promise.all(
       enrollments.map(async (enrollment) => {
-        const course = enrollment.course as unknown as {
-          _id: { toString(): string }
-          title: string
-          thumbnailUrl: string
-          totalLessons?: number
-          availableAt?: Date | null
-          instructor: { firstName: string; lastName: string; avatarUrl: string | null }
-        }
-        
-        const firstLesson = await Lesson.findOne({ course: course._id })
-          .sort({ order: 1 })
-          .select("_id")
-          .lean()
-        
+        const course = enrollment.course as unknown as PopulatedCourse
+        const courseId = course._id.toString()
+        const courseLessons = lessonsByCourse.get(courseId) ?? []
+        const firstLesson = courseLessons[0]
+        const packages = course.packages ?? []
+        const packageKey = enrollment.packageKey ?? null
+        const resumeLessonId =
+          enrollment.lastAccessedLesson?.toString() ?? firstLesson?._id.toString() ?? null
+
+        // openLessons is `openPublishedLessonIds`'s own set (docs/go-patches-phase-3.md
+        // R3) — published lessons the package opens. `getCourseAccess` reads null for a
+        // non-access-granting status (pre_enrolled/expired/refunded/suspended/cancelled)
+        // or for course staff; either way there's no per-enrollment access record to
+        // size the set from, so fall back to the course's own published lesson count.
+        const access = await getCourseAccess(user._id.toString(), courseId)
+        const openLessons = access
+          ? (await openPublishedLessonIds(access)).size
+          : courseLessons.filter((l) => l.isPublished).length
+
         return {
           id: enrollment._id.toString(),
-          courseId: course._id.toString(),
+          courseId,
           courseTitle: course.title,
           courseThumbnail: course.thumbnailUrl,
           instructorName: `${course.instructor.firstName} ${course.instructor.lastName}`,
@@ -702,15 +751,18 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
           status: enrollment.status,
           courseAvailableAt: course.availableAt ? new Date(course.availableAt).toISOString() : null,
           firstLessonId: firstLesson?._id.toString() || null,
-          resumeLessonId:
-            enrollment.lastAccessedLesson?.toString() ??
-            firstLesson?._id.toString() ??
-            null,
+          resumeLessonId,
+          resumeLessonTitle: courseLessons.find((l) => l._id.toString() === resumeLessonId)?.title ?? null,
+          packageKey,
+          packageName: enrollment.packageName ?? null,
+          instructorId: course.instructor._id.toString(),
+          instructorHeadline: course.instructor.instructorProfile?.headline || null,
+          entitlements: entitlementsFor({ packages }, { packageKey }),
+          explicitPackage: packageKey !== null && packages.some((p) => p.key === packageKey),
+          openLessons,
         }
       })
     )
-    
-    return results
   } catch (error) {
     console.error("Fetch my enrollments error:", error)
     return []
@@ -866,15 +918,16 @@ export async function markLessonComplete(
     const lessonIds = (await Lesson.find({ course: courseId }).select("_id").lean()).map((l) => l._id.toString())
     if (!lessonIds.includes(lessonId)) return { success: false, error: "Lesson not found" }
 
-    const locked = await lockedLessonIds(await getCourseAccess(user._id.toString(), courseId))
+    const access = await getCourseAccess(user._id.toString(), courseId)
+    const locked = await lockedLessonIds(access)
     if (locked.has(lessonId)) return { success: false, error: "This lesson isn't included in your package" }
 
     if (!enrollment.completedLessons.some((id: { toString(): string }) => id.toString() === lessonId)) {
       enrollment.completedLessons.push(new mongoose.Types.ObjectId(lessonId))
     }
 
-    // Progress counts only the lessons this package opens.
-    const open = new Set(lessonIds.filter((id) => !locked.has(id)))
+    // Progress counts only the published lessons this package opens (docs/go-patches-phase-3.md R3).
+    const open = access ? await openPublishedLessonIds(access) : new Set<string>()
     const done = enrollment.completedLessons.filter((id: { toString(): string }) => open.has(id.toString())).length
     enrollment.progress = open.size > 0 ? Math.min(100, Math.round((done / open.size) * 100)) : 0
     enrollment.lastAccessedAt = new Date()

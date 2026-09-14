@@ -115,9 +115,10 @@ function ProgressPane({
   enrollments: StudentEnrollment[]
   isLoading: boolean
 }) {
-  const totalLessons = enrollments.reduce((s, e) => s + (e.totalLessons ?? 0), 0)
+  // Progress is measured over the lessons each package opens (Phase 3 Task 4).
+  const totalLessons = enrollments.reduce((s, e) => s + e.openLessons, 0)
   const completedLessons = enrollments.reduce(
-    (s, e) => s + Math.round(((e.progress ?? 0) / 100) * (e.totalLessons ?? 0)),
+    (s, e) => s + Math.round(((e.progress ?? 0) / 100) * e.openLessons),
     0
   )
   const overallPct = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0

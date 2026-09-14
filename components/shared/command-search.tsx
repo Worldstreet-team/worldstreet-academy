@@ -47,7 +47,7 @@ function useCommandItems(courses: BrowseCourse[], isInstructor: boolean) {
     },
     {
       id: "page-my-courses",
-      label: "My Courses",
+      label: "My programs",
       description: "View enrolled courses",
       icon: BookOpenIcon,
       action: () => router.push("/dashboard/my-courses"),

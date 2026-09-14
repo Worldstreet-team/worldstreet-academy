@@ -2,7 +2,8 @@
 
 import * as React from "react"
 import { Topbar } from "@/components/platform/topbar"
-import { CourseCard, CourseCardSkeleton } from "@/components/platform/course-card"
+import { CourseCardSkeleton } from "@/components/platform/course-card"
+import { EnrollmentCard } from "@/components/platform/enrollment-card"
 import { EmptyState } from "@/components/shared/empty-state"
 import { ArtCourses } from "@/components/shared/illustrations"
 import { useEnrollments } from "@/lib/hooks/queries"
@@ -12,7 +13,7 @@ import { SearchIcon } from "lucide-react"
 const TABS = ["All", "In Progress", "Completed"] as const
 type Tab = (typeof TABS)[number]
 
-export default function MyCoursesPage() {
+export default function MyProgramsPage() {
   const [activeTab, setActiveTab] = React.useState<Tab>("All")
   const [search, setSearch] = React.useState("")
   const { data: enrolledCourses = [], isLoading } = useEnrollments()
@@ -34,7 +35,8 @@ export default function MyCoursesPage() {
       courses = courses.filter(
         (c) =>
           c.courseTitle.toLowerCase().includes(q) ||
-          c.instructorName.toLowerCase().includes(q)
+          c.instructorName.toLowerCase().includes(q) ||
+          (c.packageName ?? "").toLowerCase().includes(q)
       )
     }
 
@@ -43,12 +45,12 @@ export default function MyCoursesPage() {
 
   return (
     <>
-      <Topbar title="My Courses" />
+      <Topbar title="My programs" />
       <div className="flex-1 px-4 sm:px-6 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-8 md:px-8 md:pb-12 lg:px-12">
         <div className="mx-auto w-full max-w-7xl space-y-8">
           <div>
             <h1 className="font-display text-[28px] font-semibold tracking-[-0.02em] text-ws-primary">
-              My courses
+              My programs
             </h1>
             <p className="mt-1 text-[15px] text-ws-muted">
               Everything you&apos;re enrolled in, in one place.
@@ -65,8 +67,8 @@ export default function MyCoursesPage() {
             <EmptyState
               art={<ArtCourses />}
               title="You're not enrolled in anything yet"
-              description="Pick a course and it'll show up here with your progress."
-              actionLabel="Browse courses"
+              description="Pick a program and it'll show up here with your progress."
+              actionLabel="Browse programs"
               actionHref="/dashboard/courses"
             />
           ) : (
@@ -94,14 +96,14 @@ export default function MyCoursesPage() {
 
                 <div className="relative sm:w-72">
                   <SearchIcon
-                    
                     size={16}
-                    className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ws-subtle" />
+                    className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ws-subtle"
+                  />
                   <input
                     type="text"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search your courses…"
+                    placeholder="Search your programs…"
                     className="h-11 md:h-10 w-full rounded-full bg-ws-chip pl-11 pr-4 text-base md:text-sm text-ws-primary outline-none transition-colors duration-[var(--ws-motion-fast)] placeholder:text-ws-subtle focus:ring-[1.5px] focus:ring-ws-brand"
                   />
                 </div>
@@ -111,38 +113,22 @@ export default function MyCoursesPage() {
                 <div className="flex flex-col items-center justify-center py-16 text-[13px] text-ws-muted">
                   <p>
                     {search.trim()
-                      ? `No courses match "${search}"`
-                      : `No ${activeTab.toLowerCase()} courses`}
+                      ? `No programs match "${search}"`
+                      : `No ${activeTab.toLowerCase()} programs`}
                   </p>
                   <button
                     type="button"
                     onClick={() => (search.trim() ? setSearch("") : setActiveTab("All"))}
                     className="mt-1 text-[13px] font-medium text-ws-gold hover:opacity-80"
                   >
-                    {search.trim() ? "Clear search" : "Show all courses"}
+                    {search.trim() ? "Clear search" : "Show all programs"}
                   </button>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                  {filteredCourses.map((course) => {
-                    // A reservation isn't startable: the card routes to the
-                    // course page (countdown + status) instead of the player.
-                    const preLaunch = course.status === "pre_enrolled"
-                    return (
-                      <CourseCard
-                        key={course.id}
-                        href={
-                          preLaunch
-                            ? `/dashboard/courses/${course.courseId}`
-                            : `/dashboard/courses/${course.courseId}/learn/${course.resumeLessonId ?? course.firstLessonId ?? "first"}`
-                        }
-                        title={course.courseTitle}
-                        thumbnailUrl={course.courseThumbnail}
-                        progress={course.progress}
-                        comingSoonAt={preLaunch ? course.courseAvailableAt : null}
-                      />
-                    )
-                  })}
+                  {filteredCourses.map((course) => (
+                    <EnrollmentCard key={course.id} enrollment={course} />
+                  ))}
                 </div>
               )}
             </>

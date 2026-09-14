@@ -62,7 +62,7 @@ type NavItem = {
 const learnItems: NavItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: House, match: (p) => p === "/dashboard" },
   {
-    title: "My courses",
+    title: "My programs",
     href: "/dashboard/my-courses",
     icon: GraduationCap,
     match: (p) =>
@@ -283,7 +283,7 @@ export function AppSidebar() {
                   item={item}
                   active={isActive(item, pathname)}
                   badge={
-                    item.title === "My courses" && inProgressCount > 0 ? (
+                    item.title === "My programs" && inProgressCount > 0 ? (
                       <NavBadge>{inProgressCount}</NavBadge>
                     ) : undefined
                   }

@@ -23,7 +23,7 @@ const navItems: BottomNavItem[] = [
     match: (p: string) => p === "/dashboard",
   },
   {
-    title: "My Courses",
+    title: "My programs",
     href: "/dashboard/my-courses",
     icon: BookOpenIcon,
     match: (p: string) => p === "/dashboard/my-courses",
