@@ -251,6 +251,12 @@ export async function adminSetEnrollmentPackage(
     const enrollment = await Enrollment.findById(enrollmentId)
     if (!enrollment) return { success: false, error: "Enrollment not found" }
 
+    // Payment decides the tier of a reservation or a refunded row; only live
+    // enrollments can be moved, so the audit trail never goes stale.
+    if (enrollment.status !== "active" && enrollment.status !== "completed") {
+      return { success: false, error: "Only active or completed enrollments can change package" }
+    }
+
     const course = await Course.findById(enrollment.course).select("packages").lean()
     const pkg = course ? packageFor(course, packageKey) : null
     if (!pkg) return { success: false, error: "This course doesn't sell that package" }
@@ -265,6 +271,7 @@ export async function adminSetEnrollmentPackage(
     try {
       await PaymentEvent.create({
         order: null,
+        // Deliberately not unique (unlike Order.reference): every change on this enrollment logs its own event.
         reference: `academy_package_${enrollment._id.toString()}`,
         type: "package_changed",
         payload: {

@@ -351,7 +351,7 @@ function AdminEnrollmentsInner() {
                                   Restore
                                 </DropdownMenuItem>
                               )}
-                              {e.coursePackages.length > 0 && (
+                              {e.coursePackages.length > 0 && (e.status === "active" || e.status === "completed") && (
                                 <DropdownMenuItem
                                   onClick={() => {
                                     setPackageChoice(e.packageKey)
