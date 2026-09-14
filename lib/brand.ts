@@ -30,3 +30,9 @@ export const BRAND = {
   certificatePrefix: "WSA",
   signatory: SIGNATORY,
 } as const
+
+/**
+ * Default meta description — the root layout's (every page without its own)
+ * and the homepage's. Spec §1 hero copy; the name comes from BRAND (D1).
+ */
+export const SITE_DESCRIPTION = `Master practical, in-demand skills through expert-led programs designed for the new and modern economy. Explore the eight schools of ${BRAND.name}, choose your path and start building capabilities you can apply in the real world.`

@@ -2,7 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Public_Sans, Dancing_Script, Poppins } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "@/components/theme-provider";
-import { BRAND } from "@/lib/brand";
+import { BRAND, SITE_DESCRIPTION } from "@/lib/brand";
+import { APP_URL } from "@/lib/app-url";
 import "./globals.css";
 
 const publicSans = Public_Sans({subsets:['latin'],variable:'--font-sans'});
@@ -36,12 +37,21 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
+  // Absolute base for og:image, canonical and share URLs (lib/app-url.ts — loopback is ignored in production).
+  metadataBase: new URL(APP_URL),
   title: {
     default: BRAND.name,
     template: `%s | ${BRAND.name}`,
   },
-  description:
-    "Learn cryptocurrency trading, DeFi, risk management, and blockchain development from industry experts.",
+  description: SITE_DESCRIPTION,
+  // Every page inherits this card and app/opengraph-image.tsx unless its own metadata sets openGraph.
+  openGraph: {
+    siteName: BRAND.name,
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+  },
   icons: {
     icon: "/worldstreet-logo/WorldStreet1.png",
     apple: "/worldstreet-logo/WorldStreet1.png",

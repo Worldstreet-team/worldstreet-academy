@@ -3,6 +3,7 @@ import { cache } from "react"
 import { notFound, permanentRedirect } from "next/navigation"
 import { fetchProgramBySlug } from "@/lib/actions/student"
 import { appUrl } from "@/lib/app-url"
+import { BRAND } from "@/lib/brand"
 import { checkEnrollment } from "@/lib/actions/enrollments"
 import { getCachedUser } from "@/lib/auth/cached"
 import { courseAvailability } from "@/lib/types/course"
@@ -28,10 +29,27 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params
   const program = await getProgram(slug)
   if (!program) return {}
+  const description = program.shortDescription ?? program.description.slice(0, 160)
+  const url = appUrl(`/programs/${program.slug}`)
   return {
     title: program.title,
-    description: program.shortDescription ?? program.description.slice(0, 160),
-    alternates: { canonical: appUrl(`/programs/${program.slug}`) },
+    description,
+    alternates: { canonical: url },
+    // A page's openGraph REPLACES the inherited one, so set it only with a thumbnail
+    // to show; without one the page keeps the site card (app/opengraph-image.tsx)
+    // and Next fills og:title/description from the fields above.
+    ...(program.thumbnailUrl
+      ? {
+          openGraph: {
+            siteName: BRAND.name,
+            type: "website",
+            url,
+            title: `${program.title} | ${BRAND.name}`,
+            description,
+            images: [{ url: program.thumbnailUrl, alt: program.title }],
+          },
+        }
+      : {}),
   }
 }
 

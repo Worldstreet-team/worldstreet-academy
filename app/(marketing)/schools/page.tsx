@@ -2,12 +2,14 @@ import type { Metadata } from "next"
 import { SCHOOLS, countProgramsBySchool } from "@/lib/schools"
 import { fetchBrowseCourses } from "@/lib/actions/student"
 import { BRAND } from "@/lib/brand"
+import { appUrl } from "@/lib/app-url"
 import { SchoolCard } from "@/components/marketing/school-card"
 
 export const metadata: Metadata = {
   title: "Schools",
   description:
     "Your future can take many directions. Choose the school that matches your interests, goals and ambitions.",
+  alternates: { canonical: appUrl("/schools") },
 }
 
 // Program counts come from the live catalogue.

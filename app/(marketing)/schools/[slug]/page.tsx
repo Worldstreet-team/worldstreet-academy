@@ -6,6 +6,7 @@ import { SCHOOL_BY_SLUG, isSchoolSlug } from "@/lib/schools"
 import { fetchBrowseCourses } from "@/lib/actions/student"
 import { SchoolIcon } from "@/components/shared/school-icon"
 import { ProgramRow } from "@/components/marketing/program-row"
+import { appUrl } from "@/lib/app-url"
 
 // Published/coming-soon state of a school's programs changes under a cached render.
 export const revalidate = 0
@@ -16,7 +17,11 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params
   if (!isSchoolSlug(slug)) return {}
   const school = SCHOOL_BY_SLUG[slug]
-  return { title: school.name, description: school.tagline ?? school.blurb }
+  return {
+    title: school.name,
+    description: school.tagline ?? school.blurb,
+    alternates: { canonical: appUrl(`/schools/${school.slug}`) },
+  }
 }
 
 /**

@@ -3,6 +3,7 @@ import Link from "next/link"
 import { ArrowRightIcon } from "lucide-react"
 import { SCHOOLS, type SchoolSlug } from "@/lib/schools"
 import { BRAND } from "@/lib/brand"
+import { appUrl } from "@/lib/app-url"
 import { fetchBrowseCourses, type BrowseCourse } from "@/lib/actions/student"
 import { getCachedUser } from "@/lib/auth/cached"
 import { MarketingCourseCard } from "@/components/marketing/course-card"
@@ -11,6 +12,7 @@ import { SchoolIcon } from "@/components/shared/school-icon"
 export const metadata: Metadata = {
   title: "Programs",
   description: `Browse every program across the eight schools of ${BRAND.name}.`,
+  alternates: { canonical: appUrl("/programs") },
 }
 
 // Published/coming-soon state changes under a cached render.
