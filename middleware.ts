@@ -19,7 +19,7 @@ export default clerkMiddleware(async (auth, request) => {
       if (isLocalDev) {
         // Local dev: redirect to local sign-in
         const loginUrl = new URL("/login", request.url)
-        loginUrl.searchParams.set("redirect_url", pathname)
+        loginUrl.searchParams.set("redirect_url", `${pathname}${request.nextUrl.search}`)
         return NextResponse.redirect(loginUrl)
       }
 

@@ -85,7 +85,7 @@ export function CatalogueGrid({
                 Straight from the live catalogue — levels and prices as they are.
               </p>
               <Link
-                href="/courses"
+                href="/programs"
                 className="mt-7 inline-flex h-12 items-center justify-center rounded-full bg-black px-8 text-[15px] font-semibold text-white transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-85 sm:mt-9 sm:h-13 sm:px-9"
               >
                 Browse all programs
@@ -111,7 +111,7 @@ export function CatalogueGrid({
               ))}
               {/* End-cap: the rail resolves into the full catalogue. */}
               <Link
-                href="/courses"
+                href="/programs"
                 className="row-span-2 flex w-[10rem] snap-start items-center justify-center rounded-xl border border-black/25 text-[15px] font-semibold text-ws-brand-on transition-colors duration-[var(--ws-motion-fast)] hover:bg-black/10 sm:w-[12rem]"
               >
                 View all →

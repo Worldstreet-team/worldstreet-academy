@@ -14,7 +14,7 @@ const REGISTER_URL = isLocalDev ? "/register" : "https://worldstreetgold.com/reg
 /** Public destinations, in journey order (spec §17). Shared by the md+ link row and the mobile sheet. */
 const PUBLIC_LINKS: MarketingNavLink[] = [
   { href: "/schools", label: "Schools" },
-  { href: "/courses", label: "Programs" },
+  { href: "/programs", label: "Programs" },
   { href: "/#how-it-works", label: "How it works" },
 ]
 

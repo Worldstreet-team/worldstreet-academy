@@ -26,7 +26,7 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/courses" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                <Link href="/programs" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                   Programs
                 </Link>
               </li>

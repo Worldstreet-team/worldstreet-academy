@@ -54,7 +54,7 @@ export function UpcomingDrops({ drops }: { drops: BrowseCourse[] }) {
                     className="absolute inset-x-0 top-[-1px] h-px origin-left scale-x-0 bg-ws-brand transition-transform duration-300 ease-[var(--land-ease-inertia)] group-hover:scale-x-100"
                   />
                   <Link
-                    href={`/courses/${course.id}`}
+                    href={`/programs/${course.slug}`}
                     className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40"
                   >
                     <div className="grid grid-cols-[auto_1fr] items-center gap-x-5 gap-y-3 py-5 sm:grid-cols-[auto_1fr_auto] md:gap-x-8 md:py-6">

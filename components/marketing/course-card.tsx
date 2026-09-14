@@ -78,7 +78,7 @@ export function MarketingCourseCard({
       )}
     >
       <Link
-        href={`/courses/${course.id}`}
+        href={`/programs/${course.slug}`}
         className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40"
         onClick={() => {
           if (signedIn) void autoBookmark(course.id)

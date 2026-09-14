@@ -169,7 +169,7 @@ function ReviewCard({ review }: { review: LandingReview }) {
             {review.reviewerName}
           </span>
           <Link
-            href={`/courses/${review.courseId}`}
+            href={`/programs/${review.courseSlug}`}
             className="block truncate text-[12px] text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:text-ws-gold"
           >
             on {review.courseTitle}

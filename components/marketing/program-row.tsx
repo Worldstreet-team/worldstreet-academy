@@ -23,8 +23,7 @@ export function programPriceLabel(
 
 /**
  * One program on a school page (spec §5): title, blurb, level, price and the
- * [VIEW PROGRAM] affordance. The whole row is the link. Links to the existing
- * course page until Phase 2 ships `/programs/[slug]`.
+ * [VIEW PROGRAM] affordance. The whole row is the link. Links to the program page.
  */
 export function ProgramRow({ course }: { course: BrowseCourse }) {
   const comingSoon =
@@ -33,7 +32,7 @@ export function ProgramRow({ course }: { course: BrowseCourse }) {
   return (
     <li>
       <Link
-        href={`/courses/${course.id}`}
+        href={`/programs/${course.slug}`}
         className="group grid gap-5 rounded-lg border border-ws-hairline bg-ws-surface p-5 transition-colors duration-[var(--ws-motion-base)] hover:border-ws-brand/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40 sm:grid-cols-[9rem_1fr] sm:p-6"
       >
         <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-md bg-ws-sunken sm:aspect-[4/3]">
