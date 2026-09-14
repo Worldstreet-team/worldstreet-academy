@@ -93,3 +93,17 @@ export const PACKAGE_LABEL: Record<PackageKey, string> = {
 export function lowestPackageWith(course: CourseLike, flag: keyof IPackageEntitlements): PackageKey | null {
   return PACKAGE_KEYS.find((key) => packageFor(course, key)?.entitlements[flag]) ?? null
 }
+
+/**
+ * Executive mentorship (spec §6 "Private 1-on-1 coaching"): an enrollment that
+ * bought the Executive package, while that package is still on the course (found
+ * by key, `enabled` ignored — buyers keep what they paid for) and includes
+ * mentorship. Legacy null-package rows and single "Full program" tiers never
+ * qualify: full ACCESS is not a purchased service. Server callers pair it with an
+ * access-granting enrollment (`getCourseAccess`). The dashboard's
+ * `isMentorEnrollment` is the client twin.
+ */
+export function includesMentorship(course: CourseLike, enrollment: EnrollmentLike): boolean {
+  if (enrollment?.packageKey !== "executive") return false
+  return Boolean((course.packages ?? []).find((p) => p.key === "executive")?.entitlements.mentorship)
+}

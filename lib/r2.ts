@@ -129,4 +129,25 @@ export function generateResourceKey(originalFilename: string): string {
   return `worldstreet-academy/resources/${timestamp}-${randomId}.${extension}`
 }
 
+/**
+ * Student submission files refuse to upload unless the PRIVATE resources bucket
+ * is configured. Unlike course resources they never fall back to the public
+ * bucket (R2_RESOURCE_BUCKET's `|| R2_BUCKET`).
+ */
+export function hasPrivateResourceBucket(): boolean {
+  return Boolean(process.env.R2_RESOURCES_BUCKET_NAME)
+}
+
+/** The folder one student's files for one assignment live in — submitAssignment only accepts keys inside it. */
+export function submissionKeyPrefix(assignmentId: string, userId: string): string {
+  return `worldstreet-academy/submissions/${assignmentId}/${userId}/`
+}
+
+/** Key for one submission file: inside the student's folder, unguessable, extension kept. */
+export function generateSubmissionKey(assignmentId: string, userId: string, originalFilename: string): string {
+  const randomId = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10)
+  const extension = originalFilename.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "bin"
+  return `${submissionKeyPrefix(assignmentId, userId)}${Date.now()}-${randomId}.${extension}`
+}
+
 export { r2Client }

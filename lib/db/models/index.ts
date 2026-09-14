@@ -36,3 +36,6 @@ export {
 export { Exam, type IExam, type IExamSettings, type ExamStatus, type ExamScope } from "./exam"
 export { Question, type IQuestion, type IQuestionOption, type QuestionType } from "./question"
 export { ExamAttempt, type IExamAttempt, type IAttemptAnswer, type AttemptStatus } from "./exam-attempt"
+export { MentorshipSession, type IMentorshipSession, type MentorshipSessionStatus } from "./mentorship-session"
+export { Assignment, type IAssignment, type AssignmentStatus } from "./assignment"
+export { Submission, type ISubmission, type ISubmissionFile, type SubmissionStatus } from "./submission"

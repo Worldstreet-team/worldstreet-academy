@@ -56,6 +56,8 @@ export interface IEnrollment extends Document {
   examPassed: boolean
   examPassedAt: Date | null
   bestScorePercent: number | null
+  /** Executive mentor's plain-text roadmap for this student (Phase 7). Additive — Go ignores it. */
+  mentorRoadmap: { text: string; updatedAt: Date; updatedBy: Types.ObjectId } | null
   createdAt: Date
   updatedAt: Date
 }
@@ -156,6 +158,17 @@ const EnrollmentSchema = new Schema<IEnrollment>(
     },
     bestScorePercent: {
       type: Number,
+      default: null,
+    },
+    mentorRoadmap: {
+      type: new Schema(
+        {
+          text: { type: String, required: true, maxlength: 5000 },
+          updatedAt: { type: Date, required: true },
+          updatedBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
+        },
+        { _id: false }
+      ),
       default: null,
     },
   },

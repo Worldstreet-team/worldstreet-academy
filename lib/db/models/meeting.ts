@@ -30,6 +30,8 @@ export interface IMeeting extends Document {
   courseId?: Types.ObjectId
   /** Set when this meeting is an instructor-application interview. */
   applicationId?: Types.ObjectId
+  /** Set when this meeting is an Executive mentorship session (private; joinMeeting gates it). */
+  mentorshipSessionId?: Types.ObjectId
   /** Scheduled-meeting reminder ledger (cron marks what it already sent). */
   reminders?: { h24SentAt?: Date | null; h1SentAt?: Date | null }
   courseThumbnailUrl?: string
@@ -81,6 +83,7 @@ const MeetingSchema = new Schema<IMeeting>(
     participants: [MeetingParticipantSchema],
     courseId: { type: Schema.Types.ObjectId, ref: "Course" },
     applicationId: { type: Schema.Types.ObjectId, ref: "InstructorApplication" },
+    mentorshipSessionId: { type: Schema.Types.ObjectId, ref: "MentorshipSession" },
     reminders: {
       h24SentAt: { type: Date, default: null },
       h1SentAt: { type: Date, default: null },
