@@ -6,7 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import { cn } from "@/lib/utils"
 import type { LearnLesson } from "@/lib/actions/student"
-import { CheckIcon, FileIcon, VideoIcon, WifiIcon } from "lucide-react"
+import { CheckIcon, FileIcon, LockIcon, VideoIcon, WifiIcon } from "lucide-react"
 import { RenderIcon } from "@/components/shared/render-icon"
 
 type LessonSidebarProps = {
@@ -115,7 +115,7 @@ export function LessonSidebar({
                       <motion.div
                         className={cn(
                           "absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold",
-                          isCompleted && !isCurrent
+                          !lesson.locked && isCompleted && !isCurrent
                             ? "bg-ws-success text-white"
                             : isCurrent
                               ? "bg-primary text-primary-foreground"
@@ -124,7 +124,9 @@ export function LessonSidebar({
                         layout
                         transition={{ duration: 0.3 }}
                       >
-                        {isCompleted && !isCurrent ? (
+                        {lesson.locked ? (
+                          <LockIcon size={12} className="text-white" aria-label="Locked" />
+                        ) : isCompleted && !isCurrent ? (
                           <CheckIcon  size={12} className="text-white" />
                         ) : (
                           index + 1
@@ -132,7 +134,7 @@ export function LessonSidebar({
                       </motion.div>
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-sm">{lesson.title}</p>
+                      <p className={cn("truncate font-medium text-sm", lesson.locked && "text-muted-foreground")}>{lesson.title}</p>
                       <p className="text-xs text-muted-foreground capitalize">
                         {lesson.type}
                         {lesson.duration ? ` · ${Math.floor(lesson.duration / 60)}:${String(lesson.duration % 60).padStart(2, '0')}` : ""}

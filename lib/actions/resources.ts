@@ -13,6 +13,7 @@ import {
   R2_RESOURCE_BUCKET,
 } from "@/lib/r2"
 import type { ResourceKind } from "@/lib/db/models/resource"
+import { getCourseAccess, isLessonLockedFor, lockedLessonIds } from "@/lib/course-access"
 
 // Instructors upload learning materials, students download them — but only
 // once the server has confirmed they're enrolled. Files live in a private
@@ -197,10 +198,12 @@ export async function listCourseResources(courseId: string): Promise<ResourceLis
     await connectDB()
     const user = await getCurrentUser()
     const access = await hasCourseAccess(courseId, user)
+    // Materials attached to a lesson the student's package can't open stay locked.
+    const lockedLessons = user ? await lockedLessonIds(await getCourseAccess(user.id, courseId)) : new Set<string>()
 
     const resources = await Resource.find({ course: courseId }).sort({ order: 1 }).lean()
     return resources.map((r) => {
-      const unlocked = access || r.isFree
+      const unlocked = r.isFree || (access && !(r.lesson && lockedLessons.has(r.lesson.toString())))
       return {
         id: r._id.toString(),
         title: r.title,
@@ -243,6 +246,9 @@ export async function getResourceDownloadUrl(
       const access = await hasCourseAccess(resource.course.toString(), user)
       if (!access) {
         return { success: false, error: "Enroll in this course to download its materials" }
+      }
+      if (resource.lesson && (await isLessonLockedFor(user.id, resource.lesson.toString()))) {
+        return { success: false, error: "This material belongs to a lesson outside your package" }
       }
     }
 

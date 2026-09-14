@@ -3,6 +3,7 @@
 import connectDB from "@/lib/db"
 import { WatchProgress } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth"
+import { isLessonLockedFor } from "@/lib/course-access"
 
 // ============================================================================
 // TYPES
@@ -35,6 +36,8 @@ export async function saveWatchProgress(
     await connectDB()
     const user = await getCurrentUser()
     if (!user) return { success: false }
+
+    if (await isLessonLockedFor(user.id, lessonId)) return { success: false }
 
     const completed = duration > 0 && currentTime / duration >= 0.9
 
@@ -97,6 +100,8 @@ export async function getLessonWatchProgress(
     await connectDB()
     const user = await getCurrentUser()
     if (!user) return null
+
+    if (await isLessonLockedFor(user.id, lessonId)) return null
 
     const record = await WatchProgress.findOne({
       user: user.id,

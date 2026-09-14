@@ -22,7 +22,7 @@ import { getCurrentUser } from "@/lib/auth/actions"
 import { courseAvailability } from "@/lib/types/course"
 import { sendEnrollmentConfirmationEmail } from "@/lib/email"
 import { notifyAdmins, notifyUser } from "@/lib/notify"
-import { getCourseAccess } from "@/lib/course-access"
+import { getCourseAccess, isLessonLockedFor, lockedLessonIds } from "@/lib/course-access"
 import { PACKAGE_KEYS, canAccessLesson, packageFor } from "@/lib/entitlements"
 import {
   createWalletCharge,
@@ -498,11 +498,17 @@ export async function completeLesson(
       return { success: false, error: "Not enrolled in this course" }
     }
 
+    const access = await getCourseAccess(userId, courseId)
+    const locked = await lockedLessonIds(access)
+    if (locked.has(lessonId)) {
+      return { success: false, error: "This lesson isn't included in your package", code: "package_locked" as const }
+    }
+
     // Add lesson to completed if not already
     const lessonObjectId = new Types.ObjectId(lessonId)
     const lessonIdStr = lessonObjectId.toString()
     const completedIds = enrollment.completedLessons.map((id: Types.ObjectId) => id.toString())
-    
+
     if (!completedIds.includes(lessonIdStr)) {
       enrollment.completedLessons.push(lessonObjectId)
     }
@@ -510,21 +516,21 @@ export async function completeLesson(
     enrollment.lastAccessedLesson = lessonObjectId
     enrollment.lastAccessedAt = new Date()
 
-    // Calculate progress
-    const totalLessons = await Lesson.countDocuments({
-      course: courseId,
-      isPublished: true,
-    })
-
-    enrollment.progress = Math.round(
-      (enrollment.completedLessons.length / totalLessons) * 100
+    // Progress counts only published lessons this package opens.
+    const publishedIds = (await Lesson.find({ course: courseId, isPublished: true }).select("_id").lean()).map(
+      (l) => l._id.toString()
     )
+    const open = new Set(publishedIds.filter((id) => !locked.has(id)))
+    const done = enrollment.completedLessons.filter((id: Types.ObjectId) => open.has(id.toString())).length
+    enrollment.progress = open.size > 0 ? Math.min(100, Math.round((done / open.size) * 100)) : 0
 
     // Check if course is completed — when the course requires a CBT exam,
-    // completion (and thus the certificate) waits for a passing attempt.
+    // completion (and thus the certificate) waits for a passing attempt, unless
+    // the package has no assessment & certificate.
     if (enrollment.progress >= 100) {
       const gatedCourse = await Course.findById(courseId).select("examRequired").lean()
-      if (!gatedCourse?.examRequired || enrollment.examPassed) {
+      const examGates = !!gatedCourse?.examRequired && (access?.entitlements.certificate ?? true)
+      if (!examGates || enrollment.examPassed) {
         enrollment.status = "completed"
         enrollment.completedAt = new Date()
       }
@@ -558,6 +564,11 @@ export async function updateLastAccessed(
 ) {
   try {
     await connectDB()
+
+    // A lesson outside the student's package is never "where they left off".
+    if (await isLessonLockedFor(userId, lessonId)) {
+      return { success: false, error: "This lesson isn't included in your package" }
+    }
 
     await Enrollment.findOneAndUpdate(
       { user: userId, course: courseId },
@@ -655,10 +666,11 @@ export async function getEnrollmentProgress(
       return null
     }
 
-    const totalLessons = await Lesson.countDocuments({
-      course: courseId,
-      isPublished: true,
-    })
+    // Only the published lessons this package opens count toward the total.
+    const locked = await lockedLessonIds(await getCourseAccess(userId, courseId))
+    const totalLessons = (await Lesson.find({ course: courseId, isPublished: true }).select("_id").lean()).filter(
+      (l) => !locked.has(l._id.toString())
+    ).length
 
     return {
       progress: enrollment.progress,

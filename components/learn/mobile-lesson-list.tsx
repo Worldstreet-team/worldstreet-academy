@@ -5,7 +5,7 @@ import Image from "next/image"
 import { motion, AnimatePresence, useReducedMotion } from "motion/react"
 import { cn } from "@/lib/utils"
 import type { LearnLesson } from "@/lib/actions/student"
-import { CheckIcon, FileIcon, VideoIcon, WifiIcon } from "lucide-react"
+import { CheckIcon, FileIcon, LockIcon, VideoIcon, WifiIcon } from "lucide-react"
 import { RenderIcon } from "@/components/shared/render-icon"
 
 type MobileLessonListProps = {
@@ -97,14 +97,16 @@ export function MobileLessonList({
               <div
                 className={cn(
                   "absolute bottom-0.5 right-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-semibold",
-                  isCompleted && !isCurrent
+                  !lesson.locked && isCompleted && !isCurrent
                     ? "bg-ws-success text-white"
                     : isCurrent
                       ? "bg-primary text-primary-foreground"
                       : "bg-black/70 text-white"
                 )}
               >
-                {isCompleted && !isCurrent ? (
+                {lesson.locked ? (
+                  <LockIcon size={10} className="text-white" aria-label="Locked" />
+                ) : isCompleted && !isCurrent ? (
                   <CheckIcon  size={10} className="text-white" />
                 ) : (
                   index + 1
@@ -112,7 +114,7 @@ export function MobileLessonList({
               </div>
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate font-medium text-sm">{lesson.title}</p>
+              <p className={cn("truncate font-medium text-sm", lesson.locked && "text-muted-foreground")}>{lesson.title}</p>
               <p className="text-[11px] text-muted-foreground capitalize">
                 {lesson.type}
                 {lesson.duration 

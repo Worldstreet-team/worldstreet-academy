@@ -21,6 +21,8 @@ import { CourseRating } from "@/components/learn/course-rating"
 import { RichTextContent } from "@/components/ui/rich-text-editor"
 import { FinishCourseButton } from "@/components/learn/finish-course-button"
 import { CourseResources } from "@/components/learn/course-resources"
+import { PackageLockNotice } from "@/components/learn/package-lock-notice"
+import { PACKAGE_LABEL } from "@/lib/entitlements"
 
 export default async function LessonPage({
   params,
@@ -70,14 +72,16 @@ export default async function LessonPage({
   // Remember where the student is so "Continue learning" resumes here.
   // Fire-and-forget: the action swallows its own errors and a failure must
   // never block the lesson from rendering.
-  if (currentUser) {
+  if (currentUser && !currentLesson.locked) {
     void updateLastAccessed(currentUser.id, courseId, actualLessonId)
   }
 
   const isLessonCompleted = completedLessonIds.includes(actualLessonId)
+  // Progress is measured over the lessons this package opens.
+  const openLessonIds = new Set(lessons.filter((l) => !l.locked).map((l) => l.id))
   const courseProgressPercent =
-    lessons.length > 0
-      ? Math.round((completedLessonIds.length / lessons.length) * 100)
+    openLessonIds.size > 0
+      ? Math.min(100, Math.round((completedLessonIds.filter((id) => openLessonIds.has(id)).length / openLessonIds.size) * 100))
       : 0
 
   return (
@@ -116,7 +120,16 @@ export default async function LessonPage({
         <div className="flex-1 flex flex-col lg:overflow-auto">
           {/* Video / Content Area */}
           <div className="shrink-0">
-            {currentLesson.type === "video" && currentLesson.videoUrl ? (
+            {currentLesson.locked ? (
+              <div className="w-full border-b border-ws-hairline bg-ws-sunken">
+                <div className="mx-auto max-w-xl px-6 py-12 md:py-16">
+                  <PackageLockNotice
+                    title="This lesson isn't in your package"
+                    requiredLabel={currentLesson.requiredPackage ? PACKAGE_LABEL[currentLesson.requiredPackage] : null}
+                  />
+                </div>
+              </div>
+            ) : currentLesson.type === "video" && currentLesson.videoUrl ? (
               <LessonVideoPlayer
                 src={currentLesson.videoUrl}
                 courseId={courseId}
@@ -162,13 +175,15 @@ export default async function LessonPage({
                   {currentLesson.duration} min
                 </span>
               )}
-              <div className="ml-auto">
-                <MarkCompleteButton
-                  courseId={courseId}
-                  lessonId={actualLessonId}
-                  completed={isLessonCompleted}
-                />
-              </div>
+              {!currentLesson.locked && (
+                <div className="ml-auto">
+                  <MarkCompleteButton
+                    courseId={courseId}
+                    lessonId={actualLessonId}
+                    completed={isLessonCompleted}
+                  />
+                </div>
+              )}
             </div>
             <h1 className="text-lg md:text-xl font-bold">
               {currentLesson.title}
@@ -235,7 +250,7 @@ export default async function LessonPage({
             </div>
 
             {/* Knowledge check for this lesson (renders only when one exists) */}
-            <LessonQuizCard courseId={courseId} lessonId={actualLessonId} />
+            {!currentLesson.locked && <LessonQuizCard courseId={courseId} lessonId={actualLessonId} />}
 
             {/* Downloadable materials for this lesson + the course */}
             <Separator />

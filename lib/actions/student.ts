@@ -5,7 +5,8 @@ import connectDB from "@/lib/db"
 import { Course, Enrollment, Bookmark, User, Lesson, type IPackageEntitlements, type PackageKey } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth"
 import { isSchoolSlug, type SchoolSlug } from "@/lib/schools"
-import { FULL_ACCESS, PACKAGE_RANK } from "@/lib/entitlements"
+import { FULL_ACCESS, PACKAGE_RANK, canAccessLesson, effectiveLessonTier, entitlementsFor } from "@/lib/entitlements"
+import { getCourseAccess, lockedLessonIds } from "@/lib/course-access"
 
 // ============================================================================
 // TYPES
@@ -475,6 +476,10 @@ export type LearnLesson = {
   duration: number | null
   order: number
   isFree: boolean
+  /** The student's package can't open this lesson — media is withheld and the page shows a lock notice. */
+  locked: boolean
+  /** Tier that opens a locked lesson; null when the lesson is open. */
+  requiredPackage: PackageKey | null
 }
 
 export type LearnCourse = {
@@ -484,6 +489,11 @@ export type LearnCourse = {
   instructorName: string
   instructorAvatarUrl: string | null
   rating: number | null
+  slug: string
+  /** The viewer's package; null for legacy enrollments and for course staff. */
+  packageKey: PackageKey | null
+  /** What the viewer's package includes — full access for the course's instructor and admins. */
+  entitlements: IPackageEntitlements
   /** False when the caller isn't enrolled — paid lesson media is withheld. */
   hasAccess: boolean
   lessons: LearnLesson[]
@@ -512,6 +522,7 @@ export async function fetchCourseForLearning(courseId: string): Promise<LearnCou
 
     const user = await getCurrentUser()
     let hasAccess = false
+    let enrollment: { packageKey: PackageKey | null } | null = null
     if (user) {
       if (user.role === "ADMIN") {
         hasAccess = true
@@ -520,12 +531,13 @@ export async function fetchCourseForLearning(courseId: string): Promise<LearnCou
       ) {
         hasAccess = true
       } else {
-        const enrollment = await Enrollment.findOne({
+        const found = await Enrollment.findOne({
           user: user.id,
           course: courseId,
           status: { $in: ["active", "completed"] },
-        }).select("_id")
-        hasAccess = Boolean(enrollment)
+        }).select("_id packageKey")
+        hasAccess = Boolean(found)
+        enrollment = found ? { packageKey: found.packageKey ?? null } : null
       }
     }
 
@@ -540,6 +552,8 @@ export async function fetchCourseForLearning(courseId: string): Promise<LearnCou
       .sort({ order: 1 })
       .lean()
 
+    const packages = course.packages ?? []
+
     return {
       id: course._id.toString(),
       title: course.title,
@@ -547,9 +561,14 @@ export async function fetchCourseForLearning(courseId: string): Promise<LearnCou
       instructorName: `${instructor.firstName} ${instructor.lastName}`,
       instructorAvatarUrl: instructor.avatarUrl,
       rating: course.rating?.average || null,
+      slug: course.slug,
+      packageKey: enrollment?.packageKey ?? null,
+      entitlements: entitlementsFor({ packages }, enrollment),
       hasAccess,
       lessons: lessons.map((l) => {
-        const unlocked = hasAccess || l.isFree
+        // Staff have no enrollment → nothing locks for them.
+        const locked = hasAccess && !canAccessLesson({ packages }, l, enrollment)
+        const unlocked = (hasAccess && !locked) || l.isFree
         return {
           id: l._id.toString(),
           courseId: courseId,
@@ -562,6 +581,8 @@ export async function fetchCourseForLearning(courseId: string): Promise<LearnCou
           duration: l.videoDuration ? Math.round(l.videoDuration / 60) : null,
           order: l.order,
           isFree: l.isFree,
+          locked,
+          requiredPackage: locked ? effectiveLessonTier({ packages }, l) : null,
         }
       }),
     }
@@ -828,32 +849,35 @@ export async function markLessonComplete(courseId: string, lessonId: string): Pr
     await connectDB()
     const user = await getAuthenticatedUser()
     const { Lesson } = await import("@/lib/db/models")
-    
-    // Find or create enrollment
-    let enrollment = await Enrollment.findOne({ user: user._id, course: courseId })
-    
-    if (!enrollment) {
-      enrollment = await Enrollment.create({
-        user: user._id,
-        course: courseId,
-        status: "active",
-        progress: 0,
-        completedLessons: [],
-      })
-    }
-    
-    // Add lesson to completed if not already there
+
+    // Progress lives on an enrollment the student already has — this never
+    // creates one (it used to, handing an active enrollment and full access on
+    // any course to anyone who called the action).
+    const enrollment = await Enrollment.findOne({
+      user: user._id,
+      course: courseId,
+      status: { $in: ["active", "completed"] },
+    })
+    if (!enrollment) return { success: false }
+
+    const lessonIds = (await Lesson.find({ course: courseId }).select("_id").lean()).map((l) => l._id.toString())
+    if (!lessonIds.includes(lessonId)) return { success: false }
+
+    const locked = await lockedLessonIds(await getCourseAccess(user._id.toString(), courseId))
+    if (locked.has(lessonId)) return { success: false }
+
     if (!enrollment.completedLessons.some((id: { toString(): string }) => id.toString() === lessonId)) {
       enrollment.completedLessons.push(new mongoose.Types.ObjectId(lessonId))
     }
-    
-    // Calculate progress
-    const totalLessons = await Lesson.countDocuments({ course: courseId })
-    enrollment.progress = Math.round((enrollment.completedLessons.length / totalLessons) * 100)
+
+    // Progress counts only the lessons this package opens.
+    const open = new Set(lessonIds.filter((id) => !locked.has(id)))
+    const done = enrollment.completedLessons.filter((id: { toString(): string }) => open.has(id.toString())).length
+    enrollment.progress = open.size > 0 ? Math.min(100, Math.round((done / open.size) * 100)) : 0
     enrollment.lastAccessedAt = new Date()
-    
+
     await enrollment.save()
-    
+
     return { success: true }
   } catch (error) {
     console.error("Mark lesson complete error:", error)
@@ -893,35 +917,33 @@ export async function markCourseComplete(
     await connectDB()
     const user = await getAuthenticatedUser()
 
+    // Never creates an enrollment (it used to hand a completed enrollment —
+    // and so a certificate — to anyone who called this action).
+    const enrollment = await Enrollment.findOne({
+      user: user._id,
+      course: courseId,
+      status: { $in: ["active", "completed"] },
+    })
+    if (!enrollment) return { success: false }
+
     // CBT gate: when the course requires an exam, completion only happens
-    // through a passing attempt (lib/actions/exams.ts) — never directly.
-    const course = await Course.findById(courseId).select("examRequired").lean()
-    const examRequired = !!course?.examRequired
+    // through a passing attempt (lib/actions/exams.ts) — unless the package has
+    // no assessment & certificate (Basic), which completes on its lessons.
+    const [course, access] = await Promise.all([
+      Course.findById(courseId).select("examRequired").lean(),
+      getCourseAccess(user._id.toString(), courseId),
+    ])
+    const examGates = !!course?.examRequired && (access?.entitlements.certificate ?? true)
 
-    // Find or create enrollment
-    let enrollment = await Enrollment.findOne({ user: user._id, course: courseId })
-
-    if (!enrollment) {
-      enrollment = await Enrollment.create({
-        user: user._id,
-        course: courseId,
-        status: examRequired ? "active" : "completed",
-        progress: 100,
-        completedLessons: [],
-        completedAt: examRequired ? null : new Date(),
-      })
-      if (examRequired) return { success: true, requiresExam: true }
-    } else {
-      enrollment.progress = 100
-      enrollment.lastAccessedAt = new Date()
-      if (examRequired && !enrollment.examPassed) {
-        await enrollment.save()
-        return { success: true, requiresExam: true }
-      }
-      enrollment.status = "completed"
-      enrollment.completedAt = new Date()
+    enrollment.progress = 100
+    enrollment.lastAccessedAt = new Date()
+    if (examGates && !enrollment.examPassed) {
       await enrollment.save()
+      return { success: true, requiresExam: true }
     }
+    enrollment.status = "completed"
+    enrollment.completedAt = new Date()
+    await enrollment.save()
 
     return { success: true }
   } catch (error) {
