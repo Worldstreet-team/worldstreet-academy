@@ -732,6 +732,44 @@ export async function sendClassReminderEmail(
   }
 }
 
+/**
+ * Executive mentorship mail — request, confirmation, decline/cancellation and
+ * T-24h/T-1h reminders. The caller composes the copy (times via
+ * formatUtcDateTime, which names its zone).
+ */
+export async function sendMentorshipEmail(
+  to: string,
+  data: {
+    subject: string
+    title: string
+    bodyText: string
+    ctaLabel: string
+    ctaUrl: string
+    recipientName?: string
+  }
+) {
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to,
+      subject: data.subject,
+      react: React.createElement(SimplePipelineEmail, {
+        preview: data.title,
+        title: data.title,
+        bodyText: data.bodyText,
+        ctaLabel: data.ctaLabel,
+        ctaUrl: data.ctaUrl,
+        avatarName: data.recipientName,
+      }),
+    })
+    if (error) return { success: false, error: error.message }
+    return { success: true }
+  } catch (err) {
+    console.error("[Email] Mentorship email error:", err)
+    return { success: false, error: "Failed to send email" }
+  }
+}
+
 /* ─── Send Functions ─── */
 
 /**

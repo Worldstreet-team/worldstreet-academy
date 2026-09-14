@@ -275,6 +275,14 @@ export function InstructorsTile({ rows }: { rows: InstructorRow[] }) {
                 )}
               </div>
               {row.headline && <p className="truncate text-xs text-ws-muted">{row.headline}</p>}
+              {row.isMentor && (
+                <Link
+                  href="/dashboard/mentorship"
+                  className="mt-0.5 inline-block text-xs font-medium text-ws-primary hover:underline"
+                >
+                  Sessions &amp; roadmap
+                </Link>
+              )}
             </div>
             <div className="ml-auto">
               {row.canMessage ? (
