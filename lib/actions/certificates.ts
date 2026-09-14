@@ -5,6 +5,7 @@ import { Enrollment, Course, User, type ICoursePackage } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth"
 import { entitlementsFor } from "@/lib/entitlements"
 import { SCHOOL_BY_SLUG, isSchoolSlug } from "@/lib/schools"
+import { normalizeCertificateId } from "@/lib/certificate-id"
 
 // ============================================================================
 // TYPES
@@ -175,6 +176,73 @@ export async function fetchMyCertificates(): Promise<StudentCertificate[]> {
   } catch (error) {
     console.error("Fetch my certificates error:", error)
     return []
+  }
+}
+
+// ============================================================================
+// PUBLIC VERIFICATION (spec §13)
+// ============================================================================
+
+export type VerifiedCertificate = {
+  certificateId: string
+  studentName: string
+  programName: string
+  /** null for a course without a school */
+  schoolName: string | null
+  completedAt: string
+  /** "" when the instructor account no longer exists */
+  instructorName: string
+}
+
+/**
+ * Public lookup behind /verify/[certificateId] — no auth. A certificate
+ * verifies only while its enrollment is completed, its package includes the
+ * certificate, and the ID is stored on the enrollment (legacy IDs count once
+ * backfilled). The instructor's signature is not required: it attests
+ * completion, and a later signature change must not revoke issued PDFs.
+ * Returns names, program and dates only — never an email or a database id.
+ */
+export async function verifyCertificate(certificateId: string): Promise<VerifiedCertificate | null> {
+  try {
+    const id = normalizeCertificateId(certificateId)
+    if (!id) return null
+
+    await connectDB()
+
+    // $type repeats the partial unique index's filter so this lookup can use it.
+    const enrollment = await Enrollment.findOne({
+      certificateId: { $eq: id, $type: "string" },
+      status: "completed",
+    })
+      .select("user course completedAt packageKey certificateId")
+      .lean()
+    if (!enrollment || !enrollment.completedAt || !enrollment.certificateId) return null
+
+    const [course, student] = await Promise.all([
+      Course.findById(enrollment.course)
+        .select("title school packages instructor")
+        .populate("instructor", "firstName lastName")
+        .lean(),
+      User.findById(enrollment.user).select("firstName lastName").lean(),
+    ])
+    if (!course || !student) return null
+
+    // The same gate as fetchCertificate: packages without the certificate never certify.
+    if (!entitlementsFor(course, enrollment).certificate) return null
+
+    const instructor = course.instructor as unknown as { firstName?: string; lastName?: string } | null
+
+    return {
+      certificateId: enrollment.certificateId,
+      studentName: `${student.firstName} ${student.lastName ?? ""}`.trim(),
+      programName: course.title,
+      schoolName: isSchoolSlug(course.school) ? SCHOOL_BY_SLUG[course.school].name : null,
+      completedAt: enrollment.completedAt.toISOString(),
+      instructorName: instructor ? `${instructor.firstName ?? ""} ${instructor.lastName ?? ""}`.trim() : "",
+    }
+  } catch (error) {
+    console.error("Verify certificate error:", error)
+    return null
   }
 }
 
