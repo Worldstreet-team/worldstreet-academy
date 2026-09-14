@@ -72,6 +72,7 @@ Otherwise the lesson is **locked**, and Go must:
 **R6 — Live classes.** Only if Go lists or joins course meetings (`meetings.courseId` set):
 - List: show a class only to enrollments with `entitlements.liveClasses`.
 - Join: allow the host, admins, users in `meetings.invites[].userId`, and enrollments with `liveClasses`. Refuse everyone else.
+- Scheduled classes (Phase 4): course meetings can now be `status: "scheduled"` with `scheduledAt`. List them as upcoming, and refuse non-host joins until the host starts the class (`status: "active"`); the web lets the host start it only from 15 minutes before `scheduledAt`.
 
 **R7 — Instructor Q&A.** Only if Go creates conversations. When a `USER` starts a **new** conversation with someone who teaches courses the user is enrolled in, refuse if none of those enrollments has `entitlements.instructorQa`. Existing conversations are untouched. Users with no enrollment with that instructor are unaffected.
 

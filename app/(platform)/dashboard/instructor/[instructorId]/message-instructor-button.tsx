@@ -12,12 +12,15 @@ interface MessageInstructorButtonProps {
   label?: string
   /** "outline" where a gold button would compete with the page's primary CTA. */
   variant?: "default" | "outline"
+  /** Accessible name when several Message buttons share a page ("Message Sarah Chen"). */
+  ariaLabel?: string
 }
 
 export function MessageInstructorButton({
   instructorId,
   label = "Message Instructor",
   variant = "default",
+  ariaLabel,
 }: MessageInstructorButtonProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -43,6 +46,7 @@ export function MessageInstructorButton({
         className="gap-1.5"
         onClick={handleMessage}
         disabled={isPending}
+        aria-label={ariaLabel}
       >
         <MessageSquareIcon  size={14} />
         {isPending ? "Opening..." : label}

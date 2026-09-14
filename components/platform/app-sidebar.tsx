@@ -37,6 +37,7 @@ import { useUnreadCount } from "@/lib/hooks/use-unread-count"
 import { useOngoingCall } from "@/components/providers/call-provider"
 import { useSidebarActivity } from "@/lib/hooks/use-sidebar-activity"
 import { useEnrollments } from "@/lib/hooks/queries"
+import { enrollmentHref, grantsAccess, pickResume } from "@/lib/dashboard-home"
 import { BRAND } from "@/lib/brand"
 import { BrandLockup } from "@/components/shared/brand-lockup"
 
@@ -202,15 +203,13 @@ export function AppSidebar() {
   /**
    * Resuming a course is the single most common reason a learner returns, and
    * it used to take three clicks (sidebar → dashboard → find the card). The
-   * most recently touched unfinished course gets a dedicated row instead.
+   * dashboard's Continue learning pick (`pickResume`) gets a dedicated row
+   * instead, so the sidebar and the dashboard always resume the same course.
    */
-  const resume = React.useMemo(() => {
-    return [...enrollments]
-      .filter((e) => e.progress < 100)
-      .sort((a, b) => new Date(b.lastAccessedAt).getTime() - new Date(a.lastAccessedAt).getTime())[0]
-  }, [enrollments])
+  const resume = React.useMemo(() => pickResume(enrollments), [enrollments])
 
-  const inProgressCount = enrollments.filter((e) => e.progress < 100).length
+  // Only enrollments that still open the player count as "in progress".
+  const inProgressCount = enrollments.filter((e) => grantsAccess(e) && e.progress < 100).length
   const liveCount = activeMeetings.length + invites.length
 
   React.useEffect(() => {
@@ -251,7 +250,7 @@ export function AppSidebar() {
           <SidebarGroup className="group-data-[collapsible=icon]:hidden pb-1">
             <SidebarGroupContent>
               <Link
-                href={`/dashboard/courses/${resume.courseId}/learn/${resume.resumeLessonId ?? resume.firstLessonId ?? "first"}`}
+                href={enrollmentHref(resume)}
                 className="block rounded-md border border-ws-hairline bg-ws-raised/60 p-3 transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-raised"
               >
                 <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-ws-muted">

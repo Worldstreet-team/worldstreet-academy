@@ -17,7 +17,8 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { MessageInstructorButton } from "@/app/(platform)/dashboard/instructor/[instructorId]/message-instructor-button"
 import type { StudentEnrollment } from "@/lib/actions/student"
-import { enrollmentHref, formatDateTime, type InstructorRow } from "@/lib/dashboard-home"
+import { BRAND } from "@/lib/brand"
+import { enrollmentHref, formatDateTime, grantsAccess, type InstructorRow } from "@/lib/dashboard-home"
 import { useMyCertificates, useUpcomingClasses } from "@/lib/hooks/queries"
 
 /* Spec §12 dashboard tiles. Surface cards separated by fill (no borders), 13px
@@ -120,14 +121,16 @@ export function ProgressTile({
   enrollments: StudentEnrollment[]
   isLoading: boolean
 }) {
-  const totalLessons = enrollments.reduce((s, e) => s + e.openLessons, 0)
-  const completedLessons = enrollments.reduce(
+  // Only enrollments that still open the player count — a refunded or expired row isn't progress.
+  const granted = enrollments.filter(grantsAccess)
+  const totalLessons = granted.reduce((s, e) => s + e.openLessons, 0)
+  const completedLessons = granted.reduce(
     (s, e) => s + Math.round(((e.progress ?? 0) / 100) * e.openLessons),
     0
   )
   const overallPct = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0
-  const inProgress = enrollments.filter((e) => e.progress > 0 && e.progress < 100).length
-  const completedCourses = enrollments.filter((e) => e.progress === 100).length
+  const inProgress = granted.filter((e) => e.progress > 0 && e.progress < 100).length
+  const completedCourses = granted.filter((e) => e.progress === 100).length
 
   return (
     <DashboardTile icon={TrendingUpIcon} title="My progress">
@@ -278,6 +281,7 @@ export function InstructorsTile({ rows }: { rows: InstructorRow[] }) {
                 <MessageInstructorButton
                   instructorId={row.instructorId}
                   label={row.isMentor ? "Message your mentor" : "Message"}
+                  ariaLabel={row.isMentor ? `Message your mentor, ${row.name}` : `Message ${row.name}`}
                   variant="outline"
                 />
               ) : (
@@ -301,7 +305,7 @@ export function CommunityTile() {
   if (!COMMUNITY_URL) return null
   return (
     <DashboardTile icon={UsersIcon} title="Community">
-      <p className="text-[13px] text-ws-muted">Connect with other WorldStreet learners.</p>
+      <p className="text-[13px] text-ws-muted">Connect with other {BRAND.wordmark} learners.</p>
       <a
         href={COMMUNITY_URL}
         target="_blank"
