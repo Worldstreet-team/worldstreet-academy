@@ -185,7 +185,7 @@ export async function fetchInstructorCertificateStats(): Promise<InstructorCerti
     const courses = await Course.find({
       instructor: currentUser.id,
     })
-      .select("title thumbnailUrl rating")
+      .select("title thumbnailUrl rating packages")
       .lean()
 
     if (courses.length === 0) return []
@@ -193,11 +193,14 @@ export async function fetchInstructorCertificateStats(): Promise<InstructorCerti
     // Get certificate counts for each course
     const results = await Promise.all(
       courses.map(async (course) => {
-        const certCount = await Enrollment.countDocuments({
+        const completed = await Enrollment.find({
           course: course._id,
           status: "completed",
           completedAt: { $ne: null },
         })
+          .select("packageKey")
+          .lean()
+        const certCount = completed.filter((e) => entitlementsFor(course, e).certificate).length
 
         return {
           courseId: course._id.toString(),
@@ -246,26 +249,28 @@ export async function fetchCourseCertificates(
       .sort({ completedAt: -1 })
       .lean()
 
-    const certificates = enrollments.map((enrollment) => {
-      const student = enrollment.user as unknown as {
-        _id: { toString(): string }
-        firstName: string
-        lastName: string
-        email: string
-        avatarUrl: string | null
-        signatureUrl: string | null
-      }
+    const certificates = enrollments
+      .filter((e) => entitlementsFor(course, e).certificate)
+      .map((enrollment) => {
+        const student = enrollment.user as unknown as {
+          _id: { toString(): string }
+          firstName: string
+          lastName: string
+          email: string
+          avatarUrl: string | null
+          signatureUrl: string | null
+        }
 
-      return {
-        id: enrollment._id.toString(),
-        studentId: student._id.toString(),
-        studentName: `${student.firstName} ${student.lastName}`,
-        studentEmail: student.email,
-        studentAvatarUrl: student.avatarUrl,
-        completedAt: enrollment.completedAt!.toISOString(),
-        hasStudentSigned: !!student.signatureUrl,
-      }
-    })
+        return {
+          id: enrollment._id.toString(),
+          studentId: student._id.toString(),
+          studentName: `${student.firstName} ${student.lastName}`,
+          studentEmail: student.email,
+          studentAvatarUrl: student.avatarUrl,
+          completedAt: enrollment.completedAt!.toISOString(),
+          hasStudentSigned: !!student.signatureUrl,
+        }
+      })
 
     return {
       courseTitle: course.title,
