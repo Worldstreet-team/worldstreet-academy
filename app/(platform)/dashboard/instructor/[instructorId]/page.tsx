@@ -12,8 +12,10 @@ import {
   fetchInstructorProfile,
   fetchInstructorPublicCourses,
   fetchEnrolledCoursesFromInstructor,
+  fetchFacultyUsername,
 } from "@/lib/actions/student"
-import { BookOpenIcon, CalendarIcon, ChevronLeftIcon, ExternalLinkIcon, StarIcon, UsersIcon } from "lucide-react"
+import { facultyHref } from "@/lib/faculty"
+import { BookOpenIcon, CalendarIcon, ChevronLeftIcon, ExternalLinkIcon, GlobeIcon, StarIcon, UsersIcon } from "lucide-react"
 
 // Force dynamic rendering to show fresh instructor avatars
 export const revalidate = 0
@@ -25,10 +27,11 @@ export default async function InstructorProfilePage({
 }) {
   const { instructorId } = await params
 
-  const [instructor, courses, enrolledCourses] = await Promise.all([
+  const [instructor, courses, enrolledCourses, facultyUsername] = await Promise.all([
     fetchInstructorProfile(instructorId),
     fetchInstructorPublicCourses(instructorId),
     fetchEnrolledCoursesFromInstructor(instructorId).catch(() => []),
+    fetchFacultyUsername(instructorId),
   ])
 
   if (!instructor) notFound()
@@ -130,8 +133,16 @@ export default async function InstructorProfilePage({
               </div>
             )}
 
-            {/* Message button */}
-            <MessageInstructorButton instructorId={instructorId} />
+            {/* Message button + the public faculty page, only when it resolves */}
+            <div className="flex flex-wrap items-start justify-center gap-2">
+              <MessageInstructorButton instructorId={instructorId} />
+              {facultyUsername && (
+                <Button variant="outline" size="sm" className="gap-1.5" render={<Link href={facultyHref(facultyUsername)} />}>
+                  <GlobeIcon size={14} aria-hidden />
+                  Public profile
+                </Button>
+              )}
+            </div>
           </div>
         </div>
 

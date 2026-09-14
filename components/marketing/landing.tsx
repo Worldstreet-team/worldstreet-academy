@@ -1,4 +1,4 @@
-import { fetchBrowseCourses, type BrowseCourse } from "@/lib/actions/student"
+import { fetchBrowseCourses, fetchFaculty, type BrowseCourse } from "@/lib/actions/student"
 import { fetchLandingReviews } from "@/lib/actions/reviews"
 import { getCurrentUser } from "@/lib/auth/actions"
 import { countProgramsBySchool } from "@/lib/schools"
@@ -9,6 +9,7 @@ import { AboutBand } from "@/components/marketing/about-band"
 import { WhyBand } from "@/components/marketing/why-band"
 import { SchoolsGrid } from "@/components/marketing/schools-grid"
 import { CatalogueGrid } from "@/components/marketing/catalogue-rail"
+import { FacultyTeaser } from "@/components/faculty/faculty-teaser"
 import { UpcomingDrops } from "@/components/marketing/upcoming-drops"
 import { Testimonials, FinaleCta } from "@/components/marketing/reviews-finale"
 import { Faq } from "@/components/marketing/faq"
@@ -32,8 +33,9 @@ function futureDrops(published: BrowseCourse[]): BrowseCourse[] {
  * The Academy landing at `/` — clean editorial composition, in order: hero,
  * the band of words, the About statement, the Why pillars, the Schools grid,
  * the How-it-works timeline, the catalogue card grid (the ONLY section
- * allowed to show course thumbnails), Upcoming drops (hidden when nothing is
- * scheduled), testimonials (real reviews), the FAQ, and the finale CTA.
+ * allowed to show course thumbnails), the Faculty teaser (hidden when there is
+ * no faculty), Upcoming drops (hidden when nothing is scheduled), testimonials
+ * (real reviews), the FAQ, and the finale CTA.
  *
  * This server component is the ONLY fetch point; sections are client leaves
  * that receive data as props. Every fetch already falls back to `[]`/null,
@@ -42,10 +44,11 @@ function futureDrops(published: BrowseCourse[]): BrowseCourse[] {
  * LandingReview fields plus the true "70% default" pass-mark line.
  */
 export async function Landing() {
-  const [user, courses, reviews] = await Promise.all([
+  const [user, courses, reviews, faculty] = await Promise.all([
     getCurrentUser().catch(() => null),
     fetchBrowseCourses(),
     fetchLandingReviews(9),
+    fetchFaculty(),
   ])
 
   const signedIn = Boolean(user)
@@ -89,6 +92,9 @@ export async function Landing() {
 
       {/* Featured programs — the catalogue grid (the ONLY course-art section; hides below 3) */}
       <CatalogueGrid courses={gridCourses} signedIn={signedIn} />
+
+      {/* Faculty — up to four instructors and View faculty; hides at zero (spec §10) */}
+      <FacultyTeaser faculty={faculty} />
 
       {/* Upcoming drops (renders only when something is scheduled) */}
       {drops.length > 0 && <UpcomingDrops drops={drops} />}

@@ -97,6 +97,7 @@ export default async function ProgramPage({ params }: Params) {
         <WhatsIncluded />
         <ProgramInstructor
           id={program.instructorId}
+          username={program.instructorUsername}
           name={program.instructorName}
           avatarUrl={program.instructorAvatarUrl}
           headline={program.instructorHeadline}

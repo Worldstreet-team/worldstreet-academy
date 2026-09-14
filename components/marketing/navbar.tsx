@@ -6,19 +6,27 @@ import { NavbarShell } from "@/components/marketing/navbar-shell"
 import { getCurrentUser } from "@/lib/auth/actions"
 import { BRAND } from "@/lib/brand"
 import { BrandLockup } from "@/components/shared/brand-lockup"
+import { cn } from "@/lib/utils"
 
 const isLocalDev = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_")
 const LOGIN_URL = isLocalDev ? "/login" : "https://worldstreetgold.com/login"
 const REGISTER_URL = isLocalDev ? "/register" : "https://worldstreetgold.com/register"
 
-/** Public destinations, in journey order (spec §17). Shared by the md+ link row and the mobile sheet. */
-const PUBLIC_LINKS: MarketingNavLink[] = [
-  { href: "/schools", label: "Schools" },
-  { href: "/programs", label: "Programs" },
-  { href: "/#how-it-works", label: "How it works" },
-]
+/**
+ * Public destinations, in journey order (spec §17). Shared by the md+ link row
+ * and the mobile sheet. "Faculty" (spec §10) is listed only when faculty
+ * exists, so it never links to an empty page.
+ */
+function publicLinks(showFaculty: boolean): MarketingNavLink[] {
+  return [
+    { href: "/schools", label: "Schools" },
+    { href: "/programs", label: "Programs" },
+    ...(showFaculty ? [{ href: "/faculty", label: "Faculty" }] : []),
+    { href: "/#how-it-works", label: "How it works" },
+  ]
+}
 
-export async function Navbar() {
+export async function Navbar({ showFaculty }: { showFaculty: boolean }) {
   // Server-side auth check: signed-in users get one gold path back into the
   // app; guests get the acquisition pair. "My Learning" is signed-in only —
   // for a guest it would just bounce through the login wall.
@@ -27,8 +35,9 @@ export async function Navbar() {
 
   // Same destinations as the md+ link row, plus the secondary auth action —
   // below md those all live in the sheet so the bar fits a 320px viewport.
+  const links = publicLinks(showFaculty)
   const mobileLinks: MarketingNavLink[] = [
-    ...PUBLIC_LINKS,
+    ...links,
     ...(user ? [{ href: "/dashboard", label: "My Learning" }] : []),
     ...(isInstructor ? [{ href: "/instructor", label: "Instructor Dashboard" }] : []),
     ...(user ? [] : [{ href: LOGIN_URL, label: "Sign In", external: true }]),
@@ -45,11 +54,16 @@ export async function Navbar() {
             <BrandLockup alt={BRAND.name} />
           </Link>
           <nav className="hidden items-center gap-1 md:flex">
-            {PUBLIC_LINKS.map((link) => (
+            {links.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className="rounded-full px-3 py-1.5 text-sm font-medium text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-chip hover:text-ws-primary"
+                className={cn(
+                  "rounded-full px-3 py-1.5 text-sm font-medium text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-chip hover:text-ws-primary",
+                  // Measured: a fourth link overlaps the bar's CTA below lg, and
+                  // below xl once "Instructor Dashboard" is in the row too.
+                  link.href === "/faculty" && (isInstructor ? "hidden xl:inline-flex" : "hidden lg:inline-flex")
+                )}
               >
                 {link.label}
               </Link>

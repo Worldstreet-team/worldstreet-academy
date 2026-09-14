@@ -1,15 +1,18 @@
 import Link from "next/link"
 import { BadgeCheckIcon, ChevronRightIcon, UsersIcon } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { facultyHref } from "@/lib/faculty"
 
 /**
  * Public instructor block (spec §6 "instructor"). No Message button — that
- * needs a signed-in conversation. The profile link is the dashboard one and
- * therefore only offered to signed-in visitors (it would bounce a guest
- * through the login wall); `/faculty/[username]` arrives in Phase 5.
+ * needs a signed-in conversation. When the instructor is faculty the block
+ * links their public `/faculty/[username]` page for every visitor; otherwise
+ * only signed-in visitors get the dashboard profile (it would bounce a guest
+ * through the login wall).
  */
 export function ProgramInstructor({
   id,
+  username,
   name,
   avatarUrl,
   headline,
@@ -18,6 +21,8 @@ export function ProgramInstructor({
   signedIn,
 }: {
   id: string
+  /** Faculty URL key; null when the instructor isn't faculty, so there is no page to link. */
+  username: string | null
   name: string
   avatarUrl: string | null
   headline: string | null
@@ -60,14 +65,24 @@ export function ProgramInstructor({
             </p>
           )}
           {bio && <p className="mt-4 text-[15px] leading-relaxed text-ws-muted">{bio}</p>}
-          {signedIn && (
+          {username ? (
             <Link
-              href={`/dashboard/instructor/${id}`}
+              href={facultyHref(username)}
               className="mt-4 inline-flex items-center gap-1 text-[13px] font-semibold text-ws-gold hover:underline"
             >
-              View full profile
+              View faculty profile
               <ChevronRightIcon size={14} aria-hidden />
             </Link>
+          ) : (
+            signedIn && (
+              <Link
+                href={`/dashboard/instructor/${id}`}
+                className="mt-4 inline-flex items-center gap-1 text-[13px] font-semibold text-ws-gold hover:underline"
+              >
+                View full profile
+                <ChevronRightIcon size={14} aria-hidden />
+              </Link>
+            )
           )}
         </div>
       </div>

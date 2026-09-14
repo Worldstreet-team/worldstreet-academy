@@ -8,7 +8,7 @@ import { isSchoolSlug, type SchoolSlug } from "@/lib/schools"
 import { FULL_ACCESS, PACKAGE_RANK, canAccessLesson, effectiveLessonTier, entitlementsFor } from "@/lib/entitlements"
 import { getCourseAccess, lockedLessonIds, openPublishedLessonIds } from "@/lib/course-access"
 import { isCountryCode } from "@/lib/countries"
-import { FACULTY_ROLES, safeWebUrl } from "@/lib/faculty"
+import { FACULTY_ROLES, isFacultyRole, safeWebUrl } from "@/lib/faculty"
 
 // ============================================================================
 // TYPES
@@ -336,6 +336,8 @@ export type ProgramDetail = BrowseCourse & {
   instructorHeadline: string | null
   instructorBio: string | null
   instructorTotalStudents: number
+  /** The instructor's faculty URL key; null when they aren't INSTRUCTOR/ADMIN, so no /faculty link is offered. */
+  instructorUsername: string | null
   /**
    * Enabled tiers in ladder order (basic → standard → executive). Never empty:
    * a course without a ladder gets one synthesized "Full program" tier at the
@@ -356,13 +358,15 @@ const NO_ENTITLEMENTS: IPackageEntitlements = {
 /** Shared finder behind the program page (by slug) and checkout (by id). */
 async function findProgram(filter: { slug: string } | { _id: string }): Promise<ProgramDetail | null> {
   const course = await Course.findOne({ ...filter, status: "published" })
-    .populate("instructor", "firstName lastName avatarUrl bio instructorProfile")
+    .populate("instructor", "username role firstName lastName avatarUrl bio instructorProfile")
     .lean()
 
   if (!course) return null
 
   const instructor = course.instructor as unknown as {
     _id: { toString(): string }
+    username: string
+    role: string
     firstName: string
     lastName?: string
     avatarUrl: string | null
@@ -433,6 +437,8 @@ async function findProgram(filter: { slug: string } | { _id: string }): Promise<
     instructorHeadline: instructor.instructorProfile?.headline || null,
     instructorBio: instructor.bio,
     instructorTotalStudents: instructor.instructorProfile?.totalStudents || 0,
+    // The course is published, so an INSTRUCTOR/ADMIN teaching it is faculty.
+    instructorUsername: isFacultyRole(instructor.role) ? instructor.username : null,
     packages,
   }
 }
@@ -1302,6 +1308,36 @@ export async function fetchFacultyProfile(username: string): Promise<FacultyProf
     }
   } catch (error) {
     console.error("Fetch faculty profile error:", error)
+    return null
+  }
+}
+
+/** How many faculty members exist — the marketing layout shows "Faculty" links only when this is > 0. */
+export async function fetchFacultyCount(): Promise<number> {
+  try {
+    await connectDB()
+    const counts = await publishedCourseCounts()
+    if (counts.size === 0) return 0
+    return await User.countDocuments({ _id: { $in: Array.from(counts.keys()) }, role: { $in: [...FACULTY_ROLES] } })
+  } catch (error) {
+    console.error("Fetch faculty count error:", error)
+    return 0
+  }
+}
+
+/** A user's faculty URL key, or null when they aren't faculty — so a /faculty link is only offered when it resolves. */
+export async function fetchFacultyUsername(userId: string): Promise<string | null> {
+  try {
+    if (!mongoose.isValidObjectId(userId)) return null
+    await connectDB()
+    const user = await User.findOne({ _id: userId, role: { $in: [...FACULTY_ROLES] } })
+      .select("username")
+      .lean()
+    if (!user) return null
+    const teaches = await Course.exists({ instructor: user._id, status: "published" })
+    return teaches ? user.username : null
+  } catch (error) {
+    console.error("Fetch faculty username error:", error)
     return null
   }
 }

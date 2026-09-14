@@ -2,7 +2,7 @@ import Link from "next/link"
 import { BrandLockup } from "@/components/shared/brand-lockup"
 import { BRAND } from "@/lib/brand"
 
-export function Footer() {
+export function Footer({ showFaculty }: { showFaculty: boolean }) {
   return (
     <footer className="border-t bg-muted/40">
       <div className="container mx-auto px-4 py-12">
@@ -30,6 +30,14 @@ export function Footer() {
                   Programs
                 </Link>
               </li>
+              {/* Only when faculty exists (spec §10) — never a link to an empty page */}
+              {showFaculty && (
+                <li>
+                  <Link href="/faculty" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                    Faculty
+                  </Link>
+                </li>
+              )}
               <li>
                 <Link href="/#faq" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                   FAQ
