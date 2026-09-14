@@ -204,7 +204,7 @@ export default function CheckoutPage() {
 
           {/* Package switcher — doubles as the ladder when no package is chosen */}
           {multiTier && (
-            <fieldset className="space-y-2">
+            <fieldset className="min-w-0 space-y-2">
               <legend className="mb-2 text-sm font-semibold text-ws-primary">
                 {selected ? "Your package" : "Choose your package"}
               </legend>
