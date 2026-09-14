@@ -226,7 +226,7 @@ export function PackageEditor({
                 value={pkg.price}
                 onChange={(e) => patch(pkg.uid, { price: e.target.value })}
               />
-              <p className="text-[10px] text-muted-foreground">Required. Enter 0 to make this tier free.</p>
+              <p className="text-[10px] text-muted-foreground">Required. Enter 0 only when this is the program&apos;s single package.</p>
             </div>
           </div>
 

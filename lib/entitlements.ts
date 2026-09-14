@@ -12,29 +12,48 @@ export const FULL_ACCESS: IPackageEntitlements = {
   prioritySupport: true,
 }
 
-// Optional: a .lean()/projected read of a legacy course predates this field
-// and returns no `packages` key at all — Mongoose only materialises the `[]`
-// default when it hydrates a document.
+// Optional fields: a .lean()/projected read of a legacy row predates these
+// fields and returns no key at all — Mongoose only materialises defaults when
+// it hydrates a document.
 type CourseLike = { packages?: ICoursePackage[] | null }
-type EnrollmentLike = { packageKey: PackageKey | null } | null | undefined
-type LessonLike = { minPackageKey: PackageKey | null }
+type EnrollmentLike = { packageKey?: PackageKey | null } | null | undefined
+type LessonLike = { minPackageKey?: PackageKey | null; isFree?: boolean }
 
+/** An enabled (on-sale) package by key — what checkout may sell. */
 export function packageFor(course: CourseLike, key: PackageKey | null): ICoursePackage | null {
   if (!key) return null
   return (course.packages ?? []).find((p) => p.key === key && p.enabled) ?? null
 }
 
-/** null packageKey → FULL_ACCESS (grandfathered); a package → its switches. */
+/**
+ * What an enrollment's package unlocks. The bought package is found by key
+ * even if its tier has since been disabled for sale — buyers keep what they
+ * paid for. A null packageKey (legacy / free / pre-enrolled), or a package no
+ * longer on the course at all → FULL_ACCESS (grandfathered).
+ */
 export function entitlementsFor(course: CourseLike, enrollment: EnrollmentLike): IPackageEntitlements {
-  const pkg = packageFor(course, enrollment?.packageKey ?? null)
+  const key = enrollment?.packageKey ?? null
+  const pkg = key ? (course.packages ?? []).find((p) => p.key === key) : undefined
   return pkg ? pkg.entitlements : FULL_ACCESS
 }
 
-export function canAccessLesson(lesson: LessonLike, enrollment: EnrollmentLike): boolean {
-  if (!lesson.minPackageKey) return true
+/**
+ * A lesson's tier only gates while the course still sells (has enabled) that
+ * tier — a tier switched off in the ladder gates nothing.
+ */
+export function effectiveLessonTier(course: CourseLike, lesson: LessonLike): PackageKey | null {
+  const tier = lesson.minPackageKey ?? null
+  return tier && packageFor(course, tier) ? tier : null
+}
+
+/** Free-preview lessons, untiered lessons and legacy (null-package) enrollments always open. */
+export function canAccessLesson(course: CourseLike, lesson: LessonLike, enrollment: EnrollmentLike): boolean {
+  if (lesson.isFree) return true
+  const tier = effectiveLessonTier(course, lesson)
+  if (!tier) return true
   const key = enrollment?.packageKey ?? null
   if (!key) return true
-  return PACKAGE_RANK[key] >= PACKAGE_RANK[lesson.minPackageKey]
+  return PACKAGE_RANK[key] >= PACKAGE_RANK[tier]
 }
 
 /**
@@ -63,4 +82,9 @@ export const PACKAGE_LABEL: Record<PackageKey, string> = {
   basic: "Basic",
   standard: "Standard",
   executive: "Executive 101",
+}
+
+/** Lowest enabled tier whose package includes `flag` — the package a lock notice names. null when none does. */
+export function lowestPackageWith(course: CourseLike, flag: keyof IPackageEntitlements): PackageKey | null {
+  return PACKAGE_KEYS.find((key) => packageFor(course, key)?.entitlements[flag]) ?? null
 }

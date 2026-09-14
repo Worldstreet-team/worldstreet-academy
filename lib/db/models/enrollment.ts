@@ -38,6 +38,8 @@ export interface IEnrollment extends Document {
   packageKey: PackageKey | null
   /** Package name snapshot at purchase. */
   packageName: string | null
+  /** Executive onboarding answers, sent once from the checkout success page (D4). */
+  mentorshipIntake: { goals: string; availability: string; submittedAt: Date } | null
   // Progress tracking
   progress: number // 0-100 percentage
   completedLessons: Types.ObjectId[] // Array of completed lesson IDs
@@ -101,6 +103,17 @@ const EnrollmentSchema = new Schema<IEnrollment>(
     },
     packageKey: { type: String, enum: [null, "basic", "standard", "executive"], default: null },
     packageName: { type: String, default: null },
+    mentorshipIntake: {
+      type: new Schema(
+        {
+          goals: { type: String, required: true, maxlength: 2000 },
+          availability: { type: String, required: true, maxlength: 500 },
+          submittedAt: { type: Date, required: true },
+        },
+        { _id: false }
+      ),
+      default: null,
+    },
     progress: {
       type: Number,
       default: 0,

@@ -31,6 +31,20 @@ const PackagesSchema = z
   .max(3)
   .refine((arr) => new Set(arr.map((p) => p.key)).size === arr.length, "Package keys must be unique")
   .refine((arr) => arr.filter((p) => p.highlight).length <= 1, "Only one package can be highlighted")
+  .superRefine((arr, ctx) => {
+    // A $0 tier only works alone: next to paid tiers it turns Course.pricing
+    // "free", which the mobile app reads as "enrol without paying".
+    if (arr.filter((p) => p.enabled).length < 2) return
+    arr.forEach((p, i) => {
+      if (p.enabled && p.price === 0) {
+        ctx.addIssue({
+          code: "custom",
+          path: [i, "price"],
+          message: "A free tier only works as a program's single package — set a price or disable the other tiers",
+        })
+      }
+    })
+  })
 
 /**
  * Reads and validates the `packages` form field shared by createCourse/updateCourse.
