@@ -214,7 +214,13 @@ const verifyLookups = new Map<string, { count: number; resetAt: number }>()
 /** Counts this lookup against the caller's IP; true once it is over the limit. */
 async function overVerifyLimit(): Promise<boolean> {
   const h = await headers()
-  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip")?.trim() || "unknown"
+  // Cloudflare, when it fronts the app, sets cf-connecting-ip and overwrites any client-sent value.
+  // Keying on the proxy chain alone would pool every visitor behind one Cloudflare edge into one bucket.
+  const ip =
+    h.get("cf-connecting-ip")?.trim() ||
+    h.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    h.get("x-real-ip")?.trim() ||
+    "unknown"
   const now = Date.now()
   for (const [key, entry] of verifyLookups) {
     if (entry.resetAt <= now) verifyLookups.delete(key)
