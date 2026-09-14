@@ -1,4 +1,5 @@
 import type { SchoolSlug } from "@/lib/schools"
+import type { PackageKey } from "@/lib/db/models/course"
 
 export type CourseLevel = "beginner" | "intermediate" | "advanced"
 export type CoursePricing = "free" | "paid"
@@ -77,4 +78,6 @@ export type Lesson = {
   duration: number | null // in seconds
   order: number
   isFree: boolean
+  /** Lowest package that can open this lesson; null/undefined = every tier. */
+  minPackageKey?: PackageKey | null
 }

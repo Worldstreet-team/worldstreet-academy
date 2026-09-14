@@ -42,7 +42,8 @@ import type { Lesson, CourseLevel, CoursePricing, CourseStatus } from "@/lib/typ
 import { CheckIcon, ChevronDownIcon, ChevronLeftIcon, EyeIcon, FileIcon, PlusIcon, SquarePenIcon, Trash2Icon, VideoIcon } from "lucide-react"
 import { RenderIcon } from "@/components/shared/render-icon"
 import { SCHOOLS, type SchoolSlug } from "@/lib/schools"
-import type { ICoursePackage } from "@/lib/db/models"
+import type { ICoursePackage, PackageKey } from "@/lib/db/models"
+import { PACKAGE_KEYS, PACKAGE_LABEL } from "@/lib/entitlements"
 import {
   PackageEditor,
   ladderPrice,
@@ -128,6 +129,7 @@ type EditorLesson = {
   duration: string
   autoDuration: boolean
   isFree: boolean
+  minPackageKey: PackageKey | ""
 }
 
 const typeIcons = {
@@ -153,6 +155,7 @@ function emptyLesson(): EditorLesson {
     duration: "",
     autoDuration: true,
     isFree: false,
+    minPackageKey: "",
   }
 }
 
@@ -239,6 +242,7 @@ export function CourseEditor({
       duration: l.duration ? l.duration.toString() : "",
       autoDuration: true,
       isFree: l.isFree,
+      minPackageKey: l.minPackageKey ?? "",
     }))
   )
   const [expandedLesson, setExpandedLesson] = useState<string | null>(null)
@@ -800,6 +804,34 @@ export function CourseEditor({
                                 </label>
                               )}
                             </div>
+                          </div>
+
+                          {/* Minimum package (spec §6 ladder gating) */}
+                          <div className="space-y-1.5">
+                            <Label>Minimum package</Label>
+                            <Select
+                              value={lesson.minPackageKey || "everyone"}
+                              onValueChange={(v) =>
+                                updateLesson(lesson.tempId, {
+                                  minPackageKey: v && v !== "everyone" ? (v as PackageKey) : "",
+                                })
+                              }
+                            >
+                              <SelectTrigger className="w-full">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="everyone">Everyone</SelectItem>
+                                {PACKAGE_KEYS.map((k) => (
+                                  <SelectItem key={k} value={k}>
+                                    {PACKAGE_LABEL[k]} and up
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <p className="text-[10px] text-muted-foreground">
+                              Lowest tier that can open this lesson. Everyone also covers every existing enrolment.
+                            </p>
                           </div>
 
                           {/* Lesson Thumbnail */}

@@ -27,6 +27,7 @@ export default async function AdminEditCoursePage({
     duration: l.duration,
     order: 0, // not used by the editor form
     isFree: l.isFree,
+    minPackageKey: l.minPackageKey,
   }))
 
   return (

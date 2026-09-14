@@ -32,6 +32,7 @@ export default async function CourseLessonsPage({
     duration: l.duration,
     order: idx,
     isFree: l.isFree,
+    minPackageKey: l.minPackageKey,
   }))
 
   const totalMinutes = lessons.reduce((s, l) => s + (l.duration ?? 0), 0)

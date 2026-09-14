@@ -10,7 +10,7 @@ import { uploadThumbnail, deleteFromCloudinary } from "@/lib/cloudinary"
 import type { CourseLevel, CoursePricing, CourseStatus } from "@/lib/types"
 import { getCurrentUser } from "@/lib/auth"
 import { SCHOOL_BY_SLUG, isSchoolSlug, type SchoolSlug } from "@/lib/schools"
-import { pricingFromPackages } from "@/lib/entitlements"
+import { isPackageKey, pricingFromPackages } from "@/lib/entitlements"
 
 const PackageSchema = z.object({
   key: z.enum(["basic", "standard", "executive"]),
@@ -249,6 +249,7 @@ export async function fetchCourseForEdit(courseId: string) {
         thumbnailUrl: l.videoThumbnailUrl || "",
         duration: l.videoDuration ?? null,
         isFree: l.isFree,
+        minPackageKey: l.minPackageKey ?? null,
       })),
     }
   } catch (error) {
@@ -347,7 +348,7 @@ export async function createCourse(
         console.log("[Create Course] Parsed lessons:", lessons)
         if (Array.isArray(lessons) && lessons.length > 0) {
           await Lesson.insertMany(
-            lessons.map((l: { title: string; description?: string; type?: string; thumbnailUrl?: string; videoUrl?: string; content?: string; duration?: string; isFree?: boolean }, idx: number) => ({
+            lessons.map((l: { title: string; description?: string; type?: string; thumbnailUrl?: string; videoUrl?: string; content?: string; duration?: string; isFree?: boolean; minPackageKey?: string | null }, idx: number) => ({
               course: course._id,
               title: l.title,
               description: l.description || null,
@@ -357,6 +358,7 @@ export async function createCourse(
               content: l.content || null,
               videoDuration: l.duration ? parseInt(l.duration) : null,
               isFree: l.isFree || false,
+              minPackageKey: isPackageKey(l.minPackageKey) ? l.minPackageKey : null,
               order: idx,
               isPublished: status === "published",
             }))
@@ -501,7 +503,7 @@ export async function updateCourse(
           
           if (lessons.length > 0) {
             await Lesson.insertMany(
-              lessons.map((l: { tempId?: string; title: string; description?: string; type?: string; thumbnailUrl?: string; videoUrl?: string; content?: string; duration?: string; isFree?: boolean }, idx: number) => ({
+              lessons.map((l: { tempId?: string; title: string; description?: string; type?: string; thumbnailUrl?: string; videoUrl?: string; content?: string; duration?: string; isFree?: boolean; minPackageKey?: string | null }, idx: number) => ({
                 course: courseId,
                 title: l.title,
                 description: l.description || null,
@@ -511,6 +513,7 @@ export async function updateCourse(
                 content: l.content || null,
                 videoDuration: l.duration ? parseInt(l.duration) : null,
                 isFree: l.isFree || false,
+                minPackageKey: isPackageKey(l.minPackageKey) ? l.minPackageKey : null,
                 order: idx,
                 isPublished: status === "published",
               }))
@@ -609,6 +612,8 @@ export async function addLesson(
   const content = formData.get("content") as string
   const duration = formData.get("duration") as string
   const isFree = formData.get("isFree") === "true"
+  const minPackageKeyRaw = formData.get("minPackageKey")
+  const minPackageKey = isPackageKey(minPackageKeyRaw) ? minPackageKeyRaw : null
 
   const fieldErrors: Record<string, string> = {}
 
@@ -653,6 +658,7 @@ export async function addLesson(
       content: null,
       videoDuration: duration ? parseInt(duration) * 60 : null,
       isFree,
+      minPackageKey,
       order,
       isPublished: course.status === "published",
     })
@@ -666,6 +672,43 @@ export async function addLesson(
   } catch (error) {
     console.error("Add lesson error:", error)
     return { success: false, error: "Failed to add lesson", fieldErrors: {} }
+  }
+}
+
+// ---- Lesson minimum package ----
+/**
+ * Sets the lowest tier that can open a lesson (null = everyone). Called from
+ * the lesson manager's per-row select; ownership-scoped like the other
+ * lesson mutations (admins may edit any course).
+ */
+export async function setLessonMinPackage(
+  courseId: string,
+  lessonId: string,
+  minPackageKey: string | null
+): Promise<{ success: boolean; error: string | null }> {
+  if (minPackageKey !== null && !isPackageKey(minPackageKey)) {
+    return { success: false, error: "Unknown package" }
+  }
+
+  try {
+    await connectDB()
+    const instructor = await getAuthenticatedInstructor()
+
+    const course = await Course.findOne({ _id: courseId, ...courseScope(instructor) }).select("_id")
+    if (!course) return { success: false, error: "Course not found" }
+
+    const lesson = await Lesson.findOneAndUpdate(
+      { _id: lessonId, course: courseId },
+      { minPackageKey },
+      { new: true }
+    ).select("_id")
+    if (!lesson) return { success: false, error: "Lesson not found" }
+
+    revalidatePath(`/instructor/courses/${courseId}/lessons`)
+    return { success: true, error: null }
+  } catch (error) {
+    console.error("Set lesson package error:", error)
+    return { success: false, error: "Failed to update lesson" }
   }
 }
 

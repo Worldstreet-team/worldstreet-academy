@@ -44,6 +44,7 @@ export default async function EditCoursePage({
     duration: l.duration,
     order: 0, // Not used in form
     isFree: l.isFree,
+    minPackageKey: l.minPackageKey,
   }))
 
   return <CourseEditor course={course} existingLessons={lessons} />

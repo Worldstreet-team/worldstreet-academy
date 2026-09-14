@@ -1,7 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { useActionState, useState } from "react"
+import { useActionState, useState, useTransition } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -44,9 +45,12 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import type { Lesson } from "@/lib/types"
+import type { PackageKey } from "@/lib/db/models"
+import { PACKAGE_KEYS, PACKAGE_LABEL } from "@/lib/entitlements"
 import {
   addLesson,
   deleteLesson,
+  setLessonMinPackage,
   type CourseFormState,
 } from "@/lib/actions/instructor"
 
@@ -59,6 +63,51 @@ const initialState: CourseFormState = {
 const typeIcons: Record<string, LucideIcon> = {
   video: Video,
   text: FileText,
+}
+
+/** Per-row tier select — saves immediately through setLessonMinPackage. */
+function LessonTierSelect({
+  courseId,
+  lessonId,
+  value,
+}: {
+  courseId: string
+  lessonId: string
+  value: PackageKey | null
+}) {
+  const router = useRouter()
+  const [pending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+
+  return (
+    <div className="flex flex-col items-end gap-0.5">
+      <Select
+        value={value ?? "everyone"}
+        disabled={pending}
+        onValueChange={(v) => {
+          setError(null)
+          startTransition(async () => {
+            const res = await setLessonMinPackage(courseId, lessonId, v && v !== "everyone" ? v : null)
+            if (res.success) router.refresh()
+            else setError(res.error)
+          })
+        }}
+      >
+        <SelectTrigger className="h-7 w-[9rem] text-xs" aria-label="Minimum package">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="everyone">Everyone</SelectItem>
+          {PACKAGE_KEYS.map((k) => (
+            <SelectItem key={k} value={k}>
+              {PACKAGE_LABEL[k]} and up
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {error && <p className="text-[10px] text-ws-danger">{error}</p>}
+    </div>
+  )
 }
 
 /** Simple confirm before the (unchanged) deleteLesson server action fires. */
@@ -166,6 +215,11 @@ export function LessonManager({
                         )}
                       </div>
                     </div>
+                    <LessonTierSelect
+                      courseId={courseId}
+                      lessonId={lesson.id}
+                      value={lesson.minPackageKey ?? null}
+                    />
                     <Button
                       variant="ghost"
                       size="sm"
@@ -275,6 +329,23 @@ export function LessonManager({
                 )}
               </div>
             )}
+
+            <div className="space-y-1.5">
+              <Label>Minimum package</Label>
+              <Select name="minPackageKey" defaultValue="everyone">
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="everyone">Everyone</SelectItem>
+                  {PACKAGE_KEYS.map((k) => (
+                    <SelectItem key={k} value={k}>
+                      {PACKAGE_LABEL[k]} and up
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
             <div className="flex items-center gap-2">
               <input

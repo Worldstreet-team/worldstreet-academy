@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import connectDB from "@/lib/db"
-import { Course, Lesson, ILesson } from "@/lib/db/models"
+import { Course, Lesson, ILesson, type PackageKey } from "@/lib/db/models"
 import { uploadVideo, deleteFromCloudinary } from "@/lib/cloudinary"
 import { z } from "zod/v4"
 
@@ -18,6 +18,7 @@ const CreateLessonSchema = z.object({
   sectionTitle: z.string().optional(),
   isFree: z.boolean().optional(),
   liveScheduledAt: z.string().optional(), // ISO date string for live lessons
+  minPackageKey: z.enum(["basic", "standard", "executive"]).nullable().optional(),
 })
 
 const UpdateLessonSchema = CreateLessonSchema.partial()
@@ -36,6 +37,7 @@ export type LessonListItem = {
   sectionTitle: string | null
   order: number
   isFree: boolean
+  minPackageKey: PackageKey | null
   isPublished: boolean
 }
 
@@ -377,6 +379,7 @@ export async function getCourseLessons(
       sectionTitle: lesson.sectionTitle,
       order: lesson.order,
       isFree: lesson.isFree,
+      minPackageKey: lesson.minPackageKey ?? null,
       isPublished: lesson.isPublished,
     }))
   } catch (error) {
@@ -412,6 +415,7 @@ export async function getPublishedLessons(
       sectionTitle: lesson.sectionTitle,
       order: lesson.order,
       isFree: lesson.isFree,
+      minPackageKey: lesson.minPackageKey ?? null,
       isPublished: lesson.isPublished,
     }))
   } catch (error) {
