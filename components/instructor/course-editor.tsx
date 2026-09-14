@@ -245,6 +245,15 @@ export function CourseEditor({
       minPackageKey: l.minPackageKey ?? "",
     }))
   )
+  // Tiers this course sells, in ladder order — the only valid lesson tiers.
+  const soldTiers = PACKAGE_KEYS.filter((k) => packages.some((p) => p.enabled && p.key === k))
+  const tierItems = [
+    { value: "everyone", label: "Everyone" },
+    ...soldTiers.map((k) => ({ value: k, label: `${PACKAGE_LABEL[k]} and up` })),
+  ]
+  const orphanedTierLessons = lessons.filter(
+    (l) => l.minPackageKey !== "" && !soldTiers.includes(l.minPackageKey)
+  ).length
   const [expandedLesson, setExpandedLesson] = useState<string | null>(null)
 
   function addNewLesson() {
@@ -582,6 +591,12 @@ export function CourseEditor({
           <SectionDivider label="Packages" />
 
           <PackageEditor value={packages} onChange={setPackages} error={state.fieldErrors.packages} />
+          {orphanedTierLessons > 0 && (
+            <p className="text-[11px] text-ws-warning">
+              {orphanedTierLessons === 1 ? "1 lesson requires" : `${orphanedTierLessons} lessons require`} a package
+              this course no longer sells. Saving opens {orphanedTierLessons === 1 ? "it" : "them"} to every enrolment.
+            </p>
+          )}
 
           <SectionDivider label="Pricing" />
 
@@ -806,33 +821,36 @@ export function CourseEditor({
                             </div>
                           </div>
 
-                          {/* Minimum package (spec §6 ladder gating) */}
-                          <div className="space-y-1.5">
-                            <Label>Minimum package</Label>
-                            <Select
-                              value={lesson.minPackageKey || "everyone"}
-                              onValueChange={(v) =>
-                                updateLesson(lesson.tempId, {
-                                  minPackageKey: v && v !== "everyone" ? (v as PackageKey) : "",
-                                })
-                              }
-                            >
-                              <SelectTrigger className="w-full">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="everyone">Everyone</SelectItem>
-                                {PACKAGE_KEYS.map((k) => (
-                                  <SelectItem key={k} value={k}>
-                                    {PACKAGE_LABEL[k]} and up
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <p className="text-[10px] text-muted-foreground">
-                              Lowest tier that can open this lesson. Everyone also covers every existing enrolment.
-                            </p>
-                          </div>
+                          {/* Minimum package (spec §6 ladder gating) — only tiers the course sells */}
+                          {soldTiers.length > 0 && (
+                            <div className="space-y-1.5">
+                              <Label>Minimum package</Label>
+                              <Select
+                                items={tierItems}
+                                value={lesson.minPackageKey && soldTiers.includes(lesson.minPackageKey) ? lesson.minPackageKey : "everyone"}
+                                onValueChange={(v) =>
+                                  updateLesson(lesson.tempId, {
+                                    minPackageKey: v && v !== "everyone" ? (v as PackageKey) : "",
+                                  })
+                                }
+                              >
+                                <SelectTrigger className="w-full">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="everyone">Everyone</SelectItem>
+                                  {soldTiers.map((k) => (
+                                    <SelectItem key={k} value={k}>
+                                      {PACKAGE_LABEL[k]} and up
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <p className="text-[10px] text-muted-foreground">
+                                Lowest tier that can open this lesson. Everyone also covers every existing enrolment.
+                              </p>
+                            </div>
+                          )}
 
                           {/* Lesson Thumbnail */}
                           <MediaUpload

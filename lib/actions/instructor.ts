@@ -5,18 +5,18 @@ import { redirect } from "next/navigation"
 import type mongoose from "mongoose"
 import { z } from "zod/v4"
 import connectDB from "@/lib/db"
-import { Course, Lesson, User, ICourse, type ICoursePackage } from "@/lib/db/models"
+import { Course, Lesson, User, ICourse, type ICoursePackage, type PackageKey } from "@/lib/db/models"
 import { uploadThumbnail, deleteFromCloudinary } from "@/lib/cloudinary"
 import type { CourseLevel, CoursePricing, CourseStatus } from "@/lib/types"
 import { getCurrentUser } from "@/lib/auth"
 import { SCHOOL_BY_SLUG, isSchoolSlug, type SchoolSlug } from "@/lib/schools"
-import { isPackageKey, pricingFromPackages } from "@/lib/entitlements"
+import { PACKAGE_LABEL, isPackageKey, pricingFromPackages } from "@/lib/entitlements"
 
 const PackageSchema = z.object({
   key: z.enum(["basic", "standard", "executive"]),
-  name: z.string().trim().min(2).max(60),
+  name: z.string().trim().min(2, "Name must be at least 2 characters").max(60, "Name must be 60 characters or less"),
   tagline: z.string().trim().max(120).default(""),
-  price: z.number().int().min(0).max(100000),
+  price: z.number({ error: "Enter a price in whole dollars" }).int("Price must be whole dollars").min(0, "Price can't be negative").max(100000, "Price can't exceed $100,000"),
   features: z.array(z.string().trim().min(1).max(160)).max(20).default([]),
   highlight: z.boolean().default(false),
   ctaLabel: z.string().trim().max(40).nullable().default(null),
@@ -54,11 +54,25 @@ function parsePackages(
 
   const result = PackagesSchema.safeParse(parsed)
   if (!result.success) {
-    fieldErrors.packages = result.error.issues[0]?.message ?? "Invalid packages"
+    const issue = result.error.issues[0]
+    const index = typeof issue?.path[0] === "number" ? issue.path[0] : null
+    const row = index !== null && Array.isArray(parsed) ? (parsed[index] as { key?: unknown } | undefined) : undefined
+    const tier = row && isPackageKey(row.key) ? `${PACKAGE_LABEL[row.key]} package: ` : ""
+    fieldErrors.packages = `${tier}${issue?.message ?? "Invalid packages"}`
     return null
   }
 
   return result.data
+}
+
+/** Keys of the tiers a course actually sells (enabled packages). */
+function soldTierKeys(packages: ReadonlyArray<{ key: PackageKey; enabled: boolean }> | null | undefined): Set<PackageKey> {
+  return new Set((packages ?? []).filter((p) => p.enabled).map((p) => p.key))
+}
+
+/** A lesson tier outside the sold set gates nothing — store null (every enrolment). */
+function lessonTier(raw: unknown, sold: Set<PackageKey>): PackageKey | null {
+  return isPackageKey(raw) && sold.has(raw) ? raw : null
 }
 
 // ---- Types for form state ----
@@ -347,6 +361,7 @@ export async function createCourse(
         const lessons = JSON.parse(lessonsJson)
         console.log("[Create Course] Parsed lessons:", lessons)
         if (Array.isArray(lessons) && lessons.length > 0) {
+          const sold = soldTierKeys(packages)
           await Lesson.insertMany(
             lessons.map((l: { title: string; description?: string; type?: string; thumbnailUrl?: string; videoUrl?: string; content?: string; duration?: string; isFree?: boolean; minPackageKey?: string | null }, idx: number) => ({
               course: course._id,
@@ -358,7 +373,7 @@ export async function createCourse(
               content: l.content || null,
               videoDuration: l.duration ? parseInt(l.duration) : null,
               isFree: l.isFree || false,
-              minPackageKey: isPackageKey(l.minPackageKey) ? l.minPackageKey : null,
+              minPackageKey: lessonTier(l.minPackageKey, sold),
               order: idx,
               isPublished: status === "published",
             }))
@@ -502,6 +517,7 @@ export async function updateCourse(
           await Lesson.deleteMany({ course: courseId })
           
           if (lessons.length > 0) {
+            const sold = soldTierKeys(packages ?? existingCourse.packages)
             await Lesson.insertMany(
               lessons.map((l: { tempId?: string; title: string; description?: string; type?: string; thumbnailUrl?: string; videoUrl?: string; content?: string; duration?: string; isFree?: boolean; minPackageKey?: string | null }, idx: number) => ({
                 course: courseId,
@@ -513,7 +529,7 @@ export async function updateCourse(
                 content: l.content || null,
                 videoDuration: l.duration ? parseInt(l.duration) : null,
                 isFree: l.isFree || false,
-                minPackageKey: isPackageKey(l.minPackageKey) ? l.minPackageKey : null,
+                minPackageKey: lessonTier(l.minPackageKey, sold),
                 order: idx,
                 isPublished: status === "published",
               }))
@@ -612,8 +628,6 @@ export async function addLesson(
   const content = formData.get("content") as string
   const duration = formData.get("duration") as string
   const isFree = formData.get("isFree") === "true"
-  const minPackageKeyRaw = formData.get("minPackageKey")
-  const minPackageKey = isPackageKey(minPackageKeyRaw) ? minPackageKeyRaw : null
 
   const fieldErrors: Record<string, string> = {}
 
@@ -658,7 +672,7 @@ export async function addLesson(
       content: null,
       videoDuration: duration ? parseInt(duration) * 60 : null,
       isFree,
-      minPackageKey,
+      minPackageKey: lessonTier(formData.get("minPackageKey"), soldTierKeys(course.packages)),
       order,
       isPublished: course.status === "published",
     })
@@ -686,16 +700,17 @@ export async function setLessonMinPackage(
   lessonId: string,
   minPackageKey: string | null
 ): Promise<{ success: boolean; error: string | null }> {
-  if (minPackageKey !== null && !isPackageKey(minPackageKey)) {
-    return { success: false, error: "Unknown package" }
-  }
-
   try {
     await connectDB()
     const instructor = await getAuthenticatedInstructor()
 
-    const course = await Course.findOne({ _id: courseId, ...courseScope(instructor) }).select("_id")
+    const course = await Course.findOne({ _id: courseId, ...courseScope(instructor) }).select("_id packages")
     if (!course) return { success: false, error: "Course not found" }
+
+    // Only a tier the course sells may gate a lesson; null opens it to every enrolment.
+    if (minPackageKey !== null && !(isPackageKey(minPackageKey) && soldTierKeys(course.packages).has(minPackageKey))) {
+      return { success: false, error: "This course doesn't sell that package" }
+    }
 
     const lesson = await Lesson.findOneAndUpdate(
       { _id: lessonId, course: courseId },

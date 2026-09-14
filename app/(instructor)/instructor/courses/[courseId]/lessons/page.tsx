@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/shared/page-header"
 import { fetchCourseForEdit } from "@/lib/actions/instructor"
 import { LessonManager } from "@/components/instructor/lesson-manager"
 import { ArrowLeft, Pencil } from "lucide-react"
+import { PACKAGE_KEYS } from "@/lib/entitlements"
 
 export default async function CourseLessonsPage({
   params,
@@ -36,6 +37,8 @@ export default async function CourseLessonsPage({
   }))
 
   const totalMinutes = lessons.reduce((s, l) => s + (l.duration ?? 0), 0)
+  // Tiers this course sells, in ladder order — the only valid lesson tiers.
+  const tiers = PACKAGE_KEYS.filter((k) => course.packages.some((p) => p.enabled && p.key === k))
 
   return (
     <>
@@ -70,7 +73,7 @@ export default async function CourseLessonsPage({
           </div>
 
           {/* Lesson Manager */}
-          <LessonManager courseId={courseId} lessons={lessons} />
+          <LessonManager courseId={courseId} lessons={lessons} tiers={tiers} />
         </div>
       </div>
     </>

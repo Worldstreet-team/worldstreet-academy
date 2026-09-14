@@ -46,7 +46,7 @@ import {
 } from "lucide-react"
 import type { Lesson } from "@/lib/types"
 import type { PackageKey } from "@/lib/db/models"
-import { PACKAGE_KEYS, PACKAGE_LABEL } from "@/lib/entitlements"
+import { PACKAGE_LABEL } from "@/lib/entitlements"
 import {
   addLesson,
   deleteLesson,
@@ -65,31 +65,48 @@ const typeIcons: Record<string, LucideIcon> = {
   text: FileText,
 }
 
-/** Per-row tier select — saves immediately through setLessonMinPackage. */
+/**
+ * Per-row tier select — saves immediately through setLessonMinPackage. Holds
+ * the choice optimistically so the trigger doesn't snap back while saving;
+ * a failed save restores the previous value.
+ */
 function LessonTierSelect({
   courseId,
   lessonId,
   value,
+  tiers,
+  items,
 }: {
   courseId: string
   lessonId: string
   value: PackageKey | null
+  tiers: PackageKey[]
+  items: ReadonlyArray<{ value: string; label: string }>
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [current, setCurrent] = useState<PackageKey | null>(value)
 
   return (
     <div className="flex flex-col items-end gap-0.5">
       <Select
-        value={value ?? "everyone"}
+        items={items}
+        value={current && tiers.includes(current) ? current : "everyone"}
         disabled={pending}
         onValueChange={(v) => {
+          const next = v && v !== "everyone" ? (v as PackageKey) : null
+          if (next === current) return
+          const previous = current
+          setCurrent(next)
           setError(null)
           startTransition(async () => {
-            const res = await setLessonMinPackage(courseId, lessonId, v && v !== "everyone" ? v : null)
+            const res = await setLessonMinPackage(courseId, lessonId, next)
             if (res.success) router.refresh()
-            else setError(res.error)
+            else {
+              setCurrent(previous)
+              setError(res.error)
+            }
           })
         }}
       >
@@ -98,7 +115,7 @@ function LessonTierSelect({
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="everyone">Everyone</SelectItem>
-          {PACKAGE_KEYS.map((k) => (
+          {tiers.map((k) => (
             <SelectItem key={k} value={k}>
               {PACKAGE_LABEL[k]} and up
             </SelectItem>
@@ -159,13 +176,20 @@ function DeleteLessonButton({
 export function LessonManager({
   courseId,
   lessons,
+  tiers,
 }: {
   courseId: string
   lessons: Lesson[]
+  /** Enabled package keys in ladder order — the only tiers a lesson may require. Empty hides the tier controls. */
+  tiers: PackageKey[]
 }) {
   const [state, formAction, isPending] = useActionState(addLesson, initialState)
   const [lessonType, setLessonType] = useState("video")
   const [dialogOpen, setDialogOpen] = useState(false)
+  const items = [
+    { value: "everyone", label: "Everyone" },
+    ...tiers.map((k) => ({ value: k, label: `${PACKAGE_LABEL[k]} and up` })),
+  ]
 
   return (
     <div className="space-y-4">
@@ -215,11 +239,15 @@ export function LessonManager({
                         )}
                       </div>
                     </div>
-                    <LessonTierSelect
-                      courseId={courseId}
-                      lessonId={lesson.id}
-                      value={lesson.minPackageKey ?? null}
-                    />
+                    {tiers.length > 0 && (
+                      <LessonTierSelect
+                        courseId={courseId}
+                        lessonId={lesson.id}
+                        value={lesson.minPackageKey ?? null}
+                        tiers={tiers}
+                        items={items}
+                      />
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -330,22 +358,24 @@ export function LessonManager({
               </div>
             )}
 
-            <div className="space-y-1.5">
-              <Label>Minimum package</Label>
-              <Select name="minPackageKey" defaultValue="everyone">
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="everyone">Everyone</SelectItem>
-                  {PACKAGE_KEYS.map((k) => (
-                    <SelectItem key={k} value={k}>
-                      {PACKAGE_LABEL[k]} and up
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {tiers.length > 0 && (
+              <div className="space-y-1.5">
+                <Label>Minimum package</Label>
+                <Select name="minPackageKey" defaultValue="everyone" items={items}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="everyone">Everyone</SelectItem>
+                    {tiers.map((k) => (
+                      <SelectItem key={k} value={k}>
+                        {PACKAGE_LABEL[k]} and up
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="flex items-center gap-2">
               <input

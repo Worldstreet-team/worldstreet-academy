@@ -45,6 +45,8 @@ const NO_ENTITLEMENTS: IPackageEntitlements = {
   prioritySupport: false,
 }
 
+const TIER_ITEMS = PACKAGE_KEYS.map((k) => ({ value: k, label: PACKAGE_LABEL[k] }))
+
 const ENTITLEMENT_LABELS: ReadonlyArray<{ key: keyof IPackageEntitlements; label: string }> = [
   { key: "liveClasses", label: "Live classes" },
   { key: "instructorQa", label: "Instructor Q&A" },
@@ -70,13 +72,24 @@ export function toEditorPackage(p: ICoursePackage): EditorPackage {
   }
 }
 
-export function toCoursePackage(p: EditorPackage): ICoursePackage {
+/** "" or non-numeric → null. No rounding or clamping: the server rejects null, decimals and negatives with a message. */
+function parsePrice(raw: string): number | null {
+  const trimmed = raw.trim()
+  if (trimmed === "") return null
+  const n = Number(trimmed)
+  return Number.isFinite(n) ? n : null
+}
+
+/** What the editor posts: an ICoursePackage whose price may still be invalid (null) — the server is the authority. */
+export type PackagePayload = Omit<ICoursePackage, "price"> & { price: number | null }
+
+export function toCoursePackage(p: EditorPackage): PackagePayload {
   const ctaLabel = p.ctaLabel.trim()
   return {
     key: p.key,
     name: p.name.trim(),
     tagline: p.tagline.trim(),
-    price: Math.max(0, Math.round(Number(p.price) || 0)),
+    price: parsePrice(p.price),
     features: p.featuresText
       .split("\n")
       .map((f) => f.trim())
@@ -105,9 +118,11 @@ export function emptyPackage(key: PackageKey): EditorPackage {
 
 /** Cheapest ENABLED tier in whole dollars, or null when no tier is enabled (the course then sells at its own price). */
 export function ladderPrice(packages: EditorPackage[]): number | null {
-  const enabled = packages.filter((p) => p.enabled)
-  if (enabled.length === 0) return null
-  return Math.min(...enabled.map((p) => toCoursePackage(p).price))
+  const prices = packages
+    .filter((p) => p.enabled)
+    .map((p) => parsePrice(p.price))
+    .filter((n): n is number => n !== null)
+  return prices.length === 0 ? null : Math.min(...prices)
 }
 
 /**
@@ -152,6 +167,7 @@ export function PackageEditor({
         <div key={pkg.uid} className="space-y-3 rounded-md border p-3">
           <div className="flex items-center gap-2">
             <Select
+              items={TIER_ITEMS}
               value={pkg.key}
               onValueChange={(v) => {
                 if (v) patch(pkg.uid, { key: v as PackageKey })
@@ -210,6 +226,7 @@ export function PackageEditor({
                 value={pkg.price}
                 onChange={(e) => patch(pkg.uid, { price: e.target.value })}
               />
+              <p className="text-[10px] text-muted-foreground">Required. Enter 0 to make this tier free.</p>
             </div>
           </div>
 
