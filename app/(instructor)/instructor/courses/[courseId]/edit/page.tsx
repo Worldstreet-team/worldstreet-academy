@@ -29,6 +29,7 @@ export default async function EditCoursePage({
     whatYouWillLearn: data.course.whatYouWillLearn,
     availableAt: data.course.availableAt,
     preEnrollEnabled: data.course.preEnrollEnabled,
+    packages: data.course.packages,
   }
 
   const lessons = data.lessons.map((l) => ({

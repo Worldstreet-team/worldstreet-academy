@@ -218,6 +218,26 @@ export async function fetchCourseForEdit(courseId: string) {
         whatYouWillLearn: course.whatYouWillLearn ?? [],
         availableAt: course.availableAt ? course.availableAt.toISOString() : null,
         preEnrollEnabled: course.preEnrollEnabled ?? true,
+        packages: (course.packages ?? []).map(
+          (p): ICoursePackage => ({
+            key: p.key,
+            name: p.name,
+            tagline: p.tagline ?? "",
+            price: p.price,
+            features: p.features ?? [],
+            highlight: Boolean(p.highlight),
+            ctaLabel: p.ctaLabel ?? null,
+            enabled: p.enabled !== false,
+            entitlements: {
+              liveClasses: Boolean(p.entitlements?.liveClasses),
+              instructorQa: Boolean(p.entitlements?.instructorQa),
+              assignments: Boolean(p.entitlements?.assignments),
+              certificate: Boolean(p.entitlements?.certificate),
+              mentorship: Boolean(p.entitlements?.mentorship),
+              prioritySupport: Boolean(p.entitlements?.prioritySupport),
+            },
+          })
+        ),
       },
       lessons: lessons.map((l) => ({
         id: l._id.toString(),

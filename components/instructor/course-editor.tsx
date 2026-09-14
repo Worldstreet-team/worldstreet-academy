@@ -42,6 +42,14 @@ import type { Lesson, CourseLevel, CoursePricing, CourseStatus } from "@/lib/typ
 import { CheckIcon, ChevronDownIcon, ChevronLeftIcon, EyeIcon, FileIcon, PlusIcon, SquarePenIcon, Trash2Icon, VideoIcon } from "lucide-react"
 import { RenderIcon } from "@/components/shared/render-icon"
 import { SCHOOLS, type SchoolSlug } from "@/lib/schools"
+import type { ICoursePackage } from "@/lib/db/models"
+import {
+  PackageEditor,
+  ladderPrice,
+  toCoursePackage,
+  toEditorPackage,
+  type EditorPackage,
+} from "@/components/instructor/package-editor"
 
 // Minimal course data for editing
 type EditableCourse = {
@@ -58,6 +66,7 @@ type EditableCourse = {
   whatYouWillLearn?: string[]
   availableAt?: string | null
   preEnrollEnabled?: boolean
+  packages?: ICoursePackage[]
 }
 
 /** ISO string → value for a datetime-local input, in the viewer's timezone. */
@@ -178,6 +187,15 @@ export function CourseEditor({
   const [objectives, setObjectives] = useState<string[]>(course?.whatYouWillLearn ?? [])
   const [availableAtLocal, setAvailableAtLocal] = useState(isoToLocalInput(course?.availableAt))
   const [preEnrollEnabled, setPreEnrollEnabled] = useState(course?.preEnrollEnabled ?? true)
+  const [packages, setPackages] = useState<EditorPackage[]>(
+    (course?.packages ?? []).map(toEditorPackage)
+  )
+  // With a ladder, the course's scalar pricing is the cheapest enabled
+  // tier (the server derives the same in updateCourse/createCourse); the
+  // hidden fields mirror that so the server's price check keeps passing.
+  const derivedPrice = ladderPrice(packages)
+  const effectivePricing = derivedPrice === null ? pricing : derivedPrice > 0 ? "paid" : "free"
+  const effectivePrice = derivedPrice === null ? price : String(derivedPrice)
   const [previewError, setPreviewError] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
 
@@ -275,8 +293,9 @@ export function CourseEditor({
             <input type="hidden" name="thumbnailUrl" value={thumbnailUrl} />
             <input type="hidden" name="level" value={level} />
             <input type="hidden" name="school" value={school} />
-            <input type="hidden" name="pricing" value={pricing} />
-            <input type="hidden" name="price" value={price} />
+            <input type="hidden" name="pricing" value={effectivePricing} />
+            <input type="hidden" name="price" value={effectivePrice} />
+            <input type="hidden" name="packages" value={JSON.stringify(packages.map(toCoursePackage))} />
             <input type="hidden" name="status" value={status} />
             <input type="hidden" name="whatYouWillLearn" value={JSON.stringify(objectives)} />
             <input type="hidden" name="availableAt" value={localInputToIso(availableAtLocal)} />
@@ -556,8 +575,18 @@ export function CourseEditor({
             )}
           </div>
 
+          <SectionDivider label="Packages" />
+
+          <PackageEditor value={packages} onChange={setPackages} error={state.fieldErrors.packages} />
+
           <SectionDivider label="Pricing" />
 
+          {derivedPrice !== null ? (
+            <p className="rounded-md border p-3 text-[11px] text-muted-foreground">
+              Set by packages: this course sells {derivedPrice > 0 ? `from $${derivedPrice}` : "free"} — the
+              cheapest enabled tier. Disable every tier to price the course directly.
+            </p>
+          ) : (
           <div className="space-y-3">
             <Select
               defaultValue={pricing}
@@ -598,6 +627,7 @@ export function CourseEditor({
               </div>
             )}
           </div>
+          )}
         </div>
 
         {/* ───────── CENTER: Curriculum ───────── */}
