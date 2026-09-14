@@ -59,12 +59,22 @@ function CornerOrnament({ className }: { className?: string }) {
 
 // ── Certificate visual component (used for preview) ──────────────────────────
 
+/** The Academy signatory block renders only once product supplies a name and a signature file (D9). */
+const signatory =
+  BRAND.signatory.name && BRAND.signatory.imagePath
+    ? { name: BRAND.signatory.name, title: BRAND.signatory.title, imagePath: BRAND.signatory.imagePath }
+    : null
+
 function CertificatePreview({
   data,
   studentSignature,
+  certificateId,
+  verifyLabel,
 }: {
   data: CertificateData
   studentSignature: string | null
+  certificateId: string
+  verifyLabel: string | null
 }) {
   const { theme, systemTheme } = useTheme()
   const currentTheme = theme === "system" ? systemTheme : theme
@@ -72,10 +82,12 @@ function CertificatePreview({
     ? "/worldstreet-logo/WorldStreet4x.png"
     : "/worldstreet-logo/WorldStreet1x.png"
 
+  // UTC — the same day /verify shows.
   const completedDate = new Date(data.completedAt).toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",
+    timeZone: "UTC",
   })
 
   return (
@@ -169,14 +181,19 @@ function CertificatePreview({
           </div>
         </div>
 
-        {/* Course info */}
+        {/* Program info */}
         <div className="text-center max-w-[70%]">
           <p className="text-[8px] sm:text-[9px] md:text-[10px] text-ws-subtle mb-1.5 sm:mb-2">
-            for successfully completing the course
+            for successfully completing the program
           </p>
           <p className="text-xs sm:text-sm md:text-lg font-semibold text-ws-primary leading-snug">
-            {data.courseTitle}
+            {data.programName}
           </p>
+          {data.schoolName && (
+            <p className="mt-0.5 text-[7px] sm:text-[8px] md:text-[10px] text-ws-muted">
+              {data.schoolName}
+            </p>
+          )}
         </div>
 
         {/* Bottom — Signatures + Seal */}
@@ -199,19 +216,38 @@ function CertificatePreview({
             </p>
           </div>
 
-          {/* Center seal — Logo */}
-          <div className="flex flex-col items-center">
-            <Image
-              src={logoPath}
-              alt={BRAND.name}
-              width={64}
-              height={64}
-              className="w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 object-contain"
-            />
-            <p className="text-[6px] sm:text-[7px] md:text-[8px] text-ws-subtle tracking-widest uppercase mt-1">
-              Verified
-            </p>
-          </div>
+          {/* Center — the Academy signatory once configured (D9), else the seal */}
+          {signatory ? (
+            <div className="flex flex-col items-center gap-1">
+              <Image
+                src={signatory.imagePath}
+                alt={`${signatory.name} signature`}
+                width={160}
+                height={40}
+                className="h-6 sm:h-8 md:h-10 w-auto object-contain mb-0.5"
+              />
+              <div className="w-full max-w-[120px] sm:max-w-[140px] md:max-w-[160px] h-px bg-ws-track" />
+              <p className="text-[7px] sm:text-[8px] md:text-[9px] text-ws-subtle uppercase tracking-widest mt-0.5">
+                {signatory.title ?? "Authorized signatory"}
+              </p>
+              <p className="text-[8px] sm:text-[9px] md:text-[10px] text-ws-muted font-medium">
+                {signatory.name}
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center">
+              <Image
+                src={logoPath}
+                alt={BRAND.name}
+                width={64}
+                height={64}
+                className="w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 object-contain"
+              />
+              <p className="text-[6px] sm:text-[7px] md:text-[8px] text-ws-subtle tracking-widest uppercase mt-1">
+                Verified
+              </p>
+            </div>
+          )}
 
           {/* Instructor signature */}
           <div className="flex flex-col items-center gap-1">
@@ -232,9 +268,10 @@ function CertificatePreview({
           </div>
         </div>
 
-        {/* Certificate ID */}
-        <p className="absolute bottom-3 sm:bottom-4 md:bottom-5 left-0 right-0 text-center text-[6px] sm:text-[7px] md:text-[8px] text-ws-subtle tracking-wider">
-          WSA-{data.id.slice(-8).toUpperCase()}
+        {/* Certificate ID + where to verify it (spec §13) */}
+        <p className="absolute bottom-3 sm:bottom-4 md:bottom-5 inset-x-0 flex flex-wrap justify-center gap-x-2 px-8 text-center text-[6px] sm:text-[7px] md:text-[8px] text-ws-subtle tracking-wider tabular-nums">
+          <span>{`Certificate ID ${certificateId}`}</span>
+          {verifyLabel && <span>{`Verify at ${verifyLabel}`}</span>}
         </p>
       </div>
     </div>
@@ -243,7 +280,20 @@ function CertificatePreview({
 
 // ── Main certificate page client component ───────────────────────────────────
 
-export function CertificateClient({ data }: { data: CertificateData }) {
+/**
+ * The stored certificate ID, or — for a certificate completed before IDs were
+ * stored — the ID it has always printed. Same rule as `legacyCertificateId` in
+ * lib/certificate-id.ts, repeated because that module (node crypto + Mongoose)
+ * can't enter a client bundle.
+ */
+function printedCertificateId(data: CertificateData): string {
+  return data.certificateId ?? `${BRAND.certificatePrefix}-${data.id.slice(-8).toUpperCase()}`
+}
+
+export function CertificateClient({ data, verifyUrl }: { data: CertificateData; verifyUrl: string | null }) {
+  const certificateId = printedCertificateId(data)
+  /** Printed without the scheme; never uppercased — the /verify path is case-sensitive. */
+  const verifyLabel = verifyUrl ? verifyUrl.replace(/^https?:\/\//, "") : null
   const { theme, systemTheme } = useTheme()
   const currentTheme = theme === "system" ? systemTheme : theme
   const logoPath = currentTheme === "light" 
@@ -269,7 +319,7 @@ export function CertificateClient({ data }: { data: CertificateData }) {
     const cx = w / 2
 
     // ── Load images in parallel ──────────────────────────────────
-    const [logoDataUrl, watermarkDataUrl, instructorSigDataUrl, studentSigDataUrl] =
+    const [logoDataUrl, watermarkDataUrl, instructorSigDataUrl, studentSigDataUrl, signatoryDataUrl] =
       await Promise.all([
         fetchAsDataUrl(logoPath),
         fetchAsDataUrl(logoPath),
@@ -277,6 +327,7 @@ export function CertificateClient({ data }: { data: CertificateData }) {
           ? fetchAsDataUrl(data.instructorSignatureUrl)
           : null,
         studentSig ? fetchAsDataUrl(studentSig) : null,
+        signatory ? fetchAsDataUrl(signatory.imagePath) : null,
       ])
 
     // ── White background ─────────────────────────────────────────
@@ -384,24 +435,26 @@ export function CertificateClient({ data }: { data: CertificateData }) {
     doc.setLineWidth(0.25)
     doc.line(cx - 40, 97, cx + 40, 97)
 
-    // ── "for successfully completing the course" ─────────────────
+    // ── "for successfully completing the program" ────────────────
     doc.setFont("helvetica", "normal")
     doc.setFontSize(6.5)
     doc.setTextColor(160, 160, 160)
-    doc.text("FOR SUCCESSFULLY COMPLETING THE COURSE", cx, 108, {
+    doc.text("FOR SUCCESSFULLY COMPLETING THE PROGRAM", cx, 108, {
       align: "center",
     })
 
-    // ── Course title ─────────────────────────────────────────────
+    // ── Program title (+ school) ─────────────────────────────────
     doc.setFont("helvetica", "bold")
     doc.setFontSize(13)
     doc.setTextColor(50, 50, 50)
-    const courseTitle = data.courseTitle
-    if (courseTitle.length > 55) {
-      const lines = doc.splitTextToSize(courseTitle, 170)
-      doc.text(lines, cx, 118, { align: "center" })
-    } else {
-      doc.text(courseTitle, cx, 118, { align: "center" })
+    const programLines: string[] =
+      data.programName.length > 55 ? doc.splitTextToSize(data.programName, 170) : [data.programName]
+    doc.text(programLines, cx, 118, { align: "center" })
+    if (data.schoolName) {
+      doc.setFont("helvetica", "normal")
+      doc.setFontSize(7)
+      doc.setTextColor(120, 120, 120)
+      doc.text(data.schoolName, cx, 118 + programLines.length * 5.5 + 1, { align: "center" })
     }
 
     // ── Bottom section: 3-column layout ──────────────────────────
@@ -424,23 +477,41 @@ export function CertificateClient({ data }: { data: CertificateData }) {
 
     const dateFormatted = new Date(data.completedAt).toLocaleDateString(
       "en-US",
-      { year: "numeric", month: "long", day: "numeric" }
+      { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" }
     )
     doc.setFontSize(7)
     doc.setTextColor(80, 80, 80)
     doc.text(dateFormatted, colLeft, botY + 11, { align: "center" })
 
-    // ── Center: Seal / Logo — WorldStreet3x ──────────────────────
-    if (logoDataUrl) {
-      // Maintain aspect ratio - WorldStreet logo is wider than tall
-      const sealWidth = 24
-      const sealHeight = 16
-      doc.addImage(logoDataUrl, "PNG", cx - sealWidth/2, botY - 12, sealWidth, sealHeight)
+    // ── Center: Academy signatory (D9) when configured, else the seal ──
+    if (signatory) {
+      if (signatoryDataUrl) {
+        doc.addImage(signatoryDataUrl, "PNG", cx - 18, botY - 14, 36, 12)
+      }
+      doc.setDrawColor(180, 180, 180)
+      doc.setLineWidth(0.25)
+      doc.line(cx - 22, botY, cx + 22, botY)
+
+      doc.setFont("helvetica", "normal")
+      doc.setFontSize(5.5)
+      doc.setTextColor(160, 160, 160)
+      doc.text((signatory.title ?? "Authorized signatory").toUpperCase(), cx, botY + 5, { align: "center" })
+
+      doc.setFontSize(7)
+      doc.setTextColor(80, 80, 80)
+      doc.text(signatory.name, cx, botY + 11, { align: "center" })
+    } else {
+      if (logoDataUrl) {
+        // Maintain aspect ratio - WorldStreet logo is wider than tall
+        const sealWidth = 24
+        const sealHeight = 16
+        doc.addImage(logoDataUrl, "PNG", cx - sealWidth/2, botY - 12, sealWidth, sealHeight)
+      }
+      doc.setFont("helvetica", "normal")
+      doc.setFontSize(5)
+      doc.setTextColor(190, 190, 190)
+      doc.text("VERIFIED", cx, botY + 13, { align: "center" })
     }
-    doc.setFont("helvetica", "normal")
-    doc.setFontSize(5)
-    doc.setTextColor(190, 190, 190)
-    doc.text("VERIFIED", cx, botY + 13, { align: "center" })
 
     // ── Right column: Instructor signature + Name ────────────────
     if (instructorSigDataUrl) {
@@ -466,18 +537,21 @@ export function CertificateClient({ data }: { data: CertificateData }) {
     doc.setTextColor(80, 80, 80)
     doc.text(data.instructorName, colRight, botY + 11, { align: "center" })
 
-    // ── Certificate ID ───────────────────────────────────────────
+    // ── Certificate ID + verify URL (spec §13) ───────────────────
     doc.setFont("helvetica", "normal")
-    doc.setFontSize(5)
-    doc.setTextColor(200, 200, 200)
-    doc.text(`WSA-${data.id.slice(-8).toUpperCase()}`, cx, h - 12, {
-      align: "center",
-    })
+    doc.setFontSize(5.5)
+    doc.setTextColor(150, 150, 150)
+    doc.text(`CERTIFICATE ID ${certificateId}`, cx, h - 21, { align: "center" })
+    if (verifyLabel) {
+      doc.setFontSize(5)
+      doc.setTextColor(170, 170, 170)
+      doc.text(`Verify at ${verifyLabel}`, cx, h - 16.5, { align: "center" })
+    }
 
     doc.save(
-      `WorldStreet-Certificate-${data.courseTitle.replace(/[^a-zA-Z0-9]/g, "-")}.pdf`
+      `${BRAND.name.replace(/[^a-zA-Z0-9]+/g, "-")}-Certificate-${data.programName.replace(/[^a-zA-Z0-9]/g, "-")}.pdf`
     )
-  }, [data, studentSig, logoPath])
+  }, [data, studentSig, logoPath, certificateId, verifyLabel])
 
   return (
     <div className="min-h-dvh flex flex-col items-center bg-ws-page">
@@ -507,7 +581,12 @@ export function CertificateClient({ data }: { data: CertificateData }) {
       {/* Certificate */}
       <div className="w-full max-w-4xl px-4 pb-6">
         <div className="rounded-lg border border-ws-hairline overflow-hidden">
-          <CertificatePreview data={data} studentSignature={studentSig} />
+          <CertificatePreview
+            data={data}
+            studentSignature={studentSig}
+            certificateId={certificateId}
+            verifyLabel={verifyLabel}
+          />
         </div>
       </div>
 
@@ -579,9 +658,17 @@ export function CertificateClient({ data }: { data: CertificateData }) {
           )}
         </div>
 
-        <p className="text-center text-[11px] text-muted-foreground mt-4">
-          Certificate ID: WSA-{data.id.slice(-8).toUpperCase()}
+        <p className="text-center text-[11px] text-muted-foreground mt-4 tabular-nums">
+          {`Certificate ID: ${certificateId}`}
         </p>
+        {verifyUrl && (
+          <p className="text-center text-[11px] text-muted-foreground mt-1">
+            Verify this certificate at{" "}
+            <a href={verifyUrl} className="underline underline-offset-2 hover:text-ws-primary break-all">
+              {verifyLabel}
+            </a>
+          </p>
+        )}
       </div>
     </div>
   )

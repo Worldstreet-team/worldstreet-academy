@@ -4,6 +4,7 @@ import connectDB from "@/lib/db"
 import { Enrollment, Course, User, type ICoursePackage } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth"
 import { entitlementsFor } from "@/lib/entitlements"
+import { SCHOOL_BY_SLUG, isSchoolSlug } from "@/lib/schools"
 
 // ============================================================================
 // TYPES
@@ -18,6 +19,12 @@ export type CertificateData = {
   courseId: string
   instructorSignatureUrl: string | null
   studentSignatureUrl: string | null
+  /** Stored certificate ID (spec §13); null for a certificate completed before IDs were stored — the view prints the legacy value. */
+  certificateId: string | null
+  /** The program (course) title as printed on the certificate. */
+  programName: string
+  /** Full school name ("School of Trading & Financial Markets"); null for a course without a school. */
+  schoolName: string | null
 }
 
 export type StudentCertificate = {
@@ -102,6 +109,9 @@ export async function fetchCertificate(courseId: string): Promise<CertificateDat
       courseId: courseId,
       instructorSignatureUrl: instructor.signatureUrl ?? null,
       studentSignatureUrl: user.signatureUrl ?? null,
+      certificateId: enrollment.certificateId ?? null,
+      programName: course.title,
+      schoolName: isSchoolSlug(course.school) ? SCHOOL_BY_SLUG[course.school].name : null,
     }
   } catch (error) {
     console.error("Fetch certificate error:", error)
