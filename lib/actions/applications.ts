@@ -968,6 +968,10 @@ export async function adminDecideApplication(
     // not abort the promotion/notification half of a decision.
     if (decision === "approved") {
       const newRole = user.role === "USER" ? "INSTRUCTOR" : user.role
+      // Spec §10 "Professional experience" starts as the application's answer
+      // but never replaces one already on the profile. This $set rewrites the
+      // whole instructorProfile, so the Phase 5 fields are carried across.
+      const currentExperience = user.instructorProfile?.experience ?? null
       await User.updateOne(
         { _id: user._id },
         {
@@ -976,6 +980,10 @@ export async function adminDecideApplication(
             instructorStatus: "approved",
             instructorProfile: {
               headline: app.answers.headline,
+              specialization: user.instructorProfile?.specialization ?? null,
+              experience: currentExperience?.trim() ? currentExperience : app.answers.experience?.trim() || null,
+              credentials: [...(user.instructorProfile?.credentials ?? [])],
+              featured: user.instructorProfile?.featured ?? false,
               expertise: app.answers.expertise ?? [],
               socialLinks: {
                 twitter: app.answers.twitter ?? undefined,

@@ -1,10 +1,19 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import mongoose from "mongoose"
 import connectDB from "@/lib/db"
 import { User, Enrollment, Order, Course, InstructorApplication } from "@/lib/db/models"
 import { requireAdmin, syncRoleToClerk } from "@/lib/auth/admin"
 import { notifyUser } from "@/lib/notify"
+import {
+  AdminFacultyProfileSchema,
+  facultyFormFrom,
+  facultyProfileSet,
+  firstFacultyError,
+  isFacultyRole,
+  type FacultyProfileForm,
+} from "@/lib/faculty"
 
 const PAGE_SIZE = 20
 
@@ -193,5 +202,82 @@ export async function adminUpdateUserRole(
   } catch (error) {
     console.error("Admin update role error:", error)
     return { success: false, error: "Failed to update role" }
+  }
+}
+
+// ============================================================================
+// FACULTY PROFILE (spec §10) — the "Edit faculty profile" dialog on /admin/users
+// ============================================================================
+
+export type AdminFacultyProfile = {
+  userId: string
+  name: string
+  username: string
+  form: FacultyProfileForm
+  featured: boolean
+}
+
+/** One instructor's or admin's faculty fields for the admin dialog; null for students and unknown ids. */
+export async function adminGetFacultyProfile(userId: string): Promise<AdminFacultyProfile | null> {
+  try {
+    await connectDB()
+    await requireAdmin()
+    if (!mongoose.isValidObjectId(userId)) return null
+
+    const u = await User.findById(userId)
+      .select("username firstName lastName role bio country instructorProfile")
+      .lean()
+    if (!u || !isFacultyRole(u.role)) return null
+
+    return {
+      userId: u._id.toString(),
+      name: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || u.username,
+      username: u.username,
+      form: facultyFormFrom(u),
+      featured: u.instructorProfile?.featured ?? false,
+    }
+  } catch (error) {
+    console.error("Admin get faculty profile error:", error)
+    return null
+  }
+}
+
+/**
+ * Admin save of a faculty profile: the instructor editor's schema plus
+ * `featured`. Name and photo are not editable here — they belong to the
+ * account owner, who sets them on /instructor/profile.
+ */
+export async function adminUpdateFacultyProfile(
+  userId: string,
+  input: FacultyProfileForm & { featured: boolean }
+): Promise<{ success: true } | { success: false; error: string }> {
+  try {
+    await connectDB()
+    await requireAdmin()
+
+    if (!mongoose.isValidObjectId(userId)) return { success: false, error: "User not found" }
+    const user = await User.findById(userId).select("role").lean()
+    if (!user) return { success: false, error: "User not found" }
+    if (!isFacultyRole(user.role)) {
+      return { success: false, error: "Only instructors and admins have a faculty profile" }
+    }
+
+    const parsed = AdminFacultyProfileSchema.safeParse(input)
+    if (!parsed.success) return { success: false, error: firstFacultyError(parsed.error) }
+
+    const { featured, ...profile } = parsed.data
+    await User.updateOne(
+      { _id: user._id },
+      { $set: { ...facultyProfileSet(profile), "instructorProfile.featured": featured } }
+    )
+
+    revalidatePath("/admin/users")
+    revalidatePath("/faculty", "layout")
+    revalidatePath("/")
+    return { success: true }
+  } catch (error) {
+    console.error("Admin update faculty profile error:", error)
+    const denied = error instanceof Error && error.message === "Not authorized"
+    return { success: false, error: denied ? "Not authorized" : "Failed to update faculty profile" }
   }
 }

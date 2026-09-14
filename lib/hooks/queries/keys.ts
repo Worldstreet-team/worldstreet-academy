@@ -67,4 +67,5 @@ export const queryKeys = {
   adminApplications: (filters?: { status?: string; page?: number }) =>
     filters ? (["admin", "applications", filters] as const) : (["admin", "applications"] as const),
   adminApplicationDetail: (id: string) => ["admin", "application", id] as const,
+  adminFacultyProfile: (userId: string) => ["admin", "faculty-profile", userId] as const,
 } as const

@@ -42,7 +42,8 @@ import {
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import { formatDate, StatusBadge, FilterChips, Pagination } from "@/components/admin/shared"
 import { useUser } from "@/components/providers/user-provider"
-import { UsersIcon } from "lucide-react"
+import { FacultyProfileDialog } from "@/components/admin/faculty-profile-dialog"
+import { UserRoundPenIcon, UsersIcon } from "lucide-react"
 
 type RoleFilter = "all" | "USER" | "INSTRUCTOR" | "ADMIN"
 type Role = "USER" | "INSTRUCTOR" | "ADMIN"
@@ -57,6 +58,7 @@ export default function AdminUsersPage() {
   const [selected, setSelected] = React.useState<AdminUserRow | null>(null)
   const [pendingRole, setPendingRole] = React.useState<Role | null>(null)
   const [actionError, setActionError] = React.useState<string | null>(null)
+  const [facultyUserId, setFacultyUserId] = React.useState<string | null>(null)
 
   React.useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 350)
@@ -300,6 +302,25 @@ export default function AdminUsersPage() {
                   )}
                   {actionError && <p className="text-xs text-ws-danger">{actionError}</p>}
                 </div>
+
+                {/* Faculty profile (spec §10) — instructors and admins only */}
+                {selected.role !== "USER" && (
+                  <div className="space-y-2 pt-2 border-t border-ws-hairline">
+                    <p className="text-xs font-semibold">Faculty profile</p>
+                    <p className="text-[11px] text-ws-muted">
+                      Specialization, biography, experience, credentials, country, links and the featured flag.
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5 text-xs"
+                      onClick={() => setFacultyUserId(selected.id)}
+                    >
+                      <UserRoundPenIcon size={14} aria-hidden />
+                      Edit faculty profile
+                    </Button>
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -347,6 +368,11 @@ export default function AdminUsersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Faculty profile editor — mounted only while open */}
+      {facultyUserId && (
+        <FacultyProfileDialog userId={facultyUserId} onClose={() => setFacultyUserId(null)} />
+      )}
     </>
   )
 }
