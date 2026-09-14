@@ -4,6 +4,7 @@ import mongoose from "mongoose"
 import connectDB from "@/lib/db"
 import { Course, Enrollment, Bookmark, User, Lesson } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth"
+import { isSchoolSlug, type SchoolSlug } from "@/lib/schools"
 
 // ============================================================================
 // TYPES
@@ -13,14 +14,20 @@ export type BrowseCourse = {
   id: string
   title: string
   description: string
+  /** Spec §5 program blurb; null on legacy courses (fall back to `description`). */
+  shortDescription: string | null
   thumbnailUrl: string | null
   instructorId: string
   instructorName: string
   instructorAvatarUrl: string | null
   level: "beginner" | "intermediate" | "advanced"
   category: string
+  /** Phase 0 taxonomy; null on courses not yet assigned to a school. */
+  school: SchoolSlug | null
   pricing: "free" | "paid"
   price: number | null
+  /** Enabled package tiers on the course (0 = no package ladder). `price` is already the cheapest enabled tier. */
+  tierCount: number
   status: string
   availableAt: string | null
   preEnrollEnabled: boolean
@@ -92,6 +99,7 @@ export async function fetchBrowseCourses(options?: {
   level?: string
   pricing?: string
   search?: string
+  school?: SchoolSlug
 }): Promise<BrowseCourse[]> {
   try {
     await connectDB()
@@ -104,6 +112,9 @@ export async function fetchBrowseCourses(options?: {
     if (options?.pricing) {
       if (options.pricing === "Free") query.price = 0
       else if (options.pricing === "Paid") query.price = { $gt: 0 }
+    }
+    if (options?.school) {
+      query.school = options.school
     }
     if (options?.search) {
       query.$or = [
@@ -129,14 +140,17 @@ export async function fetchBrowseCourses(options?: {
         id: course._id.toString(),
         title: course.title,
         description: course.description,
+        shortDescription: course.shortDescription ?? null,
         thumbnailUrl: course.thumbnailUrl,
         instructorId: instructor._id.toString(),
         instructorName: `${instructor.firstName} ${instructor.lastName}`,
         instructorAvatarUrl: instructor.avatarUrl,
         level: course.level as "beginner" | "intermediate" | "advanced",
         category: course.category || "",
+        school: isSchoolSlug(course.school) ? course.school : null,
         pricing: course.pricing as "free" | "paid",
         price: course.price,
+        tierCount: (course.packages ?? []).filter((p) => p.enabled).length,
         status: course.status,
         availableAt: course.availableAt ? course.availableAt.toISOString() : null,
         preEnrollEnabled: course.preEnrollEnabled ?? true,
@@ -411,14 +425,17 @@ export async function fetchOtherCourses(excludeCourseId: string): Promise<Browse
         id: course._id.toString(),
         title: course.title,
         description: course.description,
+        shortDescription: course.shortDescription ?? null,
         thumbnailUrl: course.thumbnailUrl,
         instructorId: instructor._id.toString(),
         instructorName: `${instructor.firstName} ${instructor.lastName}`,
         instructorAvatarUrl: instructor.avatarUrl,
         level: course.level as "beginner" | "intermediate" | "advanced",
         category: course.category || "",
+        school: isSchoolSlug(course.school) ? course.school : null,
         pricing: course.pricing as "free" | "paid",
         price: course.price,
+        tierCount: (course.packages ?? []).filter((p) => p.enabled).length,
         status: course.status,
         availableAt: course.availableAt ? course.availableAt.toISOString() : null,
         preEnrollEnabled: course.preEnrollEnabled ?? true,

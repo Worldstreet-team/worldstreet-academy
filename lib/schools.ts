@@ -99,3 +99,18 @@ export const SCHOOL_SLUGS = SCHOOLS.map((s) => s.slug) as [SchoolSlug, ...School
 export function isSchoolSlug(value: unknown): value is SchoolSlug {
   return typeof value === "string" && SCHOOLS.some((s) => s.slug === value)
 }
+
+/**
+ * Program count per school from any list carrying `school` (e.g. the
+ * published `BrowseCourse[]` the landing already fetches). Every school is
+ * present in the result, zero included, so cards never read `undefined`.
+ */
+export function countProgramsBySchool(
+  items: ReadonlyArray<{ school: SchoolSlug | null }>
+): Record<SchoolSlug, number> {
+  const counts = Object.fromEntries(SCHOOLS.map((s) => [s.slug, 0])) as Record<SchoolSlug, number>
+  for (const item of items) {
+    if (item.school && item.school in counts) counts[item.school] += 1
+  }
+  return counts
+}
