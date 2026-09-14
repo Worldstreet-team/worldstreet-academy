@@ -129,17 +129,19 @@ export async function fetchBrowseCourses(options?: {
     
     const query: Record<string, unknown> = { status: "published" }
     
-    if (options?.level && options.level !== "All") {
+    // A server action receives raw JSON: these filters reach the query only as
+    // plain strings, never as operator objects like {"$ne": null} — else ignored.
+    if (typeof options?.level === "string" && options.level && options.level !== "All") {
       query.level = options.level.toLowerCase()
     }
     if (options?.pricing) {
       if (options.pricing === "Free") query.price = 0
       else if (options.pricing === "Paid") query.price = { $gt: 0 }
     }
-    if (options?.school) {
+    if (typeof options?.school === "string" && options.school) {
       query.school = options.school
     }
-    if (options?.instructorId) {
+    if (typeof options?.instructorId === "string" && mongoose.Types.ObjectId.isValid(options.instructorId)) {
       query.instructor = options.instructorId
     }
     if (options?.search) {
@@ -1236,7 +1238,8 @@ type FacultyUserDoc = {
  */
 async function publishedCourseCounts(): Promise<Map<string, number>> {
   const rows = await Course.aggregate<{ _id: mongoose.Types.ObjectId; count: number }>([
-    { $match: { status: "published" } },
+    // A published course with no instructor (a non-Mongoose writer) must not take the whole directory down.
+    { $match: { status: "published", instructor: { $type: "objectId" } } },
     { $group: { _id: "$instructor", count: { $sum: 1 } } },
   ])
   return new Map(rows.map((row) => [row._id.toString(), row.count]))
