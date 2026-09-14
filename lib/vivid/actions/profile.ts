@@ -40,7 +40,9 @@ export async function vividUpdateProfile(p: { firstName?: string; lastName?: str
     if (!currentUser) return { success: false, error: "Not authenticated" }
 
     const { updateProfile } = await import("@/lib/actions/profile")
-    await updateProfile(p)
+    const result = await updateProfile(p)
+    // Report the refusal (e.g. the 1,000-character bio cap) instead of claiming success.
+    if (!result.success) return { success: false, error: result.error ?? "Failed to update profile" }
     return { success: true, message: "Profile updated!" }
   } catch (error) {
     console.error("[Vivid] updateProfile error:", error)

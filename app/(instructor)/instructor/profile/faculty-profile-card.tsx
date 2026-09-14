@@ -31,6 +31,8 @@ export function FacultyProfileCard({
     startTransition(async () => {
       const result = await updateFacultyProfile(value)
       if (result.success) {
+        // Show what was stored: the server normalizes (e.g. https:// on a bare LinkedIn link).
+        setValue(result.data)
         setSaved(true)
         setTimeout(() => setSaved(false), 2500)
       } else {

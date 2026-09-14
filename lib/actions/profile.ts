@@ -98,11 +98,12 @@ export async function getMyFacultyProfile(): Promise<FacultyProfileForm | null> 
 /**
  * Save the signed-in instructor's faculty fields. Same schema as the admin
  * editor; written as a targeted $set, so the student counters and the
- * admin-only `featured` flag are untouched.
+ * admin-only `featured` flag are untouched. Returns the stored (normalized)
+ * values as editor state, so the form shows what was saved.
  */
 export async function updateFacultyProfile(
   input: FacultyProfileForm
-): Promise<{ success: true } | { success: false; error: string }> {
+): Promise<{ success: true; data: FacultyProfileForm } | { success: false; error: string }> {
   try {
     await connectDB()
     const currentUser = await getCurrentUser()
@@ -119,7 +120,11 @@ export async function updateFacultyProfile(
     revalidatePath("/instructor/profile")
     revalidatePath("/faculty", "layout")
     revalidatePath("/")
-    return { success: true }
+    // Editor state from exactly what the $set stored: trimmed, https:// added, de-duplicated.
+    return {
+      success: true,
+      data: facultyFormFrom({ bio: parsed.data.bio, country: parsed.data.country, instructorProfile: parsed.data }),
+    }
   } catch (error) {
     console.error("Update faculty profile error:", error)
     return { success: false, error: "Failed to update faculty profile" }
