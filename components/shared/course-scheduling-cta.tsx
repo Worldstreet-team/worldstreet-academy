@@ -2,8 +2,9 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { preEnrollCourse } from "@/lib/actions/enrollments"
+import { loginUrl } from "@/lib/auth/login-url"
 import { AvailabilityCountdown } from "@/components/shared/availability-countdown"
 import { CalendarClockIcon, CheckIcon } from "lucide-react"
 
@@ -48,6 +49,7 @@ export function CourseSchedulingCta({
   signedIn: boolean
 }) {
   const router = useRouter()
+  const pathname = usePathname()
   const [pending, startTransition] = React.useTransition()
   const [error, setError] = React.useState<string | null>(null)
 
@@ -93,7 +95,7 @@ export function CourseSchedulingCta({
         {availableAt && (
           <>
             <p className="mt-1 text-xs text-ws-muted">
-              Available on <span className="font-medium text-ws-primary">{formatLaunch(availableAt)}</span>
+              Available on <span className="font-medium text-ws-primary" suppressHydrationWarning>{formatLaunch(availableAt)}</span>
             </p>
             <AvailabilityCountdown availableAt={availableAt} className="mt-2" />
           </>
@@ -116,12 +118,12 @@ export function CourseSchedulingCta({
             {pending ? "Enrolling…" : "Enroll Now — Free Until Launch"}
           </button>
         ) : (
-          <Link
-            href="/login"
+          <a
+            href={loginUrl(pathname)}
             className="flex h-11 items-center justify-center rounded-sm bg-ws-brand px-5 text-sm font-semibold text-ws-brand-on transition-opacity hover:opacity-90"
           >
             Sign in to enroll
-          </Link>
+          </a>
         )
       ) : (
         <div className="flex h-11 items-center justify-center rounded-sm bg-ws-chip text-sm font-medium text-ws-muted">

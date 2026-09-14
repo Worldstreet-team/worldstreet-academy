@@ -1,9 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useState, useTransition } from "react"
-import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { Heart } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { loginUrl } from "@/lib/auth/login-url"
 import {
   toggleCourseBookmark,
   checkCoursesBookmarked,
@@ -72,7 +73,7 @@ function queueBookmarkCheck(courseId: string): Promise<boolean> {
  *
  * Signed-in: optimistic toggle against `toggleCourseBookmark`, reverting if
  * the server declines. Signed-out: an identical-looking control that links to
- * /login, so the two states never shift layout.
+ * sign-in (returning to this page), so the two states never shift layout.
  * ------------------------------------------------------------------------- */
 
 const chipClasses =
@@ -104,6 +105,7 @@ export function WishlistButton({
 }) {
   const [bookmarked, setBookmarked] = useState(false)
   const [, startTransition] = useTransition()
+  const pathname = usePathname()
 
   useEffect(() => {
     if (!signedIn) return
@@ -133,8 +135,8 @@ export function WishlistButton({
 
   if (!signedIn) {
     return (
-      <Link
-        href="/login"
+      <a
+        href={loginUrl(pathname)}
         aria-label="Sign in to save this course to your wishlist"
         title="Sign in to save"
         className={cn(
@@ -145,7 +147,7 @@ export function WishlistButton({
       >
         <Heart size={isFull ? 16 : 15} strokeWidth={1.75} aria-hidden />
         {isFull && "Add to wishlist"}
-      </Link>
+      </a>
     )
   }
 
