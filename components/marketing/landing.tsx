@@ -2,10 +2,9 @@ import { fetchBrowseCourses, type BrowseCourse } from "@/lib/actions/student"
 import { fetchLandingReviews } from "@/lib/actions/reviews"
 import { getCurrentUser } from "@/lib/auth/actions"
 import { HeroWall } from "@/components/marketing/hero-wall"
-import { RoomsTimeline } from "@/components/marketing/rooms-timeline"
+import { HowItWorks } from "@/components/marketing/how-it-works"
 import { WordsMarquee } from "@/components/marketing/words-marquee"
 import { AboutBand } from "@/components/marketing/about-band"
-import { ProgramsList } from "@/components/marketing/programs-list"
 import { CatalogueGrid } from "@/components/marketing/catalogue-rail"
 import { UpcomingDrops } from "@/components/marketing/upcoming-drops"
 import { Testimonials, FinaleCta } from "@/components/marketing/reviews-finale"
@@ -74,11 +73,8 @@ export async function Landing() {
       {/* §3 — About, set on the page itself */}
       <AboutBand />
 
-      {/* §4 — Programs index */}
-      <ProgramsList />
-
-      {/* §5 — The product walkthrough, mid-page where it reads as evidence */}
-      <RoomsTimeline />
+      {/* How it works — the four-step journey (spec §11) */}
+      <HowItWorks />
 
       {/* §6 — The catalogue grid (the ONLY course-art section; hides below 3) */}
       <CatalogueGrid courses={gridCourses} signedIn={signedIn} />

@@ -1,55 +1,63 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { motion, useScroll, useTransform } from "motion/react"
 import {
   BrowserFrame,
   ClassroomVignette,
-  LiveRoomVignette,
-  ExamVignette,
-} from "@/components/marketing/hero-slider"
+  PackagesVignette,
+  ProgramVignette,
+  SchoolsVignette,
+} from "@/components/marketing/vignettes"
 import { Reveal } from "@/components/marketing/motion/reveal"
 import { useMotionOK } from "@/components/marketing/motion/bus"
 
 /**
- * §— INSIDE THE ACADEMY, as a timeline. The three rooms run down the page in
- * order — classroom → live room → exam & certificate — beside a vertical
- * track whose gold beam fills with scroll, so the section reads as the path
- * a student actually walks. Left column: sticky step label; right: the room
- * itself in a browser frame.
+ * HOW IT WORKS (spec §11) — the four-step journey as a timeline: sticky step
+ * label on one side, the product moment in a browser frame on the other,
+ * beside a vertical track whose gold beam fills with scroll. One section now
+ * tells the story the old Programs index + Rooms timeline pair told twice.
  *
- * The beam is scroll-linked (useScroll on the section, spring-free transform;
- * height and glow both derive from progress). Reduced motion: the track
- * renders fully lit, entries plain-fade.
+ * The beam is scroll-linked (useScroll on the track, spring-free transform).
+ * Reduced motion: the track renders fully lit, entries plain-fade.
  */
 const STEPS = [
   {
-    id: "learn",
+    id: "school",
     step: "01",
-    label: "The classroom",
-    route: "/dashboard/courses/…/learn",
-    body: "Video and text lessons in order, free previews, and a watch position that autosaves.",
-    Vignette: ClassroomVignette,
+    label: "Choose your school",
+    route: "/schools",
+    body: "Find the area that matches your goals.",
+    Vignette: SchoolsVignette,
   },
   {
-    id: "live",
+    id: "program",
     step: "02",
-    label: "The live room",
-    route: "/dashboard/meetings",
-    body: "Scheduled live classes with class chat — raise a hand, ask mid-lesson.",
-    Vignette: LiveRoomVignette,
+    label: "Select your program",
+    route: "/programs/forex-trading-mastery",
+    body: "Explore the curriculum, instructors, benefits and learning format.",
+    Vignette: ProgramVignette,
   },
   {
-    id: "exam",
+    id: "package",
     step: "03",
-    label: "Exam → certificate",
-    route: "/dashboard/courses/…/exam",
-    body: "A timed exam with a pass mark, then a signed certificate with its own ID.",
-    Vignette: ExamVignette,
+    label: "Choose your package",
+    route: "/programs/forex-trading-mastery#packages",
+    body: "Select the learning experience that fits your needs.",
+    Vignette: PackagesVignette,
+  },
+  {
+    id: "enrol",
+    step: "04",
+    label: "Enrol & start learning",
+    route: "/dashboard/courses/…/learn",
+    body: "Complete your payment and gain access to your learning dashboard.",
+    Vignette: ClassroomVignette,
   },
 ] as const
 
-export function RoomsTimeline() {
+export function HowItWorks() {
   const ok = useMotionOK()
   const trackRef = React.useRef<HTMLDivElement>(null)
   const { scrollYProgress } = useScroll({
@@ -59,16 +67,16 @@ export function RoomsTimeline() {
   const beamHeight = useTransform(scrollYProgress, [0, 1], ["0%", "100%"])
 
   return (
-    <section className="relative py-24 md:py-32" aria-label="Inside the academy">
+    <section id="how-it-works" className="relative scroll-mt-24 py-24 md:py-32" aria-label="How it works">
       <div className="mx-auto max-w-7xl px-6">
         <Reveal y={22} duration={0.7}>
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-ws-gold">
-            Inside the academy
+            How it works
           </p>
           <h2 className="mt-3 max-w-2xl font-display text-[clamp(1.75rem,3.6vw,2.75rem)] font-semibold leading-[1.08] tracking-[-0.02em] text-ws-primary">
-            First lesson to signed certificate,
+            Start your journey
             <br />
-            one room at a time.
+            in four simple steps.
           </h2>
         </Reveal>
 
@@ -88,11 +96,11 @@ export function RoomsTimeline() {
             )}
           </div>
 
-          <div className="space-y-20 md:space-y-32">
+          <ol className="space-y-20 md:space-y-32">
             {STEPS.map((step, i) => {
               const flip = i % 2 === 1
               return (
-                <div
+                <li
                   key={step.id}
                   className="relative grid gap-8 pl-10 md:grid-cols-2 md:gap-16 md:pl-0"
                 >
@@ -104,14 +112,8 @@ export function RoomsTimeline() {
                     <span className="size-1.5 rounded-full bg-ws-gold" />
                   </span>
 
-                  {/* Label — sticky while its room scrolls by on desktop. */}
-                  <div
-                    className={
-                      flip
-                        ? "md:order-2 md:pl-16"
-                        : "md:pr-16 md:text-right"
-                    }
-                  >
+                  {/* Label — sticky while its frame scrolls by on desktop. */}
+                  <div className={flip ? "md:order-2 md:pl-16" : "md:pr-16 md:text-right"}>
                     <div className="md:sticky md:top-28">
                       <Reveal y={18} duration={0.6}>
                         <span className="font-display text-[13px] font-bold tracking-[0.14em] text-ws-gold">
@@ -132,7 +134,7 @@ export function RoomsTimeline() {
                     </div>
                   </div>
 
-                  {/* The room */}
+                  {/* The product moment */}
                   <div className={flip ? "md:order-1 md:pr-16" : "md:pl-16"}>
                     <Reveal y={28} duration={0.75}>
                       <div className="h-[24rem] md:h-[28rem]">
@@ -142,11 +144,28 @@ export function RoomsTimeline() {
                       </div>
                     </Reveal>
                   </div>
-                </div>
+                </li>
               )
             })}
-          </div>
+          </ol>
         </div>
+
+        {/* Spec §11 close: "Your journey starts here." + [EXPLORE PROGRAMS] */}
+        <Reveal
+          y={18}
+          duration={0.6}
+          className="mt-20 flex flex-col items-start gap-5 border-t border-ws-hairline pt-10 sm:flex-row sm:items-center sm:justify-between md:mt-24"
+        >
+          <p className="font-display text-xl font-semibold tracking-[-0.01em] text-ws-primary md:text-2xl">
+            Your journey starts here.
+          </p>
+          <Link
+            href="/schools"
+            className="inline-flex h-12 items-center justify-center rounded-sm bg-ws-brand px-8 text-[15px] font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90"
+          >
+            Explore programs
+          </Link>
+        </Reveal>
       </div>
     </section>
   )
