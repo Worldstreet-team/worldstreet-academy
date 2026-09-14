@@ -6,6 +6,7 @@ import { Call, Conversation, User, Message, type ICall, type CallType } from "@/
 import { getCurrentUser } from "@/lib/auth"
 import { createMeeting, addParticipant } from "@/lib/realtime"
 import { emitCallEvent, emitCallEventToMany, type CallEventPayload } from "@/lib/call-events"
+import { instructorQaRefusal } from "@/lib/course-access"
 
 // ── Helpers ──
 
@@ -69,15 +70,9 @@ export async function initiateCall(
     const recipientId = new Types.ObjectId(receiverId)
 
     // Parallelize conversation lookup + stale call expiry (independent operations)
-    const [conversation, expireResult] = await Promise.all([
+    const [existingConversation, expireResult] = await Promise.all([
       Conversation.findOne({
         participants: { $all: [callerId, recipientId] },
-      }).then(async (conv) => {
-        if (conv) return conv
-        return Conversation.create({
-          participants: [callerId, recipientId],
-          lastMessageAt: new Date(),
-        })
       }),
       // Expire stale ringing calls between this pair
       Call.updateMany(
@@ -102,6 +97,16 @@ export async function initiateCall(
     ])
     if (expireResult.modifiedCount > 0) {
       console.log(`[InitiateCall] Expired ${expireResult.modifiedCount} previous ringing calls between pair`)
+    }
+
+    let conversation = existingConversation
+    if (!conversation) {
+      const refusal = await instructorQaRefusal(currentUser, receiverId)
+      if (refusal) return { success: false, error: refusal }
+      conversation = await Conversation.create({
+        participants: [callerId, recipientId],
+        lastMessageAt: new Date(),
+      })
     }
 
     const [caller, receiver] = await Promise.all([

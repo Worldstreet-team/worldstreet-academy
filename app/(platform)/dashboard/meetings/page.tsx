@@ -920,6 +920,7 @@ export default function MeetingsPage() {
   }
 
   async function handleJoinByLink(meetingId: string) {
+    setJoinError(null)
     // Check if already in this meeting in another tab
     if (tabChannelRef.current) {
       const isOccupied = await new Promise<boolean>((resolve) => {
@@ -1002,6 +1003,7 @@ export default function MeetingsPage() {
   }
 
   async function handleRejoin(meeting: MeetingWithDetails) {
+    setJoinError(null)
     setSetupMessage("Connecting...")
     const result = await joinMeeting(meeting.id)
     if (result.success) {
