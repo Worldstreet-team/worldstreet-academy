@@ -14,7 +14,9 @@
  * package that includes the certificate. Duplicated literally from the app's
  * TS (a .mjs script can't import it):
  *   - lib/brand.ts           BRAND.certificatePrefix ("WSA")
- *   - lib/certificate-id.ts  legacyCertificateId()
+ *   - lib/certificate-id.ts  legacyCertificateId() — the legacy rule's third
+ *                            home is printedCertificateId() in
+ *                            components/learn/certificate-view.tsx; keep all equal
  *   - lib/entitlements.ts    entitlementsFor(): a null packageKey, or a package
  *                            no longer on the course, is full access (certifies)
  * Basic completions never certify and are skipped. Collisions (the legacy

@@ -10,6 +10,7 @@ import { courseAvailability } from "@/lib/types/course"
 import type { CourseStatus } from "@/lib/types/course"
 import { PACKAGE_RANK, entitlementsFor, isPackageKey, packageFor } from "@/lib/entitlements"
 import { getCourseAccess, openPublishedLessonIds } from "@/lib/course-access"
+import { ensureCertificateId } from "@/lib/certificate-id"
 
 const PAGE_SIZE = 20
 
@@ -222,6 +223,9 @@ export async function adminSetEnrollmentStatus(
           : "pre_enrolled"
     }
     await enrollment.save()
+    // A restored completion that was never stamped stores the ID its certificate
+    // already prints (the legacy value) — restore never mints a fresh one.
+    if (action === "restore") await ensureCertificateId(enrollment, false)
 
     revalidatePath("/admin/enrollments")
     return { success: true }
@@ -294,6 +298,9 @@ export async function adminSetEnrollmentPackage(
     enrollment.packageKey = pkg.key
     enrollment.packageName = pkg.name
     await enrollment.save()
+    // An upgrade can make an existing completion certify: store the ID its
+    // certificate prints (the legacy value), never a fresh random one.
+    await ensureCertificateId(enrollment, false)
 
     try {
       await PaymentEvent.create({

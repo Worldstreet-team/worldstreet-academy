@@ -5,7 +5,7 @@ import { Enrollment, Course, User, type ICoursePackage } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth"
 import { entitlementsFor } from "@/lib/entitlements"
 import { SCHOOL_BY_SLUG, isSchoolSlug } from "@/lib/schools"
-import { normalizeCertificateId } from "@/lib/certificate-id"
+import { ensureCertificateId, normalizeCertificateId } from "@/lib/certificate-id"
 
 // ============================================================================
 // TYPES
@@ -92,25 +92,31 @@ export async function fetchCertificate(courseId: string): Promise<CertificateDat
     // Packages without assessment & certificate (Basic) complete, but never certify.
     if (!entitlementsFor(course, enrollment).certificate) return null
 
+    // null when the instructor account no longer exists — the certificate still
+    // renders (no instructor name, no signature), as /verify still attests it.
     const instructor = course.instructor as unknown as {
-      firstName: string
-      lastName: string
-      signatureUrl: string | null
-    }
+      firstName?: string | null
+      lastName?: string | null
+      signatureUrl?: string | null
+    } | null
 
     const user = await User.findById(currentUser.id).select("firstName lastName signatureUrl").lean()
     if (!user) return null
 
+    // Completed and certifying but never stamped (a Go/mobile completion, the
+    // deploy → backfill window): store the legacy ID this page already prints.
+    const certificateId = enrollment.certificateId ?? (await ensureCertificateId(enrollment, false))
+
     return {
       id: enrollment._id.toString(),
-      studentName: `${user.firstName} ${user.lastName}`,
+      studentName: [user.firstName, user.lastName].filter(Boolean).join(" "),
       courseTitle: course.title,
-      instructorName: `${instructor.firstName} ${instructor.lastName}`,
+      instructorName: instructor ? [instructor.firstName, instructor.lastName].filter(Boolean).join(" ") : "",
       completedAt: enrollment.completedAt.toISOString(),
       courseId: courseId,
-      instructorSignatureUrl: instructor.signatureUrl ?? null,
+      instructorSignatureUrl: instructor?.signatureUrl ?? null,
       studentSignatureUrl: user.signatureUrl ?? null,
-      certificateId: enrollment.certificateId ?? null,
+      certificateId,
       programName: course.title,
       schoolName: isSchoolSlug(course.school) ? SCHOOL_BY_SLUG[course.school].name : null,
     }

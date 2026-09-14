@@ -283,8 +283,9 @@ function CertificatePreview({
 /**
  * The stored certificate ID, or — for a certificate completed before IDs were
  * stored — the ID it has always printed. Same rule as `legacyCertificateId` in
- * lib/certificate-id.ts, repeated because that module (node crypto + Mongoose)
- * can't enter a client bundle.
+ * lib/certificate-id.ts and the backfill in scripts/backfill-certificate-ids.mjs,
+ * repeated because that module (node crypto + Mongoose) can't enter a client
+ * bundle. Change all three together.
  */
 function printedCertificateId(data: CertificateData): string {
   return data.certificateId ?? `${BRAND.certificatePrefix}-${data.id.slice(-8).toUpperCase()}`
