@@ -295,6 +295,13 @@ Brand: "WorldStreet Academy" appears in 43 code locations; the lockup (mark + "W
 
 **Depends on:** Phase 0, 2.
 
+**Carried over from Phase 2 (final review, 2026-09-14) — bake these into the 3.x tasks:**
+- **Legacy path.** A course with no enabled packages renders one synthesized "Full program" tier whose CTA links `package=standard`. `purchaseCourse` must treat any `packageKey` on a course with no enabled packages as absent (charge `course.price`, no `package_required`), or that link dead-ends.
+- **Lesson tiers are a subset of the sold ladder.** Since the Phase 2 fix wave every write path stores `minPackageKey` only when it is an enabled package on the course (else `null`). Enforcement should still treat a tier the course no longer sells as `null` (a later tier disable in the lesson manager is not re-normalised until the next editor save).
+- **$0 tiers.** `pricingFromPackages` makes `Course.pricing` "free" when the cheapest enabled tier is $0, so a free Basic on a paid ladder flips the scalar the mobile app reads. Decide whether a $0 tier is allowed on a paid ladder and route it through the free-enrolment path.
+- **Live reservations use the ladder.** On `/programs/[slug]` a pre-enrolled visitor on a live course now picks a package from the ladder (links carry `package=`); checkout must activate the reservation with that package.
+- **Release caveat, strengthened.** Saving a course in the editor now rewrites `course.price` to the cheapest enabled tier, bypassing the catalogue script's `--allow-price-change` guard. Phase 2 must not reach production without Phase 3.
+
 ### Tasks
 
 **3.1 `purchaseCourse` takes a package (`lib/actions/enrollments.ts`).**
