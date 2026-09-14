@@ -1,5 +1,6 @@
 "use server"
 
+import { headers } from "next/headers"
 import connectDB from "@/lib/db"
 import { Enrollment, Course, User, type ICoursePackage } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth"
@@ -191,6 +192,7 @@ export async function fetchMyCertificates(): Promise<StudentCertificate[]> {
 
 export type VerifiedCertificate = {
   certificateId: string
+  /** First name + last initial ("Johnson D.") — IDs can be guessed, so the full name is never public. */
   studentName: string
   programName: string
   /** null for a course without a school */
@@ -200,16 +202,54 @@ export type VerifiedCertificate = {
   instructorName: string
 }
 
+const VERIFY_MAX_LOOKUPS = 30
+const VERIFY_WINDOW_MS = 10 * 60 * 1000
+
+/**
+ * /verify lookups per client IP. In memory on purpose: the app runs as one
+ * long-lived Node process (Coolify). Never exported — this is a "use server" file.
+ */
+const verifyLookups = new Map<string, { count: number; resetAt: number }>()
+
+/** Counts this lookup against the caller's IP; true once it is over the limit. */
+async function overVerifyLimit(): Promise<boolean> {
+  const h = await headers()
+  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip")?.trim() || "unknown"
+  const now = Date.now()
+  for (const [key, entry] of verifyLookups) {
+    if (entry.resetAt <= now) verifyLookups.delete(key)
+  }
+  const entry = verifyLookups.get(ip)
+  if (!entry) {
+    verifyLookups.set(ip, { count: 1, resetAt: now + VERIFY_WINDOW_MS })
+    return false
+  }
+  entry.count += 1
+  return entry.count > VERIFY_MAX_LOOKUPS
+}
+
+/** "Johnson D." — first name + last initial; the first name alone when there is no last name. */
+function maskedStudentName(firstName: string | null | undefined, lastName: string | null | undefined): string {
+  const initial = lastName?.trim().charAt(0).toUpperCase()
+  return [firstName?.trim(), initial ? `${initial}.` : ""].filter(Boolean).join(" ")
+}
+
 /**
  * Public lookup behind /verify/[certificateId] — no auth. A certificate
  * verifies only while its enrollment is completed, its package includes the
  * certificate, and the ID is stored on the enrollment (legacy IDs count once
  * backfilled). The instructor's signature is not required: it attests
  * completion, and a later signature change must not revoke issued PDFs.
- * Returns names, program and dates only — never an email or a database id.
+ * Returns a masked student name, program and dates only — never an email or a
+ * database id. At most VERIFY_MAX_LOOKUPS per IP per 10 minutes; past that it
+ * returns "rate_limited" (legacy IDs are guessable, so lookups can't be free).
  */
-export async function verifyCertificate(certificateId: string): Promise<VerifiedCertificate | null> {
+export async function verifyCertificate(
+  certificateId: string
+): Promise<VerifiedCertificate | "rate_limited" | null> {
   try {
+    if (await overVerifyLimit()) return "rate_limited"
+
     const id = normalizeCertificateId(certificateId)
     if (!id) return null
 
@@ -240,7 +280,7 @@ export async function verifyCertificate(certificateId: string): Promise<Verified
 
     return {
       certificateId: enrollment.certificateId,
-      studentName: `${student.firstName} ${student.lastName ?? ""}`.trim(),
+      studentName: maskedStudentName(student.firstName, student.lastName),
       programName: course.title,
       schoolName: isSchoolSlug(course.school) ? SCHOOL_BY_SLUG[course.school].name : null,
       completedAt: enrollment.completedAt.toISOString(),

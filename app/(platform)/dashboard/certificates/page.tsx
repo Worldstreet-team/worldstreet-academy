@@ -41,6 +41,8 @@ export default async function CertificatesPage() {
                   year: "numeric",
                   month: "short",
                   day: "numeric",
+                  // UTC — the same day the certificate and /verify print.
+                  timeZone: "UTC",
                 })
 
                 return (

@@ -29,11 +29,13 @@ function formatDate(iso: string): string {
   })
 }
 
-function Field({ label, value }: { label: string; value: string }) {
+function Field({ label, value, numeric = false }: { label: string; value: string; numeric?: boolean }) {
   return (
     <div className="min-w-0">
       <dt className="text-[11px] font-medium uppercase tracking-[0.12em] text-ws-subtle">{label}</dt>
-      <dd className="mt-1 break-words text-[15px] font-medium text-ws-primary">{value}</dd>
+      <dd className={`mt-1 break-words text-[15px] font-medium text-ws-primary${numeric ? " tabular-nums" : ""}`}>
+        {value}
+      </dd>
     </div>
   )
 }
@@ -41,11 +43,14 @@ function Field({ label, value }: { label: string; value: string }) {
 /**
  * `/verify/[certificateId]` — spec §13 made checkable. Public (no auth), RSC,
  * noindex. The ID is read case-insensitively; an unknown, revoked or
- * non-certifying ID reads "No certificate with this ID" (HTTP 200).
+ * non-certifying ID reads "No certificate with this ID" (HTTP 200). Lookups are
+ * rate-limited per IP; over the limit the page says so inline, never "not found".
  */
 export default async function VerifyCertificatePage({ params }: Params) {
   const { certificateId } = await params
-  const certificate = await verifyCertificate(certificateId)
+  const result = await verifyCertificate(certificateId)
+  const rateLimited = result === "rate_limited"
+  const certificate = rateLimited ? null : result
   const lookedUp = certificateId.trim().toUpperCase().slice(0, 40)
 
   return (
@@ -61,7 +66,18 @@ export default async function VerifyCertificatePage({ params }: Params) {
         Every {BRAND.name} certificate carries a unique ID. This page checks it against our records.
       </p>
 
-      {certificate ? (
+      {rateLimited ? (
+        <section aria-labelledby="certificate-heading" className="mt-10 rounded-lg bg-ws-surface p-6 md:p-8">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ws-warning/10 text-ws-warning">
+              <CircleAlertIcon size={18} aria-hidden />
+            </span>
+            <h2 id="certificate-heading" className="min-w-0 font-display text-lg font-semibold text-ws-primary">
+              Too many lookups — try again in a few minutes.
+            </h2>
+          </div>
+        </section>
+      ) : certificate ? (
         <section aria-labelledby="certificate-heading" className="mt-10 rounded-lg bg-ws-surface p-6 md:p-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2
@@ -79,7 +95,7 @@ export default async function VerifyCertificatePage({ params }: Params) {
             <Field label="Student" value={certificate.studentName} />
             <Field label="Program" value={certificate.programName} />
             {certificate.schoolName && <Field label="School" value={certificate.schoolName} />}
-            <Field label="Completed" value={formatDate(certificate.completedAt)} />
+            <Field label="Completed" value={formatDate(certificate.completedAt)} numeric />
             {certificate.instructorName && <Field label="Instructor" value={certificate.instructorName} />}
           </dl>
           <p className="mt-6 border-t border-ws-hairline pt-4 text-[13px] leading-relaxed text-ws-muted">
