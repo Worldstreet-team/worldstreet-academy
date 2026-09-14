@@ -39,6 +39,8 @@ export const queryKeys = {
   assessments: ["assessments"] as const,
   mentorship: ["mentorship"] as const,
   mentorshipQueue: ["mentorship-queue"] as const,
+  courseAssignments: (courseId: string) => ["course-assignments", courseId] as const,
+  studentAssignment: (assignmentId: string) => ["student-assignment", assignmentId] as const,
 
   // ── Instructor application ──
   myApplication: ["my-instructor-application"] as const,

@@ -7,7 +7,7 @@ import { Topbar } from "@/components/platform/topbar"
 import { PageHeader } from "@/components/shared/page-header"
 import { EmptyState } from "@/components/shared/empty-state"
 import { ArtCourses } from "@/components/shared/illustrations"
-import { ArrowLeft, FileQuestion, Pencil } from "lucide-react"
+import { ArrowLeft, ClipboardCheck, FileQuestion, Pencil } from "lucide-react"
 import { fetchCourseForEdit } from "@/lib/actions/instructor"
 import { ResourceManager } from "@/components/instructor/resource-manager"
 import { DeleteCourseButton } from "@/components/instructor/delete-course-dialog"
@@ -250,6 +250,14 @@ export default async function InstructorCourseInfoPage({
                   >
                     <FileQuestion size={16} strokeWidth={2} />
                     Exam (CBT)
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    render={<Link href={`/instructor/courses/${course.id}/assignments`} />}
+                  >
+                    <ClipboardCheck size={16} strokeWidth={2} />
+                    Assignments
                   </Button>
                   {/* Type-to-confirm dialog; the deleteCourse action is unchanged */}
                   <DeleteCourseButton courseId={course.id} courseTitle={course.title} />
