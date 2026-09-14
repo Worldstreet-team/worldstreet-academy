@@ -673,6 +673,53 @@ export async function sendInterviewReminderEmail(
   }
 }
 
+/** T-24h / T-1h course class reminder (sent by the cron route) — class wording for the host and students. */
+export async function sendClassReminderEmail(
+  to: string,
+  data: {
+    recipientName: string
+    classTitle: string
+    courseTitle: string | null
+    hostName: string
+    /** The recipient is the instructor running the class. */
+    isHost: boolean
+    scheduledAt: string
+    joinUrl: string
+    window: "24h" | "1h"
+  }
+) {
+  const when = new Date(data.scheduledAt).toLocaleString("en-US", {
+    dateStyle: "full",
+    timeStyle: "short",
+  })
+  const what = data.courseTitle ? `${data.classTitle} (${data.courseTitle})` : data.classTitle
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to,
+      subject:
+        data.window === "1h"
+          ? "Your class starts in about an hour"
+          : "Reminder: your class is coming up",
+      react: React.createElement(SimplePipelineEmail, {
+        preview: `${data.classTitle} — ${when}`,
+        title: data.window === "1h" ? "Class starting soon" : "Class coming up",
+        bodyText: data.isHost
+          ? `${data.recipientName}, you're hosting ${what}, scheduled for ${when}. Open it from Meetings to start the class — students can join once you're in.`
+          : `${data.recipientName}, ${what} with ${data.hostName} is scheduled for ${when}. You can join as soon as your instructor starts the class.`,
+        ctaLabel: data.isHost ? "Open class" : "View class",
+        ctaUrl: data.joinUrl,
+        avatarName: data.recipientName,
+      }),
+    })
+    if (error) return { success: false, error: error.message }
+    return { success: true }
+  } catch (err) {
+    console.error("[Email] Class reminder error:", err)
+    return { success: false, error: "Failed to send email" }
+  }
+}
+
 /* ─── Send Functions ─── */
 
 /**

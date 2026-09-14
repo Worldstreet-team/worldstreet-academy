@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from "next/server"
 import connectDB from "@/lib/db"
-import { Meeting, User } from "@/lib/db/models"
+import { Course, Enrollment, Meeting, User } from "@/lib/db/models"
 import { notifyUser } from "@/lib/notify"
-import { sendInterviewReminderEmail } from "@/lib/email"
+import { sendClassReminderEmail, sendInterviewReminderEmail } from "@/lib/email"
+import { entitlementsFor } from "@/lib/entitlements"
 import { APP_URL } from "@/lib/app-url"
 
 
 /**
- * Scheduled-meeting reminders — T-24h and T-1h, for interviews and any other
- * scheduled meeting. Idempotent via the per-meeting `reminders` ledger.
+ * Scheduled-meeting reminders — T-24h and T-1h. Idempotent via the per-meeting
+ * `reminders` ledger.
+ *
+ * - Course classes (meeting.courseId): the host, invitees, and every student
+ *   whose active/completed enrollment's package includes live classes — the
+ *   same audience that may join (joinMeeting) — with class wording.
+ * - Every other scheduled meeting (instructor interviews): host + invitees,
+ *   interview wording, exactly as before.
  *
  * Coolify scheduled task (~every 10 min):
  *   curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" \
@@ -46,51 +53,89 @@ export async function POST(request: NextRequest) {
     const joinPath = `/dashboard/meetings?join=${meeting._id.toString()}`
     const when = meeting.scheduledAt
 
-    // Recipients: host + everyone invited.
     const host = await User.findById(meeting.hostId).select("firstName lastName email").lean()
     const hostName = host ? `${host.firstName ?? ""} ${host.lastName ?? ""}`.trim() : "Host"
     const inviteeIds = (meeting.invites ?? [])
       .filter((i) => i.userId)
       .map((i) => i.userId!.toString())
-    const invitees = inviteeIds.length
-      ? await User.find({ _id: { $in: inviteeIds } }).select("firstName lastName email").lean()
-      : []
 
     const title =
       window === "1h" ? "Starting in ~1 hour" : "Reminder: scheduled for tomorrow"
     const bodyLine = `${meeting.title} — ${when.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}`
 
     const jobs: Promise<unknown>[] = []
-    // Host bell (+ email for interview meetings)
-    jobs.push(notifyUser(meeting.hostId.toString(), { type: "meeting", title, body: bodyLine, href: joinPath }))
-    if (host?.email && !host.email.endsWith("@users.noemail")) {
-      jobs.push(
-        sendInterviewReminderEmail(host.email, {
-          recipientName: host.firstName || "there",
-          counterpartName: invitees[0]
-            ? `${invitees[0].firstName ?? ""} ${invitees[0].lastName ?? ""}`.trim()
-            : "your participant",
-          scheduledAt: when.toISOString(),
-          joinUrl: `${APP_URL}${joinPath}`,
-          window,
-        })
-      )
-    }
-    // Invitees
-    for (const inv of invitees) {
-      jobs.push(notifyUser(inv._id.toString(), { type: "meeting", title, body: bodyLine, href: joinPath }))
-      if (inv.email && !inv.email.endsWith("@users.noemail")) {
+
+    if (meeting.courseId) {
+      // Course class: host + invitees + students whose package includes live classes.
+      const [course, enrollments] = await Promise.all([
+        Course.findById(meeting.courseId).select("title packages").lean(),
+        Enrollment.find({ course: meeting.courseId, status: { $in: ["active", "completed"] } })
+          .select("user packageKey")
+          .lean(),
+      ])
+      const studentIds = course
+        ? enrollments.filter((e) => entitlementsFor(course, e).liveClasses).map((e) => e.user.toString())
+        : []
+      const hostId = meeting.hostId.toString()
+      const recipientIds = [...new Set([hostId, ...inviteeIds, ...studentIds])]
+      const recipients = await User.find({ _id: { $in: recipientIds } }).select("firstName email").lean()
+
+      for (const recipient of recipients) {
+        const recipientId = recipient._id.toString()
+        jobs.push(notifyUser(recipientId, { type: "meeting", title, body: bodyLine, href: joinPath }))
+        if (recipient.email && !recipient.email.endsWith("@users.noemail")) {
+          jobs.push(
+            sendClassReminderEmail(recipient.email, {
+              recipientName: recipient.firstName || "there",
+              classTitle: meeting.title,
+              courseTitle: course?.title ?? null,
+              hostName,
+              isHost: recipientId === hostId,
+              scheduledAt: when.toISOString(),
+              joinUrl: `${APP_URL}${joinPath}`,
+              window,
+            })
+          )
+        }
+      }
+    } else {
+      // Interview (or any other scheduled meeting): host + everyone invited.
+      const invitees = inviteeIds.length
+        ? await User.find({ _id: { $in: inviteeIds } }).select("firstName lastName email").lean()
+        : []
+
+      // Host bell (+ email for interview meetings)
+      jobs.push(notifyUser(meeting.hostId.toString(), { type: "meeting", title, body: bodyLine, href: joinPath }))
+      if (host?.email && !host.email.endsWith("@users.noemail")) {
         jobs.push(
-          sendInterviewReminderEmail(inv.email, {
-            recipientName: inv.firstName || "there",
-            counterpartName: hostName,
+          sendInterviewReminderEmail(host.email, {
+            recipientName: host.firstName || "there",
+            counterpartName: invitees[0]
+              ? `${invitees[0].firstName ?? ""} ${invitees[0].lastName ?? ""}`.trim()
+              : "your participant",
             scheduledAt: when.toISOString(),
             joinUrl: `${APP_URL}${joinPath}`,
             window,
           })
         )
       }
+      // Invitees
+      for (const inv of invitees) {
+        jobs.push(notifyUser(inv._id.toString(), { type: "meeting", title, body: bodyLine, href: joinPath }))
+        if (inv.email && !inv.email.endsWith("@users.noemail")) {
+          jobs.push(
+            sendInterviewReminderEmail(inv.email, {
+              recipientName: inv.firstName || "there",
+              counterpartName: hostName,
+              scheduledAt: when.toISOString(),
+              joinUrl: `${APP_URL}${joinPath}`,
+              window,
+            })
+          )
+        }
+      }
     }
+
     await Promise.allSettled(jobs)
 
     // Mark the ledger AFTER sending — a crash mid-send re-sends rather than skips.
