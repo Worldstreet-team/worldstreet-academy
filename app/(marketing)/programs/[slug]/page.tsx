@@ -11,6 +11,8 @@ import { WhatsIncluded } from "@/components/programs/whats-included"
 import { ProgramInstructor } from "@/components/programs/program-instructor"
 import { Faq } from "@/components/marketing/faq"
 import type { ProgramAccess } from "@/components/programs/access"
+import { PackageLadder } from "@/components/programs/package-ladder"
+import { ProgramStickyBar } from "@/components/programs/program-sticky-bar"
 
 // Per-visitor: enrollment state and the coming-soon/live cutover both change
 // under a cached render.
@@ -76,6 +78,7 @@ export default async function ProgramPage({ params }: Params) {
             />
           </section>
         )}
+        <PackageLadder courseId={program.id} packages={program.packages} access={access} />
         <WhatsIncluded />
         <ProgramInstructor
           id={program.instructorId}
@@ -88,6 +91,12 @@ export default async function ProgramPage({ params }: Params) {
         />
       </div>
       <Faq />
+      {access.kind === "open" && (
+        <ProgramStickyBar
+          fromPrice={Math.min(...program.packages.map((p) => p.price))}
+          multiTier={program.packages.length > 1}
+        />
+      )}
     </article>
   )
 }
