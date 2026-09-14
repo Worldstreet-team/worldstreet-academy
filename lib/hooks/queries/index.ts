@@ -17,3 +17,4 @@ export {
   useUnreadCount,
   useInvalidateMessages,
 } from "./use-messages"
+export { useMyCertificates } from "./use-certificates"

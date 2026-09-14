@@ -2,12 +2,31 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { ArrowRight } from "lucide-react"
 import { Topbar } from "@/components/platform/topbar"
 import { CourseCard, CourseCardSkeleton } from "@/components/platform/course-card"
+import { EnrollmentCard } from "@/components/platform/enrollment-card"
 import { Mascot } from "@/components/platform/mascot"
-import type { StudentEnrollment } from "@/lib/actions/student"
-
+import { Button } from "@/components/ui/button"
+import {
+  CertificatesTile,
+  CommunityTile,
+  CurrentCourseTile,
+  InstructorsTile,
+  ProgressTile,
+  SupportTile,
+  UpcomingClassesTile,
+} from "@/components/dashboard/home-tiles"
+import { BRAND } from "@/lib/brand"
+import {
+  enrollmentHref,
+  hasPrioritySupport,
+  includesAny,
+  instructorRows,
+  pickCurrent,
+  pickResume,
+} from "@/lib/dashboard-home"
 import {
   useEnrollments,
   useBookmarks,
@@ -25,8 +44,8 @@ function getGreeting(): string {
 }
 
 /**
- * Section header — title left, "See all" gold link right, per the Academy Home
- * reference screen. Sections are separated by space, not by nested cards.
+ * Section header — title left, a quiet "See all" right. Gold on this page
+ * belongs to the Continue learning CTA alone.
  */
 function SectionHeader({
   title,
@@ -45,15 +64,10 @@ function SectionHeader({
       {href && (
         <Link
           href={href}
-          className="group inline-flex items-center gap-1 text-[13px] font-medium text-ws-gold transition-opacity hover:opacity-80"
+          className="group inline-flex items-center gap-1 text-[13px] font-medium text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:text-ws-primary"
         >
           {linkLabel}
-          <ArrowRight
-            size={14}
-            strokeWidth={2}
-            aria-hidden
-            className="transition-transform duration-[var(--ws-motion-fast)] group-hover:translate-x-0.5"
-          />
+          <ArrowRight size={14} strokeWidth={2} aria-hidden />
         </Link>
       )}
     </div>
@@ -69,119 +83,20 @@ function CourseGrid({ children }: { children: React.ReactNode }) {
   )
 }
 
-/**
- * Compact empty state, sized to sit in the flow of a course section rather
- * than dominate it. The shared `EmptyState` is a full-page block — at ~500px
- * tall it made an empty dashboard read as a broken page instead of a new one.
- */
-function SectionEmpty({
-  title,
-  description,
-  actionLabel,
-  actionHref,
-}: {
-  title: string
-  description: string
-  actionLabel?: string
-  actionHref?: string
-}) {
+/** Compact empty state that sits in a section's flow; the hero CTA carries the action. */
+function SectionEmpty({ title, description }: { title: string; description: string }) {
   return (
-    <div className="flex flex-col items-start gap-3 rounded-lg border border-dashed border-ws-hairline bg-ws-surface/40 px-6 py-8 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <p className="text-[15px] font-semibold text-ws-primary">{title}</p>
-        <p className="mt-1 text-[13px] text-ws-muted">{description}</p>
-      </div>
-      {actionLabel && actionHref && (
-        <Link
-          href={actionHref}
-          className="inline-flex h-11 shrink-0 items-center justify-center rounded-sm bg-ws-brand px-6 text-[15px] font-semibold text-ws-brand-on transition-opacity hover:opacity-90"
-        >
-          {actionLabel}
-        </Link>
-      )}
-    </div>
-  )
-}
-
-/**
- * The learner's overall standing, shown inside the greeting pane: lessons
- * completed across every enrollment, one gold bar for overall progress, and
- * the in-progress / completed course split.
- */
-function ProgressPane({
-  enrollments,
-  isLoading,
-}: {
-  enrollments: StudentEnrollment[]
-  isLoading: boolean
-}) {
-  // Progress is measured over the lessons each package opens (Phase 3 Task 4).
-  const totalLessons = enrollments.reduce((s, e) => s + e.openLessons, 0)
-  const completedLessons = enrollments.reduce(
-    (s, e) => s + Math.round(((e.progress ?? 0) / 100) * e.openLessons),
-    0
-  )
-  const overallPct = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0
-  const inProgress = enrollments.filter((e) => e.progress > 0 && e.progress < 100).length
-  const completedCourses = enrollments.filter((e) => e.progress === 100).length
-
-  if (isLoading) {
-    return (
-      <div className="w-full shrink-0 lg:w-80">
-        <div className="h-3 w-32 animate-pulse rounded-full bg-ws-raised" />
-        <div className="mt-3 h-1.5 w-full animate-pulse rounded-full bg-ws-track" />
-        <div className="mt-4 h-3 w-44 animate-pulse rounded-full bg-ws-raised" />
-      </div>
-    )
-  }
-
-  return (
-    <div className="w-full shrink-0 lg:w-80">
-      <div className="flex items-baseline justify-between gap-4">
-        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-ws-muted">
-          Overall progress
-        </p>
-        <p className="text-[13px] tabular-nums text-ws-muted">
-          {totalLessons > 0 ? (
-            <>
-              <span className="font-semibold text-ws-primary">{completedLessons}</span>/
-              {totalLessons} lessons
-            </>
-          ) : (
-            "No lessons yet"
-          )}
-        </p>
-      </div>
-
-      <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-ws-track">
-        <div
-          className="h-full rounded-full bg-ws-brand"
-          style={{ width: `${Math.max(overallPct, totalLessons > 0 ? 2 : 0)}%` }}
-        />
-      </div>
-
-      <div className="mt-3.5 flex items-center justify-between gap-4">
-        <p className="tabular-nums">
-          <span className="font-display text-xl font-semibold text-ws-primary">{overallPct}%</span>{" "}
-          <span className="text-[13px] text-ws-muted">complete</span>
-        </p>
-        <div className="flex items-center gap-2">
-          <span className="rounded-full bg-ws-chip px-2.5 py-1 text-[11px] font-medium text-ws-muted">
-            <span className="font-semibold tabular-nums text-ws-primary">{inProgress}</span> in
-            progress
-          </span>
-          <span className="rounded-full bg-ws-chip px-2.5 py-1 text-[11px] font-medium text-ws-muted">
-            <span className="font-semibold tabular-nums text-ws-primary">{completedCourses}</span>{" "}
-            completed
-          </span>
-        </div>
-      </div>
+    <div className="rounded-lg bg-ws-surface px-6 py-8">
+      <p className="text-[15px] font-semibold text-ws-primary">{title}</p>
+      <p className="mt-1 text-[13px] text-ws-muted">{description}</p>
     </div>
   )
 }
 
 export default function DashboardPage() {
   const user = useUser()
+  // The checkout success page's "Go to dashboard" links here with ?welcome=1.
+  const welcome = useSearchParams().get("welcome") === "1"
 
   const { data: enrollments = [], isLoading: isLoadingEnrollments } = useEnrollments()
   const { data: bookmarks = [], isLoading: isLoadingBookmarks } = useBookmarks()
@@ -189,45 +104,58 @@ export default function DashboardPage() {
   const bookmarkedIds = useBookmarkedIds()
   const toggleBookmark = useToggleBookmark()
 
+  const resume = pickResume(enrollments)
+  const current = pickCurrent(enrollments)
+  const instructors = instructorRows(enrollments)
+  // Tiles the student's packages can't back are hidden, never faked.
+  const showUpcomingClasses = includesAny(enrollments, "liveClasses")
+  const showCertificates = includesAny(enrollments, "certificate")
+
   return (
     <>
       <Topbar title="Dashboard" />
 
       <div className="flex-1 px-4 sm:px-6 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-8 md:px-8 md:pb-12 lg:px-12">
         <div className="mx-auto w-full max-w-7xl space-y-12">
-          {/* Greeting pane — mascot + greeting on the left, the learner's
-              overall standing on the right, on a quiet surface card. The
-              lesson tally is derived from each course's progress × lesson
-              count, which is exactly how `progress` itself is computed
-              server-side, so the two never disagree. */}
-          <header className="ws-animate-in relative overflow-hidden rounded-lg border border-ws-hairline bg-ws-surface">
-            <div className="relative flex flex-col gap-6 p-6 md:p-8 lg:flex-row lg:items-center lg:justify-between lg:gap-10">
-              <div className="flex min-w-0 items-center gap-6 md:gap-10">
-                <Mascot
-                  size={150}
-                  className="h-[110px] w-[110px] shrink-0 md:h-[150px] md:w-[150px]"
-                />
-                <div className="min-w-0">
-                  <h1 className="font-display text-[28px] font-semibold tracking-[-0.02em] text-ws-primary md:text-[34px]">
-                    {getGreeting()}, {user.firstName}
-                  </h1>
-                  <p className="mt-2 text-[15px] text-ws-muted">
-                    Pick up where you left off, or discover something new.
-                  </p>
+          {/* Welcome band + the page's one gold CTA (spec §12 "Continue learning →") */}
+          <header className="ws-animate-in rounded-lg bg-ws-surface">
+            <div className="flex flex-col gap-6 p-6 sm:flex-row sm:items-center md:gap-10 md:p-8">
+              <Mascot size={150} className="h-[96px] w-[96px] shrink-0 md:h-[130px] md:w-[130px]" />
+              <div className="min-w-0 flex-1">
+                <h1 className="font-display text-[28px] font-semibold tracking-[-0.02em] text-ws-primary md:text-[34px]">
+                  {welcome ? `Welcome to ${BRAND.name}` : `${getGreeting()}, ${user.firstName}`}
+                </h1>
+                <p className="mt-2 text-[15px] text-ws-muted">
+                  {welcome
+                    ? "Your learning journey starts now."
+                    : "Pick up where you left off, or discover something new."}
+                </p>
+                <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2">
+                  {isLoadingEnrollments ? (
+                    <div className="h-11 w-48 animate-pulse rounded-sm bg-ws-raised" />
+                  ) : resume ? (
+                    <>
+                      <Button size="lg" className="h-11 gap-2 px-6" render={<Link href={enrollmentHref(resume)} />}>
+                        Continue learning
+                        <ArrowRight size={16} aria-hidden />
+                      </Button>
+                      <span className="max-w-full truncate text-[13px] text-ws-muted">{resume.courseTitle}</span>
+                    </>
+                  ) : (
+                    <Button size="lg" className="h-11 gap-2 px-6" render={<Link href="/dashboard/courses" />}>
+                      Browse programs
+                      <ArrowRight size={16} aria-hidden />
+                    </Button>
+                  )}
                 </div>
               </div>
-
-              <ProgressPane
-                enrollments={enrollments}
-                isLoading={isLoadingEnrollments}
-              />
             </div>
           </header>
 
-          {/* My courses */}
-          <section className="">
+          {/* MY PROGRAMS */}
+          <section>
             <SectionHeader
-              title="My courses"
+              title="My programs"
               href={enrollments.length > 0 ? "/dashboard/my-courses" : undefined}
             />
             {isLoadingEnrollments ? (
@@ -239,28 +167,32 @@ export default function DashboardPage() {
             ) : enrollments.length === 0 ? (
               <SectionEmpty
                 title="You're not enrolled in anything yet"
-                description="Pick a course below and it'll show up here with your progress."
-                actionLabel="Browse courses"
-                actionHref="/dashboard/courses"
+                description="Choose a program and it'll show up here with your progress."
               />
             ) : (
               <CourseGrid>
                 {enrollments.slice(0, 3).map((enrollment) => (
-                  <CourseCard
-                    key={enrollment.id}
-                    href={`/dashboard/courses/${enrollment.courseId}/learn/${enrollment.resumeLessonId ?? enrollment.firstLessonId ?? "first"}`}
-                    title={enrollment.courseTitle}
-                    thumbnailUrl={enrollment.courseThumbnail}
-                    progress={enrollment.progress}
-                  />
+                  <EnrollmentCard key={enrollment.id} enrollment={enrollment} />
                 ))}
               </CourseGrid>
             )}
           </section>
 
-          {/* Browse courses */}
-          <section className="">
-            <SectionHeader title="Browse courses" href="/dashboard/courses" />
+          {/* Spec §12 tiles, in spec order. A uniform grid: tiles hide per student,
+              so fixed column spans would leave holes. */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <CurrentCourseTile enrollment={current} isLoading={isLoadingEnrollments} />
+            <ProgressTile enrollments={enrollments} isLoading={isLoadingEnrollments} />
+            {showUpcomingClasses && <UpcomingClassesTile />}
+            {showCertificates && <CertificatesTile />}
+            {instructors.length > 0 && <InstructorsTile rows={instructors} />}
+            <CommunityTile />
+            <SupportTile priority={hasPrioritySupport(enrollments)} />
+          </div>
+
+          {/* Browse programs */}
+          <section>
+            <SectionHeader title="Browse programs" href="/dashboard/courses" />
             {isLoadingBrowse ? (
               <CourseGrid>
                 {[0, 1, 2].map((i) => (
@@ -269,8 +201,8 @@ export default function DashboardPage() {
               </CourseGrid>
             ) : browseCourses.length === 0 ? (
               <SectionEmpty
-                title="No courses published yet"
-                description="New courses will appear here as instructors publish them."
+                title="No programs published yet"
+                description="New programs will appear here as instructors publish them."
               />
             ) : (
               <CourseGrid>
@@ -295,10 +227,9 @@ export default function DashboardPage() {
             )}
           </section>
 
-          {/* Bookmarks — only when there are any. An empty-state block for a
-              purely optional feature was pure vertical noise on the old page. */}
+          {/* Bookmarks — only when there are any. */}
           {(isLoadingBookmarks || bookmarks.length > 0) && (
-            <section className="">
+            <section>
               <SectionHeader title="Bookmarks" href="/dashboard/bookmarks" />
               {isLoadingBookmarks ? (
                 <CourseGrid>

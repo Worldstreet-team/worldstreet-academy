@@ -8,9 +8,17 @@ import { MessageSquareIcon } from "lucide-react"
 
 interface MessageInstructorButtonProps {
   instructorId: string
+  /** Button text — the dashboard says "Message" or "Message your mentor". */
+  label?: string
+  /** "outline" where a gold button would compete with the page's primary CTA. */
+  variant?: "default" | "outline"
 }
 
-export function MessageInstructorButton({ instructorId }: MessageInstructorButtonProps) {
+export function MessageInstructorButton({
+  instructorId,
+  label = "Message Instructor",
+  variant = "default",
+}: MessageInstructorButtonProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -30,14 +38,14 @@ export function MessageInstructorButton({ instructorId }: MessageInstructorButto
   return (
     <div className="flex flex-col items-end gap-1">
       <Button
-        variant="default"
+        variant={variant}
         size="sm"
         className="gap-1.5"
         onClick={handleMessage}
         disabled={isPending}
       >
         <MessageSquareIcon  size={14} />
-        {isPending ? "Opening..." : "Message Instructor"}
+        {isPending ? "Opening..." : label}
       </Button>
       {error && <p className="text-[11px] text-ws-danger">{error}</p>}
     </div>

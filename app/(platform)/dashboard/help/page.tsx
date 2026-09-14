@@ -10,6 +10,8 @@ import {
 } from "lucide-react"
 import { Topbar } from "@/components/platform/topbar"
 import { PageHeader } from "@/components/shared/page-header"
+import { fetchMyEnrollments } from "@/lib/actions/student"
+import { hasPrioritySupport } from "@/lib/dashboard-home"
 
 /**
  * FAQ content is intentionally scoped to how the Academy actually works —
@@ -25,7 +27,7 @@ const faqs = [
   {
     question: "How is my course progress tracked?",
     answer:
-      "Each lesson you finish is marked complete, and your overall progress is the share of lessons completed. You can see per-course progress on My Courses and pick up exactly where you left off from the course player.",
+      "Each lesson you finish is marked complete, and your overall progress is the share of lessons completed. You can see per-course progress on My programs and pick up exactly where you left off from the course player.",
   },
   {
     question: "When can I take the course exam?",
@@ -75,7 +77,13 @@ const quickLinks = [
   },
 ]
 
-export default function HelpPage() {
+export default async function HelpPage() {
+  // Priority-support packages (spec §12 Support) flag their emails for the support inbox.
+  const priority = hasPrioritySupport(await fetchMyEnrollments())
+  const supportHref = priority
+    ? `mailto:support@worldstreetgold.com?subject=${encodeURIComponent("[Priority] Support request")}`
+    : "mailto:support@worldstreetgold.com"
+
   return (
     <>
       <Topbar title="Help" />
@@ -114,7 +122,7 @@ export default function HelpPage() {
               </h2>
               <div className="mt-3 divide-y divide-ws-hairline overflow-hidden rounded-lg border border-ws-hairline bg-ws-surface">
                 <a
-                  href="mailto:support@worldstreetgold.com"
+                  href={supportHref}
                   className="flex min-h-14 items-center gap-3 px-5 py-3 transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-raised/60"
                 >
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ws-raised text-ws-muted">
@@ -122,7 +130,7 @@ export default function HelpPage() {
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-ws-primary">
-                      Email us
+                      Email us{priority ? " · Priority support" : ""}
                     </p>
                     <p className="truncate text-[13px] text-ws-muted">
                       support@worldstreetgold.com · replies within one business
