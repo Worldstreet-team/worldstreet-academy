@@ -160,8 +160,9 @@ export function HeroWall({
           delay={0.05}
           className="mt-5 max-w-4xl font-display text-[clamp(2.75rem,6.5vw,5.5rem)] font-semibold leading-[1.02] tracking-[-0.03em] text-ws-primary"
           lines={[
-            { text: "A trading floor" },
-            { text: "with a syllabus.", className: "text-ws-gold" },
+            { text: "Learn Skills." },
+            { text: "Build Value." },
+            { text: "Own Your Future.", className: "text-ws-gold" },
           ]}
         />
         <motion.p
@@ -170,8 +171,10 @@ export function HeroWall({
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: EASE_INERTIA, delay: 0.35 }}
         >
-          Courses from traders who trade, live sessions you can speak in, and a
-          real exam between the last lesson and your signed certificate.
+          Master practical, in-demand skills through expert-led programs
+          designed for the new and modern economy. Explore our schools,
+          choose your path and start building capabilities you can apply in
+          the real world.
         </motion.p>
         <motion.div
           className="mt-8 flex flex-wrap items-center gap-3"
@@ -179,27 +182,27 @@ export function HeroWall({
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: EASE_INERTIA, delay: 0.5 }}
         >
+          <Link
+            href="/schools"
+            className="inline-flex h-12 items-center justify-center rounded-sm bg-ws-brand px-8 text-[15px] font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90"
+          >
+            Explore programs
+          </Link>
           {signedIn ? (
             <Link
               href="/dashboard"
-              className="inline-flex h-12 items-center justify-center rounded-sm bg-ws-brand px-8 text-[15px] font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90"
+              className="inline-flex h-12 items-center justify-center rounded-sm border border-ws-hairline px-7 text-[15px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:border-ws-brand/40 hover:text-ws-gold"
             >
               Continue learning
             </Link>
           ) : (
             <a
               href={registerUrl}
-              className="inline-flex h-12 items-center justify-center rounded-sm bg-ws-brand px-8 text-[15px] font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90"
+              className="inline-flex h-12 items-center justify-center rounded-sm border border-ws-hairline px-7 text-[15px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:border-ws-brand/40 hover:text-ws-gold"
             >
               Start learning
             </a>
           )}
-          <Link
-            href="/courses"
-            className="inline-flex h-12 items-center justify-center rounded-sm border border-ws-hairline px-7 text-[15px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:border-ws-brand/40 hover:text-ws-gold"
-          >
-            Explore courses
-          </Link>
         </motion.div>
       </div>
     </section>

@@ -5,6 +5,7 @@ import { StarIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Reveal, RevealGroup } from "@/components/marketing/motion/reveal"
 import type { LandingReview } from "@/lib/actions/reviews"
+import { BRAND } from "@/lib/brand"
 
 /**
  * §8 — FROM THE FLOOR. Real reviews only (`fetchLandingReviews` verbatim,
@@ -23,13 +24,13 @@ export function Testimonials({ reviews }: { reviews: LandingReview[] }) {
       <div className="mx-auto max-w-6xl px-6">
         <RevealGroup>
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-ws-gold">
-            From the floor
+            Testimonials
           </p>
           <h2
             className="mt-4 max-w-3xl font-display font-semibold leading-[1.05] tracking-[-0.02em] text-ws-primary"
             style={{ fontSize: "clamp(2rem, 4.5vw, 3.5rem)" }}
           >
-            Rated by the people who did the work.
+            Real people. Real learning experiences.
           </h2>
         </RevealGroup>
 
@@ -76,35 +77,46 @@ export function FinaleCta({
         style={{ background: "var(--ws-glow-brand)" }}
       />
       <div className="relative mx-auto max-w-3xl px-6">
-        <Reveal as="h2" amount={0.2} className="font-display text-[clamp(2.5rem,5.5vw,4.25rem)] font-semibold leading-[1.02] tracking-[-0.03em] text-ws-primary">
-          <span className="block">Ready when</span>
-          <span className="block text-ws-gold">the market is.</span>
+        <Reveal as="h2" amount={0.2} className="font-display text-[clamp(2.25rem,5vw,4rem)] font-semibold leading-[1.04] tracking-[-0.03em] text-ws-primary">
+          <span className="block">Your next level starts with</span>
+          <span className="block text-ws-gold">what you learn today.</span>
         </Reveal>
-        <Reveal as="p" amount={0.2} delay={0.1} className="mx-auto mt-5 max-w-md text-[15px] leading-relaxed text-ws-muted">
-          Courses run beginner to advanced — start where you are.
+        <Reveal as="p" amount={0.2} delay={0.1} className="mx-auto mt-6 max-w-2xl text-[15px] leading-relaxed text-ws-muted md:text-[16px]">
+          The world is changing. Technology is changing. Business is changing.
+          The way people create careers and opportunities is changing. The
+          question isn&apos;t whether the world will change. The question is:
+          Will you be ready?
         </Reveal>
-        <Reveal amount={0.2} delay={0.18} className="mt-8 flex flex-wrap items-center justify-center gap-3">
+        <Reveal as="p" amount={0.2} delay={0.14} className="mx-auto mt-4 max-w-md text-[15px] font-medium leading-relaxed text-ws-primary">
+          Choose a skill. Build your knowledge. Develop your capability. Create
+          your opportunity.
+        </Reveal>
+        <Reveal amount={0.2} delay={0.2} className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <Link
+            href="/schools"
+            className="inline-flex h-12 items-center justify-center rounded-sm bg-ws-brand px-9 text-[15px] font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90"
+          >
+            Explore programs
+          </Link>
           {signedIn ? (
             <Link
-              href="/dashboard"
-              className="inline-flex h-12 items-center justify-center rounded-sm bg-ws-brand px-9 text-[15px] font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90"
+              href="/dashboard/courses"
+              className="inline-flex h-12 items-center justify-center rounded-sm border border-ws-hairline px-8 text-[15px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:border-ws-brand/40 hover:text-ws-gold"
             >
-              Get started
+              Enrol now
             </Link>
           ) : (
             <a
               href={registerUrl}
-              className="inline-flex h-12 items-center justify-center rounded-sm bg-ws-brand px-9 text-[15px] font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90"
+              className="inline-flex h-12 items-center justify-center rounded-sm border border-ws-hairline px-8 text-[15px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:border-ws-brand/40 hover:text-ws-gold"
             >
-              Get started
+              Enrol now
             </a>
           )}
-          <Link
-            href="/courses"
-            className="inline-flex h-12 items-center justify-center rounded-sm border border-ws-hairline px-8 text-[15px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:border-ws-brand/40 hover:text-ws-gold"
-          >
-            Browse courses
-          </Link>
+        </Reveal>
+        <Reveal as="p" amount={0.2} delay={0.26} className="mx-auto mt-8 max-w-xl text-[13px] leading-relaxed text-ws-subtle">
+          Welcome to {BRAND.name}.{" "}
+          <span className="font-semibold text-ws-muted">Learn Skills. Build Value. Create Your Future.</span>
         </Reveal>
       </div>
     </section>

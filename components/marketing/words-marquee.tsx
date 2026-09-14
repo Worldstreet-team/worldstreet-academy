@@ -5,16 +5,16 @@ import { addFrame, useMotionOK } from "@/components/marketing/motion/bus"
 
 /** What the academy actually trades in. Words, not claims. */
 const WORDS = [
-  "Curriculum",
-  "Discipline",
-  "Risk",
-  "Structure",
+  "Trading",
+  "Blockchain",
+  "Artificial intelligence",
+  "Software",
+  "Cybersecurity",
+  "Data",
+  "Creative media",
+  "Digital business",
   "Mentorship",
-  "Practice",
-  "Execution",
   "Certification",
-  "Patience",
-  "Conviction",
 ] as const
 
 /** px per second at full tilt. */

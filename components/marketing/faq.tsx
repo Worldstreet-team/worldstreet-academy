@@ -14,37 +14,37 @@ import { BRAND } from "@/lib/brand"
  * Native button rows over hairline dividers; answers are height-animated
  * (instant under reduced motion) and the plus icon rotates 45° into an ×.
  *
- * Every answer is grounded in the shipped product — wallet-balance checkout
- * (lib/actions/enrollments.purchaseCourse), free courses, course levels and
- * free-preview lessons, timed exams with a per-course pass mark, signed PDF
- * certificates, free pre-enrollment on scheduled drops, and the dashboard's
- * Become an Instructor application. No invented numbers, no invented policy.
+ * Copy is spec §15 verbatim.
  */
 
 const FAQS = [
   {
-    q: "How do I pay for a course?",
-    a: "Paid courses are bought with your WorldStreet wallet balance — there's no separate card checkout inside the academy. Free courses cost nothing: enroll and start.",
+    q: `Who can join ${BRAND.name}?`,
+    a: "Anyone who wants to develop practical knowledge and skills can explore our programs, subject to the requirements of individual courses.",
   },
   {
-    q: "I'm new to trading. Is this for me?",
-    a: "Yes — every course is labeled beginner, intermediate or advanced, and instructors can open lessons as free previews so you can try a course before you commit.",
+    q: "Do I need previous experience?",
+    a: "Many programs are designed for beginners. Individual program pages will specify prerequisites where necessary.",
   },
   {
-    q: "How do exams work?",
-    a: "A course exam is a timed sitting with a pass mark set by the instructor. Passing it unlocks your course completion.",
+    q: "Are classes online?",
+    a: `Programs can be delivered through the ${BRAND.name} LMS using the format specified on each program page.`,
   },
   {
-    q: "Do I get a certificate?",
-    a: "Once you pass, your certificate of completion is issued — signed by you and your instructor, and downloadable as a PDF to share.",
+    q: "Can I learn more than one course?",
+    a: "Yes. Students can enrol in multiple programs where available.",
   },
   {
-    q: "What does a scheduled drop mean?",
-    a: "Some courses are published ahead of their release date. When pre-enrollment is on, you reserve a seat free before launch — you only pay when it goes live and you start.",
+    q: "Do I receive a certificate?",
+    a: "Eligible programs may provide certificates upon meeting their completion requirements.",
   },
   {
-    q: `Can I teach on ${BRAND.name}?`,
-    a: "Yes — apply from the Become an Instructor page in your dashboard. Once approved, you can build courses and run live sessions of your own.",
+    q: "Can I pay online?",
+    a: "Yes. The platform provides secure payment options available to the student's country.",
+  },
+  {
+    q: "What happens after payment?",
+    a: "Your enrollment is confirmed and your course access becomes available according to the program's delivery schedule.",
   },
 ] as const
 
@@ -53,7 +53,7 @@ export function Faq() {
   const [open, setOpen] = React.useState<number | null>(null)
 
   return (
-    <section className="relative isolate py-24 md:py-32" aria-label="Frequently asked questions">
+    <section id="faq" className="relative isolate scroll-mt-24 py-24 md:py-32" aria-label="Frequently asked questions">
       <div className="mx-auto grid max-w-7xl gap-12 px-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-16">
         {/* ── Heading column ── */}
         <div>
@@ -69,8 +69,8 @@ export function Faq() {
                 Answers before you ask.
               </h2>
               <p className="mt-4 max-w-sm text-[15px] leading-relaxed text-ws-muted">
-                The short version of how paying, learning, exams and teaching
-                work here.
+                The short version of how joining, learning, paying and
+                certificates work here.
               </p>
             </RevealGroup>
           </div>

@@ -73,7 +73,7 @@ export function CatalogueGrid({
           <div className="relative px-6 pb-2 pt-10 sm:px-12 sm:pt-16 lg:py-24 lg:pl-16 lg:pr-8">
             <RevealGroup>
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ws-brand-on/70">
-                The catalogue
+                Featured programs
               </p>
               <h2
                 className="mt-4 max-w-lg font-display font-semibold leading-[1.02] tracking-[-0.03em] text-ws-brand-on sm:mt-5"
@@ -88,7 +88,7 @@ export function CatalogueGrid({
                 href="/courses"
                 className="mt-7 inline-flex h-12 items-center justify-center rounded-full bg-black px-8 text-[15px] font-semibold text-white transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-85 sm:mt-9 sm:h-13 sm:px-9"
               >
-                Browse all courses
+                Browse all programs
               </Link>
             </RevealGroup>
           </div>
@@ -99,7 +99,7 @@ export function CatalogueGrid({
               ref={railRef}
               onScroll={syncEdges}
               className="grid auto-cols-[14.5rem] grid-flow-col grid-rows-2 gap-3.5 overflow-x-auto px-6 py-8 [-ms-overflow-style:none] [scrollbar-width:none] sm:auto-cols-[17rem] sm:gap-5 sm:px-12 sm:py-10 lg:py-16 lg:pl-2 lg:pr-12 [&::-webkit-scrollbar]:hidden"
-              aria-label="Course catalogue"
+              aria-label="Program catalogue"
             >
               {courses.map((course) => (
                 <MarketingCourseCard
@@ -122,7 +122,7 @@ export function CatalogueGrid({
             <div className="flex items-center justify-end gap-2 px-6 pb-8 sm:px-12 sm:pb-10 lg:pb-16 lg:pr-12">
               <button
                 type="button"
-                aria-label="Previous courses"
+                aria-label="Previous programs"
                 onClick={() => page(-1)}
                 disabled={atStart}
                 className="flex size-11 items-center justify-center rounded-full border border-black/25 text-ws-brand-on transition-[background-color,opacity] duration-[var(--ws-motion-fast)] hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/40 disabled:pointer-events-none disabled:opacity-35"
@@ -131,7 +131,7 @@ export function CatalogueGrid({
               </button>
               <button
                 type="button"
-                aria-label="More courses"
+                aria-label="More programs"
                 onClick={() => page(1)}
                 disabled={atEnd}
                 className="flex size-11 items-center justify-center rounded-full bg-black text-white transition-[opacity] duration-[var(--ws-motion-fast)] hover:opacity-85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/40 disabled:pointer-events-none disabled:opacity-35"
