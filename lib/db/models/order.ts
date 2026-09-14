@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose"
+import type { PackageKey } from "./course"
 
 /**
  * A purchase order for a paid course — the auditable state machine around a
@@ -41,6 +42,7 @@ export interface IOrder extends Document {
   status: OrderStatus
   /** Wallet charge id once the debit is confirmed. */
   chargeId: string | null
+  packageKey: PackageKey | null
   failureCode: string | null
   history: IOrderTransition[]
   createdAt: Date
@@ -62,6 +64,7 @@ const OrderSchema = new Schema<IOrder>(
       index: true,
     },
     chargeId: { type: String, default: null },
+    packageKey: { type: String, enum: [null, "basic", "standard", "executive"], default: null },
     failureCode: { type: String, default: null },
     history: [
       {

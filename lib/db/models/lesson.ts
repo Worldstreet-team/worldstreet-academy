@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose"
+import type { PackageKey } from "./course"
 
 export type LessonType = "video" | "live" | "text"
 
@@ -22,6 +23,8 @@ export interface ILesson extends Document {
   sectionTitle: string | null // Group lessons into sections
   order: number
   isFree: boolean // Preview lesson (accessible without purchase)
+  /** Lowest package that can open this lesson; null = every tier (and every legacy enrollment). */
+  minPackageKey: PackageKey | null
   isPublished: boolean
   /**
    * @deprecated Superseded by the `Resource` collection (./resource.ts), which
@@ -102,6 +105,7 @@ const LessonSchema = new Schema<ILesson>(
       type: Boolean,
       default: false,
     },
+    minPackageKey: { type: String, enum: [null, "basic", "standard", "executive"], default: null },
     isPublished: {
       type: Boolean,
       default: false,

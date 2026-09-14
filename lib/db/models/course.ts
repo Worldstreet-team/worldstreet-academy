@@ -13,6 +13,35 @@ export type CoursePricing = "free" | "paid"
  */
 export type CourseStatus = "draft" | "published" | "suspended" | "closed" | "archived"
 
+export type PackageKey = "basic" | "standard" | "executive"
+
+/** What a package unlocks beyond the lessons themselves (spec §6 ladder). */
+export interface IPackageEntitlements {
+  liveClasses: boolean
+  instructorQa: boolean
+  assignments: boolean
+  certificate: boolean
+  mentorship: boolean
+  prioritySupport: boolean
+}
+
+/**
+ * One purchasable tier of a course. Prices are whole USD like Course.price.
+ * An empty `packages` array means the course sells at its single `price`
+ * (every course today) — readers synthesize one package from it.
+ */
+export interface ICoursePackage {
+  key: PackageKey
+  name: string
+  tagline: string
+  price: number
+  features: string[]
+  highlight: boolean
+  ctaLabel: string | null
+  enabled: boolean
+  entitlements: IPackageEntitlements
+}
+
 export interface ICourse extends Document {
   _id: Types.ObjectId
   title: string
@@ -67,6 +96,7 @@ export interface ICourse extends Document {
   liveNotifiedAt: Date | null
   /** When true, passing the course exam gates completion + certificate (enforced web + Go). */
   examRequired: boolean
+  packages: ICoursePackage[]
   createdAt: Date
   updatedAt: Date
 }
@@ -178,6 +208,32 @@ const CourseSchema = new Schema<ICourse>(
     examRequired: {
       type: Boolean,
       default: false,
+    },
+    packages: {
+      type: [
+        new Schema<ICoursePackage>(
+          {
+            key: { type: String, enum: ["basic", "standard", "executive"], required: true },
+            name: { type: String, required: true, trim: true, maxlength: 60 },
+            tagline: { type: String, default: "", maxlength: 120 },
+            price: { type: Number, required: true, min: 0 },
+            features: { type: [String], default: [] },
+            highlight: { type: Boolean, default: false },
+            ctaLabel: { type: String, default: null, maxlength: 40 },
+            enabled: { type: Boolean, default: true },
+            entitlements: {
+              liveClasses: { type: Boolean, default: false },
+              instructorQa: { type: Boolean, default: false },
+              assignments: { type: Boolean, default: false },
+              certificate: { type: Boolean, default: false },
+              mentorship: { type: Boolean, default: false },
+              prioritySupport: { type: Boolean, default: false },
+            },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
     },
     publishedAt: {
       type: Date,

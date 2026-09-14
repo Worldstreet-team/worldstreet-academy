@@ -1,5 +1,14 @@
 export { User, type IUser, type InstructorStatus } from "./user"
-export { Course, type ICourse, type CourseLevel, type CoursePricing, type CourseStatus } from "./course"
+export {
+  Course,
+  type ICourse,
+  type CourseLevel,
+  type CoursePricing,
+  type CourseStatus,
+  type PackageKey,
+  type IPackageEntitlements,
+  type ICoursePackage,
+} from "./course"
 export { Lesson, type ILesson, type LessonType } from "./lesson"
 export { Enrollment, type IEnrollment, type EnrollmentStatus } from "./enrollment"
 export { Review, type IReview } from "./review"

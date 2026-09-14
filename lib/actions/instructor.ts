@@ -3,12 +3,63 @@
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import type mongoose from "mongoose"
+import { z } from "zod/v4"
 import connectDB from "@/lib/db"
-import { Course, Lesson, User, ICourse } from "@/lib/db/models"
+import { Course, Lesson, User, ICourse, type ICoursePackage } from "@/lib/db/models"
 import { uploadThumbnail, deleteFromCloudinary } from "@/lib/cloudinary"
 import type { CourseLevel, CoursePricing, CourseStatus } from "@/lib/types"
 import { getCurrentUser } from "@/lib/auth"
 import { SCHOOL_BY_SLUG, isSchoolSlug, type SchoolSlug } from "@/lib/schools"
+import { pricingFromPackages } from "@/lib/entitlements"
+
+const PackageSchema = z.object({
+  key: z.enum(["basic", "standard", "executive"]),
+  name: z.string().trim().min(2).max(60),
+  tagline: z.string().trim().max(120).default(""),
+  price: z.number().int().min(0).max(100000),
+  features: z.array(z.string().trim().min(1).max(160)).max(20).default([]),
+  highlight: z.boolean().default(false),
+  ctaLabel: z.string().trim().max(40).nullable().default(null),
+  enabled: z.boolean().default(true),
+  entitlements: z.object({
+    liveClasses: z.boolean(), instructorQa: z.boolean(), assignments: z.boolean(),
+    certificate: z.boolean(), mentorship: z.boolean(), prioritySupport: z.boolean(),
+  }),
+})
+const PackagesSchema = z
+  .array(PackageSchema)
+  .max(3)
+  .refine((arr) => new Set(arr.map((p) => p.key)).size === arr.length, "Package keys must be unique")
+  .refine((arr) => arr.filter((p) => p.highlight).length <= 1, "Only one package can be highlighted")
+
+/**
+ * Reads and validates the `packages` form field shared by createCourse/updateCourse.
+ * Absent field → untouched (editor doesn't send it yet). Present but invalid →
+ * fieldErrors.packages set, packages stays null so the caller keeps existing data.
+ */
+function parsePackages(
+  formData: FormData,
+  fieldErrors: Record<string, string>
+): ICoursePackage[] | null {
+  const raw = formData.get("packages")
+  if (typeof raw !== "string" || raw === "") return null
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    fieldErrors.packages = "Packages could not be read"
+    return null
+  }
+
+  const result = PackagesSchema.safeParse(parsed)
+  if (!result.success) {
+    fieldErrors.packages = result.error.issues[0]?.message ?? "Invalid packages"
+    return null
+  }
+
+  return result.data
+}
 
 // ---- Types for form state ----
 export type CourseFormState = {
@@ -207,6 +258,7 @@ export async function createCourse(
 
   // Validate
   const fieldErrors: Record<string, string> = {}
+  const packages = parsePackages(formData, fieldErrors)
 
   if (!title || title.trim().length < 3) {
     fieldErrors.title = "Title must be at least 3 characters"
@@ -243,6 +295,9 @@ export async function createCourse(
       return { success: false, error: "Only admins can set that course status", fieldErrors: {} }
     }
 
+    // Packages (when sent) are the source of truth for pricing — cheapest enabled tier.
+    const pricingOverride = packages ? pricingFromPackages(packages) : null
+
     // Create the course
     const course = await Course.create({
       title,
@@ -261,6 +316,8 @@ export async function createCourse(
       availableAt: availableAt === "invalid" ? null : availableAt,
       preEnrollEnabled,
       publishedAt: requestedStatus === "published" ? new Date() : null,
+      ...(packages ? { packages } : {}),
+      ...(pricingOverride ? { pricing: pricingOverride.pricing, price: pricingOverride.price } : {}),
     })
     
     // Create lessons if provided
@@ -340,6 +397,7 @@ export async function updateCourse(
   const preEnrollEnabled = formData.get("preEnrollEnabled") !== "false"
 
   const fieldErrors: Record<string, string> = {}
+  const packages = parsePackages(formData, fieldErrors)
 
   if (!title || title.trim().length < 3) {
     fieldErrors.title = "Title must be at least 3 characters"
@@ -386,6 +444,9 @@ export async function updateCourse(
       return { success: false, error: "Only admins can set that course status", fieldErrors: {} }
     }
 
+    // Packages (when sent) are the source of truth for pricing — cheapest enabled tier.
+    const pricingOverride = packages ? pricingFromPackages(packages) : null
+
     // Update course
     await Course.findByIdAndUpdate(courseId, {
       title,
@@ -405,6 +466,8 @@ export async function updateCourse(
       ...(status === "published" && !existingCourse.publishedAt
         ? { publishedAt: new Date() }
         : {}),
+      ...(packages ? { packages } : {}),
+      ...(pricingOverride ? { pricing: pricingOverride.pricing, price: pricingOverride.price } : {}),
     })
     
     // Update lessons if provided

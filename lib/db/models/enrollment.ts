@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose"
+import type { PackageKey } from "./course"
 
 /**
  * pre_enrolled — enrolled before the course's availableAt, uncharged. Becomes
@@ -33,6 +34,10 @@ export interface IEnrollment extends Document {
   activatedAt: Date | null
   /** True for pre-payment-integration paid enrollments granted without a real charge (grandfathered, excluded from earnings). */
   legacyUnpaid: boolean
+  /** Package bought (null = legacy single-price, free, or pre-enrolled). */
+  packageKey: PackageKey | null
+  /** Package name snapshot at purchase. */
+  packageName: string | null
   // Progress tracking
   progress: number // 0-100 percentage
   completedLessons: Types.ObjectId[] // Array of completed lesson IDs
@@ -94,6 +99,8 @@ const EnrollmentSchema = new Schema<IEnrollment>(
       type: Boolean,
       default: false,
     },
+    packageKey: { type: String, enum: [null, "basic", "standard", "executive"], default: null },
+    packageName: { type: String, default: null },
     progress: {
       type: Number,
       default: 0,
