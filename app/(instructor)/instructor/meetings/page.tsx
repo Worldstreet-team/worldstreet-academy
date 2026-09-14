@@ -88,6 +88,15 @@ const MEETINGS_PATH = "/instructor/meetings"
 
 type ScreenSharer = { id: string; name: string; isLocal: boolean }
 
+/** joinMeeting's refusal when the host tries to start a course class more than 15 minutes early. */
+const EARLY_START_ERROR = "This class is scheduled for later"
+
+/** That refusal for the host, with the start time in their own timezone. */
+function earlyStartNotice(startsAt: string): string {
+  const when = new Date(startsAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })
+  return `This class is scheduled for ${when} — you can start it from 15 minutes before.`
+}
+
 export default function InstructorMeetingsPage() {
   const user = useUser()
   const searchParams = useSearchParams()
@@ -1044,6 +1053,7 @@ export default function InstructorMeetingsPage() {
       }
     } else {
       setSetupMessage(null)
+      if (result.error === EARLY_START_ERROR && result.startsAt) setScheduleNotice(earlyStartNotice(result.startsAt))
       console.error("[Meeting] Join failed:", result.error)
     }
   }
@@ -1085,6 +1095,7 @@ export default function InstructorMeetingsPage() {
       }
     } else {
       setSetupMessage(null)
+      if (result.error === EARLY_START_ERROR && result.startsAt) setScheduleNotice(earlyStartNotice(result.startsAt))
       console.error("[Meeting] Rejoin failed:", result.error)
     }
   }

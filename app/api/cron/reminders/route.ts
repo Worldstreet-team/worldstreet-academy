@@ -6,6 +6,12 @@ import { sendClassReminderEmail, sendInterviewReminderEmail } from "@/lib/email"
 import { entitlementsFor } from "@/lib/entitlements"
 import { APP_URL } from "@/lib/app-url"
 
+/**
+ * Where a class reminder sends its host: the instructor page, which starts the
+ * class on request. Never the auto-joining student link — that would try to open
+ * the room from a reminder tapped a day early.
+ */
+const HOST_CLASS_PATH = "/instructor/meetings"
 
 /**
  * Scheduled-meeting reminders — T-24h and T-1h. Idempotent via the per-meeting
@@ -84,7 +90,9 @@ export async function POST(request: NextRequest) {
 
         for (const recipient of recipients) {
           const recipientId = recipient._id.toString()
-          jobs.push(notifyUser(recipientId, { type: "meeting", title, body: bodyLine, href: joinPath }))
+          const isHost = recipientId === hostId
+          const href = isHost ? HOST_CLASS_PATH : joinPath
+          jobs.push(notifyUser(recipientId, { type: "meeting", title, body: bodyLine, href }))
           if (recipient.email && !recipient.email.endsWith("@users.noemail")) {
             jobs.push(
               sendClassReminderEmail(recipient.email, {
@@ -92,9 +100,9 @@ export async function POST(request: NextRequest) {
                 classTitle: meeting.title,
                 courseTitle: course?.title ?? null,
                 hostName,
-                isHost: recipientId === hostId,
+                isHost,
                 scheduledAt: when.toISOString(),
-                joinUrl: `${APP_URL}${joinPath}`,
+                joinUrl: `${APP_URL}${href}`,
                 window,
               })
             )

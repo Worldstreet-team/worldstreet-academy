@@ -24,6 +24,9 @@ function backgroundSave(promise: Promise<unknown>) {
   promise.catch((err) => console.error("[Meeting] Background save failed:", err))
 }
 
+/** How early the host may start a scheduled course class (joinMeeting refuses before that). */
+const HOST_EARLY_START_MS = 15 * 60_000
+
 // ── Types ──
 
 export type MeetingRole = "host" | "co-host" | "participant" | "guest"
@@ -175,6 +178,21 @@ export async function joinMeeting(meetingId: string): Promise<{
 
     // Host already has access — use currentUser directly (skip DB lookup)
     if (meeting.hostId.toString() === currentUser.id) {
+      // A scheduled course class can't be started more than HOST_EARLY_START_MS
+      // ahead — a reminder tap a day early must not open the room. Interviews
+      // (no courseId) keep starting whenever the host joins.
+      if (
+        meeting.courseId &&
+        meeting.status === "scheduled" &&
+        meeting.scheduledAt &&
+        meeting.scheduledAt.getTime() - Date.now() > HOST_EARLY_START_MS
+      ) {
+        return {
+          success: false,
+          error: "This class is scheduled for later",
+          startsAt: meeting.scheduledAt.toISOString(),
+        }
+      }
       // A scheduled meeting (e.g. an interview) goes live the moment the host
       // joins — no separate "start" step needed from the meetings page.
       if (meeting.status === "scheduled") {
@@ -749,6 +767,8 @@ export async function getMyMeetings(): Promise<{
           createdAt: m.createdAt.toISOString(),
           startedAt: m.startedAt?.toISOString(),
           scheduledAt: m.scheduledAt?.toISOString(),
+          // Lets the host's list offer "Cancel class" on scheduled course classes only (not interviews).
+          courseId: m.courseId?.toString(),
           participantAvatars,
         }
       }),
@@ -2082,11 +2102,15 @@ export type UpcomingClass = {
 /** How many upcoming classes the dashboard tile and the meetings page can list. */
 const UPCOMING_CLASSES_LIMIT = 10
 
+/** A class the host hasn't started yet stays listed this long past its start time ("Waiting for your instructor"). */
+const UPCOMING_CLASS_GRACE_MS = 2 * 3600 * 1000
+
 /**
  * Scheduled course classes the student can attend: status "scheduled", start
- * time still ahead, on a course where they hold an active/completed enrollment
- * whose package includes live classes. Soonest first. When the host starts a
- * class it turns "active" and moves to Course Sessions (getMyMeetingInvites).
+ * time ahead or within the last UPCOMING_CLASS_GRACE_MS (a late host), on a
+ * course where they hold an active/completed enrollment whose package includes
+ * live classes. Soonest first. When the host starts a class it turns "active"
+ * and moves to Course Sessions (getMyMeetingInvites); a cancelled one is "ended".
  */
 export async function getUpcomingClasses(): Promise<UpcomingClass[]> {
   try {
@@ -2116,7 +2140,7 @@ export async function getUpcomingClasses(): Promise<UpcomingClass[]> {
     const meetings = await Meeting.find({
       courseId: { $in: classCourseIds },
       status: "scheduled",
-      scheduledAt: { $gte: new Date() },
+      scheduledAt: { $gte: new Date(Date.now() - UPCOMING_CLASS_GRACE_MS) },
     })
       .sort({ scheduledAt: 1 })
       .limit(UPCOMING_CLASSES_LIMIT)

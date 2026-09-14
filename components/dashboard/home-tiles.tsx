@@ -178,6 +178,9 @@ export function ProgressTile({
 /** UPCOMING CLASSES — rendered only when some package includes live classes. */
 export function UpcomingClassesTile() {
   const { data: classes = [], isLoading } = useUpcomingClasses()
+  // Read per render to tell a late class from a future one; the minute refetch re-renders, so staleness is bounded.
+  // eslint-disable-next-line react-hooks/purity
+  const now = Date.now()
   return (
     <DashboardTile
       icon={CalendarClockIcon}
@@ -195,7 +198,11 @@ export function UpcomingClassesTile() {
               <Link href={c.joinHref} className="block min-w-0">
                 <p className="truncate text-[13px] font-medium text-ws-primary">{c.title}</p>
                 <p className="truncate text-[11px] text-ws-muted">
-                  <span className="tabular-nums">{formatDateTime(c.scheduledAt)}</span>
+                  {new Date(c.scheduledAt).getTime() <= now ? (
+                    "Waiting for your instructor"
+                  ) : (
+                    <span className="tabular-nums">{formatDateTime(c.scheduledAt)}</span>
+                  )}
                   {c.courseTitle ? ` · ${c.courseTitle}` : ""}
                 </p>
               </Link>

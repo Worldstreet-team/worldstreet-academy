@@ -75,9 +75,10 @@ const TILES_PER_PAGE = 4
 
 type ScreenSharer = { id: string; name: string; isLocal: boolean }
 
-/** A class that hasn't started names its start time in the viewer's timezone. */
+/** A class that hasn't started names its start time in the viewer's timezone — or, once that has passed, the late host. */
 function joinErrorMessage(result: { error?: string; startsAt?: string }): string {
   if (result.startsAt) {
+    if (new Date(result.startsAt).getTime() <= Date.now()) return "Your instructor hasn't started this class yet"
     const when = new Date(result.startsAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })
     return `This class hasn't started yet — it begins ${when}`
   }

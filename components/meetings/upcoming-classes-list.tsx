@@ -11,6 +11,9 @@ import { useUpcomingClasses } from "@/lib/hooks/queries"
  */
 export function UpcomingClassesList({ onJoin }: { onJoin: (meetingId: string) => void }) {
   const { data: classes = [] } = useUpcomingClasses()
+  // Read per render to tell a late class from a future one; the minute refetch re-renders, so staleness is bounded.
+  // eslint-disable-next-line react-hooks/purity
+  const now = Date.now()
   if (classes.length === 0) return null
 
   return (
@@ -33,9 +36,13 @@ export function UpcomingClassesList({ onJoin }: { onJoin: (meetingId: string) =>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[13px] font-medium text-ws-primary">{c.title}</span>
                 <span className="block truncate text-[11px] text-ws-muted">
-                  <span className="tabular-nums">
-                    {new Date(c.scheduledAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}
-                  </span>
+                  {new Date(c.scheduledAt).getTime() <= now ? (
+                    "Waiting for your instructor"
+                  ) : (
+                    <span className="tabular-nums">
+                      {new Date(c.scheduledAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}
+                    </span>
+                  )}
                   {c.courseTitle ? ` · ${c.courseTitle}` : ""}
                 </span>
               </span>

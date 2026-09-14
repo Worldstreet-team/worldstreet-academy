@@ -7,7 +7,18 @@ import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { MeetingTimer } from "@/components/meetings/meeting-timer"
-import type { MeetingWithDetails, MeetingHistoryEntry } from "@/lib/actions/meetings"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { endMeeting, type MeetingWithDetails, type MeetingHistoryEntry } from "@/lib/actions/meetings"
+import { useInvalidateMeetings } from "@/lib/hooks/queries"
 import { CalendarDaysIcon, ChevronDownIcon, ChevronRightIcon, ClockIcon, LoaderCircleIcon, Trash2Icon, UsersIcon, VideoIcon, XIcon } from "lucide-react"
 
 /* ── Utility formatters ── */
@@ -235,6 +246,40 @@ export function ActiveMeetingsList({
   userId: string
   onRejoin: (meeting: MeetingWithDetails) => void
 }) {
+  const invalidateMeetings = useInvalidateMeetings()
+  // Cancel a scheduled class (the host's only undo for a mistyped one) — confirmed first.
+  const [cancelTarget, setCancelTarget] = useState<MeetingWithDetails | null>(null)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [isCancelling, setIsCancelling] = useState(false)
+  const [cancelError, setCancelError] = useState<string | null>(null)
+
+  function askCancel(meeting: MeetingWithDetails) {
+    setCancelTarget(meeting)
+    setCancelError(null)
+    setConfirmOpen(true)
+  }
+
+  async function handleConfirmCancel() {
+    if (!cancelTarget || isCancelling) return
+    setIsCancelling(true)
+    setCancelError(null)
+    try {
+      // endMeeting works on any status for the host; an ended class leaves
+      // Upcoming classes, the reminder cron and invites.
+      const result = await endMeeting(cancelTarget.id)
+      if (result.success) {
+        setConfirmOpen(false)
+        invalidateMeetings()
+      } else {
+        setCancelError(result.error ?? "Couldn't cancel the class")
+      }
+    } catch {
+      setCancelError("Couldn't cancel the class")
+    } finally {
+      setIsCancelling(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="space-y-2">
@@ -273,95 +318,132 @@ export function ActiveMeetingsList({
         const thumbnailUrl = (meeting as MeetingWithDetails & { courseThumbnailUrl?: string }).courseThumbnailUrl
         const isHostMe = meeting.hostId === userId
         const hostName = isHostMe ? "You" : meeting.hostName
-        
+        // Scheduled course classes only — interviews have their own pipeline.
+        const canCancel = isScheduled && isHostMe && !!meeting.courseId
+
         return (
-          <button
+          <div
             key={meeting.id}
-            className="w-full flex items-center gap-3 p-3 rounded-lg border border-ws-hairline bg-card hover:bg-muted/30 transition-all text-left group"
-            onClick={() => onRejoin(meeting)}
+            className="rounded-lg border border-ws-hairline bg-card hover:bg-muted/30 transition-all group"
           >
-            {/* Thumbnail or icon */}
-            <div className="relative w-11 h-11 rounded-lg overflow-hidden bg-muted/40 shrink-0 flex items-center justify-center">
-              {thumbnailUrl ? (
-                <Image src={thumbnailUrl} alt={meeting.title} fill className="object-cover" />
-              ) : (
-                <VideoIcon  size={18} className="text-muted-foreground/50" />
-              )}
-              {isActive && (
-                <div className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-ws-success ring-2 ring-card" />
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <h3 className="font-medium text-sm truncate">{meeting.title}</h3>
-                {isActive && (
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-muted text-[10px] font-medium text-muted-foreground shrink-0">
-                    <span className="relative flex h-1.5 w-1.5">
-                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-ws-success" />
-                    </span>
-                    Active
-                  </span>
-                )}
-                {isScheduled && (
-                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-ws-chip px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-ws-muted">
-                    <CalendarDaysIcon size={10} aria-hidden />
-                    {meeting.scheduledAt
-                      ? new Date(meeting.scheduledAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })
-                      : "Scheduled"}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-muted-foreground">
-                {/* Participant avatars (up to 4 + "+N") */}
-                {meeting.participantAvatars && meeting.participantAvatars.length > 0 ? (
-                  <>
-                    <div className="flex -space-x-1.5 shrink-0">
-                      {meeting.participantAvatars.slice(0, 4).map((p, i) => (
-                        <Avatar key={i} className="w-4 h-4 border border-card ring-1 ring-card">
-                          {p.avatar && <AvatarImage src={p.avatar} alt={p.name} />}
-                          <AvatarFallback className="text-[6px]">
-                            {p.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
-                          </AvatarFallback>
-                        </Avatar>
-                      ))}
-                      {meeting.participantCount > 4 && (
-                        <div className="flex items-center justify-center w-4 h-4 rounded-full border border-card ring-1 ring-card bg-muted text-[6px] font-semibold text-muted-foreground shrink-0">
-                          +{meeting.participantCount - 4}
-                        </div>
-                      )}
-                    </div>
-                    <span className="text-muted-foreground/30">&middot;</span>
-                  </>
+            <button
+              className="w-full flex items-center gap-3 p-3 text-left"
+              onClick={() => onRejoin(meeting)}
+            >
+              {/* Thumbnail or icon */}
+              <div className="relative w-11 h-11 rounded-lg overflow-hidden bg-muted/40 shrink-0 flex items-center justify-center">
+                {thumbnailUrl ? (
+                  <Image src={thumbnailUrl} alt={meeting.title} fill className="object-cover" />
                 ) : (
-                  <>
-                    <Avatar className="w-4 h-4 border border-ws-hairline">
-                      {meeting.hostAvatar && (
-                        <AvatarImage src={meeting.hostAvatar} alt={hostName} />
-                      )}
-                      <AvatarFallback className="text-[6px]">
-                        {hostName.split(" ").map(n => n[0]).join("")}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-muted-foreground/30">&middot;</span>
-                  </>
+                  <VideoIcon  size={18} className="text-muted-foreground/50" />
                 )}
-                <span className="truncate">{hostName}</span>
-                <span className="text-muted-foreground/30">&middot;</span>
-                <span className="flex items-center gap-0.5 shrink-0">
-                  <UsersIcon  size={10} />
-                  {meeting.participantCount}
-                </span>
+                {isActive && (
+                  <div className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-ws-success ring-2 ring-card" />
+                )}
               </div>
-            </div>
-            <div className={cn("shrink-0 transition-opacity", isScheduled && isHostMe ? "opacity-100" : "opacity-0 group-hover:opacity-100")}>
-              <div className="flex items-center gap-1 text-[11px] font-medium text-foreground">
-                {isScheduled && isHostMe ? "Start" : "Rejoin"}
-                <ChevronRightIcon  size={11} />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-medium text-sm truncate">{meeting.title}</h3>
+                  {isActive && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-muted text-[10px] font-medium text-muted-foreground shrink-0">
+                      <span className="relative flex h-1.5 w-1.5">
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-ws-success" />
+                      </span>
+                      Active
+                    </span>
+                  )}
+                  {isScheduled && (
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-ws-chip px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-ws-muted">
+                      <CalendarDaysIcon size={10} aria-hidden />
+                      {meeting.scheduledAt
+                        ? new Date(meeting.scheduledAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })
+                        : "Scheduled"}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-muted-foreground">
+                  {/* Participant avatars (up to 4 + "+N") */}
+                  {meeting.participantAvatars && meeting.participantAvatars.length > 0 ? (
+                    <>
+                      <div className="flex -space-x-1.5 shrink-0">
+                        {meeting.participantAvatars.slice(0, 4).map((p, i) => (
+                          <Avatar key={i} className="w-4 h-4 border border-card ring-1 ring-card">
+                            {p.avatar && <AvatarImage src={p.avatar} alt={p.name} />}
+                            <AvatarFallback className="text-[6px]">
+                              {p.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                            </AvatarFallback>
+                          </Avatar>
+                        ))}
+                        {meeting.participantCount > 4 && (
+                          <div className="flex items-center justify-center w-4 h-4 rounded-full border border-card ring-1 ring-card bg-muted text-[6px] font-semibold text-muted-foreground shrink-0">
+                            +{meeting.participantCount - 4}
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-muted-foreground/30">&middot;</span>
+                    </>
+                  ) : (
+                    <>
+                      <Avatar className="w-4 h-4 border border-ws-hairline">
+                        {meeting.hostAvatar && (
+                          <AvatarImage src={meeting.hostAvatar} alt={hostName} />
+                        )}
+                        <AvatarFallback className="text-[6px]">
+                          {hostName.split(" ").map(n => n[0]).join("")}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-muted-foreground/30">&middot;</span>
+                    </>
+                  )}
+                  <span className="truncate">{hostName}</span>
+                  <span className="text-muted-foreground/30">&middot;</span>
+                  <span className="flex items-center gap-0.5 shrink-0">
+                    <UsersIcon  size={10} />
+                    {meeting.participantCount}
+                  </span>
+                </div>
               </div>
-            </div>
-          </button>
+              <div className={cn("shrink-0 transition-opacity", isScheduled && isHostMe ? "opacity-100" : "opacity-0 group-hover:opacity-100")}>
+                <div className="flex items-center gap-1 text-[11px] font-medium text-foreground">
+                  {isScheduled && isHostMe ? "Start" : "Rejoin"}
+                  <ChevronRightIcon  size={11} />
+                </div>
+              </div>
+            </button>
+            {canCancel && (
+              <div className="flex justify-end px-3 pb-2">
+                <button
+                  type="button"
+                  onClick={() => askCancel(meeting)}
+                  className="text-[11px] font-medium text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:text-ws-danger"
+                >
+                  Cancel class
+                </button>
+              </div>
+            )}
+          </div>
         )
       })}
+
+      <AlertDialog open={confirmOpen} onOpenChange={(open) => !isCancelling && setConfirmOpen(open)}>
+        <AlertDialogContent size="sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel this class?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {cancelTarget ? `“${cancelTarget.title}” ` : "The class "}
+              leaves your students&apos; upcoming classes and its reminders stop. Students aren&apos;t sent a
+              cancellation notice.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {cancelError && <p className="text-center text-xs text-ws-danger">{cancelError}</p>}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isCancelling}>Keep class</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" disabled={isCancelling} onClick={handleConfirmCancel}>
+              {isCancelling ? "Cancelling…" : "Cancel class"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

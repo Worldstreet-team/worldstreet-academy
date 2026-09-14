@@ -435,10 +435,15 @@ export function CreateCourseMeetingModal({
   const [minLocal, setMinLocal] = useState("")
   const [scheduleError, setScheduleError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  /** In-flight submit guard — a ref, so a same-tick second click sees it before any re-render. */
+  const submittingRef = useRef(false)
 
   useEffect(() => {
+    // Closing or reopening the modal starts a fresh submit.
+    submittingRef.current = false
     if (open && course) {
       setTimeout(() => {
+        setIsCreating(false)
         setTitle(`${course.title} — Session`)
         // Earliest pickable start, in the viewer's timezone.
         setMinLocal(isoToLocalInput(new Date(Date.now() + 5 * 60_000).toISOString()))
@@ -448,7 +453,9 @@ export function CreateCourseMeetingModal({
   }, [open, course])
 
   function handleCreate() {
-    if (!title.trim() || !course) return
+    // One submit per open: a double click (or Enter then click) would otherwise
+    // create two classes — two rooms, double emails, double reminders.
+    if (submittingRef.current || !title.trim() || !course) return
     if (scheduleLater) {
       const iso = localInputToIso(scheduledLocal)
       if (!iso) {
@@ -460,12 +467,14 @@ export function CreateCourseMeetingModal({
         return
       }
       setScheduleError(null)
+      submittingRef.current = true
+      setIsCreating(true)
       onCreate(course.id, title.trim(), iso)
       return
     }
+    submittingRef.current = true
     setIsCreating(true)
     onCreate(course.id, title.trim())
-    setIsCreating(false)
   }
 
   if (!course || !open) return null
@@ -588,7 +597,7 @@ export function CreateCourseMeetingModal({
               {isCreating ? (
                 <>
                   <LoaderCircleIcon  size={15} className="animate-spin" />
-                  Starting...
+                  {scheduleLater ? "Scheduling..." : "Starting..."}
                 </>
               ) : scheduleLater ? (
                 <>
