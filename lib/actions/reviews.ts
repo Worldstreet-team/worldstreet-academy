@@ -135,6 +135,11 @@ export async function updateReview(
     }
 
     Object.assign(review, validated)
+    // An edit un-features: a curated homepage slot must never show words no
+    // admin read. (Mongoose marks a path modified only when its value changes.)
+    if (review.isModified("content") || review.isModified("title") || review.isModified("rating")) {
+      review.featured = false
+    }
     review.updatedAt = new Date()
     await review.save()
 
@@ -495,17 +500,33 @@ export async function fetchLandingReviews(limit = 6): Promise<LandingReview[]> {
   try {
     await connectDB()
 
-    const reviews = await Review.find({
-      isApproved: true,
-      isHidden: false,
-      rating: { $gte: 4 },
-      content: { $nin: [null, ""] },
-    })
-      .populate("user", "firstName lastName avatarUrl country")
-      .populate("course", "title status slug")
-      .sort({ featured: -1, rating: -1, helpfulCount: -1, createdAt: -1 })
-      .limit(limit * 2) // room to drop reviews of unpublished courses below
-      .lean()
+    // Featured ranks as `featured === true ? 1 : 0`. Reviews older than the field
+    // have no value at all, and a raw `featured: -1` sort puts an explicit false
+    // (any review an admin ever un-featured) above them, whatever the rating.
+    const ranked = await Review.aggregate<{
+      _id: mongoose.Types.ObjectId
+      user: mongoose.Types.ObjectId
+      course: mongoose.Types.ObjectId
+      rating: number
+      title?: string | null
+      content?: string | null
+    }>([
+      {
+        $match: {
+          isApproved: true,
+          isHidden: false,
+          rating: { $gte: 4 },
+          content: { $nin: [null, ""] },
+        },
+      },
+      { $addFields: { featuredRank: { $cond: [{ $eq: ["$featured", true] }, 1, 0] } } },
+      { $sort: { featuredRank: -1, rating: -1, helpfulCount: -1, createdAt: -1 } },
+      { $limit: limit * 2 }, // room to drop reviews of unpublished courses below
+    ])
+    const reviews = await Review.populate(ranked, [
+      { path: "user", select: "firstName lastName avatarUrl country" },
+      { path: "course", select: "title status slug" },
+    ])
 
     return reviews
       .map((r) => {

@@ -265,7 +265,7 @@ export async function adminSetReviewFeatured(reviewId: string, featured: boolean
     const parsed = FeatureReviewInput.safeParse({ reviewId, featured })
     if (!parsed.success) return { success: false, error: "Invalid review" }
 
-    const review = await Review.findById(parsed.data.reviewId)
+    const review = await Review.findById(parsed.data.reviewId).select("isApproved isHidden rating content").lean()
     if (!review) return { success: false, error: "Review not found" }
 
     if (
@@ -275,8 +275,9 @@ export async function adminSetReviewFeatured(reviewId: string, featured: boolean
       return { success: false, error: "Only approved, visible 4–5★ reviews with text can be featured" }
     }
 
-    review.featured = parsed.data.featured
-    await review.save()
+    // Targeted write, no full-document validation: a legacy or Go-written review
+    // that fails today's schema can still be curated.
+    await Review.updateOne({ _id: review._id }, { $set: { featured: parsed.data.featured } })
 
     revalidatePath("/admin/reviews")
     revalidatePath("/")
