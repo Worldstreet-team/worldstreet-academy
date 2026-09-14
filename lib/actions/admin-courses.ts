@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { z } from "zod/v4"
 import connectDB from "@/lib/db"
 import { Course, Review, User } from "@/lib/db/models"
 import { requireAdmin } from "@/lib/auth/admin"
@@ -158,13 +159,14 @@ export type AdminReviewRow = {
   courseId: string
   isApproved: boolean
   isHidden: boolean
+  featured: boolean
   reportCount: number
   helpfulCount: number
   createdAt: string
 }
 
 export async function adminListReviews(filters?: {
-  filter?: "all" | "reported" | "hidden"
+  filter?: "all" | "reported" | "hidden" | "featured"
   page?: number
 }): Promise<{ reviews: AdminReviewRow[]; total: number; page: number; pageCount: number }> {
   const empty = { reviews: [], total: 0, page: 1, pageCount: 1 }
@@ -176,6 +178,7 @@ export async function adminListReviews(filters?: {
     const query: Record<string, unknown> = {}
     if (filters?.filter === "reported") query.reportCount = { $gt: 0 }
     if (filters?.filter === "hidden") query.isHidden = true
+    if (filters?.filter === "featured") query.featured = true
 
     const [rows, total] = await Promise.all([
       Review.find(query)
@@ -204,6 +207,7 @@ export async function adminListReviews(filters?: {
           courseId: course?._id?.toString() ?? "",
           isApproved: r.isApproved,
           isHidden: r.isHidden,
+          featured: r.featured ?? false,
           reportCount: r.reportCount ?? 0,
           helpfulCount: r.helpfulCount ?? 0,
           createdAt: r.createdAt.toISOString(),
@@ -239,6 +243,46 @@ export async function adminSetReviewModeration(
     return { success: true }
   } catch (error) {
     console.error("Admin review moderation error:", error)
+    return { success: false, error: "Failed to update review" }
+  }
+}
+
+const FeatureReviewInput = z.object({
+  reviewId: z.string().regex(/^[a-f0-9]{24}$/),
+  featured: z.boolean(),
+})
+
+/**
+ * Curate the homepage testimonials (spec §14). Only a review the landing can
+ * actually show — approved, visible, 4–5★, with text — can be featured, so the
+ * toggle never promises something the homepage won't render.
+ */
+export async function adminSetReviewFeatured(reviewId: string, featured: boolean) {
+  try {
+    await connectDB()
+    await requireAdmin()
+
+    const parsed = FeatureReviewInput.safeParse({ reviewId, featured })
+    if (!parsed.success) return { success: false, error: "Invalid review" }
+
+    const review = await Review.findById(parsed.data.reviewId)
+    if (!review) return { success: false, error: "Review not found" }
+
+    if (
+      parsed.data.featured &&
+      (!review.isApproved || review.isHidden || review.rating < 4 || !review.content?.trim())
+    ) {
+      return { success: false, error: "Only approved, visible 4–5★ reviews with text can be featured" }
+    }
+
+    review.featured = parsed.data.featured
+    await review.save()
+
+    revalidatePath("/admin/reviews")
+    revalidatePath("/")
+    return { success: true }
+  } catch (error) {
+    console.error("Admin feature review error:", error)
     return { success: false, error: "Failed to update review" }
   }
 }

@@ -10,13 +10,14 @@ import { EmptyState } from "@/components/shared/empty-state"
 import { PageHeader } from "@/components/shared/page-header"
 import {
   adminListReviews,
+  adminSetReviewFeatured,
   adminSetReviewModeration,
 } from "@/lib/actions/admin-courses"
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import { formatDate, FilterChips, Pagination } from "@/components/admin/shared"
 import { StarIcon } from "lucide-react"
 
-type Filter = "all" | "reported" | "hidden"
+type Filter = "all" | "reported" | "hidden" | "featured"
 
 function Stars({ rating }: { rating: number }) {
   return (
@@ -72,6 +73,28 @@ export default function AdminReviewsPage() {
     onSettled: () => setActingId(null),
   })
 
+  const feature = useMutation({
+    mutationFn: ({ reviewId, featured }: { reviewId: string; featured: boolean }) =>
+      adminSetReviewFeatured(reviewId, featured),
+    onMutate: ({ reviewId }) => {
+      setActingId(reviewId)
+      setRowError(null)
+    },
+    onSuccess: (res, vars) => {
+      if (!res.success) {
+        setRowError({
+          id: vars.reviewId,
+          message: ("error" in res && res.error) || "Couldn't update the homepage",
+        })
+      }
+      queryClient.invalidateQueries({ queryKey: ["admin", "reviews"] })
+    },
+    onError: (_err, vars) => {
+      setRowError({ id: vars.reviewId, message: "Couldn't update the homepage — try again." })
+    },
+    onSettled: () => setActingId(null),
+  })
+
   return (
     <>
       <Topbar variant="admin" />
@@ -79,7 +102,7 @@ export default function AdminReviewsPage() {
         <div className="mx-auto w-full max-w-7xl space-y-8">
         <PageHeader
           title="Reviews"
-          subline="Moderate reported or problematic course reviews."
+          subline="Moderate reviews and choose which ones the homepage features."
         />
 
         <FilterChips
@@ -91,6 +114,7 @@ export default function AdminReviewsPage() {
           options={[
             { value: "reported", label: "Reported" },
             { value: "hidden", label: "Hidden" },
+            { value: "featured", label: "Featured" },
             { value: "all", label: "All" },
           ]}
         />
@@ -108,7 +132,9 @@ export default function AdminReviewsPage() {
             description={
               filter === "reported"
                 ? "No reviews have been reported."
-                : "No reviews match this filter."
+                : filter === "featured"
+                  ? "No reviews are featured on the homepage."
+                  : "No reviews match this filter."
             }
           />
         ) : (
@@ -134,6 +160,9 @@ export default function AdminReviewsPage() {
                       {!r.isApproved && (
                         <Badge variant="outline" className="text-[9px]">unapproved</Badge>
                       )}
+                      {r.featured && (
+                        <Badge variant="outline" className="text-[9px]">featured</Badge>
+                      )}
                     </div>
                   </div>
                   {r.content && (
@@ -141,12 +170,20 @@ export default function AdminReviewsPage() {
                       {r.content}
                     </p>
                   )}
-                  <div className="flex items-center justify-between gap-2 pt-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                     <p className="text-[10px] text-muted-foreground truncate">
                       {r.reviewerName} on <span className="font-medium">{r.courseTitle}</span> ·{" "}
                       {formatDate(r.createdAt)}
                     </p>
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        disabled={actingId === r.id}
+                        onClick={() => feature.mutate({ reviewId: r.id, featured: !r.featured })}
+                      >
+                        {r.featured ? "Remove from homepage" : "Feature on homepage"}
+                      </Button>
                       <Button
                         size="xs"
                         variant="outline"

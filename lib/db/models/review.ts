@@ -11,6 +11,8 @@ export interface IReview extends Document {
   // Moderation
   isApproved: boolean
   isHidden: boolean
+  /** Admin-curated: featured reviews lead the homepage testimonials (spec §14). Never bypasses the landing's floor. */
+  featured: boolean
   // Helpfulness
   helpfulCount: number
   reportCount: number
@@ -57,6 +59,10 @@ const ReviewSchema = new Schema<IReview>(
       default: true, // Auto-approve by default
     },
     isHidden: {
+      type: Boolean,
+      default: false,
+    },
+    featured: {
       type: Boolean,
       default: false,
     },

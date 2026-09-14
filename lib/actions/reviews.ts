@@ -486,9 +486,10 @@ export type LandingReview = {
 }
 
 /**
- * Real testimonials for the landing page: approved 4–5★ reviews that actually
- * say something, best-first. The landing hides the section below 3 — the same
- * floors principle as its stats. Nothing here is ever typed in by hand.
+ * Real testimonials for the landing page (spec §14): approved, visible 4–5★
+ * reviews that actually say something. Admin-featured reviews come first (so
+ * the homepage six are curated), then the best-rated. Featuring never bypasses
+ * this floor, and nothing here is ever typed in by hand.
  */
 export async function fetchLandingReviews(limit = 6): Promise<LandingReview[]> {
   try {
@@ -502,7 +503,7 @@ export async function fetchLandingReviews(limit = 6): Promise<LandingReview[]> {
     })
       .populate("user", "firstName lastName avatarUrl country")
       .populate("course", "title status slug")
-      .sort({ rating: -1, helpfulCount: -1, createdAt: -1 })
+      .sort({ featured: -1, rating: -1, helpfulCount: -1, createdAt: -1 })
       .limit(limit * 2) // room to drop reviews of unpublished courses below
       .lean()
 
