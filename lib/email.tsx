@@ -929,11 +929,18 @@ export type CourseLiveEmailData = {
   courseTitle: string
   courseId: string
   isPaid: boolean
+  /** Whole USD. With `fromPrice`, the cheapest enabled package. */
   price: number
+  /** The course sells packages, so there is no single price: quote "from $X". */
+  fromPrice: boolean
 }
 
 function CourseLiveEmail({ data }: { data: CourseLiveEmailData }) {
   const courseUrl = `${APP_URL}/dashboard/courses/${data.courseId}`
+  // A packaged course has no single price — quote its cheapest tier.
+  const priceLabel = data.fromPrice
+    ? `from $${data.price.toLocaleString("en-US")}`
+    : `$${data.price.toFixed(2)}`
   return (
     <Html style={base}>
       <Head />
@@ -948,13 +955,13 @@ function CourseLiveEmail({ data }: { data: CourseLiveEmailData }) {
             </Text>
             <Text style={sub}>
               {data.isPaid
-                ? `Start whenever you're ready — payment ($${data.price.toFixed(2)}) happens at the door, and your seat is already reserved.`
+                ? `Start whenever you're ready — payment (${priceLabel}) happens at the door, and your seat is already reserved.`
                 : "It's free and your seat is already reserved — jump straight in."}
             </Text>
 
             <Section style={{ marginTop: "28px" }}>
               <Button href={courseUrl} style={cta}>
-                {data.isPaid ? `Start course — $${data.price.toFixed(2)}` : "Start course"}
+                {data.isPaid ? `Start course — ${priceLabel}` : "Start course"}
               </Button>
             </Section>
 

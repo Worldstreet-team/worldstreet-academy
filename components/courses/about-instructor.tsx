@@ -1,6 +1,6 @@
 "use client"
 
-import { useTransition } from "react"
+import { useState, useTransition } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -38,6 +38,7 @@ export function AboutInstructor({
 }: AboutInstructorProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  const [messageError, setMessageError] = useState<string | null>(null)
   
   const initials = instructorName
     .split(" ")
@@ -52,10 +53,13 @@ export function AboutInstructor({
   const hasContent = instructorBio || instructorHeadline || allCourses.length > 0
   
   const handleMessage = () => {
+    setMessageError(null)
     startTransition(async () => {
       const result = await getOrCreateConversation(instructorId)
       if (result.success && result.conversationId) {
         router.push(`/dashboard/messages?c=${result.conversationId}`)
+      } else {
+        setMessageError(result.error ?? "Couldn't open a conversation")
       }
     })
   }
@@ -99,6 +103,7 @@ export function AboutInstructor({
                   </Button>
                 )}
               </div>
+              {messageError && <p className="mt-1 text-[11px] text-ws-danger">{messageError}</p>}
             </div>
           </div>
         </div>
@@ -193,6 +198,7 @@ export function AboutInstructor({
             </Button>
           )}
         </div>
+        {messageError && <p className="text-[11px] text-ws-danger">{messageError}</p>}
       </div>
 
       {/* More courses by this instructor */}

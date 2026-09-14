@@ -2,6 +2,7 @@
 
 import { Course, Enrollment, Lesson } from "@/lib/db/models"
 import { Types } from "mongoose"
+import { sellsPackages } from "@/lib/entitlements"
 import { initAction, type Doc } from "./helpers"
 
 export async function vividSearchCourses(p: {
@@ -203,9 +204,9 @@ export async function vividEnrollInCourse(p: { courseId: string }) {
     const existing = await Enrollment.findOne({ user: currentUser.id, course: course._id })
     if (existing) return { success: true, already: true, message: "Already enrolled" }
 
-    const sellsPackages = (course.packages ?? []).some((pkg) => pkg.enabled)
+    const packaged = sellsPackages(course)
 
-    if (course.pricing === "free" && !sellsPackages) {
+    if (course.pricing === "free" && !packaged) {
       // Route through the shared purchase action so enrollment side-effects
       // (counts, instructor stats) stay in one place.
       const { purchaseCourse } = await import("@/lib/actions/enrollments")
@@ -223,7 +224,7 @@ export async function vividEnrollInCourse(p: { courseId: string }) {
       needsCheckout: true,
       checkoutUrl: `/dashboard/checkout?courseId=${course._id}`,
       price: course.price,
-      message: sellsPackages
+      message: packaged
         ? `This program comes in packages from $${course.price}. Opening checkout so you can choose one.`
         : `This course costs $${course.price}. Redirecting to checkout.`,
     }

@@ -23,7 +23,7 @@ import { courseAvailability } from "@/lib/types/course"
 import { sendEnrollmentConfirmationEmail } from "@/lib/email"
 import { notifyAdmins, notifyUser } from "@/lib/notify"
 import { getCourseAccess, isLessonLockedFor, lockedLessonIds } from "@/lib/course-access"
-import { PACKAGE_KEYS, canAccessLesson, packageFor } from "@/lib/entitlements"
+import { PACKAGE_KEYS, canAccessLesson, packageFor, sellsPackages } from "@/lib/entitlements"
 import {
   createWalletCharge,
   refundWalletCharge,
@@ -167,9 +167,9 @@ export async function purchaseCourse(input: { courseId: string; packageKey?: Pac
     // only for an enabled tier the buyer chose. A course with no enabled
     // package sells at its single price and ignores any key — the program page
     // links its synthesized "Full program" tier as package=standard.
-    const sellsPackages = (course.packages ?? []).some((p) => p.enabled)
-    const pkg = sellsPackages ? packageFor(course, packageKey ?? null) : null
-    if (sellsPackages && !pkg) {
+    const packaged = sellsPackages(course)
+    const pkg = packaged ? packageFor(course, packageKey ?? null) : null
+    if (packaged && !pkg) {
       return { success: false, error: "Choose a package to continue", code: "package_required" }
     }
 

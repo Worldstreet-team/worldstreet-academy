@@ -25,6 +25,11 @@ export function packageFor(course: CourseLike, key: PackageKey | null): ICourseP
   return (course.packages ?? []).find((p) => p.key === key && p.enabled) ?? null
 }
 
+/** The course sells packages: at least one tier is enabled, so a buyer must choose one. */
+export function sellsPackages(course: CourseLike): boolean {
+  return (course.packages ?? []).some((p) => p.enabled)
+}
+
 /**
  * What an enrollment's package unlocks. The bought package is found by key
  * even if its tier has since been disabled for sale — buyers keep what they

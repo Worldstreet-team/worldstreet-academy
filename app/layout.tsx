@@ -20,7 +20,7 @@ const dancingScript = Dancing_Script({
 const poppins = Poppins({
   subsets: ["latin"],
   variable: "--font-display",
-  weight: ["600", "700", "800"],
+  weight: ["300", "600", "700", "800"],
 });
 
 // No maximumScale: the design system bans blocking pinch-zoom (06-motion-a11y).

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import connectDB from "@/lib/db"
 import { Course, Enrollment } from "@/lib/db/models"
 import { sendCourseLiveEmail } from "@/lib/email"
+import { pricingFromPackages, sellsPackages } from "@/lib/entitlements"
 import { notifyUser } from "@/lib/notify"
 
 /**
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
     availableAt: { $ne: null, $lte: now },
     liveNotifiedAt: null,
   })
-    .select("title pricing price")
+    .select("title pricing price packages")
     .limit(20)
 
   let coursesAnnounced = 0
@@ -72,7 +73,9 @@ export async function POST(request: NextRequest) {
         courseTitle: course.title,
         courseId: course._id.toString(),
         isPaid: course.pricing === "paid",
-        price: course.price ?? 0,
+        // A packaged course is quoted "from" its cheapest enabled tier.
+        price: pricingFromPackages(course.packages)?.price ?? course.price ?? 0,
+        fromPrice: sellsPackages(course),
       })
       if (res.success) emailsSent++
       else emailsFailed++
