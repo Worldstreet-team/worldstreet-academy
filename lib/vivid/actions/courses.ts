@@ -203,23 +203,29 @@ export async function vividEnrollInCourse(p: { courseId: string }) {
     const existing = await Enrollment.findOne({ user: currentUser.id, course: course._id })
     if (existing) return { success: true, already: true, message: "Already enrolled" }
 
-    if (course.pricing === "free") {
+    const sellsPackages = (course.packages ?? []).some((p) => p.enabled)
+
+    if (course.pricing === "free" && !sellsPackages) {
       // Route through the shared purchase action so enrollment side-effects
       // (counts, instructor stats) stay in one place.
       const { purchaseCourse } = await import("@/lib/actions/enrollments")
-      const result = await purchaseCourse(course._id.toString())
+      const result = await purchaseCourse({ courseId: course._id.toString() })
       if (!result.success) return { success: false, error: result.error }
       return { success: true, enrolled: true, message: "Enrolled successfully!" }
     }
 
-    // Paid courses go through the real checkout — the wallet debit happens
-    // server-side there; Vivid never marks a paid course as purchased itself.
+    // Paid courses — and every course sold in packages — go through the real
+    // checkout: the wallet debit happens server-side there and the student
+    // picks their own package. Vivid never chooses a tier or marks a course
+    // as purchased itself.
     return {
       success: true,
       needsCheckout: true,
       checkoutUrl: `/dashboard/checkout?courseId=${course._id}`,
       price: course.price,
-      message: `This course costs $${course.price}. Redirecting to checkout.`,
+      message: sellsPackages
+        ? `This program comes in packages from $${course.price}. Opening checkout so you can choose one.`
+        : `This course costs $${course.price}. Redirecting to checkout.`,
     }
   } catch (error) {
     console.error("[Vivid] enrollInCourse error:", error)

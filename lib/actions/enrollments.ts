@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { z } from "zod/v4"
 import connectDB from "@/lib/db"
 import {
   Course,
@@ -14,11 +15,14 @@ import {
   EARNINGS_CLEARING_DAYS,
   type IOrder,
   type OrderStatus,
+  type PackageKey,
 } from "@/lib/db/models"
 import { Types } from "mongoose"
 import { getCurrentUser } from "@/lib/auth/actions"
 import { courseAvailability } from "@/lib/types/course"
 import { sendEnrollmentConfirmationEmail } from "@/lib/email"
+import { notifyAdmins, notifyUser } from "@/lib/notify"
+import { packageFor } from "@/lib/entitlements"
 import {
   createWalletCharge,
   refundWalletCharge,
@@ -55,14 +59,27 @@ export type EnrollmentProgress = {
 // ============================================================================
 
 export type PurchaseResult =
-  | { success: true; data: { enrollmentId: string; alreadyEnrolled?: boolean } }
+  | { success: true; data: { enrollmentId: string; alreadyEnrolled?: boolean; packageName: string | null } }
   | {
       success: false
       error: string
-      code?: "auth" | "not_found" | "not_live" | "insufficient_funds" | "wallet_unavailable" | "enroll_failed"
+      code?:
+        | "auth"
+        | "invalid"
+        | "not_found"
+        | "not_live"
+        | "package_required"
+        | "insufficient_funds"
+        | "wallet_unavailable"
+        | "enroll_failed"
       shortfallMinor?: number
       availableMinor?: number
     }
+
+const PurchaseInput = z.object({
+  courseId: z.string().regex(/^[a-f0-9]{24}$/),
+  packageKey: z.enum(["basic", "standard", "executive"]).optional(),
+})
 
 async function transitionOrder(order: IOrder, status: OrderStatus, note?: string) {
   order.status = status
@@ -84,17 +101,19 @@ async function logPaymentEvent(
 }
 
 /**
- * Purchase / enroll in a course.
+ * Purchase / enroll in a course, in one of its packages when it sells them.
  *
- * The caller supplies only the courseId: identity comes from the session and
- * the price from the course record — nothing money-related is trusted from
- * the client. Paid courses debit the central Worldstreet wallet service
- * server-to-server and enroll ONLY after the wallet confirms the charge.
- * The debit is idempotent (deterministic reference per user+course), so a
- * retried or double-clicked purchase can never charge twice. If the wallet is
+ * The caller supplies only the course and the package key: identity comes
+ * from the session and the price from the course record (the chosen enabled
+ * package's price, or the single course price when the course sells no
+ * packages) — nothing money-related is trusted from the client. Paid purchases
+ * debit the central Worldstreet wallet server-to-server and enroll ONLY after
+ * the wallet confirms the charge. The debit is idempotent (deterministic
+ * reference per user + course + package + purchase generation), so a retried
+ * or double-clicked purchase can never charge twice. If the wallet is
  * unreachable we fail closed: no enrollment, no fake success.
  */
-export async function purchaseCourse(courseId: string): Promise<PurchaseResult> {
+export async function purchaseCourse(input: { courseId: string; packageKey?: PackageKey }): Promise<PurchaseResult> {
   try {
     await connectDB()
 
@@ -102,6 +121,12 @@ export async function purchaseCourse(courseId: string): Promise<PurchaseResult> 
     if (!user) {
       return { success: false, error: "You need to be signed in to enroll", code: "auth" }
     }
+
+    const parsed = PurchaseInput.safeParse(input)
+    if (!parsed.success) {
+      return { success: false, error: "That checkout link isn't valid", code: "invalid" }
+    }
+    const { courseId, packageKey } = parsed.data
 
     // Idempotent short-circuit — an existing access-granting enrollment is a
     // success, not an error. A refunded row means this is a RE-purchase: the
@@ -111,7 +136,14 @@ export async function purchaseCourse(courseId: string): Promise<PurchaseResult> 
     // A pre-enrolled row is a reservation, not access: purchase ACTIVATES it.
     const isActivation = existing?.status === "pre_enrolled"
     if (existing && existing.status !== "refunded" && !isActivation) {
-      return { success: true, data: { enrollmentId: existing._id.toString(), alreadyEnrolled: true } }
+      return {
+        success: true,
+        data: {
+          enrollmentId: existing._id.toString(),
+          alreadyEnrolled: true,
+          packageName: existing.packageName ?? null,
+        },
+      }
     }
     const isRepurchase = Boolean(existing) && !isActivation
 
@@ -130,9 +162,20 @@ export async function purchaseCourse(courseId: string): Promise<PurchaseResult> 
       }
     }
 
-    const price = course.pricing === "paid" ? course.price ?? 0 : 0
+    // Which package is being bought. A course that sells packages takes money
+    // only for an enabled tier the buyer chose. A course with no enabled
+    // package sells at its single price and ignores any key — the program page
+    // links its synthesized "Full program" tier as package=standard.
+    const sellsPackages = (course.packages ?? []).some((p) => p.enabled)
+    const pkg = sellsPackages ? packageFor(course, packageKey ?? null) : null
+    if (sellsPackages && !pkg) {
+      return { success: false, error: "Choose a package to continue", code: "package_required" }
+    }
+
+    const price = pkg ? pkg.price : course.pricing === "paid" ? course.price ?? 0 : 0
     const amountMinor = Math.round(price * 100)
     const isPaid = amountMinor > 0
+    const packageFields = { packageKey: pkg?.key ?? null, packageName: pkg?.name ?? null }
 
     // The charge reference is deterministic per PURCHASE GENERATION, not per
     // user+course. Within one generation, retries and double-clicks replay the
@@ -145,7 +188,9 @@ export async function purchaseCourse(courseId: string): Promise<PurchaseResult> 
       course: courseId,
       status: "refunded",
     })
-    const baseReference = `academy_enroll_${user.id}_${courseId}`
+    // Package purchases carry the key; single-price references stay
+    // byte-identical to pre-package orders so their retries still replay.
+    const baseReference = `academy_enroll_${user.id}_${courseId}${pkg ? `_${pkg.key}` : ""}`
     const reference = generation > 0 ? `${baseReference}_r${generation}` : baseReference
 
     let chargeId: string | null = null
@@ -171,6 +216,7 @@ export async function purchaseCourse(courseId: string): Promise<PurchaseResult> 
             reference,
             amountMinor,
             currency: "USD",
+            packageKey: packageFields.packageKey,
             status: "pending",
             history: [{ status: "pending", at: new Date() }],
           },
@@ -186,14 +232,19 @@ export async function purchaseCourse(courseId: string): Promise<PurchaseResult> 
       await logPaymentEvent(ord._id, reference, "charge_requested", {
         amountMinor,
         courseId,
+        packageKey: packageFields.packageKey,
         authUserId: user.authUserId,
       })
 
       try {
         const { charge } = await createWalletCharge(user.authUserId, {
           amountMinor,
-          description: `Course: ${course.title}`,
-          metadata: { courseId: course._id.toString(), courseSlug: course.slug ?? "" },
+          description: pkg ? `Course: ${course.title} — ${pkg.name}` : `Course: ${course.title}`,
+          metadata: {
+            courseId: course._id.toString(),
+            courseSlug: course.slug ?? "",
+            packageKey: packageFields.packageKey,
+          },
           idempotencyKey: reference,
         })
         chargeId = charge.id
@@ -215,7 +266,7 @@ export async function purchaseCourse(courseId: string): Promise<PurchaseResult> 
           })
           return {
             success: false,
-            error: "Your Worldstreet balance doesn't cover this course.",
+            error: "Your Worldstreet balance doesn't cover this purchase.",
             code: "insufficient_funds",
             availableMinor,
             shortfallMinor: Math.max(0, amountMinor - availableMinor),
@@ -243,9 +294,11 @@ export async function purchaseCourse(courseId: string): Promise<PurchaseResult> 
     try {
       if (isRepurchase || isActivation) {
         // Restore (re-purchase) or activate (pre-enrollment) the audited row.
-        // Progress is deliberately preserved either way.
+        // Progress is deliberately preserved either way. The filter pins the
+        // status we read, so a concurrent purchase that already took the row
+        // is detected below instead of silently overwritten.
         enrollment = await Enrollment.findOneAndUpdate(
-          { user: user.id, course: courseId },
+          { user: user.id, course: courseId, status: isActivation ? "pre_enrolled" : "refunded" },
           {
             $set: {
               status: "active",
@@ -255,11 +308,14 @@ export async function purchaseCourse(courseId: string): Promise<PurchaseResult> 
               purchasedAt: new Date(),
               activatedAt: new Date(),
               legacyUnpaid: false,
+              ...packageFields,
             },
           },
           { new: true }
         )
-        if (!enrollment) throw new Error("re-purchase: enrollment row vanished")
+        if (!enrollment) {
+          throw Object.assign(new Error("enrollment row changed concurrently"), { code: 11000 })
+        }
       } else {
         enrollment = await Enrollment.create({
           user: user.id,
@@ -269,21 +325,28 @@ export async function purchaseCourse(courseId: string): Promise<PurchaseResult> 
           transactionId: chargeId,
           purchasedAt: new Date(),
           activatedAt: new Date(),
+          ...packageFields,
         })
       }
     } catch (err: unknown) {
       const isDuplicate = typeof err === "object" && err !== null && (err as { code?: number }).code === 11000
-      if (isDuplicate) {
-        // Raced with another request for the same user+course; the charge is
-        // idempotent, so the money side is consistent either way.
-        const winner = await Enrollment.findOne({ user: user.id, course: courseId })
-        if (winner) {
-          if (order) await transitionOrder(order, "enrolled", "concurrent enrollment")
-          return { success: true, data: { enrollmentId: winner._id.toString(), alreadyEnrolled: true } }
+      const winner = isDuplicate
+        ? await Enrollment.findOne({ user: user.id, course: courseId, status: { $in: ["active", "completed"] } })
+        : null
+      // Raced with another request for the same user+course. Same package →
+      // same reference → the wallet replayed ONE charge, so the winner holds our
+      // charge (or nobody charged) and there is nothing to undo.
+      if (winner && (!chargeId || winner.transactionId === chargeId)) {
+        if (order) await transitionOrder(order, "enrolled", "concurrent enrollment")
+        return {
+          success: true,
+          data: { enrollmentId: winner._id.toString(), alreadyEnrolled: true, packageName: winner.packageName ?? null },
         }
       }
-      // Charged but couldn't enroll — compensate with a refund so no money is kept
-      // without access. If the refund also fails, the reconciliation job surfaces it.
+      // Charged, but THIS charge bought no access (enrollment failed, or a
+      // concurrent purchase of a different package took the row) — refund so no
+      // money is kept without access. If the refund also fails, the
+      // reconciliation job surfaces it.
       if (isPaid && chargeId) {
         try {
           await refundWalletCharge(user.authUserId, chargeId, "enrollment creation failed")
@@ -297,6 +360,12 @@ export async function purchaseCourse(courseId: string): Promise<PurchaseResult> 
             await transitionOrder(order, "failed", "enroll failed AND refund failed — orphaned charge")
             await logPaymentEvent(order._id, reference, "refund_failed", { chargeId })
           }
+        }
+      }
+      if (winner) {
+        return {
+          success: true,
+          data: { enrollmentId: winner._id.toString(), alreadyEnrolled: true, packageName: winner.packageName ?? null },
         }
       }
       console.error("Enroll in course error:", err)
@@ -354,10 +423,38 @@ export async function purchaseCourse(courseId: string): Promise<PurchaseResult> 
       },
     })
 
+    // Executive (D4): the instructor and admins schedule onboarding; the
+    // buyer's intake form waits on the success page. Keyed on the Executive
+    // tier — single "Full program" tiers also carry mentorship: true.
+    if (pkg?.key === "executive" && pkg.entitlements.mentorship) {
+      const buyer = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.email
+      const note = {
+        type: "course" as const,
+        title: `New ${pkg.name} enrollment`,
+        body: `${buyer} enrolled in ${course.title} — schedule their onboarding.`,
+      }
+      void notifyUser(course.instructor.toString(), { ...note, href: `/instructor/courses/${courseId}` })
+      void notifyAdmins({ ...note, href: `/admin/enrollments?course=${courseId}` })
+    }
+
+    void sendEnrollmentConfirmationEmail({
+      to: user.email ?? "",
+      firstName: user.firstName ?? "",
+      courseTitle: course.title,
+      courseId: course._id.toString(),
+      availableAtIso: null,
+      isPaid,
+      price,
+      packageName: packageFields.packageName,
+    })
+
     revalidatePath("/dashboard/my-courses")
     revalidatePath(`/courses/${courseId}`)
 
-    return { success: true, data: { enrollmentId: enrollment._id.toString() } }
+    return {
+      success: true,
+      data: { enrollmentId: enrollment._id.toString(), packageName: packageFields.packageName },
+    }
   } catch (error) {
     console.error("Enroll in course error:", error)
     return { success: false, error: "Failed to enroll in course", code: "enroll_failed" }
@@ -682,6 +779,7 @@ export async function preEnrollCourse(courseId: string): Promise<PreEnrollResult
       availableAtIso,
       isPaid: course.pricing === "paid",
       price: course.price ?? 0,
+      packageName: null,
     })
 
     revalidatePath("/dashboard/my-courses")

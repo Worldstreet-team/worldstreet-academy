@@ -822,6 +822,8 @@ export type EnrollmentEmailData = {
   availableAtIso: string | null
   isPaid: boolean
   price: number
+  /** Package bought; null for pre-enrolments and single-price courses. */
+  packageName: string | null
 }
 
 function formatLaunch(iso: string): string {
@@ -841,17 +843,19 @@ function EnrollmentConfirmationEmail({ data }: { data: EnrollmentEmailData }) {
   return (
     <Html style={base}>
       <Head />
-      <Preview>You&apos;re enrolled in {data.courseTitle}</Preview>
+      <Preview>
+        {data.availableAtIso ? `You're enrolled in ${data.courseTitle}` : `Enrollment confirmed: ${data.courseTitle}`}
+      </Preview>
       <Body style={body}>
         <Container style={card}>
           <Section style={contentPad}>
-            <Text style={heading}>You&apos;re enrolled</Text>
-            <Text style={sub}>
-              {data.firstName ? `${data.firstName} — you` : "You"}&apos;re in.
-              Your seat on <strong>{data.courseTitle}</strong> is reserved.
-            </Text>
+            <Text style={heading}>{data.availableAtIso ? "You're enrolled" : "Enrollment confirmed"}</Text>
             {data.availableAtIso ? (
               <>
+                <Text style={sub}>
+                  {data.firstName ? `${data.firstName} — you` : "You"}&apos;re in.
+                  Your seat on <strong>{data.courseTitle}</strong> is reserved.
+                </Text>
                 <Text style={sub}>
                   The course isn&apos;t live yet — it opens on{" "}
                   <strong>{formatLaunch(data.availableAtIso)}</strong>. Nothing
@@ -864,12 +868,20 @@ function EnrollmentConfirmationEmail({ data }: { data: EnrollmentEmailData }) {
                 </Text>
               </>
             ) : (
-              <Text style={sub}>The course is live — you can start right away.</Text>
+              <>
+                <Text style={sub}>
+                  Welcome to {BRAND.name}. Your learning journey starts now.
+                </Text>
+                <Text style={sub}>
+                  You now have access to <strong>{data.courseTitle}</strong>
+                  {data.packageName ? ` — ${data.packageName}` : ""}.
+                </Text>
+              </>
             )}
 
             <Section style={{ marginTop: "28px" }}>
               <Button href={courseUrl} style={cta}>
-                View the course
+                {data.availableAtIso ? "View the course" : "Start learning"}
               </Button>
             </Section>
 
@@ -895,7 +907,9 @@ export async function sendEnrollmentConfirmationEmail(data: EnrollmentEmailData)
     const { error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: data.to,
-      subject: `You're enrolled: ${data.courseTitle}`,
+      subject: data.availableAtIso
+        ? `You're enrolled: ${data.courseTitle}`
+        : `Enrollment confirmed: ${data.courseTitle}`,
       react: React.createElement(EnrollmentConfirmationEmail, { data }),
     })
     if (error) {

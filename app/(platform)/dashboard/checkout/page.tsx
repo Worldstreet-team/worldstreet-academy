@@ -78,7 +78,7 @@ export default function CheckoutPage() {
       // The server derives identity from the session and price from the course
       // record; enrollment is only granted after the central Worldstreet wallet
       // confirms the debit. No optimistic success.
-      const result = await purchaseCourse(course.id)
+      const result = await purchaseCourse({ courseId: course.id })
 
       if (result.success) {
         setIsSuccess(true)
