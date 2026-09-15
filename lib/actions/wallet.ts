@@ -106,10 +106,37 @@ function friendlyWalletError(err: unknown, fallback: string): string {
   return fallback
 }
 
+/* ── Why a read came back disabled ── */
+
+/**
+ * Set alongside `enabled: false` on the wallet page's reads so the UI can say
+ * something true:
+ *  · `not_configured` — WALLET_BASE_URL / WALLET_SERVICE_TOKEN are unset in
+ *    this environment; nothing will change until they are, so retrying is pointless.
+ *  · `unreachable` — configured, but the read failed (or no signed-in user); a retry may work.
+ * Money operations still fail closed exactly as before — this only labels reads.
+ */
+export type WalletUnavailableReason = "not_configured" | "unreachable"
+
+const warnState = globalThis as typeof globalThis & { __academyWalletNotConfiguredWarned?: boolean }
+
+/** Logs once per server process in development — the variable names only, never their values. */
+function notConfigured(): WalletUnavailableReason {
+  if (process.env.NODE_ENV === "development" && !warnState.__academyWalletNotConfiguredWarned) {
+    warnState.__academyWalletNotConfiguredWarned = true
+    console.warn(
+      "[Wallet] WALLET_BASE_URL and WALLET_SERVICE_TOKEN are not both set — wallet reads report not_configured and every money operation fails closed."
+    )
+  }
+  return "not_configured"
+}
+
 /* ── Overview ── */
 
 export type WalletOverview = {
   enabled: boolean
+  /** Present only when `enabled` is false. */
+  reason?: WalletUnavailableReason
   usd: DollarAccountSummary | null
   ngn: FiatWalletSummary | null
   kyc: IdentityVerificationSummary | null
@@ -117,9 +144,10 @@ export type WalletOverview = {
 
 export async function getMyWalletOverview(): Promise<WalletOverview> {
   const base: WalletOverview = { enabled: false, usd: null, ngn: null, kyc: null }
+  if (!walletEnabled()) return { ...base, reason: notConfigured() }
   try {
     const user = await walletUser()
-    if (!user) return base
+    if (!user) return { ...base, reason: "unreachable" }
 
     const [usd, ngn, kyc] = await Promise.allSettled([
       getDollarAccount(user.authUserId),
@@ -135,7 +163,7 @@ export async function getMyWalletOverview(): Promise<WalletOverview> {
     }
   } catch (err) {
     console.error("[Wallet] overview failed:", err)
-    return base
+    return { ...base, reason: "unreachable" }
   }
 }
 
@@ -178,10 +206,16 @@ const WITHDRAWAL_STATUS: Record<string, WalletTxStatus> = {
   review: "review",
 }
 
-export async function getMyWalletTransactions(): Promise<{ enabled: boolean; items: WalletTxItem[] }> {
+export async function getMyWalletTransactions(): Promise<{
+  enabled: boolean
+  /** Present only when `enabled` is false. */
+  reason?: WalletUnavailableReason
+  items: WalletTxItem[]
+}> {
+  if (!walletEnabled()) return { enabled: false, reason: notConfigured(), items: [] }
   try {
     const user = await walletUser()
-    if (!user) return { enabled: false, items: [] }
+    if (!user) return { enabled: false, reason: "unreachable", items: [] }
 
     const [usdDeps, ngnDeps, ngnWds, charges] = await Promise.allSettled([
       listDollarDeposits(user.authUserId, 20),
@@ -271,7 +305,7 @@ export async function getMyWalletTransactions(): Promise<{ enabled: boolean; ite
     return { enabled: true, items }
   } catch (err) {
     console.error("[Wallet] transactions failed:", err)
-    return { enabled: false, items: [] }
+    return { enabled: false, reason: "unreachable", items: [] }
   }
 }
 

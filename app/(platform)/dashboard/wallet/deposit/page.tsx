@@ -4,6 +4,7 @@ import * as React from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Topbar } from "@/components/platform/topbar"
+import { PageHeader } from "@/components/ui/system"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Landmark, RefreshCw } from "lucide-react"
@@ -128,16 +129,15 @@ function DepositPageInner() {
       <Topbar />
       <div className="flex-1 px-4 sm:px-6 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-8 md:px-8 md:pb-12 lg:px-12">
         <div className="mx-auto w-full max-w-md space-y-8">
-          <div className="">
-            <h1 className="font-display text-[28px] font-semibold tracking-[-0.02em] text-ws-primary">
-              Deposit
-            </h1>
-            <p className="mt-1 text-[15px] text-ws-muted">
-              {redirect
+          <PageHeader
+            title="Deposit"
+            subtitle={
+              redirect
                 ? "Top up, then you'll be taken right back to checkout."
-                : "Fund your Worldstreet balance."}
-            </p>
-          </div>
+                : "Fund your WorldStreet balance."
+            }
+            back="/dashboard/wallet"
+          />
 
           {/* Pending checkout banner */}
           {pending && (
