@@ -82,6 +82,24 @@
   --color-ws-crypto: var(--ws-accent-crypto);
   /* Course ratings are always orange, filled (01-foundations). */
   --color-ws-rating: var(--ws-accent-star);
+
+  /* DS v2 kit bridges — the hub's utility vocabulary (bg-credit-chip,
+     text-debit, bg-surface-sunken …) used by components/ui/system.tsx. Each
+     points at a canonical token ws-tokens.css already defines in BOTH modes
+     (dark 500s @14% chips, light 700s @10%); no values live here. */
+  --color-credit: var(--credit);
+  --color-credit-chip: var(--credit-chip);
+  --color-debit: var(--debit);
+  --color-debit-chip: var(--debit-chip);
+  --color-convert-chip: var(--convert-chip);
+  --color-warning: var(--warning);
+  --color-warning-chip: var(--warning-chip);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-subtle: var(--subtle);
+  /* Ambient gold glow. The token file has no --sidebar-glow/--sidebar-bleed
+     (the hub's rail crown wash); --ws-glow-brand is its one ambient glow
+     token (gold @7% dark / dim-gold @5% light). Radials only, never a fill. */
+  --color-ws-glow: var(--ws-glow-brand);
 }
 
 /* Light mode is NOT defined here. ThemeProvider syncs next-themes' choice to
@@ -273,6 +291,52 @@
   display: none;
 }
 
+/* ── Two-tone icons (Hugeicons) ─────────────────────────────────────────────
+   The house icon look (design-system/03-icons): the outer path is ink
+   (currentColor), inner detail strokes are gold. Ported from the hub's
+   `svg[viewBox="0 0 24 24"] > path:not(:first-child)`, NARROWED — that bare
+   selector would also recolour this repo's other 24-box svgs:
+     · lucide-react icons (still the default outside migrated surfaces) are
+       24-box multi-path svgs;
+     · the inline spinners (signature upload/canvas, profile avatar upload,
+       video player) are 24-box `<circle>` + `<path>`, so their arc matches
+       `path:not(:first-child)` and would take a gold stroke.
+   The marker: HugeiconsIcon always writes a `color` attribute on its <svg>
+   (`color={primaryColor || color}`, default "currentColor" —
+   @hugeicons/react dist/esm/HugeiconsIcon.js). lucide-react never does (it
+   maps `color` to `stroke`), and no inline svg here sets one (audited
+   2026-09-15). `:not(.lucide)` is a second guard in case a future lucide
+   starts passing `color` through. Un-layered on purpose, like the hub: the
+   exceptions below must beat Tailwind's layered utilities.
+
+   Specificity: base (0,4,2); each exception adds a class → (0,5,2). */
+svg[viewBox="0 0 24 24"][color]:not(.lucide) > path:not(:first-child) {
+  stroke: var(--color-primary);
+}
+
+/* …except on the gold fill itself, where the treatment paints the accent ON
+   the accent and the glyph half-vanishes. The two-tone rule assumes a
+   neutral surface behind the icon; a primary-filled button isn't one, so the
+   whole glyph takes the button's own foreground. `.bg-ws-brand` is Academy's
+   older name for the same gold fill. A Tailwind utility could not do this
+   from the call site: layered utilities lose to un-layered rules whatever
+   their specificity. */
+.bg-primary svg[viewBox="0 0 24 24"][color]:not(.lucide) > path:not(:first-child),
+.bg-ws-brand svg[viewBox="0 0 24 24"][color]:not(.lucide) > path:not(:first-child) {
+  stroke: currentColor;
+}
+
+/* …and an explicit opt-out, for icons whose COLOUR carries information (an
+   eye that reads gold when figures are hidden and muted when shown would be
+   gold in both states under the unconditional rule). `[&_path]:stroke-current`
+   from a className looks like it should work and silently does not — same
+   cascade reason as above.
+
+   Put it on the ELEMENT WRAPPING the icon (button, span), not the icon. */
+.ws-icon-mono svg[viewBox="0 0 24 24"][color]:not(.lucide) > path:not(:first-child) {
+  stroke: currentColor;
+}
+
 /* ---- Custom thin scrollbars ---- */
 * {
   scrollbar-width: thin;
@@ -334,6 +398,70 @@
     animation-duration: 0.01ms;
     animation-delay: 0ms;
   }
+}
+
+/* ── DS v2 kit motion (components/ui/system.tsx, rolling-amount.tsx) ────────
+   Ported from dashboard-revamp/app/globals.css. All one-shot, opacity and
+   transform only, and all off under prefers-reduced-motion. */
+
+/* Rise — staggered section entrance (the mobile app's `Rise` cascade).
+   Apply `.rise` to a section and set `--rise-delay` inline; sections step
+   down the page in ~60ms increments.
+   Fill mode is `backwards`, not the hub's `both`: `both` leaves the final
+   transform applied forever, which makes every Rise a containing block for
+   `position: fixed` descendants and a stacking context that swallows
+   popovers (the hub learned this on its `.ws-pane`). `backwards` still holds
+   the `from` frame through the delay, and the end frame equals the natural
+   state, so nothing else changes. */
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.rise {
+  animation: rise-in 0.45s var(--ws-ease-rise) backwards;
+  animation-delay: var(--rise-delay, 0ms);
+}
+
+/* RollingAmount — the balance odometer. Adjacent digits roll in opposite
+   directions via --rd (1 | -1); travel is in `em` so it scales with the
+   font-size. Fires only when a value changes. */
+@keyframes roll-in {
+  from { opacity: 0; transform: translateY(calc(var(--rd, -1) * -0.82em)); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes roll-out {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(calc(var(--rd, -1) * 0.82em)); }
+}
+.roll-in  { animation: roll-in  340ms cubic-bezier(0.3, 0.1, 0.25, 1) both; }
+.roll-out { animation: roll-out 340ms cubic-bezier(0.3, 0.1, 0.25, 1) both; }
+
+/* Droplet thumb — the Segmented thumb stretches like liquid mid-slide and
+   relaxes as it lands. Fired for the travel only, never at rest. */
+@keyframes ws-thumb-stretch {
+  0%   { transform: scaleX(1); }
+  45%  { transform: scaleX(1.16); }
+  100% { transform: scaleX(1); }
+}
+.ws-thumb-stretch { animation: ws-thumb-stretch 0.34s cubic-bezier(0.3, 1.2, 0.4, 1); }
+
+/* Skeleton blocks — a loading state has the SHAPE of what's coming. Neutral
+   by rule (gold is brand, primary CTA and active state; a loader is none of
+   those). Static on purpose: the Academy student revamp runs no infinite
+   loops, so this is the hub's reduced-motion rendering — its mid-tone, no
+   travelling shimmer. */
+.skel {
+  background-color: color-mix(in oklab, var(--foreground) 7%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .roll-in,
+  .roll-out,
+  .ws-thumb-stretch {
+    animation: none;
+  }
+  .roll-out { display: none; }
 }
 
 /* ---- Meeting reactions: one short one-shot rise, opacity + small travel ---- */
