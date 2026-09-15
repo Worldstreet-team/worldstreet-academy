@@ -33,7 +33,13 @@ export default async function PlatformLayout({
       <UserProvider user={user}>
         <CallProvider>
           <MeetingProvider>
-            <SidebarProvider defaultOpen={sidebarOpen}>
+            {/* The student rail floats (variant="floating"). Its icon-mode
+                width is the hub's 4.5rem: room for the 28px icon chips inside
+                the rail's inset. The instructor and admin rails keep 3rem. */}
+            <SidebarProvider
+              defaultOpen={sidebarOpen}
+              style={{ "--sidebar-width-icon": "4.5rem" } as React.CSSProperties}
+            >
               <AppSidebar />
               <SidebarInset>
                 {children}

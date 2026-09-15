@@ -137,7 +137,9 @@
      tighter than stock Tailwind — that gap is what makes the UI read geometric
      rather than pillowy. */
   --radius: 0.8125rem;
-  --sidebar: var(--ws-bg-surface);
+  /* App shells sit on the SUNKEN step (design-system 01/04), under the
+     cards the rail holds — not on the card step itself. */
+  --sidebar: var(--ws-bg-sunken);
   --sidebar-foreground: var(--ws-text-primary);
   --sidebar-primary: var(--ws-brand-primary);
   --sidebar-primary-foreground: var(--ws-brand-on-primary);

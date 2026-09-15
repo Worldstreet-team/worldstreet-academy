@@ -1,17 +1,22 @@
 "use client"
 
+import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useRef, useEffect, useState } from "react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import {
+  BookOpen01Icon,
+  Bookmark02Icon,
+  DashboardSquare01Icon,
+  Mic01Icon,
+  UserIcon,
+} from "@hugeicons/core-free-icons"
 import { cn } from "@/lib/utils"
-import { BookOpenIcon, BookmarkIcon, HouseIcon, MicIcon, UserIcon } from "lucide-react"
-import type { LucideIcon } from "lucide-react"
-import { RenderIcon } from "@/components/shared/render-icon"
 
 type BottomNavItem = {
   title: string
   href: string
-  icon: LucideIcon
+  icon: typeof DashboardSquare01Icon
   match?: (pathname: string) => boolean
 }
 
@@ -19,19 +24,19 @@ const navItems: BottomNavItem[] = [
   {
     title: "Home",
     href: "/dashboard",
-    icon: HouseIcon,
+    icon: DashboardSquare01Icon,
     match: (p: string) => p === "/dashboard",
   },
   {
     title: "My programs",
     href: "/dashboard/my-courses",
-    icon: BookOpenIcon,
+    icon: BookOpen01Icon,
     match: (p: string) => p === "/dashboard/my-courses",
   },
   {
     title: "Bookmarks",
     href: "/dashboard/bookmarks",
-    icon: BookmarkIcon,
+    icon: Bookmark02Icon,
     match: (p: string) => p === "/dashboard/bookmarks",
   },
   {
@@ -53,144 +58,83 @@ function findVividOrb(): HTMLElement | null {
   )
 }
 
+/**
+ * Mobile tab bar — the hub's floating capsule (mobile-bottom-nav.tsx) on
+ * solid chrome: inset from the edges, card fill + hairline, the active tab in
+ * a raised lozenge with a gold icon. Content scrolls under it; pages clear it
+ * with `pb-24`. The Vivid proxy is a static gold chip — no ambient animation.
+ */
 export function PlatformBottomNav() {
   const pathname = usePathname()
-  const [orbReady, setOrbReady] = useState(false)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const animRef = useRef<number>(0)
+  const [orbReady, setOrbReady] = React.useState(false)
 
-  useEffect(() => {
-    if (findVividOrb()) {
-      setOrbReady(true)
-      return
-    }
+  // Look for the orb every 500ms for up to 15s. The first look is scheduled
+  // on the next tick rather than run in the effect body, so an orb that
+  // already exists still shows the button without waiting a whole interval.
+  React.useEffect(() => {
     const started = Date.now()
-    const poll = setInterval(() => {
+    const look = () => {
       if (findVividOrb()) {
         setOrbReady(true)
-        clearInterval(poll)
+        window.clearInterval(poll)
       } else if (Date.now() - started > 15_000) {
-        clearInterval(poll)
+        window.clearInterval(poll)
       }
-    }, 500)
-    return () => clearInterval(poll)
+    }
+    const poll = window.setInterval(look, 500)
+    const first = window.setTimeout(look, 0)
+    return () => {
+      window.clearTimeout(first)
+      window.clearInterval(poll)
+    }
   }, [])
 
-  // Mini orb glow animation — Academy accent blob
-  useEffect(() => {
-    if (!orbReady) return
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext("2d")
-    if (!ctx) return
-    const size = 64
-    canvas.width = size * 2
-    canvas.height = size * 2
-
-    // Canvas can't resolve CSS variables — read the Academy accent token once
-    // per mount so the orb tracks the design system, not a hardcoded green.
-    const accent = getComputedStyle(document.documentElement)
-      .getPropertyValue("--ws-accent-academy")
-      .trim() || "#10B981"
-    const r0 = parseInt(accent.slice(1, 3), 16)
-    const g0 = parseInt(accent.slice(3, 5), 16)
-    const b0 = parseInt(accent.slice(5, 7), 16)
-    const rgba = (a: number) => `rgba(${r0},${g0},${b0},${a})`
-
-    const draw = () => {
-      ctx.clearRect(0, 0, size * 2, size * 2)
-      const t = Date.now() / 1500
-      const baseR = 24
-      const gradient = ctx.createRadialGradient(size, size, baseR * 0.2, size, size, baseR * 1.6)
-      gradient.addColorStop(0, rgba(0.85))
-      gradient.addColorStop(0.35, rgba(0.5))
-      gradient.addColorStop(0.7, rgba(0.2))
-      gradient.addColorStop(1, rgba(0))
-
-      ctx.fillStyle = gradient
-      ctx.beginPath()
-      const points = 64
-      for (let i = 0; i <= points; i++) {
-        const angle = (i / points) * Math.PI * 2
-        const noise = Math.sin(angle * 3 + t) * 3 + Math.cos(angle * 5 + t * 1.3) * 2
-        const r = baseR + noise
-        const x = size + Math.cos(angle) * r
-        const y = size + Math.sin(angle) * r
-        if (i === 0) ctx.moveTo(x, y)
-        else ctx.lineTo(x, y)
-      }
-      ctx.closePath()
-      ctx.fill()
-      animRef.current = requestAnimationFrame(draw)
-    }
-    draw()
-    return () => cancelAnimationFrame(animRef.current)
-  }, [orbReady])
+  const renderItem = (item: BottomNavItem) => {
+    const active = item.match?.(pathname) ?? pathname === item.href
+    return (
+      <Link
+        key={item.title}
+        href={item.href}
+        aria-current={active ? "page" : undefined}
+        className={cn(
+          "flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-full px-1 py-1.5 outline-none transition-colors duration-[var(--ws-motion-fast)] focus-visible:ring-2 focus-visible:ring-primary/40",
+          active
+            ? "bg-accent text-foreground ring-1 ring-foreground/[0.08]"
+            : "text-muted-foreground hover:text-foreground",
+        )}
+      >
+        <HugeiconsIcon icon={item.icon} className={cn("size-5 shrink-0", active && "text-primary")} />
+        <span className="max-w-full truncate text-[10px] font-semibold leading-none">{item.title}</span>
+      </Link>
+    )
+  }
 
   const left = navItems.slice(0, 2)
   const right = navItems.slice(2)
 
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-50 border-t bg-ws-surface md:hidden safe-area-bottom">
-      <div className="flex items-end justify-around px-2 pt-1 pb-2">
-        {left.map((item) => {
-          const active = item.match?.(pathname) ?? pathname === item.href
-          return (
-            <Link
-              key={item.title}
-              href={item.href}
-              className={cn(
-                "flex min-h-11 flex-col items-center justify-center gap-0.5 py-1.5 px-3 text-[10px] transition-colors",
-                active
-                  ? "text-foreground font-medium"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <RenderIcon icon={item.icon}  size={20} />
-              <span>{item.title}</span>
-            </Link>
-          )
-        })}
+    <nav
+      aria-label="Primary"
+      className="safe-area-bottom pointer-events-none fixed inset-x-4 bottom-3 z-50 md:hidden"
+    >
+      <div className="pointer-events-auto mx-auto flex max-w-sm items-center gap-0.5 rounded-full border border-border bg-card p-1.5 shadow-(--ws-shadow-nav)">
+        {left.map(renderItem)}
 
-        {/* Center CTA button — AI Orb (green blob, no container) */}
+        {/* Vivid — the assistant's door, a static gold chip in the centre slot */}
         {orbReady && (
           <button
+            type="button"
             onClick={() => findVividOrb()?.click()}
-            className="flex flex-col items-center gap-0.5 -mt-5 relative"
+            aria-label="Open Vivid AI assistant"
+            className="flex shrink-0 items-center justify-center rounded-full px-1 outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           >
-            <div className="relative flex h-16 w-16 items-center justify-center rounded-full ring-4 ring-background overflow-hidden">
-              <canvas
-                ref={canvasRef}
-                className="absolute inset-[-50%] w-[200%] h-[200%] pointer-events-none"
-              />
-              <MicIcon
-                size={22}
-                className="relative z-10 text-foreground/80 transition-colors" />
-            </div>
-            <span className="text-[10px] font-medium text-foreground mt-0.5">
-              AI
+            <span className="flex size-11 items-center justify-center rounded-full bg-primary/[0.14] text-primary ring-1 ring-primary/25">
+              <HugeiconsIcon icon={Mic01Icon} className="size-5" />
             </span>
           </button>
         )}
 
-        {right.map((item) => {
-          const active = item.match?.(pathname) ?? pathname === item.href
-          return (
-            <Link
-              key={item.title}
-              href={item.href}
-              className={cn(
-                "flex min-h-11 flex-col items-center justify-center gap-0.5 py-1.5 px-3 text-[10px] transition-colors",
-                active
-                  ? "text-foreground font-medium"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <RenderIcon icon={item.icon}  size={20} />
-              <span>{item.title}</span>
-            </Link>
-          )
-        })}
+        {right.map(renderItem)}
       </div>
     </nav>
   )

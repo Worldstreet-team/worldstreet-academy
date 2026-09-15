@@ -2,24 +2,35 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { Eye, EyeOff, Wallet } from "lucide-react"
+import { useQuery } from "@tanstack/react-query"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { ViewIcon, ViewOffIcon, Wallet01Icon } from "@hugeicons/core-free-icons"
+import { getMyWalletBalance } from "@/lib/actions/wallet"
+import { queryKeys } from "@/lib/hooks/queries/keys"
 
 const STORAGE_KEY = "ws:balance-hidden"
 
 /**
- * Wallet balance in the top bar.
+ * The Worldstreet Wallet's USD balance in the top bar.
  *
- * Design system: `bg/chip` pill, amount gold SemiBold 13, tabular numerals
- * (05-screens Academy TopNav), a `wallet` glyph because that's what the
- * glyph-to-icon table assigns to a balance chip, and an `eye` visibility
- * toggle — the pattern the system pairs with every balance.
+ * The figure comes from the central wallet (`getMyWalletBalance`), not from
+ * `user.walletBalance` — a legacy Mongo field the wallet service never writes;
+ * the Academy holds no balance (lib/wallet.ts). Nothing renders while the read
+ * is in flight or when the wallet is disabled: a pill reading $0.00 would claim
+ * a balance nobody knows, and the wallet page explains the disabled state.
  *
- * The toggle isn't decoration: this balance sits in a persistent bar, so it's
- * in every screenshot, screen-share and over-the-shoulder glance the user ever
- * takes. The masked state keeps the same character count so the bar doesn't
- * reflow when it flips.
+ * Ink, not gold — a balance is data, and gold is never a data colour
+ * (design-system 01). The eye toggle stays because this bar is in every
+ * screenshot and screen-share; the masked state keeps the character count so
+ * the pill doesn't reflow when it flips.
  */
-export function BalanceChip({ balance }: { balance: number }) {
+export function BalanceChip() {
+  const { data } = useQuery({
+    queryKey: queryKeys.walletBalance,
+    queryFn: () => getMyWalletBalance(),
+    staleTime: 60_000,
+  })
+
   // Default to visible and correct after mount — reading localStorage during
   // render would desync the server-rendered markup.
   const [hidden, setHidden] = React.useState(false)
@@ -46,27 +57,30 @@ export function BalanceChip({ balance }: { balance: number }) {
     })
   }, [])
 
-  const formatted = balance.toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+  if (!data?.enabled) return null
+
+  // The wallet service speaks integer US cents.
+  const formatted = (data.usdAvailableMinor / 100).toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
   })
   // Same glyph count as the real figure, so the pill width holds steady.
-  const masked = "•".repeat(Math.max(formatted.length, 4))
+  const masked = `$${"•".repeat(Math.max(formatted.length - 1, 4))}`
 
   return (
-    <div className="hidden items-center gap-1 rounded-full bg-ws-chip pr-1 transition-colors duration-[var(--ws-motion-fast)] focus-within:ring-2 focus-within:ring-ws-brand focus-within:ring-offset-2 focus-within:ring-offset-ws-surface hover:bg-ws-raised sm:inline-flex">
+    <div className="hidden h-10 shrink-0 items-center rounded-full bg-surface-sunken pr-1 ring-1 ring-border/70 transition-colors duration-[var(--ws-motion-fast)] focus-within:ring-2 focus-within:ring-primary/40 hover:bg-accent lg:inline-flex">
       <Link
         href="/dashboard/wallet"
-        aria-label={`Wallet balance ${hidden ? "hidden" : `$${formatted}`}. Open wallet.`}
-        className="flex h-8 items-center gap-2 rounded-full pl-3 pr-1 outline-none"
+        aria-label={`Wallet balance ${hidden ? "hidden" : formatted}. Open wallet.`}
+        className="flex h-full items-center gap-2 rounded-full pl-3.5 pr-1.5 outline-none"
       >
-        <Wallet size={14} strokeWidth={2} className="shrink-0 text-ws-gold" aria-hidden />
+        <HugeiconsIcon icon={Wallet01Icon} aria-hidden className="size-4 shrink-0 text-muted-foreground" />
         <span
-          className="text-[13px] font-semibold tabular-nums leading-none text-ws-gold"
+          className="text-[13px] font-semibold leading-none tabular-nums text-foreground"
           // Avoid a flash of the real figure before the stored preference loads.
           style={{ visibility: ready ? "visible" : "hidden" }}
         >
-          {hidden ? masked : `$${formatted}`}
+          {hidden ? masked : formatted}
         </span>
       </Link>
 
@@ -75,9 +89,9 @@ export function BalanceChip({ balance }: { balance: number }) {
         onClick={toggle}
         aria-label={hidden ? "Show balance" : "Hide balance"}
         aria-pressed={hidden}
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ws-muted outline-none transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-chip hover:text-ws-primary"
+        className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors duration-[var(--ws-motion-fast)] hover:bg-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary/40"
       >
-        {hidden ? <EyeOff size={13} strokeWidth={2} /> : <Eye size={13} strokeWidth={2} />}
+        <HugeiconsIcon icon={hidden ? ViewOffIcon : ViewIcon} className="size-3.5" />
       </button>
     </div>
   )

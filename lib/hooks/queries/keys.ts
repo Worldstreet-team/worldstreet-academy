@@ -27,6 +27,7 @@ export const queryKeys = {
 
   // ── Wallet ──
   walletOverview: ["wallet", "overview"] as const,
+  walletBalance: ["wallet", "balance"] as const,
   walletTransactions: ["wallet", "transactions"] as const,
   walletBanks: ["wallet", "banks"] as const,
   walletSavedBanks: ["wallet", "saved-banks"] as const,

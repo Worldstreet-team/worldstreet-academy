@@ -27,7 +27,9 @@ import {
 } from "@/lib/actions/notifications"
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import type { SSEEventPayload } from "@/lib/call-events"
-import { AwardIcon, BellIcon, BookOpenIcon, CircleAlertIcon, CircleDollarSignIcon, DoorOpenIcon, UsersIcon } from "lucide-react"
+import { AwardIcon, BookOpenIcon, CircleAlertIcon, CircleDollarSignIcon, DoorOpenIcon, UsersIcon } from "lucide-react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { Notification03Icon } from "@hugeicons/core-free-icons"
 
 export const typeIcons = {
   application: AwardIcon,
@@ -234,12 +236,13 @@ export function NotificationBell() {
   const triggerButton = (
     <button
       type="button"
-      className="relative flex h-10 w-10 items-center justify-center rounded-full text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-chip hover:text-ws-primary"
+      className="ws-touch-target relative flex size-10 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors duration-[var(--ws-motion-fast)] hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary/40"
       aria-label="Notifications"
     >
-      <BellIcon  size={18} />
+      {/* Same glyph set and 18px size as the rest of the top bar's targets. */}
+      <HugeiconsIcon icon={Notification03Icon} className="size-[18px]" />
       {unreadCount > 0 && (
-        <span className="absolute top-0.5 right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground">
+        <span className="absolute top-0.5 right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold tabular-nums text-primary-foreground ring-2 ring-background">
           {unreadCount > 99 ? "99+" : unreadCount}
         </span>
       )}
