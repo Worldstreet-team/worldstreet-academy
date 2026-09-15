@@ -2,7 +2,7 @@
 
 import { CourseCard } from "@/components/platform/course-card"
 import type { StudentEnrollment } from "@/lib/actions/student"
-import { enrollmentHref, enrollmentStatusLabel, isComingSoon } from "@/lib/dashboard-home"
+import { enrollmentHref, enrollmentStatusLabel, isComingSoon, isFinished } from "@/lib/dashboard-home"
 
 /**
  * A CourseCard for one of the student's enrollments: package chip, status chip
@@ -20,7 +20,9 @@ export function EnrollmentCard({ enrollment }: { enrollment: StudentEnrollment }
       title={enrollment.courseTitle}
       thumbnailUrl={enrollment.courseThumbnail}
       progress={enrollment.progress}
-      packageName={enrollment.packageName}
+      completed={isFinished(enrollment)}
+      // A badge requires the package still to exist on the course.
+      packageName={enrollment.explicitPackage ? enrollment.packageName : null}
       statusLabel={enrollmentStatusLabel(enrollment, now)}
       comingSoonAt={isComingSoon(enrollment, now) ? enrollment.courseAvailableAt : null}
     />

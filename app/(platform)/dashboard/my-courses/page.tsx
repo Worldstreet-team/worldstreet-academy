@@ -6,6 +6,7 @@ import { CourseCardSkeleton } from "@/components/platform/course-card"
 import { EnrollmentCard } from "@/components/platform/enrollment-card"
 import { EmptyState } from "@/components/shared/empty-state"
 import { ArtCourses } from "@/components/shared/illustrations"
+import { isFinished, isInProgress } from "@/lib/dashboard-home"
 import { useEnrollments } from "@/lib/hooks/queries"
 import { cn } from "@/lib/utils"
 import { SearchIcon } from "lucide-react"
@@ -22,11 +23,12 @@ export default function MyProgramsPage() {
     let courses = enrolledCourses
 
     switch (activeTab) {
+      // The home's and sidebar's definitions: active (0% included) vs completed status.
       case "In Progress":
-        courses = courses.filter((c) => c.progress > 0 && c.progress < 100)
+        courses = courses.filter(isInProgress)
         break
       case "Completed":
-        courses = courses.filter((c) => c.progress === 100)
+        courses = courses.filter(isFinished)
         break
     }
 

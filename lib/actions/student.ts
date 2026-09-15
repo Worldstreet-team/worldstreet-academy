@@ -79,6 +79,20 @@ export type StudentEnrollment = {
   explicitPackage: boolean
   /** Published lessons on the course this package opens — `openPublishedLessonIds`'s size, the set `progress` is measured over. */
   openLessons: number
+  /**
+   * Lessons in that same open set the student has completed — counted live, so
+   * it stays true when lessons are published or unpublished after `progress`
+   * (stored, recalculated only on a completion) was last written.
+   */
+  completedOpenLessons: number
+  /**
+   * A passing final exam still stands between this enrollment and completion:
+   * the course requires its exam, the package includes assessment & certificate,
+   * and the exam isn't passed — `markCourseComplete`'s own exam gate.
+   */
+  finalExamPending: boolean
+  /** The player's last lesson (course order) — the page that carries the Finish button. */
+  lastLessonId: string | null
 }
 
 export type StudentBookmark = {
@@ -700,7 +714,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
     const enrollments = await Enrollment.find({ user: user._id })
       .populate({
         path: "course",
-        select: "slug title thumbnailUrl instructor totalLessons availableAt status packages",
+        select: "slug title thumbnailUrl instructor totalLessons availableAt status packages examRequired",
         populate: {
           path: "instructor",
           select: "firstName lastName avatarUrl instructorProfile.headline",
@@ -717,6 +731,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
       totalLessons?: number
       availableAt?: Date | null
       packages?: ICoursePackage[] | null
+      examRequired?: boolean
       instructor: {
         _id: { toString(): string }
         firstName: string
@@ -759,16 +774,21 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
       // reads null for a non-access-granting status
       // (pre_enrolled/expired/refunded/suspended/cancelled) or for course staff;
       // either way there's no per-enrollment access record to size the set
-      // from, so fall back to the course's own published lesson count.
+      // from, so fall back to the course's own published lessons.
       const access = courseAccessFromRows(enrollment, {
         _id: course._id,
         slug: course.slug,
         instructor: course.instructor._id,
         packages,
       })
-      const openLessons = access
-        ? openPublishedLessonIdsFromRows(access, courseLessons).size
-        : courseLessons.filter((l) => l.isPublished).length
+      const openIds = access
+        ? openPublishedLessonIdsFromRows(access, courseLessons)
+        : new Set(courseLessons.filter((l) => l.isPublished).map((l) => l._id.toString()))
+      // Completions inside that same live set — stored `progress` is only
+      // rewritten on a completion, so it can't be scaled back into a count.
+      const completedIds = new Set((enrollment.completedLessons ?? []).map((id) => id.toString()))
+      const completedOpenLessons = [...openIds].filter((id) => completedIds.has(id)).length
+      const entitlements = entitlementsFor({ packages }, { packageKey })
 
       return {
         id: enrollment._id.toString(),
@@ -789,9 +809,14 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
         packageName: enrollment.packageName ?? null,
         instructorId: course.instructor._id.toString(),
         instructorHeadline: course.instructor.instructorProfile?.headline || null,
-        entitlements: entitlementsFor({ packages }, { packageKey }),
+        entitlements,
         explicitPackage: packageKey !== null && packages.some((p) => p.key === packageKey),
-        openLessons,
+        openLessons: openIds.size,
+        completedOpenLessons,
+        // `markCourseComplete`'s exam gate, read from the rows loaded above.
+        finalExamPending: !!course.examRequired && entitlements.certificate && !enrollment.examPassed,
+        // The player lists every lesson in course order (`fetchCourseForLearning`); Finish renders on its last.
+        lastLessonId: courseLessons[courseLessons.length - 1]?._id.toString() ?? null,
       }
     })
   } catch (error) {

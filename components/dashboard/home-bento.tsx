@@ -24,11 +24,13 @@ export function HomeBento({ tiles, delay = 0 }: { tiles: BentoTile[]; delay?: nu
   const order = rows.flatMap((row) => (row.kind === "pair" ? [row.wide, ...row.narrow] : row.keys))
   const delayOf = (key: string) => delay + STEP_MS * order.indexOf(key)
 
+  // Row keys come from the row's first tile id, so a tile joining the end of a
+  // row never remounts (and replays Rise on) the tiles already in it.
   return (
     <div className="flex w-full flex-col gap-4">
       {rows.map((row) =>
         row.kind === "pair" ? (
-          <div key={row.wide} className="grid gap-4 @2xl:grid-cols-2 @4xl:grid-cols-5">
+          <div key={`pair-${row.wide}`} className="grid gap-4 @2xl:grid-cols-2 @4xl:grid-cols-5">
             <Rise
               delay={delayOf(row.wide)}
               className={cn("min-w-0 @4xl:col-span-3 [&>div]:h-full", row.wideRight && "@4xl:order-last")}
@@ -46,7 +48,7 @@ export function HomeBento({ tiles, delay = 0 }: { tiles: BentoTile[]; delay?: nu
           </div>
         ) : (
           <div
-            key={row.keys.join("+")}
+            key={`even-${row.keys[0]}`}
             className={cn(
               "grid gap-4",
               row.keys.length === 2 && "@2xl:grid-cols-2",

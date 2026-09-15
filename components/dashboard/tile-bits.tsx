@@ -23,6 +23,10 @@ export const TILE_ROWS = "flex flex-col divide-y divide-border/60"
 export const TILE_ROW =
   "flex w-full min-w-0 items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/40 focus-visible:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"
 
+/** A tile's foot link ("See all"), pinned to the bottom, with the rows' inset keyboard focus ring. */
+export const TILE_FOOT_LINK =
+  "mt-auto flex items-center justify-between gap-3 border-t border-border/60 px-4 py-3 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:bg-accent/40 focus-visible:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"
+
 /** Neutral 40px icon chip for data rows — gold chips are kept for navigation rows. */
 export const DATA_CHIP = "flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-foreground/[0.05]"
 

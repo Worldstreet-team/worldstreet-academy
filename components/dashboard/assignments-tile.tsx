@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react"
 import { Award01Icon, Notebook01Icon, TaskDone01Icon } from "@hugeicons/core-free-icons"
-import { Chevron, DATA_CHIP, TILE_ROW, TILE_ROWS } from "@/components/dashboard/tile-bits"
+import { Chevron, DATA_CHIP, TILE_FOOT_LINK, TILE_ROW, TILE_ROWS } from "@/components/dashboard/tile-bits"
 import { CardHeader, CardShell } from "@/components/ui/system"
 import type { MyAssessment } from "@/lib/actions/exams"
 import { assessmentCounts, formatDateTime } from "@/lib/dashboard-home"
@@ -55,33 +55,35 @@ export function AssignmentsTile() {
         link={{ label: "See all", href: "/dashboard/assignments" }}
       />
       <div className={TILE_ROWS}>
-        {assessments.slice(0, ROWS_SHOWN).map((a) => (
-          <Link key={`${a.scope}-${a.id}`} href={a.href} className={TILE_ROW}>
-            <span className={DATA_CHIP}>
-              <HugeiconsIcon icon={KIND_ICON[a.scope]} className="h-[18px] w-[18px] text-muted-foreground" aria-hidden />
-            </span>
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-[14px] font-medium">{a.title}</span>
-              <span className="truncate text-[12.5px] text-muted-foreground">
-                {assessmentKindLabel(a)} · {a.courseTitle}
+        {assessments.slice(0, ROWS_SHOWN).map((a) => {
+          const meta = `${assessmentKindLabel(a)} · ${a.courseTitle}`
+          return (
+            <Link key={`${a.scope}-${a.id}`} href={a.href} className={TILE_ROW}>
+              <span className={DATA_CHIP}>
+                <HugeiconsIcon icon={KIND_ICON[a.scope]} className="h-[18px] w-[18px] text-muted-foreground" aria-hidden />
               </span>
-            </span>
-            <span
-              className={cn(
-                "shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                ASSESSMENT_STATUS[a.status].className
-              )}
-            >
-              {ASSESSMENT_STATUS[a.status].label}
-            </span>
-          </Link>
-        ))}
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate text-[14px] font-medium" title={a.title}>
+                  {a.title}
+                </span>
+                <span className="truncate text-[12.5px] text-muted-foreground" title={meta}>
+                  {meta}
+                </span>
+              </span>
+              <span
+                className={cn(
+                  "shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                  ASSESSMENT_STATUS[a.status].className
+                )}
+              >
+                {ASSESSMENT_STATUS[a.status].label}
+              </span>
+            </Link>
+          )
+        })}
       </div>
       {assessments.length > ROWS_SHOWN && (
-        <Link
-          href="/dashboard/assignments"
-          className="mt-auto flex items-center justify-between gap-3 border-t border-border/60 px-4 py-3 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:outline-none"
-        >
+        <Link href="/dashboard/assignments" className={TILE_FOOT_LINK}>
           {assessments.length - ROWS_SHOWN} more
           <Chevron />
         </Link>

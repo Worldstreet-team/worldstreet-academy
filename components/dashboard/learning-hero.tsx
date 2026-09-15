@@ -17,11 +17,14 @@ import {
   formatDateTime,
   homeSummary,
   initials,
-  lessonsCompleted,
+  learningStep,
   nextClass,
+  nextStepHref,
   type HomeHero,
+  type LearningStep,
 } from "@/lib/dashboard-home"
 import { useUpcomingClasses } from "@/lib/hooks/queries"
+import { useClientNow } from "@/lib/hooks/use-now"
 import { SCHOOLS } from "@/lib/schools"
 import { cn } from "@/lib/utils"
 
@@ -39,40 +42,48 @@ function greetingFor(hour: number): string {
   return "Good evening"
 }
 
+/** A long date, rendered invisibly so the eyebrow keeps its size until the browser's clock is read. */
+const DATE_PLACEHOLDER = "Wednesday, September 30"
+
 /**
  * Date eyebrow, salutation, one line of context. The dashboard is the one
- * screen with a salutation (design-system 04 → PageHeader).
- * suppressHydrationWarning: the server's clock and timezone can straddle an
- * hour or a date against the browser's.
+ * screen with a salutation (design-system 04 → PageHeader). The date and the
+ * greeting follow the student's own clock and timezone, so they are read in
+ * the browser only (`useClientNow`); the server and the hydration pass render
+ * same-size invisible text in their place.
  */
 export function HomeGreeting({
   firstName,
   welcome,
-  now,
   summary,
 }: {
   firstName: string
   /** Arrived from checkout (`?welcome=1`). */
   welcome: boolean
-  now: number
   summary: React.ReactNode
 }) {
-  const date = new Date(now)
+  const now = useClientNow()
+  const date = now === null ? null : new Date(now)
+  const name = firstName ? `, ${firstName}` : ""
   return (
     <header className="flex flex-col gap-1">
-      <p
-        suppressHydrationWarning
-        className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
-      >
-        {date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+      <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        {date ? (
+          date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
+        ) : (
+          <span aria-hidden className="invisible">
+            {DATE_PLACEHOLDER}
+          </span>
+        )}
       </p>
-      <h1
-        suppressHydrationWarning
-        className="font-display text-[26px] font-semibold leading-[1.15] tracking-[-0.02em] sm:text-[28px]"
-      >
-        {welcome
-          ? `Welcome to ${BRAND.name}`
-          : `${greetingFor(date.getHours())}${firstName ? `, ${firstName}` : ""}`}
+      <h1 className="font-display text-[26px] font-semibold leading-[1.15] tracking-[-0.02em] sm:text-[28px]">
+        {welcome ? (
+          `Welcome to ${BRAND.name}`
+        ) : date ? (
+          `${greetingFor(date.getHours())}${name}`
+        ) : (
+          <span aria-hidden className="invisible">{`Good afternoon${name}`}</span>
+        )}
       </h1>
       <div className="min-h-5 text-[14px] text-muted-foreground">{summary}</div>
     </header>
@@ -84,28 +95,35 @@ type SummaryProps = {
   toDo: number
   now: number
   welcome: boolean
+  /** Enrollments or assessments still loading — the line waits for every clause it may carry. */
   loading: boolean
   /** The student's packages include live classes — only then is the classes query run. */
   withClasses: boolean
 }
 
+function SummarySkeleton() {
+  return <Skel className="mt-1 h-4 w-64 max-w-full" />
+}
+
 /** The greeting's context line. Falls back to a plain invitation when there is nothing true to count. */
 export function HomeSummary(props: SummaryProps) {
-  if (props.loading) return <Skel className="mt-1 h-4 w-64 max-w-full" />
+  if (props.welcome) return <p>Your learning journey starts now.</p>
+  if (props.loading) return <SummarySkeleton />
   return props.withClasses ? <SummaryWithClasses {...props} /> : <SummaryLine {...props} nextClassAt={null} />
 }
 
 function SummaryWithClasses(props: SummaryProps) {
-  const { data: classes = [] } = useUpcomingClasses()
+  const { data: classes = [], isLoading } = useUpcomingClasses()
+  // Held until classes land too, so the line never grows a clause after it appears.
+  if (isLoading) return <SummarySkeleton />
   return <SummaryLine {...props} nextClassAt={nextClass(classes, props.now)?.scheduledAt ?? null} />
 }
 
-function SummaryLine({ enrollments, toDo, now, welcome, nextClassAt }: SummaryProps & { nextClassAt: string | null }) {
-  if (welcome) return <p>Your learning journey starts now.</p>
+function SummaryLine({ enrollments, toDo, now, nextClassAt }: SummaryProps & { nextClassAt: string | null }) {
   const line = homeSummary({ enrollments, nextClassAt, toDo, now })
   return (
     <p className="tabular-nums">
-      {line || (enrollments.length > 0 ? "Pick up where you left off." : "Pick a program to get started.")}
+      {line || (enrollments.length > 0 ? "Pick a new program to keep going." : "Pick a program to get started.")}
     </p>
   )
 }
@@ -128,6 +146,10 @@ const COVER_CLASS =
   "aspect-[2/1] w-full @lg:aspect-[5/2] @2xl:aspect-auto @2xl:h-full @2xl:min-h-72 @2xl:rounded-[12px]"
 const COVER_SIZES = "(min-width: 1280px) 600px, (min-width: 768px) 60vw, 100vw"
 
+function HeroCover({ enrollment: e }: { enrollment: StudentEnrollment }) {
+  return <ProgramCover src={e.courseThumbnail} sizes={COVER_SIZES} mark="lg" className={COVER_CLASS} />
+}
+
 function HeroTitle({ enrollment: e, eyebrow }: { enrollment: StudentEnrollment; eyebrow: string }) {
   return (
     <div className="flex min-w-0 flex-col gap-2.5">
@@ -147,7 +169,9 @@ function HeroTitle({ enrollment: e, eyebrow }: { enrollment: StudentEnrollment; 
           {e.instructorAvatarUrl && <AvatarImage src={e.instructorAvatarUrl} alt="" />}
           <AvatarFallback className="text-[10px]">{initials(e.instructorName)}</AvatarFallback>
         </Avatar>
-        <span className="truncate">{e.instructorName}</span>
+        <span className="truncate" title={e.instructorName}>
+          {e.instructorName}
+        </span>
       </span>
     </div>
   )
@@ -187,66 +211,134 @@ function HeroActions({
   )
 }
 
-function ContinueHero({ enrollment: e }: { enrollment: StudentEnrollment }) {
-  const coursePage = `/dashboard/courses/${e.courseId}`
-  const progress = Math.round(e.progress)
-  const hasLessons = e.openLessons > 0
-  const finished = progress >= 100
+type HeroFace = { eyebrow: string; primary: HeroLink; secondary: HeroLink | null }
 
-  // A program with no published lessons has no player to open yet.
-  const primary: HeroLink = !hasLessons
-    ? { label: "View program", href: coursePage }
-    : {
-        label: finished ? "Review lessons" : progress === 0 ? "Start first lesson" : "Resume lesson",
-        href: enrollmentHref(e),
-        icon: true,
+/** What the hero says and offers at each `learningStep`; each CTA goes where that step's flow lives. */
+function continueFace(e: StudentEnrollment, step: LearningStep): HeroFace {
+  const coursePage = `/dashboard/courses/${e.courseId}`
+  const viewProgram: HeroLink = { label: "View program", href: coursePage }
+  const hasLessons = e.openLessons > 0
+  switch (step) {
+    case "complete":
+      return {
+        eyebrow: "Program complete",
+        primary: hasLessons ? { label: "Review lessons", href: enrollmentHref(e), icon: true } : viewProgram,
+        // The certificate page needs a completed enrollment on a package that certifies.
+        secondary: e.entitlements.certificate
+          ? { label: "View certificate", href: `${coursePage}/certificate` }
+          : hasLessons
+            ? viewProgram
+            : null,
       }
-  const secondary: HeroLink | null = !hasLessons
-    ? null
-    : finished && e.entitlements.certificate
-      ? { label: "View certificate", href: `${coursePage}/certificate` }
-      : { label: "View program", href: coursePage }
+    case "exam":
+      return {
+        eyebrow: "Final step: take the exam",
+        primary: { label: "Take the exam", href: nextStepHref(e) },
+        secondary: { label: "Review lessons", href: enrollmentHref(e) },
+      }
+    case "finish":
+      return {
+        eyebrow: "Finish the program",
+        primary: { label: "Finish the program", href: nextStepHref(e) },
+        secondary: viewProgram,
+      }
+    case "no_lessons":
+      return { eyebrow: "Up next", primary: viewProgram, secondary: null }
+    case "start":
+      return {
+        eyebrow: "Up next",
+        primary: { label: "Start first lesson", href: enrollmentHref(e), icon: true },
+        secondary: viewProgram,
+      }
+    case "resume":
+      return {
+        eyebrow: "Continue learning",
+        primary: { label: "Resume lesson", href: enrollmentHref(e), icon: true },
+        secondary: viewProgram,
+      }
+  }
+}
+
+/** The line under the progress track: where the player resumes, or what completes the program. */
+function StepNote({ enrollment: e, step }: { enrollment: StudentEnrollment; step: LearningStep }) {
+  const allDone = e.completedOpenLessons >= e.openLessons
+  if (step === "exam" || step === "finish") {
+    return (
+      <p className="text-[13px] text-muted-foreground">
+        {allDone ? "Every lesson is done. " : ""}
+        {step === "exam"
+          ? "Pass the final exam to complete the program."
+          : "Press Finish on the last lesson to complete the program."}
+      </p>
+    )
+  }
+  if ((step !== "start" && step !== "resume") || !e.resumeLessonTitle) return null
+  return (
+    <p className="flex min-w-0 items-baseline gap-2 text-[13px]">
+      <span className="shrink-0 text-muted-foreground">{step === "start" ? "Starts with" : "Resume at"}</span>
+      <span className="truncate font-medium" title={e.resumeLessonTitle}>
+        {e.resumeLessonTitle}
+      </span>
+    </p>
+  )
+}
+
+function ContinueHero({ enrollment: e }: { enrollment: StudentEnrollment }) {
+  const step = learningStep(e)
+  const face = continueFace(e, step)
+  const progress = Math.round(e.progress)
 
   return (
-    <HeroFrame cover={<ProgramCover src={e.courseThumbnail} sizes={COVER_SIZES} mark="lg" className={COVER_CLASS} />}>
-      <HeroTitle
-        enrollment={e}
-        eyebrow={finished ? "Program complete" : progress === 0 ? "Up next" : "Continue learning"}
-      />
+    <HeroFrame cover={<HeroCover enrollment={e} />}>
+      <HeroTitle enrollment={e} eyebrow={face.eyebrow} />
 
       <div className="mt-auto flex flex-col gap-6">
-        {hasLessons ? (
+        {e.openLessons > 0 ? (
           <div className="flex flex-col gap-3">
             <div className="flex items-end justify-between gap-4">
-              <div className="flex items-start" aria-label={`${progress}% complete`}>
-                <Balance value={String(progress)} className="text-[3.25rem] @2xl:text-[4.25rem]" />
-                <span aria-hidden className="mt-1.5 font-display text-[1.5rem] font-light leading-none text-muted-foreground @2xl:mt-2.5 @2xl:text-[1.875rem]">
-                  %
+              <div className="flex items-start">
+                <span className="sr-only">{progress}% complete</span>
+                <span aria-hidden className="flex items-start">
+                  <Balance value={String(progress)} className="text-[3.25rem] @2xl:text-[4.25rem]" />
+                  <span className="mt-1.5 font-display text-[1.5rem] font-light leading-none text-muted-foreground @2xl:mt-2.5 @2xl:text-[1.875rem]">
+                    %
+                  </span>
                 </span>
               </div>
               <div className="flex flex-col items-end pb-1.5 text-right leading-tight">
                 <span className="text-[15px] font-semibold tabular-nums">
-                  {lessonsCompleted(e)} of {e.openLessons}
+                  {e.completedOpenLessons} of {e.openLessons}
                 </span>
                 <span className="text-[13px] text-muted-foreground">lessons done</span>
               </div>
             </div>
             <ProgressTrack value={progress} label={`${e.courseTitle} progress`} />
-            {e.resumeLessonTitle && !finished && (
-              <p className="flex min-w-0 items-baseline gap-2 text-[13px]">
-                <span className="shrink-0 text-muted-foreground">Next lesson</span>
-                <span className="truncate font-medium" title={e.resumeLessonTitle}>
-                  {e.resumeLessonTitle}
-                </span>
-              </p>
-            )}
+            <StepNote enrollment={e} step={step} />
           </div>
         ) : (
           <p className="text-[14px] text-muted-foreground">
             Lessons for this program haven&apos;t been published yet.
           </p>
         )}
-        <HeroActions primary={primary} secondary={secondary} />
+        <HeroActions primary={face.primary} secondary={face.secondary} />
+      </div>
+    </HeroFrame>
+  )
+}
+
+/**
+ * A reservation on a program that is already open. Nothing plays until
+ * checkout activates the seat; the program page's "Start course" is that door.
+ */
+function SeatReadyHero({ enrollment: e }: { enrollment: StudentEnrollment }) {
+  return (
+    <HeroFrame cover={<HeroCover enrollment={e} />}>
+      <HeroTitle enrollment={e} eyebrow="Seat ready" />
+      <div className="mt-auto flex flex-col gap-6">
+        <p className="text-[14px] text-muted-foreground">
+          This program is open. Complete your enrollment to start learning.
+        </p>
+        <HeroActions primary={{ label: "Complete enrollment", href: `/dashboard/courses/${e.courseId}` }} />
       </div>
     </HeroFrame>
   )
@@ -254,7 +346,7 @@ function ContinueHero({ enrollment: e }: { enrollment: StudentEnrollment }) {
 
 function ReservedHero({ enrollment: e }: { enrollment: StudentEnrollment }) {
   return (
-    <HeroFrame cover={<ProgramCover src={e.courseThumbnail} sizes={COVER_SIZES} mark="lg" className={COVER_CLASS} />}>
+    <HeroFrame cover={<HeroCover enrollment={e} />}>
       <HeroTitle enrollment={e} eyebrow="Seat reserved" />
       <div className="mt-auto flex flex-col gap-6">
         {e.courseAvailableAt && (
@@ -306,11 +398,9 @@ function StartHero({ returning }: { returning: boolean }) {
 
 export function LearningHero({ hero, hasEnrollments }: { hero: HomeHero | null; hasEnrollments: boolean }) {
   if (!hero) return <StartHero returning={hasEnrollments} />
-  return hero.mode === "reserved" ? (
-    <ReservedHero enrollment={hero.enrollment} />
-  ) : (
-    <ContinueHero enrollment={hero.enrollment} />
-  )
+  if (hero.mode === "reserved") return <ReservedHero enrollment={hero.enrollment} />
+  if (hero.mode === "seat_ready") return <SeatReadyHero enrollment={hero.enrollment} />
+  return <ContinueHero enrollment={hero.enrollment} />
 }
 
 /** The hero's shape while enrollments load, so nothing re-lays-out when they land. */

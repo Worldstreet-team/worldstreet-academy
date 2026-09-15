@@ -96,11 +96,16 @@ export default function DashboardPage() {
   const now = useNow()
 
   const { data: enrollments = [], isLoading: loadingEnrollments } = useEnrollments()
-  const { data: assessments = [] } = useMyAssessments()
+  const { data: assessments = [], isLoading: loadingAssessments } = useMyAssessments()
   const { data: bookmarks = [], isLoading: loadingBookmarks } = useBookmarks()
   const { data: browseCourses = [], isLoading: loadingBrowse } = useBrowseCourses()
   const bookmarkedIds = useBookmarkedIds()
   const toggleBookmark = useToggleBookmark()
+
+  // Every query that changes the tile set (and the rail and summary built from
+  // the same rows): until all of them land, tiles show skeletons, so the bento
+  // is paired once and nothing re-pairs, remounts or replays Rise.
+  const loadingTiles = loadingEnrollments || loadingAssessments
 
   const hero = pickHero(enrollments, now)
   const totals = learningTotals(enrollments)
@@ -138,7 +143,7 @@ export default function DashboardPage() {
   const loadingDiscover = loadingBrowse || loadingEnrollments
   const showBrowse = loadingDiscover || browseCourses.length === 0 || recommended.length > 0
   const showBookmarks = loadingBookmarks || bookmarks.length > 0
-  const discoverDelay = Math.min(240 + 60 * (loadingEnrollments ? 2 : tiles.length), 480)
+  const discoverDelay = Math.min(240 + 60 * (loadingTiles ? 2 : tiles.length), 480)
 
   return (
     <>
@@ -160,14 +165,13 @@ export default function DashboardPage() {
                 <HomeGreeting
                   firstName={user.firstName}
                   welcome={welcome}
-                  now={now}
                   summary={
                     <HomeSummary
                       enrollments={enrollments}
                       toDo={toDo}
                       now={now}
                       welcome={welcome}
-                      loading={loadingEnrollments}
+                      loading={loadingTiles}
                       withClasses={showClasses}
                     />
                   }
@@ -193,12 +197,18 @@ export default function DashboardPage() {
               ) : (
                 totals.open > 0 && (
                   <Rise delay={120}>
-                    <StatStrip totals={totals} showCertificates={showCertificates} showClasses={showClasses} />
+                    <StatStrip
+                      totals={totals}
+                      showCertificates={showCertificates}
+                      showClasses={showClasses}
+                      now={now}
+                    />
                   </Rise>
                 )
               )}
-              {/* A rail of one would only repeat the hero's Browse programs. */}
-              {!loadingEnrollments && actions.length > 1 && (
+              {/* A rail of one would only repeat the hero's Browse programs. It waits
+                  for assessments too, so the Assignments pill never pops in. */}
+              {!loadingTiles && actions.length > 1 && (
                 <Rise delay={180}>
                   <QuickActions actions={actions} />
                 </Rise>
@@ -206,7 +216,7 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {loadingEnrollments ? (
+          {loadingTiles ? (
             <div className="grid gap-4 @2xl:grid-cols-2 @4xl:grid-cols-5">
               <Rise delay={240} className="min-w-0 @4xl:col-span-3 [&>div]:h-full">
                 <TileSkeleton rows={4} label="Loading your programs" />

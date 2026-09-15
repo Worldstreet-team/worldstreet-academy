@@ -15,7 +15,7 @@ import {
 } from "@hugeicons/core-free-icons"
 import { glyph, type Glyph } from "@/components/dashboard/tile-bits"
 import { ActionPill, Skel } from "@/components/ui/system"
-import type { LearningTotals } from "@/lib/dashboard-home"
+import { splitClasses, type LearningTotals } from "@/lib/dashboard-home"
 import { useMyCertificates, useUpcomingClasses } from "@/lib/hooks/queries"
 
 /*
@@ -64,10 +64,12 @@ export function StatStrip({
   totals,
   showCertificates,
   showClasses,
+  now,
 }: {
   totals: LearningTotals
   showCertificates: boolean
   showClasses: boolean
+  now: number
 }) {
   return (
     <ul aria-label="Your learning at a glance" className={STRIP}>
@@ -86,7 +88,7 @@ export function StatStrip({
         />
       )}
       {showCertificates && <CertificatesStat />}
-      {showClasses && <ClassesStat />}
+      {showClasses && <ClassesStat now={now} />}
     </ul>
   )
 }
@@ -102,14 +104,23 @@ function CertificatesStat() {
   )
 }
 
-/** `getUpcomingClasses` returns at most 10, so ten reads "10+". */
-function ClassesStat() {
+/** `getUpcomingClasses`'s own limit: a full list may have more behind it. */
+const CLASS_LIST_LIMIT = 10
+
+/**
+ * Classes still ahead, read through `splitClasses` like the Upcoming classes
+ * tile — one waiting for its host has started, so it isn't upcoming. A full
+ * list reads "N+".
+ */
+function ClassesStat({ now }: { now: number }) {
   const { data: classes = [], isLoading } = useUpcomingClasses()
+  const { ahead } = splitClasses(classes, now)
+  const more = classes.length >= CLASS_LIST_LIMIT
   return (
     <StatChip
       icon={ClassesGlyph}
-      value={isLoading ? <Skel className="my-1 h-3.5 w-6" /> : classes.length >= 10 ? "10+" : classes.length}
-      label={classes.length === 1 ? "Upcoming class" : "Upcoming classes"}
+      value={isLoading ? <Skel className="my-1 h-3.5 w-6" /> : more ? `${ahead.length}+` : ahead.length}
+      label={ahead.length === 1 && !more ? "Upcoming class" : "Upcoming classes"}
     />
   )
 }

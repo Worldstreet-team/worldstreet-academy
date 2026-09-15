@@ -42,6 +42,8 @@ type CourseCardProps = {
   thumbnailUrl?: string | null
   /** Enrolled variant: 0–100 renders the progress rail + caption. */
   progress?: number
+  /** Enrolled cards: the enrollment is completed (status, not progress — a program can sit at 100% awaiting its exam). Defaults to `progress === 100`. */
+  completed?: boolean
   /** Browse variant. */
   price?: number | null
   pricing?: string
@@ -73,6 +75,7 @@ export function CourseCard({
   title,
   thumbnailUrl,
   progress,
+  completed,
   price,
   pricing,
   rating,
@@ -88,7 +91,7 @@ export function CourseCard({
   statusLabel,
 }: CourseCardProps) {
   const showProgress = typeof progress === "number" && !comingSoonAt
-  const isComplete = progress === 100 && !statusLabel
+  const isComplete = (completed ?? progress === 100) && !statusLabel
   const duration = formatDuration(totalDuration ?? 0)
   // Student-facing cards show no lesson count: the new programs carry no
   // curriculum yet and "0 lessons" is worse than saying nothing. Owner

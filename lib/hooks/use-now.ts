@@ -16,3 +16,31 @@ export function useNow(intervalMs = 60_000): number {
   }, [intervalMs])
   return now
 }
+
+const MINUTE_MS = 60_000
+
+/** Re-reads every 15s; the snapshot only changes with the minute, so subscribers re-render at most once a minute. */
+function subscribeToClock(onChange: () => void): () => void {
+  const id = setInterval(onChange, 15_000)
+  return () => clearInterval(id)
+}
+
+function readClock(): number {
+  return Math.floor(Date.now() / MINUTE_MS) * MINUTE_MS
+}
+
+function readServerClock(): null {
+  return null
+}
+
+/**
+ * The browser's clock to the minute — null on the server and through
+ * hydration. For text that depends on the student's own timezone (the
+ * greeting, today's date): the server's clock is the container's, often UTC,
+ * and React 19 never patches a mismatched text node (suppressHydrationWarning
+ * only silences it). Render a same-size placeholder while this is null; a
+ * client-side navigation gets the real value on its first render.
+ */
+export function useClientNow(): number | null {
+  return React.useSyncExternalStore<number | null>(subscribeToClock, readClock, readServerClock)
+}

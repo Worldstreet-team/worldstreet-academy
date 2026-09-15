@@ -14,7 +14,7 @@ import {
   UserGroupIcon,
 } from "@hugeicons/core-free-icons"
 import { MessageInstructorButton } from "@/app/(platform)/dashboard/instructor/[instructorId]/message-instructor-button"
-import { Chevron, TILE_ROW, TILE_ROWS, glyph } from "@/components/dashboard/tile-bits"
+import { Chevron, TILE_FOOT_LINK, TILE_ROW, TILE_ROWS, glyph } from "@/components/dashboard/tile-bits"
 import { ProgramCover, ProgressTrack, StatusChip } from "@/components/platform/program-bits"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -29,15 +29,17 @@ import {
 import type { StudentEnrollment } from "@/lib/actions/student"
 import { BRAND } from "@/lib/brand"
 import {
-  enrollmentHref,
   enrollmentStatusLabel,
   formatClassWhen,
   formatShortDate,
   grantsAccess,
+  holdsSeat,
   initials,
-  isClassLate,
   isComingSoon,
+  learningStep,
+  nextStepHref,
   programsForTab,
+  splitClasses,
   type InstructorRow,
   type ProgramTab,
 } from "@/lib/dashboard-home"
@@ -75,13 +77,16 @@ export function MyProgramsTile({ enrollments, now }: { enrollments: StudentEnrol
   const inProgress = programsForTab(enrollments, "in_progress", now)
   const tab = picked ?? (inProgress.length > 0 ? "in_progress" : "all")
   const rows = tab === "in_progress" ? inProgress : programsForTab(enrollments, tab, now)
+  // "Enrolled" counts seats held — access-granting or reserved (`holdsSeat`);
+  // refunded, expired, suspended and cancelled rows are listed under All but aren't enrollments.
+  const enrolled = enrollments.filter(holdsSeat).length
 
   return (
     <CardShell className="@container">
       <CardHeader
         className="flex-wrap"
         title="My programs"
-        subtitle={`${enrollments.length} enrolled`}
+        subtitle={`${enrolled} enrolled`}
         right={<Segmented size="sm" options={PROGRAM_TABS} value={tab} onChange={setPicked} />}
       />
       {rows.length === 0 ? (
@@ -103,12 +108,10 @@ export function MyProgramsTile({ enrollments, now }: { enrollments: StudentEnrol
           ))}
         </div>
       )}
-      {/* Pinned to the foot, so a card stretched to its partner's height ends on purpose. */}
-      <Link
-        href="/dashboard/my-courses"
-        className="mt-auto flex items-center justify-between gap-3 border-t border-border/60 px-4 py-3 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:outline-none"
-      >
-        {rows.length > PROGRAM_ROWS ? `See all ${rows.length}` : "See all programs"}
+      {/* Pinned to the foot, so a card stretched to its partner's height ends on
+          purpose. My programs opens on All, so the count is every row it lists. */}
+      <Link href="/dashboard/my-courses" className={TILE_FOOT_LINK}>
+        {enrollments.length > PROGRAM_ROWS ? `See all ${enrollments.length}` : "See all programs"}
         <Chevron />
       </Link>
     </CardShell>
@@ -118,20 +121,22 @@ export function MyProgramsTile({ enrollments, now }: { enrollments: StudentEnrol
 function ProgramRow({ enrollment: e, now }: { enrollment: StudentEnrollment; now: number }) {
   const meta = [e.instructorName, e.explicitPackage ? e.packageName : null].filter(Boolean).join(" · ")
   return (
-    <Link href={enrollmentHref(e)} className={TILE_ROW}>
+    <Link href={nextStepHref(e)} className={TILE_ROW}>
       <ProgramCover src={e.courseThumbnail} sizes="64px" mark="sm" className="h-11 w-16 shrink-0 rounded-[10px]" />
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-[14px] font-medium" title={e.courseTitle}>
           {e.courseTitle}
         </span>
-        <span className="truncate text-[12.5px] text-muted-foreground">{meta}</span>
+        <span className="truncate text-[12.5px] text-muted-foreground" title={meta}>
+          {meta}
+        </span>
       </span>
       <ProgramRowState enrollment={e} now={now} />
     </Link>
   )
 }
 
-/** The row's right edge: a state chip where the program doesn't open, otherwise the figure over its track. */
+/** The row's right edge: a state chip where the program doesn't open or has a final step, otherwise the figure over its track. */
 function ProgramRowState({ enrollment: e, now }: { enrollment: StudentEnrollment; now: number }) {
   const status = enrollmentStatusLabel(e, now)
   if (status) return <StatusChip>{status}</StatusChip>
@@ -139,14 +144,17 @@ function ProgramRowState({ enrollment: e, now }: { enrollment: StudentEnrollment
     return <StatusChip>Opens {formatShortDate(e.courseAvailableAt, now)}</StatusChip>
   }
   if (!grantsAccess(e)) return null
-  if (e.progress >= 100) {
+  const step = learningStep(e)
+  if (step === "complete") {
     return (
       <StatusChip tone="success" icon={Tick02Icon}>
         Completed
       </StatusChip>
     )
   }
-  if (e.openLessons === 0) return <span className="shrink-0 text-[12px] text-muted-foreground">No lessons yet</span>
+  if (step === "exam") return <StatusChip>Exam next</StatusChip>
+  if (step === "finish") return <StatusChip>Ready to finish</StatusChip>
+  if (step === "no_lessons") return <span className="shrink-0 text-[12px] text-muted-foreground">No lessons yet</span>
   const progress = Math.round(e.progress)
   return (
     <span className="flex w-16 shrink-0 flex-col items-end gap-1.5 @md:w-28">
@@ -158,9 +166,14 @@ function ProgramRowState({ enrollment: e, now }: { enrollment: StudentEnrollment
 
 /* ── Upcoming classes ─────────────────────────────────────────────────── */
 
+const CLASS_ROWS = 4
+
 /** Rendered only when some package includes live classes. */
 export function UpcomingClassesTile({ now }: { now: number }) {
   const { data: classes = [], isLoading } = useUpcomingClasses()
+  // The same split the stat strip counts: waiting classes (host not in yet) lead, then those ahead.
+  const { waiting, ahead } = splitClasses(classes, now)
+  const rows = [...waiting, ...ahead].slice(0, CLASS_ROWS)
   return (
     <CardShell>
       <CardHeader
@@ -170,7 +183,7 @@ export function UpcomingClassesTile({ now }: { now: number }) {
       />
       {isLoading ? (
         <SkeletonRows rows={3} label="Loading classes" />
-      ) : classes.length === 0 ? (
+      ) : rows.length === 0 ? (
         <EmptyState
           className="py-6"
           illustration="noNotifications"
@@ -179,8 +192,9 @@ export function UpcomingClassesTile({ now }: { now: number }) {
         />
       ) : (
         <div className={TILE_ROWS}>
-          {classes.slice(0, 4).map((c) => {
+          {rows.map((c) => {
             const at = new Date(c.scheduledAt)
+            const isWaiting = waiting.includes(c)
             return (
               <Link key={c.id} href={c.joinHref} className={TILE_ROW}>
                 {/* Date block: the day is what the eye looks for in a schedule. */}
@@ -194,9 +208,11 @@ export function UpcomingClassesTile({ now }: { now: number }) {
                   <span className="mt-1 font-display text-[17px] font-semibold tabular-nums">{at.getDate()}</span>
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-[14px] font-medium">{c.title}</span>
-                  <span className="truncate text-[12.5px] text-muted-foreground">
-                    {isClassLate(c.scheduledAt, now) ? (
+                  <span className="truncate text-[14px] font-medium" title={c.title}>
+                    {c.title}
+                  </span>
+                  <span className="truncate text-[12.5px] text-muted-foreground" title={c.courseTitle || undefined}>
+                    {isWaiting ? (
                       "Waiting for your instructor"
                     ) : (
                       <span className="tabular-nums">{formatClassWhen(c.scheduledAt, now)}</span>
@@ -237,16 +253,20 @@ export function CertificatesTile({ now }: { now: number }) {
         />
       ) : (
         <div className={TILE_ROWS}>
+          {/* The kit ListRow's shape, written out so a truncated title keeps its full text on hover. */}
           {certificates.slice(0, 3).map((cert) => (
-            <ListRow
-              key={cert.id}
-              icon={CertificateGlyph}
-              title={cert.courseTitle}
-              subtitle={`Earned ${formatShortDate(cert.completedAt, now)}`}
-              href={`/dashboard/courses/${cert.courseId}/certificate`}
-              right={<Chevron />}
-              className={TILE_ROW}
-            />
+            <Link key={cert.id} href={`/dashboard/courses/${cert.courseId}/certificate`} className={TILE_ROW}>
+              <RowChip icon={CertificateGlyph} />
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate text-[14px] font-medium" title={cert.courseTitle}>
+                  {cert.courseTitle}
+                </span>
+                <span className="truncate text-[12.5px] text-muted-foreground">
+                  Earned {formatShortDate(cert.completedAt, now)}
+                </span>
+              </span>
+              <Chevron />
+            </Link>
           ))}
         </div>
       )}
@@ -276,13 +296,18 @@ export function InstructorsTile({ rows }: { rows: InstructorRow[] }) {
               <span className="flex min-w-0 items-center gap-2">
                 <Link
                   href={`/dashboard/instructor/${row.instructorId}`}
+                  title={row.name}
                   className="truncate text-[14px] font-medium underline-offset-2 outline-none hover:underline focus-visible:underline"
                 >
                   {row.name}
                 </Link>
                 {row.isMentor && <StatusChip>Your mentor</StatusChip>}
               </span>
-              {row.headline && <span className="truncate text-[12.5px] text-muted-foreground">{row.headline}</span>}
+              {row.headline && (
+                <span className="truncate text-[12.5px] text-muted-foreground" title={row.headline}>
+                  {row.headline}
+                </span>
+              )}
               {row.isMentor && (
                 <Link
                   href="/dashboard/mentorship"
@@ -348,7 +373,9 @@ export function SupportTile({ priority }: { priority: boolean }) {
           <RowChip icon={SupportGlyph} />
           <span className="flex min-w-0 flex-1 flex-col">
             <span className="truncate text-[14px] font-medium">Email support</span>
-            <span className="truncate text-[12.5px] text-muted-foreground">{BRAND.supportEmail}</span>
+            <span className="truncate text-[12.5px] text-muted-foreground" title={BRAND.supportEmail}>
+              {BRAND.supportEmail}
+            </span>
           </span>
         </a>
         {COMMUNITY_URL && (
@@ -369,7 +396,7 @@ export function SupportTile({ priority }: { priority: boolean }) {
   )
 }
 
-/** The kit ListRow's gold chip, for rows ListRow can't render (mailto, new-tab links). */
+/** The kit ListRow's gold chip, for rows ListRow can't render (mailto, new-tab links, titled rows). */
 function RowChip({ icon: Icon }: { icon: React.ComponentType<{ className?: string }> }) {
   return (
     <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary/[0.12]")}>
