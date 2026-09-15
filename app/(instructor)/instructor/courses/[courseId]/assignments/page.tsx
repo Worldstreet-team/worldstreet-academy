@@ -155,9 +155,18 @@ function SubmissionCard({ submission, onGraded }: { submission: InstructorSubmis
             return
           }
           startTransition(async () => {
-            const res = await gradeSubmission({ submissionId: submission.id, grade: value, feedback })
+            const res = await gradeSubmission({
+              submissionId: submission.id,
+              grade: value,
+              feedback,
+              submittedAt: submission.submittedAt,
+            })
             if (res.success) onGraded()
-            else setError(res.error)
+            else {
+              setError(res.error)
+              // A resubmission since this view refuses the grade — reload so the new version shows.
+              onGraded()
+            }
           })
         }}
       >

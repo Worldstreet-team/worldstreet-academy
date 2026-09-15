@@ -24,6 +24,7 @@ import {
  */
 
 const OBJECT_ID = /^[a-f0-9]{24}$/
+const MAX_SUBMISSION_FILES = 3
 
 type Viewer = { id: string; role: string }
 
@@ -199,13 +200,19 @@ const GradeInput = z.object({
     .min(0, "Enter a grade from 0 to 100")
     .max(100, "Enter a grade from 0 to 100"),
   feedback: z.string().trim().max(5000, "Keep feedback under 5,000 characters"),
+  // The version the instructor was looking at (its ISO submittedAt).
+  submittedAt: z.string().min(1, "Submission not found"),
 })
 
-/** Grade (or re-grade) a submission; the student is told and can no longer resubmit. */
+/**
+ * Grade (or re-grade) a submission; the student is told and can no longer resubmit.
+ * Only the version the instructor viewed is graded — a resubmission since then refuses.
+ */
 export async function gradeSubmission(input: {
   submissionId: string
   grade: number
   feedback: string
+  submittedAt: string
 }): Promise<{ success: true; data: { gradedAt: string } } | { success: false; error: string }> {
   try {
     await connectDB()
@@ -222,9 +229,12 @@ export async function gradeSubmission(input: {
     const course = await courseStaff(user, submission.course.toString())
     if (!course) return { success: false, error: "Submission not found" }
 
+    const viewedAt = new Date(parsed.data.submittedAt)
+    if (Number.isNaN(viewedAt.getTime())) return { success: false, error: "Submission not found" }
+
     const gradedAt = new Date()
-    await Submission.updateOne(
-      { _id: submission._id },
+    const graded = await Submission.updateOne(
+      { _id: submission._id, submittedAt: viewedAt },
       {
         $set: {
           status: "graded",
@@ -235,6 +245,9 @@ export async function gradeSubmission(input: {
         },
       }
     )
+    if (graded.matchedCount === 0) {
+      return { success: false, error: "The student resubmitted — review the new version" }
+    }
 
     const assignment = await Assignment.findById(submission.assignment).select("title").lean()
     const assignmentId = submission.assignment.toString()
@@ -256,7 +269,7 @@ export async function gradeSubmission(input: {
 
 const FileInput = z.object({
   submissionId: z.string().regex(OBJECT_ID, "File not found"),
-  fileIndex: z.number().int().min(0, "File not found").max(9, "File not found"),
+  fileIndex: z.number().int().min(0, "File not found").max(MAX_SUBMISSION_FILES - 1, "File not found"),
 })
 
 /**
@@ -300,7 +313,6 @@ export async function getSubmissionFileUrl(
 /* ═══════════════════ student ═══════════════════ */
 
 const MAX_SUBMISSION_BYTES = 25 * 1024 * 1024
-const MAX_SUBMISSION_FILES = 3
 const SUBMISSION_MIME = new Set([
   "application/pdf",
   "application/msword",
@@ -439,7 +451,15 @@ export async function getSubmissionUploadUrl(
     if (!hasPrivateResourceBucket()) return { success: false, error: "File uploads aren't available right now" }
 
     const storageKey = generateSubmissionKey(parsed.data.assignmentId, user.id, parsed.data.filename)
-    const { uploadUrl } = await generatePresignedUploadUrl(storageKey, parsed.data.contentType, 900, R2_RESOURCE_BUCKET)
+    // The declared size is signed in as Content-Length, so a PUT of any other size fails
+    // the signature (R2's enforcement is checked on staging, runbook B7).
+    const { uploadUrl } = await generatePresignedUploadUrl(
+      storageKey,
+      parsed.data.contentType,
+      900,
+      R2_RESOURCE_BUCKET,
+      parsed.data.sizeBytes
+    )
     return { success: true, data: { uploadUrl, storageKey } }
   } catch (error) {
     console.error("Submission upload URL error:", error)
@@ -488,6 +508,10 @@ export async function submitAssignment(input: {
     const gate = await studentAssignmentGate(user.id, parsed.data.assignmentId)
     if (!gate.ok) return { success: false, error: gate.error }
 
+    // A graded student hears that first, whatever else is wrong with the resubmission.
+    const existing = await Submission.findOne({ assignment: gate.assignment._id, user: user.id }).select("status").lean()
+    if (existing?.status === "graded") return { success: false, error: "This assignment has already been graded" }
+
     const prefix = submissionKeyPrefix(parsed.data.assignmentId, user.id)
     const files = parsed.data.files
     if (files.some((file) => !file.key.startsWith(prefix) || file.key.includes(".."))) {
@@ -498,14 +522,11 @@ export async function submitAssignment(input: {
       return { success: false, error: "File uploads aren't available right now" }
     }
 
-    const existing = await Submission.findOne({ assignment: gate.assignment._id, user: user.id }).select("status").lean()
-    if (existing?.status === "graded") return { success: false, error: "This assignment has already been graded" }
-
     const submittedAt = new Date()
-    try {
-      // One row per student per assignment. A graded row can't match the filter,
-      // so a race with grading hits the unique index instead of overwriting a grade.
-      await Submission.findOneAndUpdate(
+    // One row per student per assignment. A graded row can't match the filter,
+    // so a race with grading hits the unique index instead of overwriting a grade.
+    const write = () =>
+      Submission.findOneAndUpdate(
         { assignment: gate.assignment._id, user: user.id, status: { $ne: "graded" } },
         {
           $set: { text: parsed.data.text, files, status: "submitted", submittedAt },
@@ -513,9 +534,20 @@ export async function submitAssignment(input: {
         },
         { upsert: true, new: true, runValidators: true }
       )
+    try {
+      await write()
     } catch (error) {
-      if (isDuplicateKey(error)) return { success: false, error: "This assignment has already been graded" }
-      throw error
+      if (!isDuplicateKey(error)) throw error
+      // The filter's status clause turns off MongoDB's own duplicate-key upsert retry, so the
+      // losing insert of a double submit lands here too. Only a graded row is a real refusal.
+      const current = await Submission.findOne({ assignment: gate.assignment._id, user: user.id }).select("status").lean()
+      if (current?.status === "graded") return { success: false, error: "This assignment has already been graded" }
+      try {
+        await write()
+      } catch (retryError) {
+        if (isDuplicateKey(retryError)) return { success: false, error: "This assignment has already been graded" }
+        throw retryError
+      }
     }
 
     void notifyUser(gate.access.course.instructorId, {

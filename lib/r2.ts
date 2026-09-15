@@ -43,18 +43,20 @@ export async function generatePresignedUploadUrl(
   key: string,
   contentType: string,
   expiresIn = 3600, // 1 hour
-  bucket: string = R2_BUCKET
+  bucket: string = R2_BUCKET,
+  contentLength?: number // when given, signed as Content-Length: the PUT must be exactly this size
 ): Promise<{ uploadUrl: string; publicUrl: string }> {
   const command = new PutObjectCommand({
     Bucket: bucket,
     Key: key,
     ContentType: contentType,
+    ...(contentLength !== undefined ? { ContentLength: contentLength } : {}),
   })
 
   const uploadUrl = await getSignedUrl(r2Client, command, {
     expiresIn,
-    // Sign the content-type header so browser can send it
-    signableHeaders: new Set(["content-type"]),
+    // Sign the content-type header so browser can send it (and the length, when bound)
+    signableHeaders: new Set(contentLength !== undefined ? ["content-type", "content-length"] : ["content-type"]),
   })
   const publicUrl = `${R2_PUBLIC_URL}/${key}`
 
