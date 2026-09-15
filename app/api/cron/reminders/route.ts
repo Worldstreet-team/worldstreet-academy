@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import connectDB from "@/lib/db"
-import { Course, Enrollment, Meeting, User } from "@/lib/db/models"
+import { Course, Enrollment, Meeting, MentorshipSession, User } from "@/lib/db/models"
 import { notifyUser } from "@/lib/notify"
 import { formatUtcDateTime, sendClassReminderEmail, sendInterviewReminderEmail, sendMentorshipEmail } from "@/lib/email"
-import { entitlementsFor } from "@/lib/entitlements"
+import { entitlementsFor, includesMentorship } from "@/lib/entitlements"
+import { getCourseAccess } from "@/lib/course-access"
 import { APP_URL } from "@/lib/app-url"
 
 /**
@@ -21,7 +22,9 @@ const HOST_CLASS_PATH = "/instructor/meetings"
  *   whose active/completed enrollment's package includes live classes — the
  *   same audience that may join (joinMeeting) — with class wording.
  * - Mentorship sessions (meeting.mentorshipSessionId): the host and the invited
- *   student only, session wording.
+ *   student only, session wording — and only while the session is confirmed and
+ *   the student still holds mentorship. A lapsed session sends nothing and its
+ *   window is stamped, so it never retries.
  * - Every other scheduled meeting (instructor interviews): host + invitees,
  *   interview wording, exactly as before.
  *
@@ -89,11 +92,23 @@ export async function POST(request: NextRequest) {
       const jobs: Promise<unknown>[] = []
 
       if (meeting.mentorshipSessionId) {
-        // Mentorship session: the host and the invited student — never a course audience.
-        const hostId = meeting.hostId.toString()
-        const recipients = await User.find({ _id: { $in: [...new Set([hostId, ...inviteeIds])] } })
-          .select("firstName email")
+        // Mentorship session: the host and the invited student — never a course audience —
+        // while it is confirmed and the student still holds mentorship. Otherwise neither
+        // is told; the ledger below still stamps this window.
+        const session = await MentorshipSession.findById(meeting.mentorshipSessionId)
+          .select("student course status")
           .lean()
+        const access =
+          session?.status === "confirmed"
+            ? await getCourseAccess(session.student.toString(), session.course.toString())
+            : null
+        const hostId = meeting.hostId.toString()
+        const recipients =
+          access && includesMentorship(access.course, access)
+            ? await User.find({ _id: { $in: [...new Set([hostId, ...inviteeIds])] } })
+                .select("firstName email")
+                .lean()
+            : []
         const whenFull = formatUtcDateTime(when, "full")
 
         for (const recipient of recipients) {

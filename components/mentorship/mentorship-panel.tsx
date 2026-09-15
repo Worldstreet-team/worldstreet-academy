@@ -112,8 +112,10 @@ function UpcomingRow({ session, onChanged }: { session: MentorshipSessionView; o
             {session.studentName} <span className="font-normal text-ws-muted">· {session.courseTitle}</span>
           </p>
           <p className="text-[11px] tabular-nums text-ws-muted">
-            {session.scheduledAt ? formatDateTime(session.scheduledAt) : ""} · start it from Active Meetings
+            {session.scheduledAt ? formatDateTime(session.scheduledAt) : ""}
+            {session.lapsed ? "" : " · start it from Active Meetings"}
           </p>
+          {session.lapsed && <p className="text-[11px] text-ws-warning">Student no longer has mentorship</p>}
         </div>
         {confirming ? (
           <div className="flex flex-wrap items-center gap-2">

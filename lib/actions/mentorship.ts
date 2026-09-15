@@ -52,8 +52,10 @@ export type MentorshipSessionView = {
   scheduledAt: string | null
   note: string
   responseNote: string
-  /** Upcoming confirmed sessions: the meetings page's join link (it refuses politely before the host starts). */
+  /** Upcoming confirmed sessions: the meetings page's join link (it refuses politely before the host starts). Null once lapsed. */
   joinHref: string | null
+  /** Upcoming, but the student no longer holds mentorship (refund, suspension, package change). */
+  lapsed: boolean
 }
 
 type SessionLean = {
@@ -113,10 +115,26 @@ async function toViews(sessions: SessionLean[]): Promise<MentorshipSessionView[]
   const titlesById = new Map(courses.map((c) => [c._id.toString(), c.title]))
   const meetingStatusById = new Map(meetings.map((m) => [m._id.toString(), m.status]))
   const now = Date.now()
+  const statuses = sessions.map((s) =>
+    viewStatus(s.status, s.scheduledAt, s.meetingId ? meetingStatusById.get(s.meetingId.toString()) : undefined, now)
+  )
 
-  return sessions.map((s) => {
+  // Upcoming sessions re-check the student's current access: a refund, suspension or
+  // package change leaves the session confirmed, but it must stop reading as live.
+  const accessKey = (s: SessionLean) => `${s.student.toString()}:${s.course.toString()}`
+  const mentored = new Map<string, boolean>()
+  await Promise.all(
+    [...new Set(sessions.filter((_, i) => statuses[i] === "upcoming").map(accessKey))].map(async (key) => {
+      const [studentId, courseId] = key.split(":")
+      const access = await getCourseAccess(studentId, courseId)
+      mentored.set(key, Boolean(access && includesMentorship(access.course, access)))
+    })
+  )
+
+  return sessions.map((s, i) => {
     const meetingId = s.meetingId ? s.meetingId.toString() : null
-    const status = viewStatus(s.status, s.scheduledAt, meetingId ? meetingStatusById.get(meetingId) : undefined, now)
+    const status = statuses[i]
+    const lapsed = status === "upcoming" && !mentored.get(accessKey(s))
     return {
       id: s._id.toString(),
       courseId: s.course.toString(),
@@ -128,7 +146,8 @@ async function toViews(sessions: SessionLean[]): Promise<MentorshipSessionView[]
       scheduledAt: s.scheduledAt ? s.scheduledAt.toISOString() : null,
       note: s.note ?? "",
       responseNote: s.responseNote ?? "",
-      joinHref: status === "upcoming" && meetingId ? `/dashboard/meetings?join=${meetingId}` : null,
+      joinHref: status === "upcoming" && !lapsed && meetingId ? `/dashboard/meetings?join=${meetingId}` : null,
+      lapsed,
     }
   })
 }
@@ -312,17 +331,25 @@ export async function cancelMentorshipSession(
     const session = await MentorshipSession.findById(parsed.data.sessionId).lean()
     if (!session) return { success: false, error: "Session not found" }
     const isStudent = session.student.toString() === user.id
-    const isInstructor = session.instructor.toString() === user.id
+    // The instructor path needs a current staff role: a demoted instructor's raw POST can't act.
+    const isInstructor =
+      session.instructor.toString() === user.id && (user.role === "INSTRUCTOR" || user.role === "ADMIN")
     if (!isStudent && !isInstructor) return { success: false, error: "Session not found" }
     if (session.status !== "requested" && session.status !== "confirmed") {
       return { success: false, error: "This session is already closed" }
     }
 
+    // End the room first, and only while it is still scheduled: if the host starts it
+    // meanwhile, the start wins and the session is left confirmed, never cancelled under them.
     if (session.status === "confirmed" && session.meetingId) {
-      const meeting = await Meeting.findById(session.meetingId).select("status").lean()
-      if (meeting?.status === "ended") return { success: false, error: "This session has already happened" }
-      if (meeting && meeting.status !== "scheduled") {
-        return { success: false, error: "This session has started — end it from the room" }
+      const ended = await Meeting.updateOne(
+        { _id: session.meetingId, status: "scheduled" },
+        { $set: { status: "ended", endedAt: new Date() } }
+      )
+      if (ended.matchedCount === 0) {
+        const meeting = await Meeting.findById(session.meetingId).select("status").lean()
+        if (meeting?.status === "ended") return { success: false, error: "This session has already happened" }
+        if (meeting) return { success: false, error: "This session has started — end it from the room" }
       }
     }
 
@@ -334,13 +361,6 @@ export async function cancelMentorshipSession(
       { new: true }
     )
     if (!closed) return { success: false, error: "This session just changed — refresh and try again" }
-
-    if (session.meetingId) {
-      await Meeting.updateOne(
-        { _id: session.meetingId, status: "scheduled" },
-        { $set: { status: "ended", endedAt: new Date() } }
-      )
-    }
 
     const [counterpart, course] = await Promise.all([
       User.findById(isStudent ? session.instructor : session.student).select("firstName email").lean(),
@@ -414,7 +434,7 @@ export async function getMentorshipQueue(): Promise<MentorshipQueue> {
     if (!user || (user.role !== "INSTRUCTOR" && user.role !== "ADMIN")) return empty
 
     const courses = await Course.find({ instructor: user.id }).select("title packages").lean()
-    const [enrollments, sessions] = await Promise.all([
+    const [enrollments, requested, confirmed] = await Promise.all([
       Enrollment.find({
         course: { $in: courses.map((c) => c._id) },
         status: { $in: ["active", "completed"] },
@@ -423,8 +443,15 @@ export async function getMentorshipQueue(): Promise<MentorshipQueue> {
         .select("user course packageKey mentorshipIntake mentorRoadmap")
         .sort({ createdAt: 1 })
         .lean(),
-      MentorshipSession.find({ instructor: user.id, status: { $in: ["requested", "confirmed"] } })
-        .sort({ createdAt: 1 })
+      // Separate queries, each with its own limit: confirmed sessions never leave "confirmed"
+      // (past is derived), so one shared list would push new requests past the limit.
+      MentorshipSession.find({ instructor: user.id, status: "requested" }).sort({ createdAt: 1 }).limit(100).lean(),
+      MentorshipSession.find({
+        instructor: user.id,
+        status: "confirmed",
+        scheduledAt: { $gte: new Date(Date.now() - SESSION_GRACE_MS) },
+      })
+        .sort({ scheduledAt: 1 })
         .limit(100)
         .lean(),
     ])
@@ -435,7 +462,7 @@ export async function getMentorshipQueue(): Promise<MentorshipQueue> {
     })
     const [students, views] = await Promise.all([
       User.find({ _id: { $in: mentored.map((m) => m.enrollment.user) } }).select("firstName lastName").lean(),
-      toViews(sessions),
+      toViews([...requested, ...confirmed]),
     ])
     const studentsById = new Map(students.map((s) => [s._id.toString(), s]))
 
@@ -482,6 +509,8 @@ export async function confirmMentorshipSession(
     await connectDB()
     const user = await getCurrentUser()
     if (!user) return { success: false, error: "You need to be signed in" }
+    // Only current staff confirm: a demoted instructor's raw POST reads as an unknown session.
+    if (user.role !== "INSTRUCTOR" && user.role !== "ADMIN") return { success: false, error: "Session not found" }
 
     const parsed = ConfirmInput.safeParse({ sessionId, slot: slotISO })
     if (!parsed.success) {
