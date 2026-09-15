@@ -44,7 +44,7 @@ function RequestForm({ program, onSent }: { program: MentorshipProgram; onSent: 
 
   return (
     <form
-      className="space-y-3"
+      className="space-y-5"
       onSubmit={(e) => {
         e.preventDefault()
         setError(null)
@@ -68,10 +68,10 @@ function RequestForm({ program, onSent }: { program: MentorshipProgram; onSent: 
       <p className="text-[13px] text-ws-muted">
         Propose up to three times that suit you. {program.instructorName} confirms one.
       </p>
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-3">
         {slots.map((value, i) => (
-          <div key={i} className="min-w-0 space-y-1">
-            <Label htmlFor={`slot-${program.courseId}-${i}`} className="text-[11px] text-ws-muted">
+          <div key={i} className="min-w-0 space-y-2">
+            <Label htmlFor={`slot-${program.courseId}-${i}`}>
               {i === 0 ? "Option 1" : `Option ${i + 1} (optional)`}
             </Label>
             <Input
@@ -84,13 +84,13 @@ function RequestForm({ program, onSent }: { program: MentorshipProgram; onSent: 
                 const next = e.target.value
                 setSlots((prev) => prev.map((slot, j) => (j === i ? next : slot)))
               }}
-              className="h-10 w-full min-w-0 text-sm"
+              className="w-full min-w-0"
             />
           </div>
         ))}
       </div>
-      <div className="space-y-1">
-        <Label htmlFor={`note-${program.courseId}`} className="text-[11px] text-ws-muted">
+      <div className="space-y-2">
+        <Label htmlFor={`note-${program.courseId}`}>
           What would you like to cover? (optional)
         </Label>
         <Textarea
@@ -98,11 +98,11 @@ function RequestForm({ program, onSent }: { program: MentorshipProgram; onSent: 
           value={note}
           onChange={(e) => setNote(e.target.value)}
           maxLength={1000}
-          className="min-h-16"
+          className="min-h-24"
         />
       </div>
-      {error && <p className="text-xs text-ws-danger">{error}</p>}
-      <Button type="submit" variant="outline" disabled={pending}>
+      {error && <p role="alert" className="rounded-[10px] bg-destructive/10 px-3.5 py-2.5 text-[13px] text-destructive">{error}</p>}
+      <Button type="submit" variant="outline" className="h-11 px-5 md:h-10" disabled={pending}>
         {pending ? "Sending…" : "Request a session"}
       </Button>
     </form>

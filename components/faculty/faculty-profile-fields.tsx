@@ -146,7 +146,7 @@ export function FacultyProfileFields({
             placeholder={expertiseFull ? "Limit reached" : "e.g. Technical analysis — press Enter"}
             disabled={disabled || expertiseFull}
           />
-          <Button type="button" variant="outline" size="sm" onClick={addExpertise} disabled={disabled || expertiseFull}>
+          <Button type="button" variant="outline" className="h-11 px-4 md:h-10" onClick={addExpertise} disabled={disabled || expertiseFull}>
             <PlusIcon size={14} aria-hidden />
             Add
           </Button>
@@ -192,7 +192,7 @@ export function FacultyProfileFields({
             placeholder={credentialsFull ? "Limit reached" : "e.g. a certification or award — press Enter"}
             disabled={disabled || credentialsFull}
           />
-          <Button type="button" variant="outline" size="sm" onClick={addCredential} disabled={disabled || credentialsFull}>
+          <Button type="button" variant="outline" className="h-11 px-4 md:h-10" onClick={addCredential} disabled={disabled || credentialsFull}>
             <PlusIcon size={14} aria-hidden />
             Add
           </Button>

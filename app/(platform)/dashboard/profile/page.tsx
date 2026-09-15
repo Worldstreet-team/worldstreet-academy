@@ -200,10 +200,10 @@ export default function ProfilePage() {
                     placeholder="Tell us about yourself..."
                   />
                 </div>
-                <div className="flex gap-2 justify-end">
+                <div className="flex gap-2.5 justify-end pt-1">
                   <Button
                     variant="outline"
-                    size="sm"
+                    className="h-10 px-4"
                     onClick={() => {
                       setIsEditing(false)
                       setFirstName(user.firstName)
@@ -214,7 +214,7 @@ export default function ProfilePage() {
                     Cancel
                   </Button>
                   <Button
-                    size="sm"
+                    className="h-10 px-5"
                     onClick={handleSaveProfile}
                     disabled={isPending}
                   >
