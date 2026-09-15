@@ -386,10 +386,12 @@ export async function joinMeeting(meetingId: string): Promise<{
 
     // Add as new participant
     // Determine join mode: guest auto-admit, pending approval, or direct participant
-    const requiresApproval = meeting.settings.requireApproval
-    // Session rooms store guestAccess false so code without the privacy gate holds
-    // strangers for approval; here the gate above has already let this caller through.
-    const guestAccess = meeting.settings.guestAccess !== false || Boolean(meeting.mentorshipSessionId)
+    // Session rooms store requireApproval + guestAccess false so code without the privacy
+    // gate holds strangers for approval. Here the gate above has already let this caller
+    // through (the session's student or an admin), so they skip both approval branches and
+    // join as a participant — a guest can't unmute or turn on video, which a 1-on-1 needs.
+    const requiresApproval = meeting.settings.requireApproval && !meeting.mentorshipSessionId
+    const guestAccess = meeting.settings.guestAccess !== false
 
     if (requiresApproval && guestAccess) {
       // Auto-admit as guest — no waiting room
