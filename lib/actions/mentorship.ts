@@ -582,8 +582,10 @@ export async function confirmMentorshipSession(
         allowScreenShare: true,
         muteOnEntry: false,
         requireApproval: true,
-        // joinMeeting's privacy gate admits only this session's student, so no waiting room.
-        guestAccess: true,
+        // false on purpose: code without the Phase 7 privacy gate (a rollback, a Go join path)
+        // then holds a stranger for the host's approval instead of admitting them. joinMeeting
+        // admits the student its gate lets through directly, so they never wait.
+        guestAccess: false,
         maxParticipants: 10,
       },
     })

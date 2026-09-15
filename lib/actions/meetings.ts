@@ -155,6 +155,27 @@ export async function createMeeting(
   }
 }
 
+/**
+ * Mentorship sessions are private: only the confirmed session's student (or an
+ * admin) gets in, and only while their package still includes mentorship.
+ * Returns the refusal, or null when the caller may enter. Callers let the host through first.
+ */
+async function mentorshipSessionRefusal(
+  sessionId: Types.ObjectId,
+  user: { id: string; role: string }
+): Promise<string | null> {
+  if (user.role === "ADMIN") return null
+  const session = await MentorshipSession.findById(sessionId).select("student course status").lean()
+  if (!session || session.status !== "confirmed" || session.student.toString() !== user.id) {
+    return "This mentorship session is private"
+  }
+  const access = await getCourseAccess(user.id, session.course.toString())
+  if (!access || !includesMentorship(access.course, access)) {
+    return "Private mentorship isn't included in your package"
+  }
+  return null
+}
+
 // ── Join a meeting (request to join) ──
 
 export async function joinMeeting(meetingId: string): Promise<{
@@ -236,19 +257,10 @@ export async function joinMeeting(meetingId: string): Promise<{
       }
     }
 
-    // Mentorship sessions are private: only the confirmed session's student (or
-    // an admin) gets in, and only while their package still includes mentorship.
-    if (meeting.mentorshipSessionId && currentUser.role !== "ADMIN") {
-      const session = await MentorshipSession.findById(meeting.mentorshipSessionId)
-        .select("student course status")
-        .lean()
-      if (!session || session.status !== "confirmed" || session.student.toString() !== currentUser.id) {
-        return { success: false, error: "This mentorship session is private" }
-      }
-      const access = await getCourseAccess(currentUser.id, session.course.toString())
-      if (!access || !includesMentorship(access.course, access)) {
-        return { success: false, error: "Private mentorship isn't included in your package" }
-      }
+    // Mentorship sessions are private (mentorshipSessionRefusal).
+    if (meeting.mentorshipSessionId) {
+      const refusal = await mentorshipSessionRefusal(meeting.mentorshipSessionId, currentUser)
+      if (refusal) return { success: false, error: refusal }
     }
 
     // A class that hasn't started: only the host's join (above) starts it, so
@@ -375,7 +387,9 @@ export async function joinMeeting(meetingId: string): Promise<{
     // Add as new participant
     // Determine join mode: guest auto-admit, pending approval, or direct participant
     const requiresApproval = meeting.settings.requireApproval
-    const guestAccess = meeting.settings.guestAccess !== false
+    // Session rooms store guestAccess false so code without the privacy gate holds
+    // strangers for approval; here the gate above has already let this caller through.
+    const guestAccess = meeting.settings.guestAccess !== false || Boolean(meeting.mentorshipSessionId)
 
     if (requiresApproval && guestAccess) {
       // Auto-admit as guest — no waiting room
@@ -811,8 +825,23 @@ export async function getMeetingDetails(meetingId: string): Promise<{
     const meeting = await Meeting.findById(meetingId)
     if (!meeting) return { success: false, error: "Meeting not found" }
 
-    // Check participant status before parallel operations
+    // Only the host, an admin, a participant or an invitee may read a meeting; anyone
+    // else hears it doesn't exist (a session's title names its student).
     const isHost = meeting.hostId.toString() === currentUser.id
+    const isMember =
+      isHost ||
+      currentUser.role === "ADMIN" ||
+      meeting.participants.some((p) => p.userId.toString() === currentUser.id) ||
+      (meeting.invites ?? []).some((inv) => inv.userId?.toString() === currentUser.id)
+    if (!isMember) return { success: false, error: "Meeting not found" }
+    // A session re-runs joinMeeting's privacy gate before any token is minted, so a
+    // student who loses access mid-session stops getting fresh tokens.
+    if (meeting.mentorshipSessionId && !isHost) {
+      const refusal = await mentorshipSessionRefusal(meeting.mentorshipSessionId, currentUser)
+      if (refusal) return { success: false, error: refusal }
+    }
+
+    // Check participant status before parallel operations
     const myP = !isHost
       ? meeting.participants.find(
           (p) => p.userId.toString() === currentUser.id && p.status === "admitted"
