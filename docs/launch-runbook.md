@@ -1,7 +1,7 @@
 # WorldStreet Mastery Academy — production launch runbook
 
 **For:** the owner. Every step here touches production or another repository, so nobody runs it but you. The repository side (SEO, legal links, docs) is already on the release branch.
-**Release:** `mastery/phase-8` — Mastery Academy Phases 0–6 plus the launch work. Phase 7 (Executive services) is not in this release.
+**Release:** `mastery/phase-7` — Mastery Academy Phases 0–8. It is the tip of the branch chain: Phases 0–6, the launch work (Phase 8) and, on top, Executive services (Phase 7).
 **Written:** 2026-09-14. **Specs:** `docs/mastery-academy-plan.md` (§0.4, Phase 8), `docs/mastery-academy-blueprint.md` §17, `docs/go-patches-phase-3.md`.
 
 Do the steps in order. Each ends with a **Check**; don't start the next step until it passes. Keep every log this runbook tells you to `tee` — rollback (§9) needs them — and keep them out of the repository.
@@ -25,11 +25,13 @@ Do the steps in order. Each ends with a **Check**; don't start the next step unt
 
 | # | Item | Who | Blocks launch? |
 |---|---|---|---|
-| B1 | **Go API patches** R1–R10 in `docs/go-patches-phase-3.md` built and ready to deploy (§2), and that document's §4 questions answered. | Backend owner | **Yes** — unless you decide in writing to launch the web app with every lesson's `minPackageKey` unset (the catalogue script never sets it; set no lesson tiers in the editor until Go ships), accepting that mobile can open Standard lessons and issue certificates to Basic buyers until Go lands. |
+| B1 | **Go API patches** R1–R11 in `docs/go-patches-phase-3.md` built and ready to deploy (§2), and that document's §4 questions answered. | Backend owner | **Yes** — unless you decide in writing to launch the web app with every lesson's `minPackageKey` unset (the catalogue script never sets it; set no lesson tiers in the editor until Go ships), accepting that mobile can open Standard lessons and issue certificates to Basic buyers until Go lands. |
 | B2 | **Price sign-off (plan D3).** The catalogue `--apply` (§6) sets each spec-ladder program's course price from its packages. The script's own header says Forex and Crypto go 199 → 49 (their Basic package) and AI & AI Automation goes 99 → 199. The §6 dry run prints the real `current -> derived` lines; product signs those lines. | Product | **Yes** |
 | B3 | **Wallet env.** `WALLET_BASE_URL` and `WALLET_SERVICE_TOKEN` set in Coolify (§3). Without them every purchase fails closed. | You | **Yes** |
 | B4 | **Legal coverage.** The Academy footer links the hub's Terms of Business, Privacy Policy and Cookie Policy (`https://www.worldstreetgold.com/legal` says each applies across every platform on one login). Ask the documents' owner to confirm they cover what the Academy does: public certificate pages (`/verify/<id>`) showing a student's name, program, school, instructor and completion date; public faculty profiles; homepage testimonials with photo, name, country and program; the OpenAI-powered voice assistant; the Google Translate widget; RealtimeKit classes and calls; email through Resend; files on Cloudflare R2. | You + legal | Your call |
 | B5 | **QA account and program.** A real WorldStreet account with enough wallet balance for the §8 purchase, and a program with at least one published lesson. The plan's journey is Forex Standard; if Forex has no published lessons yet, use a program that does and note it in the run log. | You | **Yes** for §8 |
+| B6 | **Private resources bucket.** `R2_RESOURCES_BUCKET_NAME` set in Coolify (§3) to a bucket with no public access. Without it, assignment file uploads refuse with "File uploads aren't available right now" and submission downloads with "File storage isn't available right now" (Phase 7 fails closed; it is not set in the local dev environment either). | You | **Yes** for assignments |
+| B7 | **Staging run for Executive services (Phase 7).** Neither could run locally (placeholder RealtimeKit key, no private bucket): (1) an Executive student requests a mentorship session, the instructor confirms a time on `/instructor/meetings` (this creates a real RealtimeKit room), and both join it at the scheduled time; (2) from the academy origin (`https://academy.worldstreetgold.com`) — the browser PUTs straight to the private bucket, so an upload from any other origin doesn't prove its CORS (§3) — a student uploads a file to an assignment on `/dashboard/assignments`, and the instructor downloads it from the submission; (3) R2 honours the signed size: within 15 minutes, copy that upload's presigned URL from the browser's network tab and PUT a file of a different size to it (`curl -s -o /dev/null -w "%{http_code}\n" -X PUT -H "Content-Type: <the same type>" --data-binary @<other file> "<url>"`) — expect `403`; a `200` means R2 doesn't enforce the signed length, so record it (the 25 MB cap is then only the browser's declaration). Use test accounts; cancel the session and delete the test submission afterwards. | You | **Yes** for mentorship and assignments |
 
 ## 1. Backup
 
@@ -44,7 +46,7 @@ mongosh "$PROD_URI" --quiet --eval 'print("db " + db.getName()); print("publishe
 
 Every Go rule reads a missing field as full access, so the patches are safe against today's data. They must be live before the web app sells packages, or mobile opens what a package doesn't include.
 
-1. Deploy the Go release with R1–R10 from `docs/go-patches-phase-3.md` — including R10's category change: once §6 runs, `courses.category` holds school labels, so a mobile filter on the old strings must already use `courses.school`.
+1. Deploy the Go release with R1–R11 from `docs/go-patches-phase-3.md` — including R10's category change: once §6 runs, `courses.category` holds school labels, so a mobile filter on the old strings must already use `courses.school`.
 2. **Check:** in the mobile app, a legacy enrollment still opens all of its lessons and the course list loads. The full matrix runs in §8, once the catalogue exists.
 
 ## 3. Coolify environment (academy app)
@@ -59,7 +61,7 @@ Coolify → the academy application → Environment Variables. Names only here; 
 | `NEXT_PUBLIC_COMMUNITY_URL` | Optional | **Build** | The dashboard's Community tile reads it in the browser, so Next bakes it in during the build: tick "Build Variable" and redeploy after any change. Unset → the tile is hidden. |
 | `CRON_SECRET` | Yes | Runtime | A long random value (`openssl rand -hex 32`). The three scheduled tasks (§5) send it as a bearer token. |
 
-Also confirm these existing names are present (don't change working values): `MONGODB_URI`, `CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `NEXT_PUBLIC_WALLET_FUNDING_URL`, `NEXT_PUBLIC_WALLET_WITHDRAW_URL`, `RESEND_API_KEY`, `EMAIL_FROM`, `ABLY_API_KEY`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_REALTIME_ORG_ID`, `CLOUDFLARE_REALTIME_API_KEY`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_RESOURCES_BUCKET_NAME` (that bucket must have no public access), `R2_PUBLIC_URL`, `OPENAI_API_KEY`.
+Also confirm these existing names are present (don't change working values): `MONGODB_URI`, `CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `NEXT_PUBLIC_WALLET_FUNDING_URL`, `NEXT_PUBLIC_WALLET_WITHDRAW_URL`, `RESEND_API_KEY`, `EMAIL_FROM`, `ABLY_API_KEY`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_REALTIME_ORG_ID`, `CLOUDFLARE_REALTIME_API_KEY`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_RESOURCES_BUCKET_NAME` (that bucket must have no public access; assignment uploads and submission downloads fail closed without it — B6; students' browsers upload straight to it, so its CORS allows PUT with `Content-Type` from the academy origin (`https://academy.worldstreetgold.com`)), `R2_PUBLIC_URL`, `OPENAI_API_KEY`.
 
 **Check:** after §4, `curl -s -o /dev/null -w "%{http_code}\n" -X POST "$SITE/api/cron/course-live"` prints `401` (route live, secret required).
 
@@ -69,8 +71,8 @@ Also confirm these existing names are present (don't change working values): `MO
 2. Push the release branch and open the PR:
 
    ```bash
-   git push -u origin mastery/phase-8
-   gh pr create --base main --head mastery/phase-8 --title "WorldStreet Mastery Academy — Phases 0–6 and launch" --body "Release steps: docs/launch-runbook.md"
+   git push -u origin mastery/phase-7
+   gh pr create --base main --head mastery/phase-7 --title "WorldStreet Mastery Academy — Phases 0–8" --body "Release steps: docs/launch-runbook.md"
    ```
 
 3. Merge after review; Coolify builds and deploys.
@@ -113,6 +115,19 @@ mongosh "$PROD_URI" --quiet --eval 'db.enrollments.createIndex({ certificateId: 
 
 Never create it `sparse`: new enrollments store `certificateId: null`, a sparse unique index still indexes that null, and the second new enrollment — a purchase — would fail.
 
+**Check — Phase 7 indexes:** Mongoose builds these on first use too, and a failed build is silent. Signed in, open `/dashboard/mentorship` and `/dashboard/assignments`, then:
+
+```bash
+mongosh "$PROD_URI" --quiet --eval 'printjson(db.mentorshipsessions.getIndexes().filter(i => i.name === "enrollment_1")); printjson(db.submissions.getIndexes().filter(i => i.name === "assignment_1_user_1"))'
+```
+
+Expect `enrollment_1` with `unique: true` and `partialFilterExpression: { status: 'requested' }` (one open mentorship request per enrollment), and `assignment_1_user_1` with `unique: true` (one submission per student per assignment, which keeps a racing resubmit from overwriting a graded row). If either is missing after 10 minutes, create exactly that index:
+
+```bash
+mongosh "$PROD_URI" --quiet --eval 'db.mentorshipsessions.createIndex({ enrollment: 1 }, { unique: true, partialFilterExpression: { status: "requested" } })'
+mongosh "$PROD_URI" --quiet --eval 'db.submissions.createIndex({ assignment: 1, user: 1 }, { unique: true })'
+```
+
 ## 5. Scheduled tasks (Coolify)
 
 All three routes under `app/api/cron/` are `POST`, require `Authorization: Bearer $CRON_SECRET`, and are idempotent.
@@ -120,7 +135,7 @@ All three routes under `app/api/cron/` are `POST`, require `Authorization: Beare
 | Task | Path | Cron | What it does |
 |---|---|---|---|
 | academy-course-live | `/api/cron/course-live` | `*/5 * * * *` | Emails and notifies pre-enrolled students when a scheduled course goes live; stamps `liveNotifiedAt`. Phase 3 recorded it as not yet scheduled in production. |
-| academy-reminders | `/api/cron/reminders` | `*/10 * * * *` | T-24h and T-1h reminders for scheduled classes (students whose package includes live classes) and interviews. |
+| academy-reminders | `/api/cron/reminders` | `*/10 * * * *` | T-24h and T-1h reminders for scheduled classes (students whose package includes live classes), interviews and mentorship sessions (the host and the student, while the student still holds mentorship). |
 | academy-earnings | `/api/cron/earnings` | `*/15 * * * *` | Clears matured instructor earnings to the wallet and applies refund clawbacks. |
 
 Coolify → academy app → Scheduled Tasks → Add, container = the academy app. The runner image (`node:22-alpine`) has no `curl`, so call the app from inside its own container with Node (swap the path for each task):
@@ -226,6 +241,14 @@ Then:
 
 ## 9. Rollback
 
+**Before rolling code back to a build without Phase 7 — close the mentorship rooms.** Such a build has no mentorship privacy gate: its `joinMeeting` lets any signed-in user who holds a session room's id (it travels in reminder and notification links) straight in as a guest, before the host starts the room or while it runs. End every open session room first:
+
+```bash
+mongosh "$PROD_URI" --quiet --eval 'printjson(db.meetings.updateMany({ mentorshipSessionId: { $exists: true }, status: { $in: ["scheduled","waiting","active"] } }, { $set: { status: "ended", endedAt: new Date() } }))'
+```
+
+Expect `acknowledged: true`, and note `modifiedCount` in your run log. **Those sessions must be re-confirmed after Phase 7 is re-deployed:** they stay `confirmed` with an ended room, so they read as past. Tell each student and instructor; the student requests new times and the instructor confirms one. Session rooms created by this release's code store `settings.guestAccess: false`, so an old build holds a stranger in the waiting room for the host's approval instead of admitting them — sessions created after this fix are protected even without the step.
+
 **Code:** Coolify → academy app → Deployments → the last pre-launch deployment → Redeploy. Alternatively revert the merge on `main` (`git revert -m 1 <merge sha> && git push origin main`) and let Coolify rebuild.
 
 **Data** is additive, except the catalogue's prices:
@@ -257,4 +280,6 @@ Then:
 | Identity scripts in git history | `link-tmp.cjs` and `link-mobile-identity.cjs` were removed in Phase 8 but stay in history with two Clerk user ids (identifiers, not credentials). | Leave (recommended), or rewrite history. |
 | `scripts/_swap-catalogue.mjs` | Superseded by `mastery-catalogue.mjs`. If run with `--apply` it archives courses and inserts the old 10-program catalogue. | Delete it, or keep it with its history. |
 | Certificate IDs for mobile completions | Go doesn't stamp `certificateId` yet (Go doc R9). The web stores one the first time the student opens that certificate on the web. | Re-run §7 now and then for mobile completions nobody has opened on the web, until Go stamps IDs. |
+| Replaced submission files | A resubmission replaces a submission's file list, but nothing is deleted: the files it drops, and uploads never submitted, stay in the private bucket under `worldstreet-academy/submissions/<assignmentId>/<userId>/`. | Leave them, or now and then delete objects under that prefix that no `submissions.files.key` references. |
+| RealtimeKit rooms from double confirms | When two confirms of one mentorship request race, both create a RealtimeKit room; the losing confirm deletes only its `meetings` row, so its remote room stays in the organization with no Academy record. | Leave them, or end them from the RealtimeKit dashboard (rooms named `Mentorship: <student name>` with no matching `meetings.meetingId`). |
 | Product debt | School intros, program curricula, thumbnails and instructor bios (Phase 2); the Academy signatory name and signature file (D9); a surface for §13's "LEARN. COMPLETE. GET RECOGNIZED." (Phase 6); real RealtimeKit scheduling run on staging (Phase 4). | Schedule with product. |

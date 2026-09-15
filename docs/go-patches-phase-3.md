@@ -96,7 +96,7 @@ Otherwise the lesson is **locked**, and Go must:
 
 ---
 
-## 5. Added by Phases 5–6 (ship in the same Go release)
+## 5. Added by Phases 5–7 (ship in the same Go release)
 
 **R8 — Faculty profile fields (Phase 5).** New, additive fields on `users`:
 
@@ -117,3 +117,9 @@ If Go ever writes `instructorProfile`, write dotted paths (`instructorProfile.he
 - Public check: `https://academy.worldstreetgold.com/verify/<certificateId>` answers only for a `completed`, certificate-entitled enrollment, so a refund or an admin status change away from `completed` takes the certificate off that page.
 
 **R10 — Other additive changes.** `reviews.featured: bool` (web-only homepage curation; Go may ignore it). Once `scripts/mastery-catalogue.mjs --apply` runs, `courses.category` holds the school's short label ("Trading & Financial Markets", …) on every catalogue row: a mobile filter or grouping keyed on the old strings (Cryptocurrency, Trading, DeFi, …) must switch to `courses.school` in the same release.
+
+**R11 — Executive services: private mentorship sessions (Phase 7).**
+- **Meetings privacy.** `meetings.mentorshipSessionId` (ObjectId, additive) marks a private 1-on-1 session room; it has no `courseId` by design. Any Go/mobile meeting-join path must refuse a meeting with `mentorshipSessionId` unless the caller is that session's student, the meeting's host or an admin, and must honour the session status: the student gets in only while `mentorshipsessions.status` is `"confirmed"` and they still have mentorship (R-M below). Refuse everyone but the host until the host starts the room (`meetings.status: "active"`), and never list it as a course session while it is `scheduled`. Rooms the web creates store `settings.guestAccess: false`, so a join path that reads only `settings` holds a stranger for the host's approval — the rule above is still required.
+- **Who has mentorship (R-M).** `enrollment.packageKey == "executive"`, the course's `executive` package (found by key, ignoring `enabled`, as in R1) has `entitlements.mentorship`, and the enrollment's status is `active` or `completed`. Assignments follow R1's `entitlements.assignments`.
+- **`enrollments.mentorRoadmap`** — `{ text, updatedAt, updatedBy } | null` (additive). If mobile shows it, render it as plain text. Any wholesale enrollment write must carry it (and R9's `certificateId`): write dotted paths or keep the field.
+- **Web-only collections.** `mentorshipsessions`, `assignments` and `submissions` are written only by the web; Go may ignore them. If Go ever writes them, mirror the web rules: one `requested` session per enrollment (a partial unique index), and submission files only under the per-user prefix `worldstreet-academy/submissions/<assignmentId>/<userId>/` in the private resources bucket.
