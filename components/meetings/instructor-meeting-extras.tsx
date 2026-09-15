@@ -166,7 +166,7 @@ export function InstructorInviteDialog({
                 <Input
                   value={meetingLink}
                   readOnly
-                  className="h-9 pr-9 text-xs bg-muted/20 border-ws-hairline text-foreground/60 select-all cursor-text"
+                  className="h-9 md:h-9 pr-9 text-xs bg-muted/20 border-ws-hairline text-foreground/60 select-all cursor-text"
                 />
                 <button
                   onClick={copyLink}
@@ -192,7 +192,7 @@ export function InstructorInviteDialog({
                   placeholder="Search by email..."
                   value={searchQuery}
                   onChange={(e) => handleSearchInput(e.target.value)}
-                  className="h-9 pl-8 text-xs bg-muted/20 border-ws-hairline"
+                  className="h-9 md:h-9 pl-8 text-xs bg-muted/20 border-ws-hairline"
                   autoComplete="off"
                 />
                 {isSearching && (

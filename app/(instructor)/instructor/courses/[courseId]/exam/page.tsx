@@ -109,7 +109,7 @@ function QuestionDialog({
               <label className="text-[11px] text-ws-muted">Points</label>
               <Input
                 inputMode="numeric"
-                className="h-7 w-14 text-xs"
+                className="h-7 md:h-7 w-14 text-xs"
                 value={points}
                 onChange={(e) => setPoints(e.target.value.replace(/[^0-9]/g, ""))}
               />
