@@ -52,7 +52,8 @@ import { useUnreadCount } from "@/lib/hooks/use-unread-count"
 import { useOngoingCall } from "@/components/providers/call-provider"
 import { useSidebarActivity } from "@/lib/hooks/use-sidebar-activity"
 import { useEnrollments } from "@/lib/hooks/queries"
-import { enrollmentHref, grantsAccess, isMentorEnrollment, pickResume } from "@/lib/dashboard-home"
+import { enrollmentHref, grantsAccess, isMentorEnrollment, pickHero } from "@/lib/dashboard-home"
+import { useNow } from "@/lib/hooks/use-now"
 import { BRAND } from "@/lib/brand"
 import { BrandLockup } from "@/components/shared/brand-lockup"
 import { cn } from "@/lib/utils"
@@ -211,12 +212,14 @@ const COLLAPSED_ROW = "group-data-[collapsible=icon]:size-full! group-data-[coll
 const TRIGGER =
   "size-9 shrink-0 rounded-full text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground [&_svg]:size-[18px]!"
 
-type Badge = { label: string; tone: "neutral" | "brand" | "live" }
+/** `label` is the visual pill; `spoken` is the state a screen reader hears after the row's name. */
+type Badge = { label: string; spoken: string; tone: "neutral" | "brand" | "live" }
 
-/** Count/state pill on the right of a row — the hub's badge. */
+/** Count/state pill on the right of a row — the hub's badge. Visual only: the row's name carries `spoken`. */
 function NavBadge({ badge }: { badge: Badge }) {
   return (
     <span
+      aria-hidden
       className={cn(
         "ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center gap-1 rounded-md px-1.5 text-[10px] font-bold leading-none tabular-nums",
         badge.tone === "brand" ? "bg-primary/[0.14] text-ws-gold" : "bg-foreground/[0.08] text-muted-foreground",
@@ -277,7 +280,12 @@ function NavRow({
             />
           )}
         </span>
-        <span className={cn("flex-1 truncate", collapsed && "sr-only")}>{item.title}</span>
+        <span className={cn("flex-1 truncate", collapsed && "sr-only")}>
+          {item.title}
+          {/* The pill and icon mode's dot are visual; the name says the state
+              in both modes ("Messages, 3 unread"). */}
+          {badge && <span className="sr-only">, {badge.spoken}</span>}
+        </span>
         {badge && !collapsed && <NavBadge badge={badge} />}
       </SidebarMenuButton>
     </SidebarMenuItem>
@@ -391,12 +399,19 @@ export function AppSidebar() {
     `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`.toUpperCase() || "U"
   const isInstructor = user.role === "INSTRUCTOR" || user.role === "ADMIN"
 
+  const now = useNow()
+
   /**
    * Resuming a course is the single most common reason a learner returns. The
-   * dashboard's Continue learning pick (`pickResume`) gets a card here too, so
-   * the rail and the dashboard always resume the same course.
+   * card offers the home hero's program — the same selector (`pickHero`), so
+   * the rail and the hero never point at different programs — but only when
+   * that program opens the player. A reserved seat (or any other state the
+   * hero explains) is not something to "continue", so the card stays away.
    */
-  const resume = React.useMemo(() => pickResume(enrollments), [enrollments])
+  const resume = React.useMemo(() => {
+    const hero = pickHero(enrollments, now)
+    return hero && grantsAccess(hero.enrollment) ? hero.enrollment : null
+  }, [enrollments, now])
 
   // Only enrollments that still open the player count as "in progress".
   const inProgressCount = enrollments.filter((e) => grantsAccess(e) && e.progress < 100).length
@@ -422,14 +437,16 @@ export function AppSidebar() {
 
   const badgeFor = (item: NavItem): Badge | undefined => {
     if (item.href === "/dashboard/my-courses" && inProgressCount > 0) {
-      return { label: String(inProgressCount), tone: "neutral" }
+      return { label: String(inProgressCount), spoken: `${inProgressCount} in progress`, tone: "neutral" }
     }
     if (item.href === "/dashboard/messages") {
-      if (hasOngoingCall) return { label: "On call", tone: "live" }
-      if (unreadCount > 0) return { label: unreadCount > 99 ? "99+" : String(unreadCount), tone: "brand" }
+      if (hasOngoingCall) return { label: "On call", spoken: "on a call", tone: "live" }
+      if (unreadCount > 0) {
+        return { label: unreadCount > 99 ? "99+" : String(unreadCount), spoken: `${unreadCount} unread`, tone: "brand" }
+      }
     }
     if (item.href === "/dashboard/meetings" && liveCount > 0) {
-      return { label: `${liveCount} live`, tone: "live" }
+      return { label: `${liveCount} live`, spoken: `${liveCount} live`, tone: "live" }
     }
     return undefined
   }

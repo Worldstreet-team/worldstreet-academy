@@ -46,8 +46,12 @@ import { queryKeys } from "@/lib/hooks/queries/keys"
 import { fmtMoney, NAIRA_FONT, TxStatusBadge, useBalanceHidden } from "@/components/wallet/shared"
 import { cn } from "@/lib/utils"
 
-/** Where the balance lives when this environment has no wallet connection. */
-const HUB_WALLET_URL = "https://dashboard.worldstreetgold.com"
+/**
+ * Where the balance lives when this environment has no wallet connection: the
+ * hub (www — dashboard.* only redirects to www's login) and its new wallet,
+ * `/wallet/modern` in dashboard-revamp's NAV_GROUPS.
+ */
+const HUB_WALLET_URL = "https://www.worldstreetgold.com/wallet/modern"
 
 /** Secondary figures mask to this; the hero uses Balance's own `$••••••`. */
 const MASK = "••••"
@@ -359,9 +363,9 @@ export default function WalletPage() {
     staleTime: 15_000,
   })
 
+  // The whole ["wallet"] prefix — the top bar's balance chip included.
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.walletOverview })
-    queryClient.invalidateQueries({ queryKey: queryKeys.walletTransactions })
+    queryClient.invalidateQueries({ queryKey: queryKeys.wallet })
   }
 
   const retry = () => {

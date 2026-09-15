@@ -3,12 +3,14 @@
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
+import { useQueryClient } from "@tanstack/react-query"
 import { Topbar } from "@/components/platform/topbar"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { useUser } from "@/components/providers/user-provider"
 import { purchaseCourse, checkEnrollment } from "@/lib/actions/enrollments"
 import { getMyWalletBalance, type MyWalletBalance } from "@/lib/actions/wallet"
+import { queryKeys } from "@/lib/hooks/queries/keys"
 import { fetchProgramById, type ProgramDetail, type PublicPackage } from "@/lib/actions/student"
 import { PACKAGE_LABEL } from "@/lib/entitlements"
 import { SCHOOL_BY_SLUG } from "@/lib/schools"
@@ -31,6 +33,7 @@ export default function CheckoutPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const user = useUser()
+  const queryClient = useQueryClient()
 
   const courseId = searchParams.get("courseId")
   const packageParam = searchParams.get("package")
@@ -116,6 +119,9 @@ export default function CheckoutPage() {
       })
 
       if (result.success) {
+        // Money moved outside the query cache — mark every wallet figure
+        // stale, the top bar's balance chip included.
+        queryClient.invalidateQueries({ queryKey: queryKeys.wallet })
         setIsSuccess(true)
         router.push(`/dashboard/checkout/success?courseId=${program.id}`)
       } else {

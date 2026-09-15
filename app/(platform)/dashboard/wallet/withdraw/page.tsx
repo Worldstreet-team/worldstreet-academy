@@ -28,7 +28,7 @@ import {
   syncKycAction,
 } from "@/lib/actions/wallet"
 import { queryKeys } from "@/lib/hooks/queries/keys"
-import { fmtMoney } from "@/components/wallet/shared"
+import { fmtMoney, NAIRA_FONT } from "@/components/wallet/shared"
 
 export default function WithdrawPage() {
   const queryClient = useQueryClient()
@@ -68,10 +68,9 @@ export default function WithdrawPage() {
     staleTime: 3600_000,
   })
 
+  // The whole ["wallet"] prefix — saved banks and the top bar's balance chip included.
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.walletOverview })
-    queryClient.invalidateQueries({ queryKey: queryKeys.walletTransactions })
-    queryClient.invalidateQueries({ queryKey: queryKeys.walletSavedBanks })
+    queryClient.invalidateQueries({ queryKey: queryKeys.wallet })
   }
 
   const verify = useMutation({
@@ -181,7 +180,10 @@ export default function WithdrawPage() {
               <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-ws-muted">
                 Available to withdraw
               </p>
-              <p className="mt-2 font-display text-4xl font-semibold tabular-nums tracking-[-0.02em] text-ws-primary">
+              <p
+                className="mt-2 font-display text-4xl font-semibold tabular-nums tracking-[-0.02em] text-ws-primary"
+                style={NAIRA_FONT.display}
+              >
                 {fmtMoney(overview?.ngn?.availableMinor ?? 0, "NGN")}
               </p>
               <div className="mt-5 flex items-center justify-between gap-4 border-t border-ws-hairline pt-4 text-[13px]">
@@ -300,7 +302,7 @@ export default function WithdrawPage() {
                 Amount (NGN)
               </label>
               <div className="flex items-baseline justify-center gap-1">
-                <span className="font-display text-2xl font-medium text-ws-muted">₦</span>
+                <span className="font-display text-2xl font-medium text-ws-muted" style={NAIRA_FONT.display}>₦</span>
                 <input
                   id="withdraw-amount"
                   inputMode="numeric"
@@ -318,7 +320,11 @@ export default function WithdrawPage() {
             {error && error !== "kyc_required" && (
               <p className="text-center text-[13px] text-ws-danger">{error}</p>
             )}
-            {successMsg && <p className="text-center text-[13px] text-ws-success">{successMsg}</p>}
+            {successMsg && (
+              <p className="text-center text-[13px] text-ws-success" style={NAIRA_FONT.sans}>
+                {successMsg}
+              </p>
+            )}
             <button
               type="button"
               disabled={!amount || !selectedBankId || withdraw.isPending}

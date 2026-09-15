@@ -111,7 +111,7 @@ const connectItems: NavItem[] = [
 ]
 
 const worldstreetApps = [
-  { title: "Crypto Dashboard", href: "https://dashboard.worldstreetgold.com" },
+  { title: "Crypto Dashboard", href: "https://www.worldstreetgold.com" },
   { title: "Shop", href: "https://shop.worldstreetgold.com" },
   { title: "Xtreme Live", href: "https://xtreme.worldstreetgold.com" },
   { title: "Social Platform", href: "https://social.worldstreetgold.com" },

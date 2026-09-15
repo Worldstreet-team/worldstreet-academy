@@ -1,14 +1,12 @@
 "use client"
 
-import * as React from "react"
 import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { ViewIcon, ViewOffIcon, Wallet01Icon } from "@hugeicons/core-free-icons"
 import { getMyWalletBalance } from "@/lib/actions/wallet"
 import { queryKeys } from "@/lib/hooks/queries/keys"
-
-const STORAGE_KEY = "ws:balance-hidden"
+import { useBalanceHidden } from "@/components/wallet/shared"
 
 /**
  * The Worldstreet Wallet's USD balance in the top bar.
@@ -19,43 +17,26 @@ const STORAGE_KEY = "ws:balance-hidden"
  * is in flight or when the wallet is disabled: a pill reading $0.00 would claim
  * a balance nobody knows, and the wallet page explains the disabled state.
  *
+ * The read is `quick` (a ~3s wallet timeout), never retried and not refetched
+ * on focus: Next runs client-invoked server actions one at a time, so a slow
+ * wallet must not queue every page's own actions behind a glanceable figure.
+ * A timeout fails closed like any other error — the pill just stays away.
+ *
  * Ink, not gold — a balance is data, and gold is never a data colour
  * (design-system 01). The eye toggle stays because this bar is in every
- * screenshot and screen-share; the masked state keeps the character count so
- * the pill doesn't reflow when it flips.
+ * screenshot and screen-share; it shares `useBalanceHidden` with the wallet
+ * page, so hiding in either place hides both. The masked state keeps the
+ * character count so the pill doesn't reflow when it flips.
  */
 export function BalanceChip() {
   const { data } = useQuery({
     queryKey: queryKeys.walletBalance,
-    queryFn: () => getMyWalletBalance(),
+    queryFn: () => getMyWalletBalance({ quick: true }),
     staleTime: 60_000,
+    retry: false,
+    refetchOnWindowFocus: false,
   })
-
-  // Default to visible and correct after mount — reading localStorage during
-  // render would desync the server-rendered markup.
-  const [hidden, setHidden] = React.useState(false)
-  const [ready, setReady] = React.useState(false)
-
-  React.useEffect(() => {
-    try {
-      setHidden(window.localStorage.getItem(STORAGE_KEY) === "1")
-    } catch {
-      // Private mode / storage disabled — stay visible.
-    }
-    setReady(true)
-  }, [])
-
-  const toggle = React.useCallback(() => {
-    setHidden((prev) => {
-      const next = !prev
-      try {
-        window.localStorage.setItem(STORAGE_KEY, next ? "1" : "0")
-      } catch {
-        // Non-fatal: the preference just won't persist.
-      }
-      return next
-    })
-  }, [])
+  const [hidden, toggle] = useBalanceHidden()
 
   if (!data?.enabled) return null
 
@@ -75,11 +56,9 @@ export function BalanceChip() {
         className="flex h-full items-center gap-2 rounded-full pl-3.5 pr-1.5 outline-none"
       >
         <HugeiconsIcon icon={Wallet01Icon} aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-        <span
-          className="text-[13px] font-semibold leading-none tabular-nums text-foreground"
-          // Avoid a flash of the real figure before the stored preference loads.
-          style={{ visibility: ready ? "visible" : "hidden" }}
-        >
+        {/* No pre-mount visibility guard needed: the figure only exists after a
+            client fetch, by which point the store has its stored value. */}
+        <span className="text-[13px] font-semibold leading-none tabular-nums text-foreground">
           {hidden ? masked : formatted}
         </span>
       </Link>

@@ -54,8 +54,15 @@ export function RollingAmount({
   // don't break the up/down/up rhythm the eye latches onto.
   let digitAt = 0
 
+  // Screen readers get one plain-text copy of the figure; every animated slot
+  // is aria-hidden (an aria-label on a bare span is ignored by NVDA and JAWS).
+  // A masked figure — bullets and no digits, as Balance's `hidden` renders —
+  // is announced as hidden, not as a run of bullets.
+  const masked = value.includes("•") && !/\d/.test(value)
+
   return (
-    <span className={cn("inline-flex items-end tabular-nums", className)} aria-label={value}>
+    <span className={cn("relative inline-flex items-end tabular-nums", className)}>
+      <span className="sr-only">{masked ? "Balance hidden" : value}</span>
       {chars.map((ch, i) => {
         const isDigit = ch >= "0" && ch <= "9"
         const dir = isDigit ? (digitAt++ % 2 === 0 ? -1 : 1) : -1
@@ -65,6 +72,7 @@ export function RollingAmount({
         return (
           <span
             key={`${roll.gen}-${i}`}
+            aria-hidden
             className="relative inline-block overflow-hidden"
             style={{ ["--rd" as string]: String(dir) }}
           >

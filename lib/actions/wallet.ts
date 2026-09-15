@@ -48,17 +48,28 @@ export type MyWalletBalance = {
 
 const FUNDING_URL = process.env.NEXT_PUBLIC_WALLET_FUNDING_URL || "/dashboard/wallet/deposit"
 
-export async function getMyWalletBalance(): Promise<MyWalletBalance> {
+/** The top bar's glanceable read gives up after this; checkout keeps the wallet client's default. */
+const QUICK_BALANCE_TIMEOUT_MS = 3_000
+
+/**
+ * `quick` bounds the wallet call at ~3s for the top bar's balance chip: Next
+ * runs client-invoked server actions one at a time, so a slow wallet must not
+ * queue the page's own actions behind it. Browser-callable, so only a literal
+ * `true` is honoured and nothing else from the caller reaches the wallet
+ * client. A timeout fails closed like any other error (`enabled: false`).
+ */
+export async function getMyWalletBalance(options?: { quick?: boolean }): Promise<MyWalletBalance> {
   const base: MyWalletBalance = {
     enabled: false,
     usdAvailableMinor: 0,
     usdAvailable: 0,
     fundingUrl: FUNDING_URL,
   }
+  const timeoutMs = options?.quick === true ? QUICK_BALANCE_TIMEOUT_MS : undefined
   try {
     const user = await getCurrentUser()
     if (!user || !walletEnabled()) return base
-    const balances = await getWalletBalances(user.authUserId)
+    const balances = await getWalletBalances(user.authUserId, { timeoutMs })
     return {
       enabled: true,
       usdAvailableMinor: balances.USD.availableMinor,

@@ -72,9 +72,11 @@ type WalletRequest = {
   idempotencyKey?: string
   /** Query params (service-principal GETs forward the actor identity this way). */
   query?: Record<string, string | number | undefined>
+  /** Abort after this long (default 15s). Money operations keep the default; only a glanceable read asks for less. */
+  timeoutMs?: number
 }
 
-async function walletFetch<T>({ method, path, body, idempotencyKey, query }: WalletRequest): Promise<T> {
+async function walletFetch<T>({ method, path, body, idempotencyKey, query, timeoutMs = 15_000 }: WalletRequest): Promise<T> {
   if (!walletEnabled()) {
     throw new WalletError("WALLET_DISABLED", 503, "Wallet service is not configured")
   }
@@ -102,7 +104,7 @@ async function walletFetch<T>({ method, path, body, idempotencyKey, query }: Wal
       headers,
       body: body ? JSON.stringify(body) : undefined,
       cache: "no-store",
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(timeoutMs),
     })
   } catch (err) {
     // Network failure / timeout — fail closed, never assume the money moved.
@@ -129,11 +131,15 @@ async function walletFetch<T>({ method, path, body, idempotencyKey, query }: Wal
   return payload as T
 }
 
-/** Pooled USD + NGN balances for a user (`:userId` = Clerk authUserId). */
-export async function getWalletBalances(authUserId: string): Promise<WalletBalances> {
+/** Pooled USD + NGN balances for a user (`:userId` = Clerk authUserId). `timeoutMs` overrides the 15s default. */
+export async function getWalletBalances(
+  authUserId: string,
+  { timeoutMs }: { timeoutMs?: number } = {}
+): Promise<WalletBalances> {
   const data = await walletFetch<{ ok: true } & Record<string, unknown>>({
     method: "GET",
     path: `/v1/wallet/${encodeURIComponent(authUserId)}/balances`,
+    timeoutMs,
   })
   const balances = (data.balances ?? data) as Record<string, WalletBalance>
   const zero: WalletBalance = { availableMinor: 0, lockedMinor: 0, available: 0, locked: 0 }

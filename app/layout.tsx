@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Public_Sans, Dancing_Script, Poppins } from "next/font/google";
+import { Public_Sans, Dancing_Script, Poppins, Noto_Sans } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "@/components/theme-provider";
 import { BRAND, SITE_DESCRIPTION } from "@/lib/brand";
@@ -23,6 +23,32 @@ const poppins = Poppins({
   variable: "--font-display",
   weight: ["300", "600", "700", "800"],
 });
+
+// design-system/02 ₦ glyph rule — the brand faces' Latin files carry no naira
+// sign, so NGN amounts borrow it from Noto Sans at the money weights. U+20A6
+// lives in Google's latin-ext face (unicode-range U+20A0-20AB); `subsets` only
+// steers preloading, and nothing is preloaded: the face downloads only on a
+// page that actually renders ₦.
+const notoSans = Noto_Sans({
+  subsets: ["latin-ext"],
+  weight: ["300", "400", "500", "600"],
+  variable: "--font-noto",
+  display: "swap",
+  preload: false,
+});
+
+/**
+ * Naira stacks for `NAIRA_FONT` (components/wallet/shared.tsx): brand face →
+ * Noto → the brand face's full next/font list. Noto can't just follow
+ * `var(--font-display)`: next/font ends that list with a size-adjusted local
+ * Arial, and Arial carries ₦, so the glyph would render from Arial at the
+ * wrong weight. `style.fontFamily` names the self-hosted face first.
+ */
+const primaryFace = (font: { style: { fontFamily: string } }) => font.style.fontFamily.split(",")[0];
+const nairaStacks: React.CSSProperties = {
+  ["--font-naira-display" as string]: `${primaryFace(poppins)}, ${primaryFace(notoSans)}, var(--font-display)`,
+  ["--font-naira-sans" as string]: `${primaryFace(publicSans)}, ${primaryFace(notoSans)}, var(--font-sans)`,
+};
 
 // No maximumScale: the design system bans blocking pinch-zoom (06-motion-a11y).
 export const viewport: Viewport = {
@@ -94,7 +120,8 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <body
-          className={`${dancingScript.variable} ${poppins.variable} antialiased`}
+          className={`${dancingScript.variable} ${poppins.variable} ${notoSans.variable} antialiased`}
+          style={nairaStacks}
         >
           <ThemeProvider
             attribute="class"

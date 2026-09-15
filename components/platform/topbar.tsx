@@ -8,7 +8,6 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import {
   ArrowRight01Icon,
   DashboardSpeed01Icon,
-  Globe02Icon,
   Logout01Icon,
   Moon02Icon,
   Search01Icon,
@@ -256,7 +255,12 @@ export function Topbar({ title, variant = "platform", breadcrumbOverrides }: Top
                       className="size-3.5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-foreground"
                     />
                   ) : (
-                    <HugeiconsIcon icon={Globe02Icon} className="size-[18px]" />
+                    // The current language's ISO code, not a globe or a flag
+                    // emoji (the DS bans emoji as icons). notranslate keeps
+                    // Google Translate from rewriting the code itself.
+                    <span className="text-[11px] font-semibold uppercase leading-none tracking-wide notranslate" translate="no">
+                      {currentLanguage.code}
+                    </span>
                   )}
                 </button>
               )}

@@ -17,7 +17,7 @@ import {
   provisionPayoutSubaccountAction,
 } from "@/lib/actions/wallet"
 import { queryKeys } from "@/lib/hooks/queries/keys"
-import { fmtMoney, CopyButton } from "@/components/wallet/shared"
+import { fmtMoney, CopyButton, NAIRA_FONT } from "@/components/wallet/shared"
 
 const USD_PRESETS = [10, 25, 50, 100]
 const NGN_PRESETS = [5000, 10000, 25000, 50000]
@@ -49,9 +49,9 @@ function DepositPageInner() {
     staleTime: 15_000,
   })
 
+  // The whole ["wallet"] prefix — the top bar's balance chip included.
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.walletOverview })
-    queryClient.invalidateQueries({ queryKey: queryKeys.walletTransactions })
+    queryClient.invalidateQueries({ queryKey: queryKeys.wallet })
   }
 
   const startUsd = useMutation({
@@ -346,7 +346,7 @@ function DepositPageInner() {
                       Amount (NGN)
                     </label>
                     <div className="flex items-baseline justify-center gap-1">
-                      <span className="font-display text-2xl font-medium text-ws-muted">₦</span>
+                      <span className="font-display text-2xl font-medium text-ws-muted" style={NAIRA_FONT.display}>₦</span>
                       <input
                         id="ngn-amount"
                         inputMode="numeric"
@@ -363,6 +363,7 @@ function DepositPageInner() {
                           key={v}
                           type="button"
                           onClick={() => setNgnAmount(String(v))}
+                          style={NAIRA_FONT.sans}
                           className="h-9 rounded-full bg-ws-chip px-4 text-[13px] font-medium tabular-nums text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-raised hover:text-ws-primary"
                         >
                           ₦{v.toLocaleString()}
@@ -382,7 +383,7 @@ function DepositPageInner() {
                 </div>
 
                 {overview?.ngn && (
-                  <p className="text-center text-[13px] tabular-nums text-ws-muted">
+                  <p className="text-center text-[13px] tabular-nums text-ws-muted" style={NAIRA_FONT.sans}>
                     Current NGN balance: {fmtMoney(overview.ngn.availableMinor, "NGN")}
                   </p>
                 )}

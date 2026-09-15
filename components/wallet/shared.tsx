@@ -16,13 +16,17 @@ export function fmtMoney(minor: number, currency: "USD" | "NGN"): string {
 
 /**
  * design-system/02 ₦ glyph rule: the Latin subsets of Poppins and Public Sans
- * carry no ₦, so a naira figure slots Noto Sans between the brand face and
- * system-ui — only the missing glyph falls through. Spread onto any element
- * that renders an NGN amount (`style={NAIRA_FONT.sans}`).
+ * carry no ₦, so a naira figure slots Noto Sans (loaded in app/layout.tsx)
+ * between the brand face and the rest of the stack — only the missing glyph
+ * falls through. The `--font-naira-*` stacks are built in the root layout, not
+ * here as `var(--font-display), var(--font-noto)`: next/font ends every family
+ * list with a metric-adjusted local Arial, and Arial carries ₦, so the glyph
+ * would render from Arial before Noto was ever reached. Spread onto any
+ * element that renders an NGN amount (`style={NAIRA_FONT.sans}`).
  */
 export const NAIRA_FONT = {
-  sans: { fontFamily: 'var(--font-sans), "Noto Sans", system-ui, sans-serif' },
-  display: { fontFamily: 'var(--font-display), "Noto Sans", system-ui, sans-serif' },
+  sans: { fontFamily: "var(--font-naira-sans), system-ui, sans-serif" },
+  display: { fontFamily: "var(--font-naira-display), system-ui, sans-serif" },
 } as const satisfies Record<string, React.CSSProperties>
 
 /* Status chips: a 14%/10% token wash with full-strength text (design-system/01).
@@ -50,52 +54,72 @@ export function TxStatusBadge({ status }: { status: WalletTxStatus }) {
 }
 
 /* ── Hide balances ──────────────────────────────────────────────────────────
-   The wallet page's eye toggle. Same storage key as the top bar's balance chip
-   so the preference is one choice, not two. Storage can be missing or throw
-   (private mode, blocked site data): every access is guarded and the page
-   falls back to showing figures. The server snapshot is always "shown", so
-   hydration never mismatches; the stored choice applies on the client. */
+   ONE store for every figure: the top bar's balance chip and the wallet page
+   both read `useBalanceHidden`, so hiding on either hides both — the toggle
+   exists for screen-shares. In-tab changes notify subscribers directly; other
+   tabs arrive through the window `storage` event. Storage can be missing or
+   throw (private mode, blocked site data): every access is guarded, and the
+   in-memory choice still flips for this tab. The server snapshot is always
+   "shown", so hydration never mismatches; the stored choice applies on the
+   client. */
 
 const BALANCE_HIDDEN_KEY = "ws:balance-hidden"
-let balanceHidden = false
-let balanceHiddenLoaded = false
 const balanceHiddenListeners = new Set<() => void>()
+/** null until first read. */
+let balanceHidden: boolean | null = null
 
-function loadBalanceHidden() {
-  if (balanceHiddenLoaded) return
-  balanceHiddenLoaded = true
+/** The stored choice, or null when storage can't be read. */
+function readStoredBalanceHidden(): boolean | null {
   try {
-    balanceHidden = window.localStorage.getItem(BALANCE_HIDDEN_KEY) === "1"
+    return window.localStorage.getItem(BALANCE_HIDDEN_KEY) === "1"
   } catch {
-    // Storage unavailable — keep figures visible.
+    return null
   }
+}
+
+function emitBalanceHidden() {
+  balanceHiddenListeners.forEach((listener) => listener())
+}
+
+function onBalanceHiddenStorage(event: StorageEvent) {
+  // A null key means another tab cleared storage.
+  if (event.key !== null && event.key !== BALANCE_HIDDEN_KEY) return
+  balanceHidden = event.newValue === "1"
+  emitBalanceHidden()
 }
 
 function subscribeBalanceHidden(listener: () => void) {
-  loadBalanceHidden()
+  if (balanceHiddenListeners.size === 0) {
+    // Nobody was listening, so another tab may have changed the choice meanwhile.
+    balanceHidden = readStoredBalanceHidden() ?? balanceHidden
+    window.addEventListener("storage", onBalanceHiddenStorage)
+  }
   balanceHiddenListeners.add(listener)
   return () => {
     balanceHiddenListeners.delete(listener)
+    if (balanceHiddenListeners.size === 0) window.removeEventListener("storage", onBalanceHiddenStorage)
   }
 }
 
-function getBalanceHidden() {
-  loadBalanceHidden()
+function getBalanceHidden(): boolean {
+  if (balanceHidden === null) balanceHidden = readStoredBalanceHidden() ?? false
   return balanceHidden
 }
+
+const getServerBalanceHidden = () => false
 
 function setBalanceHidden(next: boolean) {
   balanceHidden = next
   try {
     window.localStorage.setItem(BALANCE_HIDDEN_KEY, next ? "1" : "0")
   } catch {
-    // Non-fatal: the choice just won't persist.
+    // Non-fatal: the choice holds for this tab but won't persist.
   }
-  balanceHiddenListeners.forEach((listener) => listener())
+  emitBalanceHidden()
 }
 
 export function useBalanceHidden(): readonly [hidden: boolean, toggle: () => void] {
-  const hidden = React.useSyncExternalStore(subscribeBalanceHidden, getBalanceHidden, () => false)
+  const hidden = React.useSyncExternalStore(subscribeBalanceHidden, getBalanceHidden, getServerBalanceHidden)
   const toggle = React.useCallback(() => setBalanceHidden(!getBalanceHidden()), [])
   return [hidden, toggle] as const
 }

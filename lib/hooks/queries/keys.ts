@@ -25,7 +25,8 @@ export const queryKeys = {
   // ── Notifications ──
   notifications: ["notifications"] as const,
 
-  // ── Wallet ──
+  // ── Wallet ── every key starts with "wallet"; invalidate `wallet` after money moves.
+  wallet: ["wallet"] as const,
   walletOverview: ["wallet", "overview"] as const,
   walletBalance: ["wallet", "balance"] as const,
   walletTransactions: ["wallet", "transactions"] as const,
