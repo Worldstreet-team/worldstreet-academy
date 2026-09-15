@@ -3,94 +3,89 @@
 import * as React from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { ArrowRight } from "lucide-react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { ArrowRight01Icon } from "@hugeicons/core-free-icons"
 import { Topbar } from "@/components/platform/topbar"
 import { CourseCard, CourseCardSkeleton } from "@/components/platform/course-card"
-import { EnrollmentCard } from "@/components/platform/enrollment-card"
 import { AssignmentsTile } from "@/components/dashboard/assignments-tile"
-import { Mascot } from "@/components/platform/mascot"
-import { Button } from "@/components/ui/button"
+import { HomeBento, type BentoTile } from "@/components/dashboard/home-bento"
+import { QuickActions, StatStrip, StatStripSkeleton, homeQuickActions } from "@/components/dashboard/home-strip"
 import {
   CertificatesTile,
-  CommunityTile,
-  CurrentCourseTile,
   InstructorsTile,
-  ProgressTile,
+  MyProgramsTile,
   SupportTile,
   UpcomingClassesTile,
 } from "@/components/dashboard/home-tiles"
-import { BRAND } from "@/lib/brand"
+import { HomeGreeting, HomeSummary, LearningHero, LearningHeroSkeleton } from "@/components/dashboard/learning-hero"
+import { TileSkeleton } from "@/components/dashboard/tile-bits"
+import { useUser } from "@/components/providers/user-provider"
+import { CardShell, EmptyState, Eyebrow, Rise } from "@/components/ui/system"
 import {
-  enrollmentHref,
+  assessmentCounts,
   hasPrioritySupport,
   includesAny,
   instructorRows,
-  pickCurrent,
-  pickResume,
+  learningTotals,
+  notEnrolled,
+  pickHero,
 } from "@/lib/dashboard-home"
 import {
-  useEnrollments,
-  useBookmarks,
   useBookmarkedIds,
+  useBookmarks,
   useBrowseCourses,
+  useEnrollments,
+  useMyAssessments,
   useToggleBookmark,
 } from "@/lib/hooks/queries"
-import { useUser } from "@/components/providers/user-provider"
+import { useNow } from "@/lib/hooks/use-now"
 
-function getGreeting(): string {
-  const hour = new Date().getHours()
-  if (hour < 12) return "Good morning"
-  if (hour < 17) return "Good afternoon"
-  return "Good evening"
-}
-
-/**
- * Section header — title left, a quiet "See all" right. Gold on this page
- * belongs to the Continue learning CTA alone.
+/*
+ * The student home, in the hub's order (design-system 05): greeting row →
+ * learning hero → stat strip → action rail → paired bento rows → Discover.
+ * Sections enter on the Rise cascade, ~60ms apart; there is no ambient motion.
  */
-function SectionHeader({
-  title,
-  href,
-  linkLabel = "See all",
-}: {
-  title: string
-  href?: string
-  linkLabel?: string
-}) {
+
+/** Section heading outside a card: Poppins 20, with a quiet "See all". Gold on this page belongs to the hero's CTA. */
+function SectionHeading({ id, title, subtitle, href }: { id: string; title: string; subtitle: string; href: string }) {
   return (
-    <div className="mb-4 flex items-baseline justify-between gap-4">
-      <h2 className="font-display text-xl font-semibold tracking-[-0.015em] text-ws-primary">
-        {title}
-      </h2>
-      {href && (
-        <Link
-          href={href}
-          className="group inline-flex items-center gap-1 text-[13px] font-medium text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:text-ws-primary"
-        >
-          {linkLabel}
-          <ArrowRight size={14} strokeWidth={2} aria-hidden />
-        </Link>
-      )}
+    <div className="flex items-end justify-between gap-4">
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <h2 id={id} className="font-display text-[20px] font-semibold leading-tight tracking-[-0.015em]">
+          {title}
+        </h2>
+        <p className="text-[13px] text-muted-foreground">{subtitle}</p>
+      </div>
+      <Link
+        href={href}
+        className="inline-flex shrink-0 items-center gap-1 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+      >
+        See all
+        <HugeiconsIcon icon={ArrowRight01Icon} className="h-3.5 w-3.5" aria-hidden />
+      </Link>
     </div>
   )
 }
 
-/** 3-up grid, 24px gutters — the reference's course grid. */
+/**
+ * Two cards on a phone and in halves, three from ~896px of page width — the
+ * third card only appears where there is a column for it.
+ */
 function CourseGrid({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-4 @xl:grid-cols-2 @4xl:grid-cols-3 [&>*:nth-child(3)]:hidden @4xl:[&>*:nth-child(3)]:block">
       {children}
     </div>
   )
 }
 
-/** Compact empty state that sits in a section's flow; the hero CTA carries the action. */
-function SectionEmpty({ title, description }: { title: string; description: string }) {
+function CourseGridSkeleton() {
   return (
-    <div className="rounded-lg bg-ws-surface px-6 py-8">
-      <p className="text-[15px] font-semibold text-ws-primary">{title}</p>
-      <p className="mt-1 text-[13px] text-ws-muted">{description}</p>
-    </div>
+    <CourseGrid>
+      {[0, 1, 2].map((i) => (
+        <CourseCardSkeleton key={i} />
+      ))}
+    </CourseGrid>
   )
 }
 
@@ -98,167 +93,211 @@ export default function DashboardPage() {
   const user = useUser()
   // The checkout success page's "Go to dashboard" links here with ?welcome=1.
   const welcome = useSearchParams().get("welcome") === "1"
+  const now = useNow()
 
-  const { data: enrollments = [], isLoading: isLoadingEnrollments } = useEnrollments()
-  const { data: bookmarks = [], isLoading: isLoadingBookmarks } = useBookmarks()
-  const { data: browseCourses = [], isLoading: isLoadingBrowse } = useBrowseCourses()
+  const { data: enrollments = [], isLoading: loadingEnrollments } = useEnrollments()
+  const { data: assessments = [] } = useMyAssessments()
+  const { data: bookmarks = [], isLoading: loadingBookmarks } = useBookmarks()
+  const { data: browseCourses = [], isLoading: loadingBrowse } = useBrowseCourses()
   const bookmarkedIds = useBookmarkedIds()
   const toggleBookmark = useToggleBookmark()
 
-  const resume = pickResume(enrollments)
-  const current = pickCurrent(enrollments)
+  const hero = pickHero(enrollments, now)
+  const totals = learningTotals(enrollments)
   const instructors = instructorRows(enrollments)
   // Tiles the student's packages can't back are hidden, never faked.
-  const showUpcomingClasses = includesAny(enrollments, "liveClasses")
+  const showClasses = includesAny(enrollments, "liveClasses")
   const showCertificates = includesAny(enrollments, "certificate")
+  const { toDo } = assessmentCounts(assessments)
+  // The hero already shows its program; the list earns its place with a row the hero doesn't.
+  const showPrograms = enrollments.some((e) => e.id !== hero?.enrollment.id)
+
+  const actions = homeQuickActions({
+    hasAssessments: assessments.length > 0,
+    showCertificates,
+    showClasses,
+    canMessage: instructors.some((row) => row.canMessage),
+    hasMentor: instructors.some((row) => row.isMentor),
+  })
+
+  // Priority order; home-bento pairs wide lists with narrow tiles.
+  const tiles: BentoTile[] = []
+  if (showPrograms) {
+    tiles.push({ key: "programs", prefer: "wide", node: <MyProgramsTile enrollments={enrollments} now={now} /> })
+  }
+  if (assessments.length > 0) tiles.push({ key: "assignments", prefer: "wide", node: <AssignmentsTile /> })
+  if (showClasses) tiles.push({ key: "classes", prefer: "narrow", node: <UpcomingClassesTile now={now} /> })
+  if (showCertificates) tiles.push({ key: "certificates", prefer: "narrow", node: <CertificatesTile now={now} /> })
+  if (instructors.length > 0) {
+    tiles.push({ key: "instructors", prefer: "narrow", node: <InstructorsTile rows={instructors} /> })
+  }
+  tiles.push({ key: "support", prefer: "narrow", node: <SupportTile priority={hasPrioritySupport(enrollments)} /> })
+
+  // Programs the student already has would only repeat the list above.
+  const recommended = notEnrolled(browseCourses, enrollments).slice(0, 3)
+  const loadingDiscover = loadingBrowse || loadingEnrollments
+  const showBrowse = loadingDiscover || browseCourses.length === 0 || recommended.length > 0
+  const showBookmarks = loadingBookmarks || bookmarks.length > 0
+  const discoverDelay = Math.min(240 + 60 * (loadingEnrollments ? 2 : tiles.length), 480)
 
   return (
     <>
       <Topbar title="Dashboard" />
 
-      <div className="flex-1 px-4 sm:px-6 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-8 md:px-8 md:pb-12 lg:px-12">
-        <div className="mx-auto w-full max-w-7xl space-y-12">
-          {/* Welcome band + the page's one gold CTA (spec §12 "Continue learning →") */}
-          <header className="ws-animate-in rounded-lg bg-ws-surface">
-            <div className="flex flex-col gap-6 p-6 sm:flex-row sm:items-center md:gap-10 md:p-8">
-              <Mascot size={150} className="h-[96px] w-[96px] shrink-0 md:h-[130px] md:w-[130px]" />
-              <div className="min-w-0 flex-1">
-                <h1 className="font-display text-[28px] font-semibold tracking-[-0.02em] text-ws-primary md:text-[34px]">
-                  {welcome ? `Welcome to ${BRAND.name}` : `${getGreeting()}, ${user.firstName}`}
-                </h1>
-                <p className="mt-2 text-[15px] text-ws-muted">
-                  {welcome
-                    ? "Your learning journey starts now."
-                    : "Pick up where you left off, or discover something new."}
-                </p>
-                <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2">
-                  {isLoadingEnrollments ? (
-                    <div className="h-11 w-48 animate-pulse rounded-sm bg-ws-raised" />
-                  ) : resume ? (
-                    <>
-                      <Button size="lg" className="h-11 gap-2 px-6" render={<Link href={enrollmentHref(resume)} />}>
-                        Continue learning
-                        <ArrowRight size={16} aria-hidden />
-                      </Button>
-                      <span className="max-w-full truncate text-[13px] text-ws-muted">{resume.courseTitle}</span>
-                    </>
-                  ) : (
-                    <Button size="lg" className="h-11 gap-2 px-6" render={<Link href="/dashboard/courses" />}>
-                      Browse programs
-                      <ArrowRight size={16} aria-hidden />
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </header>
-
-          {/* MY PROGRAMS */}
-          <section>
-            <SectionHeader
-              title="My programs"
-              href={enrollments.length > 0 ? "/dashboard/my-courses" : undefined}
+      {/* overflow-x-clip: the phone action rail bleeds into the gutter. */}
+      <div className="flex-1 overflow-x-clip px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-6 sm:px-6 md:px-8 md:pb-12 md:pt-8 lg:px-12">
+        <div className="@container mx-auto flex w-full max-w-7xl flex-col gap-6">
+          <div className="relative">
+            {/* The one ambient gold the system allows: a static warm radial behind
+                the hero, dark mode only (design-system 01, "Ambient brand glow"). */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 -top-6 hidden h-[36rem] dark:block"
+              style={{ background: "radial-gradient(680px 440px at 68% 42%, var(--color-ws-glow), transparent 70%)" }}
             />
-            {isLoadingEnrollments ? (
-              <CourseGrid>
-                {[0, 1, 2].map((i) => (
-                  <CourseCardSkeleton key={i} />
-                ))}
-              </CourseGrid>
-            ) : enrollments.length === 0 ? (
-              <SectionEmpty
-                title="You're not enrolled in anything yet"
-                description="Choose a program and it'll show up here with your progress."
-              />
-            ) : (
-              <CourseGrid>
-                {enrollments.slice(0, 3).map((enrollment) => (
-                  <EnrollmentCard key={enrollment.id} enrollment={enrollment} />
-                ))}
-              </CourseGrid>
-            )}
-          </section>
-
-          {/* Spec §12 tiles, in spec order. A uniform grid: tiles hide per student,
-              so fixed column spans would leave holes. */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <CurrentCourseTile enrollment={current} isLoading={isLoadingEnrollments} />
-            <ProgressTile enrollments={enrollments} isLoading={isLoadingEnrollments} />
-            {showUpcomingClasses && <UpcomingClassesTile />}
-            <AssignmentsTile />
-            {showCertificates && <CertificatesTile />}
-            {instructors.length > 0 && <InstructorsTile rows={instructors} />}
-            <CommunityTile />
-            <SupportTile priority={hasPrioritySupport(enrollments)} />
+            <div className="relative flex flex-col gap-5">
+              <Rise>
+                <HomeGreeting
+                  firstName={user.firstName}
+                  welcome={welcome}
+                  now={now}
+                  summary={
+                    <HomeSummary
+                      enrollments={enrollments}
+                      toDo={toDo}
+                      now={now}
+                      welcome={welcome}
+                      loading={loadingEnrollments}
+                      withClasses={showClasses}
+                    />
+                  }
+                />
+              </Rise>
+              <Rise delay={60}>
+                {loadingEnrollments ? (
+                  <LearningHeroSkeleton />
+                ) : (
+                  <LearningHero hero={hero} hasEnrollments={enrollments.length > 0} />
+                )}
+              </Rise>
+            </div>
           </div>
 
-          {/* Browse programs */}
-          <section>
-            <SectionHeader title="Browse programs" href="/dashboard/courses" />
-            {isLoadingBrowse ? (
-              <CourseGrid>
-                {[0, 1, 2].map((i) => (
-                  <CourseCardSkeleton key={i} />
-                ))}
-              </CourseGrid>
-            ) : browseCourses.length === 0 ? (
-              <SectionEmpty
-                title="No programs published yet"
-                description="New programs will appear here as instructors publish them."
-              />
-            ) : (
-              <CourseGrid>
-                {browseCourses.slice(0, 3).map((course) => (
-                  <CourseCard
-                    key={course.id}
-                    href={`/dashboard/courses/${course.id}`}
-                    title={course.title}
-                    thumbnailUrl={course.thumbnailUrl}
-                    price={course.price}
-                    pricing={course.pricing}
-                    rating={course.rating}
-                    level={course.level}
-                    totalLessons={course.totalLessons}
-                    totalDuration={course.totalDuration}
-                    enrolledCount={course.enrolledCount}
-                    isBookmarked={bookmarkedIds.has(course.id)}
-                    onToggleBookmark={() => toggleBookmark.mutate(course.id)}
-                  />
-                ))}
-              </CourseGrid>
-            )}
-          </section>
+          {/* Stat strip + action rail — only once there is something real to count. */}
+          {(loadingEnrollments || totals.open > 0 || actions.length > 1) && (
+            <div className="flex flex-col gap-3">
+              {loadingEnrollments ? (
+                <Rise delay={120}>
+                  <StatStripSkeleton />
+                </Rise>
+              ) : (
+                totals.open > 0 && (
+                  <Rise delay={120}>
+                    <StatStrip totals={totals} showCertificates={showCertificates} showClasses={showClasses} />
+                  </Rise>
+                )
+              )}
+              {/* A rail of one would only repeat the hero's Browse programs. */}
+              {!loadingEnrollments && actions.length > 1 && (
+                <Rise delay={180}>
+                  <QuickActions actions={actions} />
+                </Rise>
+              )}
+            </div>
+          )}
+
+          {loadingEnrollments ? (
+            <div className="grid gap-4 @2xl:grid-cols-2 @4xl:grid-cols-5">
+              <Rise delay={240} className="min-w-0 @4xl:col-span-3 [&>div]:h-full">
+                <TileSkeleton rows={4} label="Loading your programs" />
+              </Rise>
+              <Rise delay={300} className="min-w-0 @4xl:col-span-2 [&>div]:h-full">
+                <TileSkeleton rows={3} />
+              </Rise>
+            </div>
+          ) : (
+            <HomeBento tiles={tiles} delay={240} />
+          )}
+
+          {(showBrowse || showBookmarks) && (
+            <Rise delay={discoverDelay} className="flex items-center gap-3 pt-2">
+              <Eyebrow>Discover</Eyebrow>
+              <div className="h-px flex-1 bg-border" />
+            </Rise>
+          )}
+
+          {showBrowse && (
+            <Rise delay={discoverDelay + 60}>
+              <section aria-labelledby="home-browse" className="flex flex-col gap-4">
+                <SectionHeading
+                  id="home-browse"
+                  title="Browse programs"
+                  subtitle={enrollments.length > 0 ? "Programs you haven't started" : "Expert-led, across every school"}
+                  href="/dashboard/courses"
+                />
+                {loadingDiscover ? (
+                  <CourseGridSkeleton />
+                ) : browseCourses.length === 0 ? (
+                  <CardShell>
+                    <EmptyState
+                      illustration="noTransactions"
+                      title="No programs published yet"
+                      description="New programs appear here as instructors publish them."
+                    />
+                  </CardShell>
+                ) : (
+                  <CourseGrid>
+                    {recommended.map((course) => (
+                      <CourseCard
+                        key={course.id}
+                        href={`/dashboard/courses/${course.id}`}
+                        title={course.title}
+                        thumbnailUrl={course.thumbnailUrl}
+                        price={course.price}
+                        pricing={course.pricing}
+                        rating={course.rating}
+                        level={course.level}
+                        totalLessons={course.totalLessons}
+                        totalDuration={course.totalDuration}
+                        enrolledCount={course.enrolledCount}
+                        isBookmarked={bookmarkedIds.has(course.id)}
+                        onToggleBookmark={() => toggleBookmark.mutate(course.id)}
+                      />
+                    ))}
+                  </CourseGrid>
+                )}
+              </section>
+            </Rise>
+          )}
 
           {/* Bookmarks — only when there are any. */}
-          {(isLoadingBookmarks || bookmarks.length > 0) && (
-            <section>
-              <SectionHeader title="Bookmarks" href="/dashboard/bookmarks" />
-              {isLoadingBookmarks ? (
-                <CourseGrid>
-                  {[0, 1, 2].map((i) => (
-                    <CourseCardSkeleton key={i} />
-                  ))}
-                </CourseGrid>
-              ) : (
-                <CourseGrid>
-                  {bookmarks.slice(0, 3).map((bookmark) => (
-                    <CourseCard
-                      key={bookmark.id}
-                      href={`/dashboard/courses/${bookmark.courseId}`}
-                      title={bookmark.courseTitle}
-                      thumbnailUrl={bookmark.courseThumbnail}
-                      price={bookmark.price}
-                      pricing={bookmark.pricing}
-                      rating={bookmark.rating}
-                      level={bookmark.level}
-                      enrolledCount={bookmark.enrolledCount}
-                      isBookmarked
-                      onToggleBookmark={() => toggleBookmark.mutate(bookmark.courseId)}
-                    />
-                  ))}
-                </CourseGrid>
-              )}
-            </section>
+          {showBookmarks && (
+            <Rise delay={discoverDelay + 120}>
+              <section aria-labelledby="home-bookmarks" className="flex flex-col gap-4">
+                <SectionHeading id="home-bookmarks" title="Bookmarks" subtitle="Saved for later" href="/dashboard/bookmarks" />
+                {loadingBookmarks ? (
+                  <CourseGridSkeleton />
+                ) : (
+                  <CourseGrid>
+                    {bookmarks.slice(0, 3).map((bookmark) => (
+                      <CourseCard
+                        key={bookmark.id}
+                        href={`/dashboard/courses/${bookmark.courseId}`}
+                        title={bookmark.courseTitle}
+                        thumbnailUrl={bookmark.courseThumbnail}
+                        price={bookmark.price}
+                        pricing={bookmark.pricing}
+                        rating={bookmark.rating}
+                        level={bookmark.level}
+                        enrolledCount={bookmark.enrolledCount}
+                        isBookmarked
+                        onToggleBookmark={() => toggleBookmark.mutate(bookmark.courseId)}
+                      />
+                    ))}
+                  </CourseGrid>
+                )}
+              </section>
+            </Rise>
           )}
         </div>
       </div>

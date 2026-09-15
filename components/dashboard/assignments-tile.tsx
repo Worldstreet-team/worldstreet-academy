@@ -1,21 +1,24 @@
 "use client"
 
 import Link from "next/link"
-import { ClipboardCheckIcon } from "lucide-react"
-import { DashboardTile } from "@/components/dashboard/home-tiles"
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react"
+import { Award01Icon, Notebook01Icon, TaskDone01Icon } from "@hugeicons/core-free-icons"
+import { Chevron, DATA_CHIP, TILE_ROW, TILE_ROWS } from "@/components/dashboard/tile-bits"
+import { CardHeader, CardShell } from "@/components/ui/system"
 import type { MyAssessment } from "@/lib/actions/exams"
-import { formatDateTime } from "@/lib/dashboard-home"
+import { assessmentCounts, formatDateTime } from "@/lib/dashboard-home"
 import { useMyAssessments } from "@/lib/hooks/queries"
 import { cn } from "@/lib/utils"
 
+/** Status chip label + wash. Shared with /dashboard/assignments. Chips are washes with full-strength text (design-system 01). */
 export const ASSESSMENT_STATUS: Record<MyAssessment["status"], { label: string; className: string }> = {
-  not_started: { label: "Not started", className: "bg-ws-chip text-ws-muted" },
-  in_progress: { label: "In progress", className: "bg-ws-warning/10 text-ws-warning" },
-  passed: { label: "Passed", className: "bg-ws-success/10 text-ws-success" },
-  failed: { label: "Failed", className: "bg-ws-danger/10 text-ws-danger" },
-  locked: { label: "Finish lessons first", className: "bg-ws-chip text-ws-muted" },
-  submitted: { label: "Submitted", className: "bg-ws-chip text-ws-primary" },
-  graded: { label: "Graded", className: "bg-ws-success/10 text-ws-success" },
+  not_started: { label: "Not started", className: "bg-foreground/[0.06] text-muted-foreground" },
+  in_progress: { label: "In progress", className: "bg-warning-chip text-warning" },
+  passed: { label: "Passed", className: "bg-credit-chip text-credit" },
+  failed: { label: "Failed", className: "bg-debit-chip text-debit" },
+  locked: { label: "Finish lessons first", className: "bg-foreground/[0.06] text-muted-foreground" },
+  submitted: { label: "Submitted", className: "bg-foreground/[0.06] text-foreground" },
+  graded: { label: "Graded", className: "bg-credit-chip text-credit" },
 }
 
 /** "Final exam" · "Knowledge check" · "Assignment" (with its due date). */
@@ -25,8 +28,13 @@ export function assessmentKindLabel(assessment: MyAssessment): string {
   return assessment.dueAt ? `Assignment · due ${formatDateTime(assessment.dueAt)}` : "Assignment"
 }
 
-/** Nothing left for the student to do on these (a submitted assignment awaits the instructor). */
-const DONE: ReadonlySet<MyAssessment["status"]> = new Set(["passed", "submitted", "graded"])
+const KIND_ICON: Record<MyAssessment["scope"], IconSvgElement> = {
+  final: Award01Icon,
+  lesson: TaskDone01Icon,
+  assignment: Notebook01Icon,
+}
+
+const ROWS_SHOWN = 5
 
 /**
  * Spec §12 Assignments: the knowledge checks and final exams the student's
@@ -37,35 +45,47 @@ export function AssignmentsTile() {
   const { data: assessments = [] } = useMyAssessments()
   if (assessments.length === 0) return null
 
-  const done = assessments.filter((a) => DONE.has(a.status)).length
+  const { toDo, done } = assessmentCounts(assessments)
 
   return (
-    <DashboardTile
-      icon={ClipboardCheckIcon}
-      title="Assignments"
-      action={assessments.length > 4 ? { label: "View all", href: "/dashboard/assignments" } : undefined}
-    >
-      <p className="mb-3 text-[13px] text-ws-muted">
-        <span className="font-semibold tabular-nums text-ws-primary">{assessments.length - done}</span> to do ·{" "}
-        <span className="tabular-nums">{done}</span> done
-      </p>
-      <ul className="space-y-3">
-        {assessments.slice(0, 4).map((a) => (
-          <li key={`${a.scope}-${a.id}`}>
-            <Link href={a.href} className="flex items-center gap-3">
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[13px] font-medium text-ws-primary">{a.title}</span>
-                <span className="block truncate text-[11px] text-ws-muted">
-                  {assessmentKindLabel(a)} · {a.courseTitle}
-                </span>
+    <CardShell>
+      <CardHeader
+        title="Assignments"
+        subtitle={`${toDo} to do · ${done} done`}
+        link={{ label: "See all", href: "/dashboard/assignments" }}
+      />
+      <div className={TILE_ROWS}>
+        {assessments.slice(0, ROWS_SHOWN).map((a) => (
+          <Link key={`${a.scope}-${a.id}`} href={a.href} className={TILE_ROW}>
+            <span className={DATA_CHIP}>
+              <HugeiconsIcon icon={KIND_ICON[a.scope]} className="h-[18px] w-[18px] text-muted-foreground" aria-hidden />
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="truncate text-[14px] font-medium">{a.title}</span>
+              <span className="truncate text-[12.5px] text-muted-foreground">
+                {assessmentKindLabel(a)} · {a.courseTitle}
               </span>
-              <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold", ASSESSMENT_STATUS[a.status].className)}>
-                {ASSESSMENT_STATUS[a.status].label}
-              </span>
-            </Link>
-          </li>
+            </span>
+            <span
+              className={cn(
+                "shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                ASSESSMENT_STATUS[a.status].className
+              )}
+            >
+              {ASSESSMENT_STATUS[a.status].label}
+            </span>
+          </Link>
         ))}
-      </ul>
-    </DashboardTile>
+      </div>
+      {assessments.length > ROWS_SHOWN && (
+        <Link
+          href="/dashboard/assignments"
+          className="mt-auto flex items-center justify-between gap-3 border-t border-border/60 px-4 py-3 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:outline-none"
+        >
+          {assessments.length - ROWS_SHOWN} more
+          <Chevron />
+        </Link>
+      )}
+    </CardShell>
   )
 }

@@ -1,27 +1,30 @@
 "use client"
 
 import Link from "next/link"
-import Image from "next/image"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { ArrowRight01Icon, Bookmark01Icon, PlayIcon, StarIcon, Tick02Icon } from "@hugeicons/core-free-icons"
 import { levelChipStyle } from "@/components/shared/level-badge"
 import { AvailabilityCountdown } from "@/components/shared/availability-countdown"
-import { abbreviateCount } from "@/lib/utils"
-import { ArrowRightIcon, BookmarkIcon, CheckIcon, PlayIcon, StarIcon } from "lucide-react"
+import { PackageChip, ProgramCover, ProgressTrack } from "@/components/platform/program-bits"
+import { Skel } from "@/components/ui/system"
+import { abbreviateCount, cn } from "@/lib/utils"
 
 /**
  * Course card — the one card used across the platform (dashboard, bookmarks,
- * my-courses). Built to the Academy spec (05-screens) with the reference
- * screen's cover treatment:
+ * my-courses, instructor catalogue), on Design System v2:
  *
- * - Cover 2:1 with a bottom scrim (imagery rule: 35% dark when text sits on
- *   imagery) carrying the lessons·duration pill, so the busy photographic
- *   covers stop fighting the body copy.
- * - Body: title SemiBold 15 (2-line slot so grid rows align). No instructor
- *   caption and no lesson count — the catalogue has neither yet.
- * - Footer: enrolled → 4px brand progress rail + "N% complete" + gold action;
- *   browse → gold price, orange star (always #F97316 filled), level badge.
+ * - The v2 card: `card` fill, 20px corners, separated by fill in dark (the
+ *   border is transparent there) and by a hairline on paper. Hover lightens one
+ *   ladder step; never a scale, never a shadow.
+ * - Cover 2:1. A scrim only when text sits on the photograph (imagery rule);
+ *   a course with no photograph gets the branded cover, not a grey box.
+ * - Body: title SemiBold 15 in a two-line slot so grid rows align.
+ * - Footer: enrolled → 4px gold track + "N% complete"; browse → price in ink
+ *   (gold is never a data colour), orange filled star, level chip.
  *
- * Hover lightens one ladder step (`bg/surface` → `bg/raised`) — never scales,
- * never adds shadow, per the system's state conventions.
+ * Owner surfaces overlay a status chip top-left and a menu top-right
+ * (instructor-course-card.tsx), so both cover corners stay free of permanent
+ * chrome.
  */
 
 function formatDuration(totalMinutes: number): string {
@@ -32,7 +35,6 @@ function formatDuration(totalMinutes: number): string {
   if (m === 0) return `${h}h`
   return `${h}h ${m}m`
 }
-
 
 type CourseCardProps = {
   href: string
@@ -63,6 +65,9 @@ type CourseCardProps = {
   statusLabel?: string | null
 }
 
+const COVER_CHIP =
+  "absolute left-3 top-2.5 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em]"
+
 export function CourseCard({
   href,
   title,
@@ -92,50 +97,44 @@ export function CourseCard({
     showLessonCount && totalLessons ? `${totalLessons} lessons` : null,
     duration || null,
   ].filter(Boolean)
+  const textOnCover = coverMeta.length > 0 || isComplete
 
   return (
-    <Link href={href} className="group block h-full">
-      <article className="flex h-full flex-col overflow-hidden rounded-lg border border-ws-hairline bg-ws-surface transition-colors duration-[var(--ws-motion-fast)] group-hover:border-ws-muted/30 group-hover:bg-ws-raised">
+    <Link
+      href={href}
+      className="group block h-full rounded-[20px] outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+    >
+      <article className="flex h-full flex-col overflow-hidden rounded-[20px] border border-border bg-card transition-colors duration-[var(--ws-motion-fast)] group-hover:bg-accent dark:border-transparent">
         {/* Cover */}
-        <div className="relative aspect-[2/1] w-full overflow-hidden bg-ws-sunken">
-          {thumbnailUrl ? (
-            <Image
-              src={thumbnailUrl}
-              alt=""
-              fill
-              className="object-cover transition-[filter] duration-[var(--ws-motion-base)] group-hover:brightness-110"
-              sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
-            />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center bg-ws-raised">
-              <PlayIcon  size={24} className="text-ws-subtle" />
-            </div>
+        <div className="relative aspect-[2/1] w-full overflow-hidden">
+          <ProgramCover
+            src={thumbnailUrl}
+            sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
+            className="absolute inset-0"
+          />
+
+          {/* Scrim only under text — the imagery rule's 35% band, darker at the edge the text sits on */}
+          {textOnCover && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/60 via-black/35 to-transparent" />
           )}
 
-          {/* Bottom scrim so overlaid chips read against any photo */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/60 to-transparent" />
-
           {statusLabel ? (
-            <span className="absolute left-3 top-2.5 z-10 inline-flex items-center rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
-              {statusLabel}
-            </span>
+            <span className={cn(COVER_CHIP, "text-white")}>{statusLabel}</span>
           ) : comingSoonAt ? (
-            <span className="absolute left-3 top-2.5 z-10 inline-flex items-center rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ws-gold">
-              Not live yet
-            </span>
+            <span className={cn(COVER_CHIP, "text-primary")}>Not live yet</span>
           ) : null}
 
-          {/* Lessons · duration — the reference's cover pill */}
+          {/* Lessons · duration */}
           {coverMeta.length > 0 && (
-            <span className="absolute bottom-2.5 left-3 z-10 inline-flex items-center gap-1.5 text-[11px] font-medium tabular-nums text-white/90">
-              <PlayIcon  size={11} aria-hidden />
+            <span className="ws-icon-mono absolute bottom-2.5 left-3 inline-flex items-center gap-1.5 text-[11px] font-medium tabular-nums text-white/90">
+              <HugeiconsIcon icon={PlayIcon} className="h-3 w-3" aria-hidden />
               {coverMeta.join(" · ")}
             </span>
           )}
 
           {isComplete && (
-            <span className="absolute bottom-2.5 right-3 z-10 inline-flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-ws-success">
-              <CheckIcon  size={11} />
+            <span className="ws-icon-mono absolute bottom-2.5 right-3 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-white">
+              <HugeiconsIcon icon={Tick02Icon} className="h-3 w-3" aria-hidden />
               Completed
             </span>
           )}
@@ -150,15 +149,14 @@ export function CourseCard({
                 e.stopPropagation()
                 onToggleBookmark()
               }}
-              className="ws-touch-target absolute right-2.5 top-2.5 z-10 flex h-8 w-8 items-center justify-center rounded-sm bg-black/45 text-white opacity-90 transition-colors duration-[var(--ws-motion-fast)] hover:bg-black/70"
+              className="ws-touch-target ws-icon-mono absolute right-2.5 top-2.5 flex h-8 w-8 items-center justify-center rounded-full bg-black/45 text-white transition-colors duration-[var(--ws-motion-fast)] hover:bg-black/65 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
             >
-              <BookmarkIcon
-                
-                size={14}
+              <HugeiconsIcon
+                icon={Bookmark01Icon}
                 fill={isBookmarked ? "currentColor" : "none"}
-                className={`transition-colors duration-[var(--ws-motion-fast)] ${
-                  isBookmarked ? "text-ws-brand" : "text-white"
-                }`} />
+                className={cn("h-4 w-4", isBookmarked ? "text-primary" : "text-white")}
+                aria-hidden
+              />
             </button>
           )}
         </div>
@@ -166,91 +164,67 @@ export function CourseCard({
         {/* Body */}
         <div className="flex flex-1 flex-col p-4">
           {/* Fixed two-line slot so grid rows align regardless of title length */}
-          <h3 className="line-clamp-2 min-h-[2.6em] text-[15px] font-semibold leading-[1.3] text-ws-primary">
+          <h3 className="line-clamp-2 min-h-[2.6em] text-[15px] font-semibold leading-[1.3] text-foreground">
             {title}
           </h3>
 
-          {packageName && (
-            <span className="mt-2 inline-block max-w-full self-start truncate rounded-full bg-ws-chip px-2 py-0.5 text-[11px] font-medium text-ws-muted">
-              {packageName}
-            </span>
-          )}
+          {packageName && <PackageChip name={packageName} className="mt-2 self-start" />}
 
           {/* Footer */}
           <div className="mt-auto pt-4">
             {comingSoonAt ? (
-              <div className="flex items-center justify-between gap-2 border-t border-ws-hairline pt-3">
-                <span className="text-[12px] text-ws-muted">
+              <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
+                <span className="text-[12px] text-muted-foreground">
                   Starts in{" "}
                   <AvailabilityCountdown
                     availableAt={comingSoonAt}
                     variant="compact"
-                    className="font-semibold tabular-nums text-ws-primary"
+                    className="font-semibold tabular-nums text-foreground"
                   />
                 </span>
-                <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-ws-gold">
-                  View
-                  <ArrowRightIcon size={13} aria-hidden />
-                </span>
+                <FooterAction label="View" />
               </div>
             ) : statusLabel ? (
-              <div className="flex items-center justify-between gap-2 border-t border-ws-hairline pt-3">
-                <span className="text-[13px] tabular-nums text-ws-muted">
+              <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
+                <span className="text-[13px] tabular-nums text-muted-foreground">
                   {typeof progress === "number" ? `${progress}% complete` : ""}
                 </span>
-                <span className="inline-flex items-center gap-1 text-[13px] font-medium text-ws-muted">
-                  View
-                  <ArrowRightIcon size={13} aria-hidden />
-                </span>
+                <FooterAction label="View" muted />
               </div>
             ) : showProgress ? (
               <>
-                <div className="h-1 w-full overflow-hidden rounded-full bg-ws-track">
-                  <div
-                    className="h-full rounded-full bg-ws-brand transition-[width] duration-[var(--ws-motion-slow)]"
-                    style={{ width: `${Math.max(progress, 2)}%` }}
-                  />
-                </div>
+                <ProgressTrack value={progress} label={`${title} progress`} />
                 <div className="mt-2 flex items-baseline justify-between gap-2">
-                  <span className="text-[13px] tabular-nums text-ws-muted">
-                    {progress}% complete
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-ws-gold">
-                    {isComplete ? "Review" : progress === 0 ? "Start" : "Continue"}
-                    <ArrowRightIcon
-                      
-                      size={13}
-                      aria-hidden
-                      className="transition-transform duration-[var(--ws-motion-fast)] group-hover:translate-x-0.5" />
-                  </span>
+                  <span className="text-[13px] tabular-nums text-muted-foreground">{progress}% complete</span>
+                  <FooterAction label={isComplete ? "Review" : progress === 0 ? "Start" : "Continue"} />
                 </div>
               </>
             ) : (
-              <div className="flex items-center justify-between gap-2 border-t border-ws-hairline pt-3">
-                <div className="flex items-baseline gap-3">
-                  <span className="text-[13px] font-semibold tabular-nums text-ws-gold">
+              <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
+                <div className="flex min-w-0 items-baseline gap-3">
+                  <span className="text-[13px] font-semibold tabular-nums text-foreground">
                     {/* USD prices always carry 2 decimals (02-typography). */}
-                    {pricing === "free" ? "Free" : price != null ? `$${price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ""}
+                    {pricing === "free"
+                      ? "Free"
+                      : price != null
+                        ? `$${price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                        : ""}
                   </span>
                   {rating ? (
                     <span className="inline-flex items-center gap-1">
-                      <StarIcon
-                        
-                        size={12}
-                        fill="currentColor"
-                        className="text-ws-rating" />
-                      <span className="text-[13px] tabular-nums text-ws-muted">{rating}</span>
+                      <HugeiconsIcon icon={StarIcon} fill="currentColor" className="h-3 w-3 text-ws-rating" aria-hidden />
+                      <span className="text-[13px] tabular-nums text-muted-foreground">{rating}</span>
                     </span>
                   ) : null}
                   {enrolledCount ? (
-                    <span className="hidden text-[11px] tabular-nums text-ws-subtle sm:inline">
+                    <span className="hidden text-[11px] tabular-nums text-subtle sm:inline">
                       {abbreviateCount(enrolledCount)} enrolled
                     </span>
                   ) : null}
                 </div>
                 {level && (
                   <span
-                    className="rounded-sm px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.05em]"
+                    className="shrink-0 rounded-sm px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.05em]"
                     style={levelChipStyle(level)}
                   >
                     {level}
@@ -265,19 +239,38 @@ export function CourseCard({
   )
 }
 
-/** Matching skeleton — `bg/raised` blocks mirroring the real geometry. */
+/** The footer's verb. Ink, not gold: a grid of gold "Continue"s would outshout the page's one primary CTA. */
+function FooterAction({ label, muted = false }: { label: string; muted?: boolean }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1 text-[13px]",
+        muted ? "font-medium text-muted-foreground" : "font-semibold text-foreground"
+      )}
+    >
+      {label}
+      <HugeiconsIcon
+        icon={ArrowRight01Icon}
+        className="h-3.5 w-3.5 transition-transform duration-[var(--ws-motion-fast)] group-hover:translate-x-0.5"
+        aria-hidden
+      />
+    </span>
+  )
+}
+
+/** Matching skeleton — neutral blocks mirroring the real geometry. */
 export function CourseCardSkeleton() {
   return (
-    <div className="overflow-hidden rounded-lg border border-ws-hairline bg-ws-surface">
-      <div className="aspect-[2/1] w-full animate-pulse bg-ws-raised" />
+    <div aria-hidden className="overflow-hidden rounded-[20px] border border-border bg-card dark:border-transparent">
+      <Skel className="aspect-[2/1] w-full rounded-none" />
       <div className="p-4">
-        <div className="h-4 w-4/5 animate-pulse rounded-xs bg-ws-raised" />
-        <div className="mt-2 h-4 w-2/5 animate-pulse rounded-xs bg-ws-raised" />
-        <div className="mt-3 flex items-center gap-2">
-          <div className="h-6 w-6 animate-pulse rounded-full bg-ws-raised" />
-          <div className="h-3 w-24 animate-pulse rounded-xs bg-ws-raised" />
+        <Skel className="h-4 w-4/5" />
+        <Skel className="mt-2 h-4 w-2/5" />
+        <Skel className="mt-6 h-1 w-full rounded-full" />
+        <div className="mt-2.5 flex items-center justify-between">
+          <Skel className="h-3 w-24" />
+          <Skel className="h-3 w-14" />
         </div>
-        <div className="mt-4 h-1 w-full animate-pulse rounded-full bg-ws-raised" />
       </div>
     </div>
   )
