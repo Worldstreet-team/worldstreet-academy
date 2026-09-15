@@ -6,7 +6,13 @@ import { Course, Enrollment, Bookmark, User, Lesson, type ICoursePackage, type I
 import { getCurrentUser } from "@/lib/auth"
 import { isSchoolSlug, type SchoolSlug } from "@/lib/schools"
 import { FULL_ACCESS, PACKAGE_RANK, canAccessLesson, effectiveLessonTier, entitlementsFor } from "@/lib/entitlements"
-import { getCourseAccess, lockedLessonIds, openPublishedLessonIds } from "@/lib/course-access"
+import {
+  getCourseAccess,
+  lockedLessonIds,
+  openPublishedLessonIds,
+  courseAccessFromRows,
+  openPublishedLessonIdsFromRows,
+} from "@/lib/course-access"
 import { saveWithCertificateId } from "@/lib/certificate-id"
 import { isCountryCode } from "@/lib/countries"
 import { FACULTY_ROLES, isFacultyRole, safeWebUrl } from "@/lib/faculty"
@@ -694,7 +700,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
     const enrollments = await Enrollment.find({ user: user._id })
       .populate({
         path: "course",
-        select: "title thumbnailUrl instructor totalLessons availableAt status packages",
+        select: "slug title thumbnailUrl instructor totalLessons availableAt status packages",
         populate: {
           path: "instructor",
           select: "firstName lastName avatarUrl instructorProfile.headline",
@@ -705,6 +711,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
 
     type PopulatedCourse = {
       _id: { toString(): string }
+      slug: string
       title: string
       thumbnailUrl: string
       totalLessons?: number
@@ -733,52 +740,60 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
       else lessonsByCourse.set(key, [lesson])
     }
 
-    return await Promise.all(
-      enrollments.map(async (enrollment) => {
-        const course = enrollment.course as unknown as PopulatedCourse
-        const courseId = course._id.toString()
-        const courseLessons = lessonsByCourse.get(courseId) ?? []
-        const firstLesson = courseLessons[0]
-        const packages = course.packages ?? []
-        const packageKey = enrollment.packageKey ?? null
-        const resumeLessonId =
-          enrollment.lastAccessedLesson?.toString() ?? firstLesson?._id.toString() ?? null
+    return enrollments.map((enrollment) => {
+      const course = enrollment.course as unknown as PopulatedCourse
+      const courseId = course._id.toString()
+      const courseLessons = lessonsByCourse.get(courseId) ?? []
+      const firstLesson = courseLessons[0]
+      const packages = course.packages ?? []
+      const packageKey = enrollment.packageKey ?? null
+      const resumeLessonId =
+        enrollment.lastAccessedLesson?.toString() ?? firstLesson?._id.toString() ?? null
 
-        // openLessons is `openPublishedLessonIds`'s own set (docs/go-patches-phase-3.md
-        // R3) — published lessons the package opens. `getCourseAccess` reads null for a
-        // non-access-granting status (pre_enrolled/expired/refunded/suspended/cancelled)
-        // or for course staff; either way there's no per-enrollment access record to
-        // size the set from, so fall back to the course's own published lesson count.
-        const access = await getCourseAccess(user._id.toString(), courseId)
-        const openLessons = access
-          ? (await openPublishedLessonIds(access)).size
-          : courseLessons.filter((l) => l.isPublished).length
-
-        return {
-          id: enrollment._id.toString(),
-          courseId,
-          courseTitle: course.title,
-          courseThumbnail: course.thumbnailUrl,
-          instructorName: `${course.instructor.firstName} ${course.instructor.lastName}`,
-          instructorAvatarUrl: course.instructor.avatarUrl,
-          progress: enrollment.progress,
-          totalLessons: course.totalLessons || 0,
-          lastAccessedAt: enrollment.lastAccessedAt?.toISOString() || new Date().toISOString(),
-          status: enrollment.status,
-          courseAvailableAt: course.availableAt ? new Date(course.availableAt).toISOString() : null,
-          firstLessonId: firstLesson?._id.toString() || null,
-          resumeLessonId,
-          resumeLessonTitle: courseLessons.find((l) => l._id.toString() === resumeLessonId)?.title ?? null,
-          packageKey,
-          packageName: enrollment.packageName ?? null,
-          instructorId: course.instructor._id.toString(),
-          instructorHeadline: course.instructor.instructorProfile?.headline || null,
-          entitlements: entitlementsFor({ packages }, { packageKey }),
-          explicitPackage: packageKey !== null && packages.some((p) => p.key === packageKey),
-          openLessons,
-        }
+      // openLessons is `openPublishedLessonIds`'s own set (docs/go-patches-phase-3.md
+      // R3) — published lessons the package opens, computed in memory from the
+      // enrollment/course/lessons already loaded above via the same pure rules
+      // `getCourseAccess`/`openPublishedLessonIds` run against the DB
+      // (`courseAccessFromRows` / `openPublishedLessonIdsFromRows` in
+      // lib/course-access.ts — the one implementation of the rule). That helper
+      // reads null for a non-access-granting status
+      // (pre_enrolled/expired/refunded/suspended/cancelled) or for course staff;
+      // either way there's no per-enrollment access record to size the set
+      // from, so fall back to the course's own published lesson count.
+      const access = courseAccessFromRows(enrollment, {
+        _id: course._id,
+        slug: course.slug,
+        instructor: course.instructor._id,
+        packages,
       })
-    )
+      const openLessons = access
+        ? openPublishedLessonIdsFromRows(access, courseLessons).size
+        : courseLessons.filter((l) => l.isPublished).length
+
+      return {
+        id: enrollment._id.toString(),
+        courseId,
+        courseTitle: course.title,
+        courseThumbnail: course.thumbnailUrl,
+        instructorName: `${course.instructor.firstName} ${course.instructor.lastName}`,
+        instructorAvatarUrl: course.instructor.avatarUrl,
+        progress: enrollment.progress,
+        totalLessons: course.totalLessons || 0,
+        lastAccessedAt: enrollment.lastAccessedAt?.toISOString() || new Date().toISOString(),
+        status: enrollment.status,
+        courseAvailableAt: course.availableAt ? new Date(course.availableAt).toISOString() : null,
+        firstLessonId: firstLesson?._id.toString() || null,
+        resumeLessonId,
+        resumeLessonTitle: courseLessons.find((l) => l._id.toString() === resumeLessonId)?.title ?? null,
+        packageKey,
+        packageName: enrollment.packageName ?? null,
+        instructorId: course.instructor._id.toString(),
+        instructorHeadline: course.instructor.instructorProfile?.headline || null,
+        entitlements: entitlementsFor({ packages }, { packageKey }),
+        explicitPackage: packageKey !== null && packages.some((p) => p.key === packageKey),
+        openLessons,
+      }
+    })
   } catch (error) {
     console.error("Fetch my enrollments error:", error)
     return []

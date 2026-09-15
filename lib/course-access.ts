@@ -29,16 +29,36 @@ export type CourseAccess = {
   course: { id: string; slug: string; instructorId: string; packages: ICoursePackage[] }
 }
 
-export async function getCourseAccess(userId: string, courseId: string): Promise<CourseAccess | null> {
-  if (!mongoose.isValidObjectId(userId) || !mongoose.isValidObjectId(courseId)) return null
-  await connectDB()
-  const [enrollment, course] = await Promise.all([
-    Enrollment.findOne({ user: userId, course: courseId, status: { $in: ["active", "completed"] } })
-      .select("_id packageKey packageName")
-      .lean(),
-    Course.findById(courseId).select("slug instructor packages").lean(),
-  ])
-  if (!enrollment || !course) return null
+/** Enrollment statuses `getCourseAccess` reads as access-granting (its own `$in` filter). */
+const ACCESS_GRANTING_STATUSES: ReadonlySet<string> = new Set(["active", "completed"])
+
+type EnrollmentAccessRow = {
+  _id: { toString(): string } | string
+  status: string
+  packageKey?: PackageKey | null
+  packageName?: string | null
+}
+
+type CourseAccessRow = {
+  _id: { toString(): string } | string
+  slug: string
+  instructor: { toString(): string } | string
+  packages?: ICoursePackage[] | null
+}
+
+/**
+ * Pure core of `getCourseAccess` — builds the same `CourseAccess` shape from
+ * an already-loaded enrollment + course pair, with no DB read. A caller that
+ * already has both rows (e.g. from a populate) should use this instead of
+ * re-reading them. Mirrors `getCourseAccess`'s own `status: { $in: [...] }`
+ * filter: an enrollment whose status isn't access-granting reads as null here
+ * too, same as course staff (no enrollment) reading as null there.
+ */
+export function courseAccessFromRows(
+  enrollment: EnrollmentAccessRow,
+  course: CourseAccessRow
+): CourseAccess | null {
+  if (!ACCESS_GRANTING_STATUSES.has(enrollment.status)) return null
   const packages = course.packages ?? []
   const packageKey = enrollment.packageKey ?? null
   return {
@@ -53,6 +73,19 @@ export async function getCourseAccess(userId: string, courseId: string): Promise
       packages,
     },
   }
+}
+
+export async function getCourseAccess(userId: string, courseId: string): Promise<CourseAccess | null> {
+  if (!mongoose.isValidObjectId(userId) || !mongoose.isValidObjectId(courseId)) return null
+  await connectDB()
+  const [enrollment, course] = await Promise.all([
+    Enrollment.findOne({ user: userId, course: courseId, status: { $in: ["active", "completed"] } })
+      .select("_id status packageKey packageName")
+      .lean(),
+    Course.findById(courseId).select("slug instructor packages").lean(),
+  ])
+  if (!enrollment || !course) return null
+  return courseAccessFromRows(enrollment, course)
 }
 
 /**
@@ -87,13 +120,20 @@ export async function instructorQaRefusal(
   return includesQa ? null : "Instructor Q&A isn't included in your package"
 }
 
+type LessonAccessRow = {
+  _id: { toString(): string } | string
+  minPackageKey?: PackageKey | null
+  isFree?: boolean
+  isPublished?: boolean
+}
+
 /**
- * Ids of the course's lessons this enrollment's package can't open. Empty when
- * there is no access-granting enrollment (other gates decide) or nothing is tiered.
+ * Pure core of `lockedLessonIds` — filters an already-loaded lesson list
+ * (course-wide, published or not) instead of reading it. Empty when there is
+ * no access-granting enrollment (other gates decide) or nothing is tiered.
  */
-export async function lockedLessonIds(access: CourseAccess | null): Promise<Set<string>> {
+export function lockedLessonIdsFromRows(access: CourseAccess | null, lessons: LessonAccessRow[]): Set<string> {
   if (!access) return new Set()
-  const lessons = await Lesson.find({ course: access.course.id }).select("_id minPackageKey isFree").lean()
   return new Set(
     lessons
       .filter((lesson) => !canAccessLesson(access.course, lesson, access))
@@ -102,15 +142,39 @@ export async function lockedLessonIds(access: CourseAccess | null): Promise<Set<
 }
 
 /**
+ * Ids of the course's lessons this enrollment's package can't open. Empty when
+ * there is no access-granting enrollment (other gates decide) or nothing is tiered.
+ */
+export async function lockedLessonIds(access: CourseAccess | null): Promise<Set<string>> {
+  if (!access) return new Set()
+  const lessons = await Lesson.find({ course: access.course.id }).select("_id minPackageKey isFree").lean()
+  return lockedLessonIdsFromRows(access, lessons)
+}
+
+/**
+ * Pure core of `openPublishedLessonIds` — filters an already-loaded
+ * course-wide lesson list instead of reading it (twice). Unpublished rows
+ * only feed `lockedLessonIdsFromRows`; they never contribute to the result.
+ */
+export function openPublishedLessonIdsFromRows(access: CourseAccess, lessons: LessonAccessRow[]): Set<string> {
+  const locked = lockedLessonIdsFromRows(access, lessons)
+  return new Set(
+    lessons
+      .filter((lesson) => lesson.isPublished)
+      .map((lesson) => lesson._id.toString())
+      .filter((id) => !locked.has(id))
+  )
+}
+
+/**
  * Ids of the course's PUBLISHED lessons this enrollment's package opens — the
  * progress and completion denominator (the same set `completeLesson` counts).
  */
 export async function openPublishedLessonIds(access: CourseAccess): Promise<Set<string>> {
-  const [locked, published] = await Promise.all([
-    lockedLessonIds(access),
-    Lesson.find({ course: access.course.id, isPublished: true }).select("_id").lean(),
-  ])
-  return new Set(published.map((lesson) => lesson._id.toString()).filter((id) => !locked.has(id)))
+  const lessons = await Lesson.find({ course: access.course.id })
+    .select("_id minPackageKey isFree isPublished")
+    .lean()
+  return openPublishedLessonIdsFromRows(access, lessons)
 }
 
 /** True only when the user is enrolled on the lesson's course and their package can't open it. */
