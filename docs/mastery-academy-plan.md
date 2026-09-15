@@ -190,11 +190,11 @@ Brand: "WorldStreet Academy" appears in 43 code locations; the lockup (mark + "W
 - Emails: `lib/email.tsx` preview renders with the new FROM.
 
 ### Exit criteria (report these)
-- [ ] One `BrandLockup` component; zero inline lockups; zero "WorldStreet Academy" strings outside comments/docs.
-- [ ] `Course.school`, `Course.packages`, `Lesson.minPackageKey`, `Enrollment.packageKey/packageName`, `Order.packageKey` exist with defaults; existing rows unaffected.
-- [ ] `lib/schools.ts`, `lib/entitlements.ts`, `lib/brand.ts` exist and are the only sources of those facts.
-- [ ] Editor saves a school; the save action accepts `packages` and derives `price` from them (the packages UI itself is Phase 2.3).
-- [ ] `scripts/mastery-catalogue.mjs` dry-runs clean and seeds the mock DB.
+- [x] One `BrandLockup` component; zero inline lockups; zero "WorldStreet Academy" strings outside comments/docs.
+- [x] `Course.school`, `Course.packages`, `Lesson.minPackageKey`, `Enrollment.packageKey/packageName`, `Order.packageKey` exist with defaults; existing rows unaffected.
+- [x] `lib/schools.ts`, `lib/entitlements.ts`, `lib/brand.ts` exist and are the only sources of those facts.
+- [x] Editor saves a school; the save action accepts `packages` and derives `price` from them (the packages UI itself is Phase 2.3).
+- [x] `scripts/mastery-catalogue.mjs` dry-runs clean and seeds the mock DB.
 
 ---
 
