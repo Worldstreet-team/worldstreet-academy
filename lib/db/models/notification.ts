@@ -22,6 +22,8 @@ export interface INotification extends Document {
   body: string
   /** In-app destination, e.g. /dashboard/become-instructor */
   href: string | null
+  /** The program this is about — the hub groups and labels course activity by it. */
+  course: Types.ObjectId | null
   readAt: Date | null
   meta: Record<string, unknown>
   createdAt: Date
@@ -39,6 +41,7 @@ const NotificationSchema = new Schema<INotification>(
     title: { type: String, required: true, maxlength: 120 },
     body: { type: String, required: true, maxlength: 500 },
     href: { type: String, default: null },
+    course: { type: Schema.Types.ObjectId, ref: "Course", default: null },
     readAt: { type: Date, default: null },
     meta: { type: Schema.Types.Mixed, default: {} },
   },

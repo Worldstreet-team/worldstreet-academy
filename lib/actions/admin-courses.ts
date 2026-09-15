@@ -138,6 +138,7 @@ export async function adminSetCourseStatus(
       title: titleByStatus[status],
       body: `"${course.title}" — updated by an administrator.`,
       href: `/instructor/courses/${course._id.toString()}`,
+      courseId: course._id.toString(),
     })
 
     revalidatePath("/admin/courses")

@@ -450,7 +450,7 @@ export async function purchaseCourse(input: { courseId: string; packageKey?: Pac
         title: `New ${pkg.name} enrollment`,
         body: `${buyer} enrolled in ${course.title} — schedule their onboarding.`,
       }
-      void notifyUser(course.instructor.toString(), { ...note, href: `/instructor/courses/${courseId}` })
+      void notifyUser(course.instructor.toString(), { ...note, href: `/instructor/courses/${courseId}`, courseId: String(courseId) })
       void notifyAdmins({ ...note, href: `/admin/enrollments?course=${courseId}` })
     }
 
@@ -968,6 +968,7 @@ export async function submitMentorshipIntake(
       title: "Executive intake received",
       body: `${buyer}: ${parsed.data.goals}`.slice(0, 500),
       href: `/instructor/courses/${courseId}`,
+      courseId: String(courseId),
     })
 
     revalidatePath("/dashboard/checkout/success")

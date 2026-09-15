@@ -3,10 +3,11 @@
 import { revalidatePath } from "next/cache"
 import { z } from "zod/v4"
 import connectDB from "@/lib/db"
-import { Assignment, Course, Submission, User } from "@/lib/db/models"
+import { Assignment, Course, Enrollment, Submission, User } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth/actions"
-import { notifyUser } from "@/lib/notify"
+import { notifyUser, notifyUsers } from "@/lib/notify"
 import { getCourseAccess } from "@/lib/course-access"
+import { entitlementsFor } from "@/lib/entitlements"
 import {
   generatePresignedDownloadUrl,
   generatePresignedUploadUrl,
@@ -170,17 +171,24 @@ export async function saveAssignment(input: {
     }
 
     let assignmentId: string
+    let wasPublished = false
     if (parsed.data.assignmentId) {
-      const updated = await Assignment.findOneAndUpdate(
+      // The version before this save: only a draft → published change is news to students.
+      const previous = await Assignment.findOneAndUpdate(
         { _id: parsed.data.assignmentId, course: parsed.data.courseId },
         { $set: fields },
-        { new: true }
+        { new: false }
       )
-      if (!updated) return { success: false, error: "Assignment not found" }
-      assignmentId = updated._id.toString()
+      if (!previous) return { success: false, error: "Assignment not found" }
+      assignmentId = previous._id.toString()
+      wasPublished = previous.status === "published"
     } else {
       const created = await Assignment.create({ course: parsed.data.courseId, instructor: course.instructor, ...fields })
       assignmentId = created._id.toString()
+    }
+
+    if (fields.status === "published" && !wasPublished) {
+      void announceAssignment(parsed.data.courseId, assignmentId, parsed.data.title, dueAt)
     }
 
     revalidatePath(`/instructor/courses/${parsed.data.courseId}/assignments`)
@@ -189,6 +197,32 @@ export async function saveAssignment(input: {
   } catch (error) {
     console.error("Save assignment error:", error)
     return { success: false, error: "Couldn't save the assignment — try again" }
+  }
+}
+
+/** Tell the course's active students whose package includes assignments that a new one is open. */
+async function announceAssignment(courseId: string, assignmentId: string, title: string, dueAt: Date | null) {
+  try {
+    const [course, enrollments] = await Promise.all([
+      Course.findById(courseId).select("title packages status").lean(),
+      Enrollment.find({ course: courseId, status: "active" }).select("user packageKey").lean(),
+    ])
+    if (!course || course.status !== "published") return
+    const recipients = enrollments
+      .filter((e) => entitlementsFor(course, e).assignments)
+      .map((e) => e.user.toString())
+    const due = dueAt
+      ? ` · due ${dueAt.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}`
+      : ""
+    await notifyUsers(recipients, {
+      type: "course",
+      title: `New assignment: ${title}`.slice(0, 120),
+      body: `${course.title}${due}`.slice(0, 500),
+      href: `/dashboard/assignments/${assignmentId}`,
+      courseId,
+    })
+  } catch (error) {
+    console.error("Announce assignment error:", error)
   }
 }
 
@@ -256,6 +290,7 @@ export async function gradeSubmission(input: {
       title: "Assignment graded",
       body: `${assignment?.title ?? "Your assignment"} (${course.title}): ${parsed.data.grade}/100.`.slice(0, 500),
       href: `/dashboard/assignments/${assignmentId}`,
+      courseId: submission.course.toString(),
     })
 
     revalidatePath(`/instructor/courses/${submission.course.toString()}/assignments`)
@@ -555,6 +590,7 @@ export async function submitAssignment(input: {
       title: "New assignment submission",
       body: `${fullName(user, "A student")} submitted ${gate.assignment.title}.`.slice(0, 500),
       href: `/instructor/courses/${gate.assignment.course.toString()}/assignments`,
+      courseId: gate.assignment.course.toString(),
     })
 
     revalidatePath(`/dashboard/assignments/${parsed.data.assignmentId}`)

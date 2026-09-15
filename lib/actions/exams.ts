@@ -962,6 +962,7 @@ export async function submitExamAttempt(
           href: isFinal
             ? `/dashboard/courses/${exam.course.toString()}/certificate`
             : `/dashboard/courses/${exam.course.toString()}`,
+          courseId: exam.course.toString(),
         })
       }
 

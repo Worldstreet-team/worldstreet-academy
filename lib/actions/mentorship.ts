@@ -284,6 +284,7 @@ export async function requestMentorshipSession(input: {
       title: "Mentorship session requested",
       body: `${studentName} (${courseTitle}) proposed: ${proposed}.`.slice(0, 500),
       href: INSTRUCTOR_PATH,
+      courseId: access.course.id,
     })
     if (mailable(instructor?.email)) {
       void sendMentorshipEmail(instructor.email, {
@@ -383,6 +384,7 @@ export async function cancelMentorshipSession(
       title,
       body: body.slice(0, 500),
       href,
+      courseId: session.course.toString(),
     })
     if (mailable(counterpart?.email)) {
       void sendMentorshipEmail(counterpart.email, {
@@ -605,6 +607,7 @@ export async function confirmMentorshipSession(
       title: "Mentorship session confirmed",
       body: `${hostName} confirmed ${formatUtcDateTime(scheduledAt)} for ${courseTitle}.`,
       href: STUDENT_PATH,
+      courseId: claimed.course.toString(),
     })
     if (mailable(student.email)) {
       void sendMentorshipEmail(student.email, {
@@ -665,6 +668,7 @@ export async function saveMentorRoadmap(
         title: "Your roadmap was updated",
         body: `${fullName(user, "Your mentor")} updated your personal roadmap for ${course.title}.`,
         href: STUDENT_PATH,
+        courseId: enrollment.course.toString(),
       })
     }
 

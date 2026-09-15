@@ -85,6 +85,7 @@ export async function POST(request: NextRequest) {
         title: "Your course is now live",
         body: `"${course.title}" just went live — your seat is reserved.`,
         href: `/dashboard/courses/${course._id.toString()}`,
+        courseId: course._id.toString(),
       })
     }
   }

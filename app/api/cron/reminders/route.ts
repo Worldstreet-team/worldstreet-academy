@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
           const recipientId = recipient._id.toString()
           const isHost = recipientId === hostId
           const href = isHost ? HOST_CLASS_PATH : joinPath
-          jobs.push(notifyUser(recipientId, { type: "meeting", title, body: bodyLine, href }))
+          jobs.push(notifyUser(recipientId, { type: "meeting", title, body: bodyLine, href, courseId: session ? session.course.toString() : undefined }))
           if (recipient.email && !recipient.email.endsWith("@users.noemail")) {
             jobs.push(
               sendMentorshipEmail(recipient.email, {
@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
           const recipientId = recipient._id.toString()
           const isHost = recipientId === hostId
           const href = isHost ? HOST_CLASS_PATH : joinPath
-          jobs.push(notifyUser(recipientId, { type: "meeting", title, body: bodyLine, href }))
+          jobs.push(notifyUser(recipientId, { type: "meeting", title, body: bodyLine, href, courseId: String(meeting.courseId) }))
           if (recipient.email && !recipient.email.endsWith("@users.noemail")) {
             jobs.push(
               sendClassReminderEmail(recipient.email, {

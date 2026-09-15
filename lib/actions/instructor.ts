@@ -5,12 +5,13 @@ import { redirect } from "next/navigation"
 import type mongoose from "mongoose"
 import { z } from "zod/v4"
 import connectDB from "@/lib/db"
-import { Course, Lesson, User, ICourse, type ICoursePackage, type PackageKey } from "@/lib/db/models"
+import { Enrollment, Course, Lesson, User, ICourse, type ICoursePackage, type PackageKey } from "@/lib/db/models"
+import { notifyUsers } from "@/lib/notify"
 import { uploadThumbnail, deleteFromCloudinary } from "@/lib/cloudinary"
 import type { CourseLevel, CoursePricing, CourseStatus } from "@/lib/types"
 import { getCurrentUser } from "@/lib/auth"
 import { SCHOOL_BY_SLUG, isSchoolSlug, type SchoolSlug } from "@/lib/schools"
-import { PACKAGE_LABEL, isPackageKey, pricingFromPackages } from "@/lib/entitlements"
+import { canAccessLesson, PACKAGE_LABEL, isPackageKey, pricingFromPackages } from "@/lib/entitlements"
 
 const PackageSchema = z.object({
   key: z.enum(["basic", "standard", "executive"]),
@@ -528,11 +529,18 @@ export async function updateCourse(
         console.log("[Update Course] Parsed lessons:", lessons)
         if (Array.isArray(lessons)) {
           // Delete existing lessons and recreate (simple approach)
+          // Lesson titles students could already see on a live course — anything
+          // published beyond them is news (a renamed lesson counts as new).
+          const announcedBefore =
+            existingCourse.status === "published"
+              ? new Set((await Lesson.find({ course: courseId, isPublished: true }).select("title").lean()).map((l) => l.title))
+              : null
+          let freshLessons: FreshLesson[] = []
           await Lesson.deleteMany({ course: courseId })
           
           if (lessons.length > 0) {
             const sold = soldTierKeys(packages ?? existingCourse.packages)
-            await Lesson.insertMany(
+            const created = await Lesson.insertMany(
               lessons.map((l: { tempId?: string; title: string; description?: string; type?: string; thumbnailUrl?: string; videoUrl?: string; content?: string; duration?: string; isFree?: boolean; minPackageKey?: string | null }, idx: number) => ({
                 course: courseId,
                 title: l.title,
@@ -548,6 +556,9 @@ export async function updateCourse(
                 isPublished: status === "published",
               }))
             )
+            if (announcedBefore && status === "published") {
+              freshLessons = created.filter((l) => l.isPublished && !announcedBefore.has(l.title))
+            }
           }
 
           // Calculate total duration in minutes
@@ -558,6 +569,10 @@ export async function updateCourse(
             totalLessons: lessons.length,
             totalDuration: Math.ceil(totalDurationSecs / 60),
           })
+
+          if (freshLessons.length > 0) {
+            void announceLessons(courseId, title, packages ?? existingCourse.packages, freshLessons)
+          }
         } else {
           console.log("[Update Course] Lessons is not an array")
         }
@@ -578,6 +593,52 @@ export async function updateCourse(
   }
 
   redirect(editorReturnPath(formData))
+}
+
+type FreshLesson = { _id: { toString(): string }; title: string } & Parameters<typeof canAccessLesson>[1]
+
+/**
+ * Tell the students who can open them that lessons were just published on a
+ * live course. Students are grouped by exactly which new lessons their package
+ * opens, so nobody is told about a lesson that is locked for them.
+ */
+async function announceLessons(
+  courseId: string,
+  courseTitle: string,
+  packages: Parameters<typeof canAccessLesson>[0]["packages"],
+  fresh: FreshLesson[]
+) {
+  try {
+    const enrollments = await Enrollment.find({ course: courseId, status: { $in: ["active", "completed"] } })
+      .select("user packageKey")
+      .lean()
+    const groups = new Map<string, { lessons: FreshLesson[]; users: string[] }>()
+    for (const enrollment of enrollments) {
+      const open = fresh.filter((lesson) => canAccessLesson({ packages }, lesson, enrollment))
+      if (open.length === 0) continue
+      const key = open.map((lesson) => lesson._id.toString()).join(",")
+      const group = groups.get(key) ?? { lessons: open, users: [] }
+      group.users.push(enrollment.user.toString())
+      groups.set(key, group)
+    }
+    await Promise.all(
+      [...groups.values()].map(({ lessons, users }) => {
+        const one = lessons.length === 1
+        return notifyUsers(users, {
+          type: "course",
+          title: (one ? `New lesson: ${lessons[0].title}` : `${lessons.length} new lessons in ${courseTitle}`).slice(0, 120),
+          body: (one
+            ? `Now available in ${courseTitle}.`
+            : lessons.slice(0, 3).map((lesson) => lesson.title).join(" · ") + (lessons.length > 3 ? " · …" : "")
+          ).slice(0, 500),
+          href: one ? `/dashboard/courses/${courseId}/learn/${lessons[0]._id.toString()}` : `/dashboard/courses/${courseId}`,
+          courseId,
+        })
+      })
+    )
+  } catch (error) {
+    console.error("Announce lessons error:", error)
+  }
 }
 
 // ---- Delete Course ----
