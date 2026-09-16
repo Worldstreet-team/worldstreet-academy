@@ -3,6 +3,7 @@ import { CardHeader, CardShell, PageHeader, Rise } from "@/components/ui/system"
 import { FaqList, type Faq } from "@/components/help/faq-list"
 import { QuickLinks, type QuickLink } from "@/components/help/quick-links"
 import { SupportContact } from "@/components/help/support-contact"
+import { TOUR_REPLAY_HREF } from "@/lib/dashboard-tour"
 
 /**
  * FAQ content is intentionally scoped to how the Academy actually works —
@@ -48,6 +49,12 @@ const faqs: Faq[] = [
 ]
 
 const quickLinks: QuickLink[] = [
+  {
+    title: "Take the tour",
+    description: "A thirty-second walk through the dashboard.",
+    href: TOUR_REPLAY_HREF,
+    icon: "tour",
+  },
   {
     title: "Wallet",
     description: "Balance, top-ups and transactions.",

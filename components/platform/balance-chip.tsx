@@ -49,7 +49,7 @@ export function BalanceChip() {
   const masked = `$${"•".repeat(Math.max(formatted.length - 1, 4))}`
 
   return (
-    <div className="hidden h-10 shrink-0 items-center rounded-full bg-surface-sunken pr-1 ring-1 ring-border/70 transition-colors duration-[var(--ws-motion-fast)] focus-within:ring-2 focus-within:ring-primary/40 hover:bg-accent lg:inline-flex">
+    <div data-tour="wallet-chip" className="hidden h-10 shrink-0 items-center rounded-full bg-surface-sunken pr-1 ring-1 ring-border/70 transition-colors duration-[var(--ws-motion-fast)] focus-within:ring-2 focus-within:ring-primary/40 hover:bg-accent lg:inline-flex">
       <Link
         href="/dashboard/wallet"
         aria-label={`Wallet balance ${hidden ? "hidden" : formatted}. Open wallet.`}

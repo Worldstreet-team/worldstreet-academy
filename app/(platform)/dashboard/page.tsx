@@ -53,9 +53,22 @@ import { useNow } from "@/lib/hooks/use-now"
  */
 
 /** Section heading outside a card: Poppins 20, with a quiet "See all". Gold on this page belongs to the hero's CTA. */
-function SectionHeading({ id, title, subtitle, href }: { id: string; title: string; subtitle: string; href: string }) {
+function SectionHeading({
+  id,
+  title,
+  subtitle,
+  href,
+  tour,
+}: {
+  id: string
+  title: string
+  subtitle: string
+  href: string
+  /** `data-tour` key, when the dashboard tour stops here. */
+  tour?: string
+}) {
   return (
-    <div className="flex items-end justify-between gap-4">
+    <div className="flex items-end justify-between gap-4" data-tour={tour}>
       <div className="flex min-w-0 flex-col gap-0.5">
         <h2 id={id} className="font-display text-[20px] font-semibold leading-tight tracking-[-0.015em]">
           {title}
@@ -186,25 +199,28 @@ export default function DashboardPage() {
                 />
               </Rise>
               <Rise delay={60}>
-                {loadingEnrollments ? (
-                  <LearningHeroSkeleton footer={<HeroStatsSkeleton />} />
-                ) : (
-                  <LearningHero
-                    hero={hero}
-                    hasEnrollments={enrollments.length > 0}
-                    // The foot counts only once there is something real to count.
-                    footer={
-                      totals.open > 0 ? (
-                        <HeroStats
-                          totals={totals}
-                          showCertificates={showCertificates}
-                          showClasses={showClasses}
-                          now={now}
-                        />
-                      ) : null
-                    }
-                  />
-                )}
+                {/* The tour spotlights the hero: its wrapper, so the stop holds through the skeleton. */}
+                <div data-tour="hero">
+                  {loadingEnrollments ? (
+                    <LearningHeroSkeleton footer={<HeroStatsSkeleton />} />
+                  ) : (
+                    <LearningHero
+                      hero={hero}
+                      hasEnrollments={enrollments.length > 0}
+                      // The foot counts only once there is something real to count.
+                      footer={
+                        totals.open > 0 ? (
+                          <HeroStats
+                            totals={totals}
+                            showCertificates={showCertificates}
+                            showClasses={showClasses}
+                            now={now}
+                          />
+                        ) : null
+                      }
+                    />
+                  )}
+                </div>
               </Rise>
             </div>
           </div>
@@ -234,6 +250,7 @@ export default function DashboardPage() {
               <section aria-labelledby="home-browse" className="flex flex-col gap-4">
                 <SectionHeading
                   id="home-browse"
+                  tour="browse-section"
                   title="Browse programs"
                   subtitle={enrollments.length > 0 ? "Programs you haven't started" : "Expert-led, across every school"}
                   href="/dashboard/courses"

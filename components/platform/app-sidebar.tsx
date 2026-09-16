@@ -56,6 +56,7 @@ import { enrollmentHref, grantsAccess, isMentorEnrollment, pickHero } from "@/li
 import { useNow } from "@/lib/hooks/use-now"
 import { BRAND } from "@/lib/brand"
 import { BrandLockup } from "@/components/shared/brand-lockup"
+import { TOUR_OPEN_GROUP_EVENT, navTourKey } from "@/lib/dashboard-tour"
 import { cn } from "@/lib/utils"
 
 /**
@@ -246,6 +247,7 @@ function NavRow({
         render={<Link href={item.href} />}
         isActive={active}
         tooltip={item.title}
+        data-tour={navTourKey(item.href)}
         className={cn(
           ROW,
           COLLAPSED_ROW,
@@ -328,12 +330,15 @@ function AppRow({ app, collapsed, isMobile }: { app: WorldStreetApp; collapsed: 
  * the moment one of its rows is the current page.
  */
 function NavGroup({
+  id,
   label,
   hasActive,
   collapsed,
   defaultOpen = false,
   children,
 }: {
+  /** Named groups can be opened by the dashboard tour (`TOUR_OPEN_GROUP_EVENT`). */
+  id?: string
   label: string
   hasActive: boolean
   collapsed: boolean
@@ -342,6 +347,17 @@ function NavGroup({
   children: React.ReactNode
 }) {
   const [open, setOpen] = React.useState(defaultOpen || hasActive)
+
+  // The tour spotlights rows inside folded groups (Wallet, Help): it asks for
+  // the group by id and the group unfolds before the row is measured.
+  React.useEffect(() => {
+    if (!id) return
+    const onOpen = (e: Event) => {
+      if ((e as CustomEvent<string>).detail === id) setOpen(true)
+    }
+    window.addEventListener(TOUR_OPEN_GROUP_EVENT, onOpen)
+    return () => window.removeEventListener(TOUR_OPEN_GROUP_EVENT, onOpen)
+  }, [id])
 
   // A folded section must not hide where you are: it re-opens when one of its
   // rows becomes active. Adjusted during render, so it lands in the same paint.
@@ -536,7 +552,7 @@ export function AppSidebar() {
           {rows(connectItems)}
         </NavGroup>
 
-        <NavGroup label="Account" hasActive={accountItems.some((i) => isActive(i, pathname))} collapsed={collapsed}>
+        <NavGroup id="account" label="Account" hasActive={accountItems.some((i) => isActive(i, pathname))} collapsed={collapsed}>
           {rows(accountItems)}
         </NavGroup>
 

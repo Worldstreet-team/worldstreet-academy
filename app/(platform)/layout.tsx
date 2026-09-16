@@ -1,3 +1,4 @@
+import { Suspense } from "react"
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
@@ -10,7 +11,7 @@ import { MeetingProvider } from "@/components/providers/meeting-provider"
 import { QueryProvider } from "@/components/providers/query-provider"
 import { getCachedUser } from "@/lib/auth/cached"
 import { TranslateScript } from "@/components/translator/translate-script"
-import { OnboardingModal } from "@/components/welcome/onboarding-modal"
+import { DashboardTour } from "@/components/welcome/dashboard-tour"
 
 export default async function PlatformLayout({
   children,
@@ -47,9 +48,12 @@ export default async function PlatformLayout({
               <PlatformBottomNav />
               <CommandSearch />
               <TranslateScript initialLanguage={user.preferredLanguage} />
-              {/* First run: introduce the Academy over the real dashboard
-                  rather than on a separate page. */}
-              {!user.hasOnboarded && <OnboardingModal userName={user.firstName} />}
+              {/* First run: a short tour of the real dashboard, not a slideshow
+                  about it. Always mounted so /dashboard?tour=1 can replay it;
+                  it reads the query string, hence the boundary. */}
+              <Suspense fallback={null}>
+                <DashboardTour autoStart={!user.hasOnboarded} firstName={user.firstName} />
+              </Suspense>
             </SidebarProvider>
           </MeetingProvider>
         </CallProvider>

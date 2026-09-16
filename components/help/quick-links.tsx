@@ -1,16 +1,17 @@
 "use client"
 
 import { HugeiconsIcon } from "@hugeicons/react"
-import { ArrowRight01Icon, Certificate01Icon, Mortarboard01Icon, Wallet01Icon } from "@hugeicons/core-free-icons"
+import { ArrowRight01Icon, Certificate01Icon, Compass01Icon, Mortarboard01Icon, Wallet01Icon } from "@hugeicons/core-free-icons"
 import { CardHeader, CardShell, ListRow } from "@/components/ui/system"
 
-export type QuickLinkIcon = "wallet" | "certificates" | "instructor"
+export type QuickLinkIcon = "tour" | "wallet" | "certificates" | "instructor"
 
 export type QuickLink = { title: string; description: string; href: string; icon: QuickLinkIcon }
 
 /* The Help page is a server component and can't hand a component to ListRow,
    so it names each glyph and the map lives on this side of the boundary. */
 const GLYPHS: Record<QuickLinkIcon, typeof Wallet01Icon> = {
+  tour: Compass01Icon,
   wallet: Wallet01Icon,
   certificates: Certificate01Icon,
   instructor: Mortarboard01Icon,
