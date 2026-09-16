@@ -1,4 +1,5 @@
 import type * as React from "react"
+import Link from "next/link"
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react"
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons"
 import { CardShell, Skel, SkeletonRows } from "@/components/ui/system"
@@ -32,6 +33,46 @@ export const DATA_CHIP = "flex h-10 w-10 shrink-0 items-center justify-center ro
 
 export function Chevron() {
   return <HugeiconsIcon icon={ArrowRight01Icon} className="h-4 w-4 shrink-0 text-muted-foreground/70" aria-hidden />
+}
+
+/**
+ * An empty tile says so in one row, in the same shape as the rows it will
+ * hold — no illustration, no cavern. The tile keeps its header, so the
+ * student still learns where this content will appear once there is some.
+ * (The kit EmptyState with its 112px illustration is for whole pages and
+ * empty canvases; two of them side by side turned the home into a waiting
+ * room, 2026-09-16.)
+ */
+export function TileEmpty({
+  icon: Icon,
+  title,
+  description,
+  link,
+}: {
+  icon: Glyph
+  title: string
+  description: string
+  link?: { label: string; href: string }
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-3 px-4 py-4">
+      <span className={DATA_CHIP}>
+        <Icon className="h-[18px] w-[18px] text-muted-foreground" />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="text-[14px] font-medium">{title}</span>
+        <span className="text-[12.5px] leading-snug text-muted-foreground">{description}</span>
+      </span>
+      {link && (
+        <Link
+          href={link.href}
+          className="shrink-0 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        >
+          {link.label}
+        </Link>
+      )}
+    </div>
+  )
 }
 
 /** A tile while its data loads: the header's two lines, then rows. */

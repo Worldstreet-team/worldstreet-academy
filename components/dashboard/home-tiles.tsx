@@ -5,6 +5,7 @@ import Link from "next/link"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   BookOpen01Icon,
+  Calendar03Icon,
   Certificate01Icon,
   CustomerSupportIcon,
   HelpCircleIcon,
@@ -14,7 +15,7 @@ import {
   UserGroupIcon,
 } from "@hugeicons/core-free-icons"
 import { MessageInstructorButton } from "@/app/(platform)/dashboard/instructor/[instructorId]/message-instructor-button"
-import { Chevron, TILE_FOOT_LINK, TILE_ROW, TILE_ROWS, glyph } from "@/components/dashboard/tile-bits"
+import { Chevron, TILE_FOOT_LINK, TILE_ROW, TILE_ROWS, TileEmpty, glyph } from "@/components/dashboard/tile-bits"
 import { ProgramCover, ProgressTrack, StatusChip } from "@/components/platform/program-bits"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -54,6 +55,7 @@ import { cn } from "@/lib/utils"
  */
 
 const ProgramsGlyph = glyph(BookOpen01Icon)
+const ClassesGlyph = glyph(Calendar03Icon)
 const CertificateGlyph = glyph(Certificate01Icon)
 const HelpGlyph = glyph(HelpCircleIcon)
 const SupportGlyph = glyph(CustomerSupportIcon)
@@ -184,11 +186,11 @@ export function UpcomingClassesTile({ now }: { now: number }) {
       {isLoading ? (
         <SkeletonRows rows={3} label="Loading classes" />
       ) : rows.length === 0 ? (
-        <EmptyState
-          className="py-6"
-          illustration="noNotifications"
+        <TileEmpty
+          icon={ClassesGlyph}
           title="No classes scheduled"
           description="When your instructor schedules a live class, it shows up here."
+          link={{ label: "Meetings", href: "/dashboard/meetings" }}
         />
       ) : (
         <div className={TILE_ROWS}>
@@ -245,9 +247,8 @@ export function CertificatesTile({ now }: { now: number }) {
       {isLoading ? (
         <SkeletonRows rows={2} label="Loading certificates" />
       ) : certificates.length === 0 ? (
-        <EmptyState
-          className="py-6"
-          illustration="welcome"
+        <TileEmpty
+          icon={CertificateGlyph}
           title="No certificates yet"
           description="Finish a program to earn your first certificate."
         />

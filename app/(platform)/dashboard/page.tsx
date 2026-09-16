@@ -9,7 +9,7 @@ import { Topbar } from "@/components/platform/topbar"
 import { CourseCard, CourseCardSkeleton } from "@/components/platform/course-card"
 import { AssignmentsTile } from "@/components/dashboard/assignments-tile"
 import { HomeBento, type BentoTile } from "@/components/dashboard/home-bento"
-import { QuickActions, StatStrip, StatStripSkeleton, homeQuickActions } from "@/components/dashboard/home-strip"
+import { HeroStats, HeroStatsSkeleton } from "@/components/dashboard/home-strip"
 import {
   CertificatesTile,
   InstructorsTile,
@@ -36,14 +36,20 @@ import {
   useBrowseCourses,
   useEnrollments,
   useMyAssessments,
+  useMyCertificates,
   useToggleBookmark,
 } from "@/lib/hooks/queries"
 import { useNow } from "@/lib/hooks/use-now"
 
 /*
  * The student home, in the hub's order (design-system 05): greeting row →
- * learning hero → stat strip → action rail → paired bento rows → Discover.
- * Sections enter on the Rise cascade, ~60ms apart; there is no ambient motion.
+ * learning hero (the program, its progress, and the student's totals as the
+ * card's foot) → paired bento rows → Discover. Three bands, each a different
+ * shape: one card, a grid of cards, a grid of course cards. The stat pills and
+ * the action rail that used to sit between the hero and the grid are gone
+ * (2026-09-16) — the figures moved into the hero, and every rail pill was
+ * already a sidebar row. Sections enter on the Rise cascade, ~60ms apart;
+ * there is no ambient motion.
  */
 
 /** Section heading outside a card: Poppins 20, with a quiet "See all". Gold on this page belongs to the hero's CTA. */
@@ -102,39 +108,41 @@ export default function DashboardPage() {
   const bookmarkedIds = useBookmarkedIds()
   const toggleBookmark = useToggleBookmark()
 
-  // Every query that changes the tile set (and the rail and summary built from
-  // the same rows): until all of them land, tiles show skeletons, so the bento
-  // is paired once and nothing re-pairs, remounts or replays Rise.
-  const loadingTiles = loadingEnrollments || loadingAssessments
-
   const hero = pickHero(enrollments, now)
   const totals = learningTotals(enrollments)
   const instructors = instructorRows(enrollments)
   // Tiles the student's packages can't back are hidden, never faked.
   const showClasses = includesAny(enrollments, "liveClasses")
   const showCertificates = includesAny(enrollments, "certificate")
+  // Certificates are read here (not only in the tile) because the tile exists
+  // only once one is earned — the hero's foot already carries the count, and
+  // an empty certificates card said nothing the figure doesn't.
+  const { data: certificates = [], isLoading: loadingCertificates } = useMyCertificates(showCertificates)
   const { toDo } = assessmentCounts(assessments)
   // The hero already shows its program; the list earns its place with a row the hero doesn't.
   const showPrograms = enrollments.some((e) => e.id !== hero?.enrollment.id)
 
-  const actions = homeQuickActions({
-    hasAssessments: assessments.length > 0,
-    showCertificates,
-    showClasses,
-    canMessage: instructors.some((row) => row.canMessage),
-    hasMentor: instructors.some((row) => row.isMentor),
-  })
+  // Every query that changes the tile set (and the summary built from the
+  // same rows): until all of them land, tiles show skeletons, so the bento
+  // is paired once and nothing re-pairs, remounts or replays Rise.
+  const loadingTiles = loadingEnrollments || loadingAssessments || (showCertificates && loadingCertificates)
 
   // Priority order; home-bento pairs wide lists with narrow tiles.
   const tiles: BentoTile[] = []
   if (showPrograms) {
     tiles.push({ key: "programs", prefer: "wide", node: <MyProgramsTile enrollments={enrollments} now={now} /> })
   }
-  if (assessments.length > 0) tiles.push({ key: "assignments", prefer: "wide", node: <AssignmentsTile /> })
+  if (assessments.length > 0) {
+    // A list of one or two rows stretched across a wide slot is mostly empty
+    // card; it takes a narrow slot until there is a list to fill the wide one.
+    tiles.push({ key: "assignments", prefer: assessments.length > 2 ? "wide" : "narrow", node: <AssignmentsTile /> })
+  }
   if (showClasses) tiles.push({ key: "classes", prefer: "narrow", node: <UpcomingClassesTile now={now} /> })
-  if (showCertificates) tiles.push({ key: "certificates", prefer: "narrow", node: <CertificatesTile now={now} /> })
   if (instructors.length > 0) {
     tiles.push({ key: "instructors", prefer: "narrow", node: <InstructorsTile rows={instructors} /> })
+  }
+  if (showCertificates && certificates.length > 0) {
+    tiles.push({ key: "certificates", prefer: "narrow", node: <CertificatesTile now={now} /> })
   }
   tiles.push({ key: "support", prefer: "narrow", node: <SupportTile priority={hasPrioritySupport(enrollments)} /> })
 
@@ -143,14 +151,14 @@ export default function DashboardPage() {
   const loadingDiscover = loadingBrowse || loadingEnrollments
   const showBrowse = loadingDiscover || browseCourses.length === 0 || recommended.length > 0
   const showBookmarks = loadingBookmarks || bookmarks.length > 0
-  const discoverDelay = Math.min(240 + 60 * (loadingTiles ? 2 : tiles.length), 480)
+  const bentoDelay = 120
+  const discoverDelay = Math.min(bentoDelay + 60 * (loadingTiles ? 2 : tiles.length), 420)
 
   return (
     <>
       <Topbar title="Dashboard" />
 
-      {/* overflow-x-clip: the phone action rail bleeds into the gutter. */}
-      <div className="flex-1 overflow-x-clip px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-6 sm:px-6 md:px-8 md:pb-12 md:pt-8 lg:px-12">
+      <div className="flex-1 px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-6 sm:px-6 md:px-8 md:pb-12 md:pt-8 lg:px-12">
         <div className="@container mx-auto flex w-full max-w-7xl flex-col gap-6">
           <div className="relative">
             {/* The one ambient gold the system allows: a static warm radial behind
@@ -179,54 +187,39 @@ export default function DashboardPage() {
               </Rise>
               <Rise delay={60}>
                 {loadingEnrollments ? (
-                  <LearningHeroSkeleton />
+                  <LearningHeroSkeleton footer={<HeroStatsSkeleton />} />
                 ) : (
-                  <LearningHero hero={hero} hasEnrollments={enrollments.length > 0} />
+                  <LearningHero
+                    hero={hero}
+                    hasEnrollments={enrollments.length > 0}
+                    // The foot counts only once there is something real to count.
+                    footer={
+                      totals.open > 0 ? (
+                        <HeroStats
+                          totals={totals}
+                          showCertificates={showCertificates}
+                          showClasses={showClasses}
+                          now={now}
+                        />
+                      ) : null
+                    }
+                  />
                 )}
               </Rise>
             </div>
           </div>
 
-          {/* Stat strip + action rail — only once there is something real to count. */}
-          {(loadingEnrollments || totals.open > 0 || actions.length > 1) && (
-            <div className="flex flex-col gap-3">
-              {loadingEnrollments ? (
-                <Rise delay={120}>
-                  <StatStripSkeleton />
-                </Rise>
-              ) : (
-                totals.open > 0 && (
-                  <Rise delay={120}>
-                    <StatStrip
-                      totals={totals}
-                      showCertificates={showCertificates}
-                      showClasses={showClasses}
-                      now={now}
-                    />
-                  </Rise>
-                )
-              )}
-              {/* A rail of one would only repeat the hero's Browse programs. It waits
-                  for assessments too, so the Assignments pill never pops in. */}
-              {!loadingTiles && actions.length > 1 && (
-                <Rise delay={180}>
-                  <QuickActions actions={actions} />
-                </Rise>
-              )}
-            </div>
-          )}
-
           {loadingTiles ? (
             <div className="grid gap-4 @2xl:grid-cols-2 @4xl:grid-cols-5">
-              <Rise delay={240} className="min-w-0 @4xl:col-span-3 [&>div]:h-full">
+              <Rise delay={bentoDelay} className="min-w-0 @4xl:col-span-3 [&>div]:h-full">
                 <TileSkeleton rows={4} label="Loading your programs" />
               </Rise>
-              <Rise delay={300} className="min-w-0 @4xl:col-span-2 [&>div]:h-full">
+              <Rise delay={bentoDelay + 60} className="min-w-0 @4xl:col-span-2 [&>div]:h-full">
                 <TileSkeleton rows={3} />
               </Rise>
             </div>
           ) : (
-            <HomeBento tiles={tiles} delay={240} />
+            <HomeBento tiles={tiles} delay={bentoDelay} />
           )}
 
           {(showBrowse || showBookmarks) && (

@@ -130,14 +130,27 @@ function SummaryLine({ enrollments, toDo, now, nextClassAt }: SummaryProps & { n
 
 /* ── The hero ─────────────────────────────────────────────────────────── */
 
-/** Photo right from ~672px of card width, stacked above the copy below it. */
-function HeroFrame({ cover, children }: { cover: React.ReactNode; children: React.ReactNode }) {
+/**
+ * Photo right from ~672px of card width, stacked above the copy below it.
+ * `footer` (the HeroStats cells) closes the card under both columns, so the
+ * program and the student's totals read as one card.
+ */
+function HeroFrame({
+  cover,
+  footer,
+  children,
+}: {
+  cover: React.ReactNode
+  footer?: React.ReactNode
+  children: React.ReactNode
+}) {
   return (
     <CardShell className="@container">
-      <div className="grid h-full @2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+      <div className="grid flex-1 @2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
         <div className="flex min-w-0 flex-col gap-6 p-5 sm:p-6 @2xl:p-8">{children}</div>
         <div className="order-first min-w-0 @2xl:order-none @2xl:p-2 @2xl:pl-0">{cover}</div>
       </div>
+      {footer}
     </CardShell>
   )
 }
@@ -283,13 +296,15 @@ function StepNote({ enrollment: e, step }: { enrollment: StudentEnrollment; step
   )
 }
 
-function ContinueHero({ enrollment: e }: { enrollment: StudentEnrollment }) {
+type HeroProps = { enrollment: StudentEnrollment; footer?: React.ReactNode }
+
+function ContinueHero({ enrollment: e, footer }: HeroProps) {
   const step = learningStep(e)
   const face = continueFace(e, step)
   const progress = Math.round(e.progress)
 
   return (
-    <HeroFrame cover={<HeroCover enrollment={e} />}>
+    <HeroFrame cover={<HeroCover enrollment={e} />} footer={footer}>
       <HeroTitle enrollment={e} eyebrow={face.eyebrow} />
 
       <div className="mt-auto flex flex-col gap-6">
@@ -330,9 +345,9 @@ function ContinueHero({ enrollment: e }: { enrollment: StudentEnrollment }) {
  * A reservation on a program that is already open. Nothing plays until
  * checkout activates the seat; the program page's "Start course" is that door.
  */
-function SeatReadyHero({ enrollment: e }: { enrollment: StudentEnrollment }) {
+function SeatReadyHero({ enrollment: e, footer }: HeroProps) {
   return (
-    <HeroFrame cover={<HeroCover enrollment={e} />}>
+    <HeroFrame cover={<HeroCover enrollment={e} />} footer={footer}>
       <HeroTitle enrollment={e} eyebrow="Seat ready" />
       <div className="mt-auto flex flex-col gap-6">
         <p className="text-[14px] text-muted-foreground">
@@ -344,9 +359,9 @@ function SeatReadyHero({ enrollment: e }: { enrollment: StudentEnrollment }) {
   )
 }
 
-function ReservedHero({ enrollment: e }: { enrollment: StudentEnrollment }) {
+function ReservedHero({ enrollment: e, footer }: HeroProps) {
   return (
-    <HeroFrame cover={<HeroCover enrollment={e} />}>
+    <HeroFrame cover={<HeroCover enrollment={e} />} footer={footer}>
       <HeroTitle enrollment={e} eyebrow="Seat reserved" />
       <div className="mt-auto flex flex-col gap-6">
         {e.courseAvailableAt && (
@@ -396,18 +411,27 @@ function StartHero({ returning }: { returning: boolean }) {
   )
 }
 
-export function LearningHero({ hero, hasEnrollments }: { hero: HomeHero | null; hasEnrollments: boolean }) {
+/** `footer` is the student's totals (HeroStats); the Start hero has none to show, so it ignores it. */
+export function LearningHero({
+  hero,
+  hasEnrollments,
+  footer,
+}: {
+  hero: HomeHero | null
+  hasEnrollments: boolean
+  footer?: React.ReactNode
+}) {
   if (!hero) return <StartHero returning={hasEnrollments} />
-  if (hero.mode === "reserved") return <ReservedHero enrollment={hero.enrollment} />
-  if (hero.mode === "seat_ready") return <SeatReadyHero enrollment={hero.enrollment} />
-  return <ContinueHero enrollment={hero.enrollment} />
+  if (hero.mode === "reserved") return <ReservedHero enrollment={hero.enrollment} footer={footer} />
+  if (hero.mode === "seat_ready") return <SeatReadyHero enrollment={hero.enrollment} footer={footer} />
+  return <ContinueHero enrollment={hero.enrollment} footer={footer} />
 }
 
 /** The hero's shape while enrollments load, so nothing re-lays-out when they land. */
-export function LearningHeroSkeleton() {
+export function LearningHeroSkeleton({ footer }: { footer?: React.ReactNode } = {}) {
   return (
     <CardShell className="@container" role="status" aria-busy="true" aria-label="Loading your programs">
-      <div className="grid h-full @2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+      <div className="grid flex-1 @2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
         <div className="flex min-w-0 flex-col gap-6 p-5 sm:p-6 @2xl:p-8">
           <div className="flex flex-col gap-3">
             <Skel className="h-3 w-32" />
@@ -426,6 +450,7 @@ export function LearningHeroSkeleton() {
           <Skel className={cn(COVER_CLASS, "rounded-none")} />
         </div>
       </div>
+      {footer}
     </CardShell>
   )
 }

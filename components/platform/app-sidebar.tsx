@@ -59,13 +59,14 @@ import { BrandLockup } from "@/components/shared/brand-lockup"
 import { cn } from "@/lib/utils"
 
 /**
- * Student rail — the hub's floating rail grammar
- * (dashboard-revamp/components/app-sidebar.tsx), ported without its glass:
- * a solid `sidebar` (sunken-step) surface inset from the viewport, 22px
- * corners, hairline ring. Rows are h-9 with a 28px icon chip; the active row
- * is a neutral fill with a gold edge tick and a gold icon — never a gold fill.
- * Sections fold with a CSS height transition (Base UI Collapsible), and
- * nothing here animates on its own.
+ * Student rail — a cousin of the hub's rail
+ * (dashboard-revamp/components/app-sidebar.tsx), not a copy: the same
+ * tokens, lockup, groups and badges, on a different silhouette. Flush to the
+ * edge on the `sidebar` (sunken) step with one right hairline, no inset
+ * card, no glass, no crown wash. Rows are h-9 pills with a bare 18px icon;
+ * the active row is a neutral fill with a gold icon — never a gold fill, no
+ * edge tick. Group labels are sentence case. Sections fold with a CSS height
+ * transition (Base UI Collapsible), and nothing here animates on its own.
  *
  * Ordered by how often a learner needs each destination: resume → learn →
  * talk → account → the rest of WorldStreet.
@@ -188,20 +189,17 @@ function isActive(item: NavItem, pathname: string) {
 }
 
 /**
- * The rail surface. `className` lands on the sidebar container; the inner
- * surface is reached by data-slot. The `!` marks beat the primitive's own
- * floating defaults (rounded-lg, shadow-sm), which tie on specificity.
- * `isolate` lets the crown wash sit at -z-10 above the fill, under the rows.
+ * The rail surface: flush to the viewport edge on the sunken step, one
+ * hairline on its right — the primitive's own `sidebar` variant. The hub
+ * floats its rail as an inset card with 22px corners, a ring, a shadow and
+ * a gold crown wash; the Academy deliberately does not (owner, 2026-09-16:
+ * similar to the hub, not the same). Same tokens, same lockup, a different
+ * silhouette.
  */
-const RAIL = cn(
-  "py-4 pl-4 pr-1",
-  "[&_[data-slot=sidebar-inner]]:relative [&_[data-slot=sidebar-inner]]:isolate [&_[data-slot=sidebar-inner]]:overflow-hidden",
-  "[&_[data-slot=sidebar-inner]]:rounded-[22px]! [&_[data-slot=sidebar-inner]]:ring-1! [&_[data-slot=sidebar-inner]]:ring-sidebar-border!",
-  "[&_[data-slot=sidebar-inner]]:shadow-[0_8px_32px_-12px_rgb(0_0_0/0.28)]!",
-)
+const RAIL = "[&_[data-slot=sidebar-inner]]:relative"
 
-/** One height, one corner, one icon size for every row in the rail. */
-const ROW = "h-9 gap-3 rounded-[10px] px-2.5 text-[13.5px] [&_svg]:size-[18px] focus-visible:ring-inset"
+/** One height, one shape, one icon size for every row: a pill, not the hub's rounded square. */
+const ROW = "h-9 gap-3 rounded-full px-3 text-[13.5px] [&_svg]:size-[18px] focus-visible:ring-inset"
 
 /**
  * Icon mode: the primitive pins buttons to a 32px square with 8px padding.
@@ -251,23 +249,22 @@ function NavRow({
         className={cn(
           ROW,
           COLLAPSED_ROW,
-          "group-data-[collapsible=icon]:p-1!",
+          "group-data-[collapsible=icon]:p-2!",
           "relative text-foreground/75 transition-colors duration-[var(--ws-motion-fast)]",
           "hover:bg-foreground/[0.04] hover:text-foreground active:bg-foreground/[0.06] active:text-foreground",
-          "data-active:bg-foreground/[0.06] data-active:font-medium data-active:text-foreground data-active:shadow-[inset_0_1px_0_0_var(--color-border)]",
+          "data-active:bg-foreground/[0.07] data-active:font-medium data-active:text-foreground",
         )}
       >
-        {/* The one place gold says "you are here": a tick on the rail's edge. */}
-        {active && !collapsed && (
-          <span aria-hidden className="absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-r-full bg-primary" />
-        )}
-        <span
-          className={cn(
-            "relative flex size-7 shrink-0 items-center justify-center rounded-[9px] transition-colors duration-[var(--ws-motion-fast)]",
-            active ? "bg-primary/[0.18]" : "bg-foreground/[0.05]",
-          )}
-        >
-          <HugeiconsIcon icon={item.icon} className={active ? "text-primary" : "text-muted-foreground"} />
+        {/* No chip, no edge tick: the row is a pill, and the icon alone goes
+            gold to say "you are here" — the only gold on the rail besides badges. */}
+        <span className="relative flex size-[18px] shrink-0 items-center justify-center">
+          <HugeiconsIcon
+            icon={item.icon}
+            className={cn(
+              "transition-colors duration-[var(--ws-motion-fast)]",
+              active ? "text-primary" : "text-muted-foreground",
+            )}
+          />
           {/* Icon mode has no room for the pill; state that needs attention
               (unread, live) keeps a dot on the chip. */}
           {collapsed && badge && badge.tone !== "neutral" && (
@@ -325,20 +322,26 @@ function AppRow({ app, collapsed, isMobile }: { app: WorldStreetApp; collapsed: 
 
 /**
  * A rail section: the hub's SectionLabel eyebrow over rows that fold away.
- * Open by default — every section is short enough to live on screen.
+ * Only Learn starts open (owner call, 2026-09-16): it is the reason a learner
+ * is here, and with every group open the rail was a wall of rows. Connect,
+ * Account and WorldStreet start folded; a folded group still opens itself
+ * the moment one of its rows is the current page.
  */
 function NavGroup({
   label,
   hasActive,
   collapsed,
+  defaultOpen = false,
   children,
 }: {
   label: string
   hasActive: boolean
   collapsed: boolean
+  /** Start expanded. Every group also opens when it holds the active row. */
+  defaultOpen?: boolean
   children: React.ReactNode
 }) {
-  const [open, setOpen] = React.useState(true)
+  const [open, setOpen] = React.useState(defaultOpen || hasActive)
 
   // A folded section must not hide where you are: it re-opens when one of its
   // rows becomes active. Adjusted during render, so it lands in the same paint.
@@ -361,8 +364,9 @@ function NavGroup({
       <Collapsible open={open} onOpenChange={setOpen}>
         <CollapsibleTrigger
           className={cn(
-            "flex w-full items-center gap-2 rounded-[7px] px-2.5 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] outline-none transition-colors duration-[var(--ws-motion-fast)] focus-visible:ring-2 focus-visible:ring-sidebar-ring",
-            hasActive ? "text-ws-gold" : "text-muted-foreground/70 hover:text-foreground",
+            // Sentence case at 12px, not the hub's tracked 10px capitals.
+            "flex w-full items-center gap-2 rounded-full px-3 pb-1.5 pt-0.5 text-[12px] font-semibold outline-none transition-colors duration-[var(--ws-motion-fast)] focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+            hasActive ? "text-foreground" : "text-muted-foreground/80 hover:text-foreground",
           )}
         >
           <span className="flex-1 text-left">{label}</span>
@@ -463,18 +467,11 @@ export function AppSidebar() {
     ))
 
   return (
-    <Sidebar variant="floating" collapsible="icon" className={RAIL}>
-      {/* Crown wash — a static warm bloom behind the lockup, dark mode only
-          (the ambient glow is off on paper, design-system 01). */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 hidden h-56 bg-[radial-gradient(120%_80%_at_10%_0%,var(--color-ws-glow)_0%,transparent_70%)] dark:block"
-      />
-
-      {/* Lockup + rail toggle, as on the hub. Collapsed: the mark, and the
-          toggle under it. The logo opens the public landing — the shell
-          already lives at /dashboard. */}
-      <SidebarHeader className="gap-0 px-2.5 pb-2 pt-4">
+    <Sidebar variant="sidebar" collapsible="icon" className={RAIL}>
+      {/* Lockup + rail toggle. Collapsed: the mark, and the toggle under it.
+          The logo opens the public landing — the shell already lives at
+          /dashboard. */}
+      <SidebarHeader className="gap-0 px-3 pb-2 pt-5">
         <div className={cn("flex items-center gap-2", collapsed && "justify-center")}>
           <Link
             href="/"
@@ -501,7 +498,7 @@ export function AppSidebar() {
         {collapsed && <SidebarTrigger className={cn(TRIGGER, "mx-auto mt-2")} />}
       </SidebarHeader>
 
-      <SidebarContent className="gap-0 px-2.5 pb-3 pt-1 group-data-[collapsible=icon]:overflow-y-auto">
+      <SidebarContent className="gap-0 px-3 pb-3 pt-1 group-data-[collapsible=icon]:overflow-y-auto">
         {/* Continue learning — the primary job, one click from anywhere. */}
         {resume && !collapsed && (
           <Link
@@ -526,7 +523,12 @@ export function AppSidebar() {
           </Link>
         )}
 
-        <NavGroup label="Learn" hasActive={learn.some((i) => isActive(i, pathname))} collapsed={collapsed}>
+        <NavGroup
+          label="Learn"
+          hasActive={learn.some((i) => isActive(i, pathname))}
+          collapsed={collapsed}
+          defaultOpen
+        >
           {rows(learn)}
         </NavGroup>
 
@@ -567,7 +569,7 @@ export function AppSidebar() {
         </NavGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border px-2.5 py-2.5">
+      <SidebarFooter className="border-t border-sidebar-border px-3 py-2.5">
         <div className={cn("flex items-center gap-1", collapsed && "justify-center")}>
           <Link
             href="/dashboard/profile"
