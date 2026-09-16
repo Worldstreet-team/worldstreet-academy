@@ -47,3 +47,6 @@ next-env.d.ts
 # Local mock-mode MongoDB data (pnpm dev:mock)
 /.local-db
 .gstack/
+
+# Local project memory (Mastery Academy notes) — never commit
+/memory.md
