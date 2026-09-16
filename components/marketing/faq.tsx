@@ -5,6 +5,7 @@ import { motion } from "motion/react"
 import { PlusIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Reveal, RevealGroup } from "@/components/marketing/motion/reveal"
+import { SectionLabel, SectionTitle } from "@/components/marketing/section-heading"
 import { EASE_LUX } from "@/components/marketing/motion/ease"
 import { useMotionOK } from "@/components/marketing/motion/bus"
 import { BRAND } from "@/lib/brand"
@@ -13,6 +14,8 @@ import { BRAND } from "@/lib/brand"
  * FAQ (spec §15). Split layout: sticky heading column left, accordion right.
  * Native button rows over hairline dividers; answers are height-animated
  * (instant under reduced motion) and the plus icon rotates 45° into an ×.
+ * An open row's question stays ink; closed rows lift from muted to ink on
+ * hover, so the list reads as a list and the open one as the page.
  *
  * Copy is spec §15 verbatim.
  */
@@ -53,22 +56,19 @@ export function Faq() {
   const [open, setOpen] = React.useState<number | null>(null)
 
   return (
-    <section id="faq" className="relative isolate scroll-mt-24 py-24 md:py-32" aria-label="Frequently asked questions">
-      <div className="mx-auto grid max-w-7xl gap-12 px-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-16">
+    <section id="faq" className="relative isolate scroll-mt-24 py-20 md:py-28" aria-labelledby="faq-heading">
+      <div className="mx-auto grid max-w-7xl gap-12 px-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-16">
         {/* ── Heading column ── */}
         <div>
-          <div className="lg:sticky lg:top-24">
+          <div className="lg:sticky lg:top-28">
             <RevealGroup>
-              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-ws-gold">
-                FAQ
-              </p>
-              <h2
-                className="mt-4 max-w-md font-display font-semibold leading-[1.05] tracking-[-0.02em] text-ws-primary"
-                style={{ fontSize: "clamp(2rem, 4.5vw, 3.5rem)" }}
-              >
-                Answers before you ask.
-              </h2>
-              <p className="mt-4 max-w-sm text-[15px] leading-relaxed text-ws-muted">
+              <SectionLabel>FAQ</SectionLabel>
+              <SectionTitle id="faq-heading" className="mt-4 max-w-md">
+                Answers before
+                <br />
+                you ask.
+              </SectionTitle>
+              <p className="mt-4 max-w-sm text-[16px] leading-relaxed text-ws-muted md:text-[17px]">
                 The short version of how joining, learning, paying and
                 certificates work here.
               </p>
@@ -93,19 +93,29 @@ export function Faq() {
                     aria-expanded={expanded}
                     aria-controls={`faq-panel-${i}`}
                     onClick={() => setOpen((prev) => (prev === i ? null : i))}
-                    className="flex w-full items-center justify-between gap-6 py-5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40"
+                    className={cn(
+                      "flex w-full items-center justify-between gap-6 py-6 text-left transition-colors duration-[var(--ws-motion-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40",
+                      expanded ? "text-ws-primary" : "text-ws-primary/80 hover:text-ws-primary"
+                    )}
                   >
-                    <span className="text-[15px] font-semibold text-ws-primary md:text-base">
+                    <span className="font-display text-[16px] font-semibold tracking-[-0.01em] md:text-[18px]">
                       {faq.q}
                     </span>
-                    <PlusIcon
-                      size={16}
-                      aria-hidden
+                    <span
                       className={cn(
-                        "shrink-0 text-ws-muted transition-transform duration-200 ease-[var(--ws-ease)]",
-                        expanded && "rotate-45"
+                        "flex size-8 shrink-0 items-center justify-center rounded-full transition-colors duration-[var(--ws-motion-fast)]",
+                        expanded ? "bg-ws-raised text-ws-primary" : "text-ws-muted"
                       )}
-                    />
+                    >
+                      <PlusIcon
+                        size={16}
+                        aria-hidden
+                        className={cn(
+                          "transition-transform duration-200 ease-[var(--ws-ease)]",
+                          expanded && "rotate-45"
+                        )}
+                      />
+                    </span>
                   </button>
                   <motion.div
                     id={`faq-panel-${i}`}
@@ -117,7 +127,7 @@ export function Faq() {
                     }}
                     transition={{ duration: ok ? 0.3 : 0, ease: EASE_LUX }}
                   >
-                    <p className="max-w-xl pb-5 pr-8 text-[14px] leading-relaxed text-ws-muted">
+                    <p className="max-w-xl pb-6 pr-12 text-[15px] leading-relaxed text-ws-muted">
                       {faq.a}
                     </p>
                   </motion.div>

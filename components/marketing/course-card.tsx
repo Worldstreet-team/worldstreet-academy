@@ -68,13 +68,16 @@ export function MarketingCourseCard({
   return (
     <article
       className={cn(
-        "group relative w-full overflow-hidden rounded-lg border border-ws-hairline bg-ws-surface transition-colors duration-[var(--ws-motion-base)] hover:border-ws-brand/40",
+        // v2 card, and a full-height flex column so every card in a grid row
+        // shares the row's height with its footer on the same baseline — a
+        // three-line title no longer makes one card taller than its neighbours.
+        "group relative flex h-full w-full flex-col overflow-hidden rounded-[20px] border border-ws-hairline bg-ws-surface transition-colors duration-[var(--ws-motion-base)] hover:bg-ws-raised dark:border-transparent",
         className
       )}
     >
       <Link
         href={`/programs/${course.slug}`}
-        className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40"
+        className="flex flex-1 flex-col focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ws-brand/40"
         onClick={() => {
           if (signedIn) void autoBookmark(course.id)
         }}
@@ -105,7 +108,7 @@ export function MarketingCourseCard({
         </div>
 
         {/* Body */}
-        <div className="p-4">
+        <div className="flex flex-1 flex-col p-4">
           <div className="flex items-center justify-between gap-2">
             <span
               className="rounded-sm px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.05em]"
@@ -124,11 +127,12 @@ export function MarketingCourseCard({
             )}
           </div>
 
-          <h3 className="mt-2.5 line-clamp-2 min-h-[2.6em] font-display text-[16px] font-semibold leading-[1.3] text-ws-primary">
+          <h3 className="mb-3 mt-2.5 line-clamp-2 min-h-[2.6em] font-display text-[16px] font-semibold leading-[1.3] text-ws-primary">
             {course.title}
           </h3>
 
-          <div className="mt-3 flex items-center justify-between gap-2 border-t border-ws-hairline pt-3">
+          {/* min-h: a card with no rating yet must not be a line shorter than its neighbours. */}
+          <div className="mt-auto flex min-h-[calc(0.75rem+1.25rem)] items-center justify-between gap-2 border-t border-ws-hairline pt-3">
             {/* No lesson/duration counts: brand-new programs read "0 lessons"
                 and that is worse than saying nothing. */}
             <span />

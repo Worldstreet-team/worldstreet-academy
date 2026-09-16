@@ -1,3 +1,5 @@
+"use client"
+
 import {
   CompassIcon,
   GaugeIcon,
@@ -6,14 +8,17 @@ import {
   TrendingUpIcon,
   UsersIcon,
 } from "lucide-react"
-import { LineMask } from "@/components/marketing/motion/line-mask"
 import { Reveal, RevealGroup } from "@/components/marketing/motion/reveal"
+import { SectionLabel, SectionTitle } from "@/components/marketing/section-heading"
 import { BRAND } from "@/lib/brand"
 
 /**
- * WHY (spec §3) — same grammar as the About band: statement left, argument
- * right on one baseline, then the six pillars full-width under a hairline.
- * No card, no panel: the section takes the page's own background.
+ * WHY (spec §3). Title left and the "Because the world is changing" lede
+ * right, bottom-aligned on one row — a different opening from the About
+ * statement above it and the Schools directory below. The six pillars are
+ * v2 cards (04-components → Card): `card` fill, 20px corners, separated by
+ * fill in dark and a hairline in light, never a border-drawn box. 44px gold
+ * chip, Poppins title, one line each. Copy is §3 verbatim.
  */
 const PILLARS = [
   {
@@ -50,45 +55,37 @@ const PILLARS = [
 
 export function WhyBand() {
   return (
-    <section className="relative py-24 md:py-32" aria-label={`Why learn with ${BRAND.name}`}>
+    <section className="relative py-20 md:py-28" aria-labelledby="why-heading">
       <div className="mx-auto max-w-7xl px-6">
-        <RevealGroup>
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-ws-gold">
-            Why {BRAND.wordmark}
-          </p>
-
-          <div className="mt-8 grid gap-x-16 gap-y-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
-            <LineMask
-              as="h2"
-              mode="inview"
-              className="font-display text-[clamp(2rem,4.4vw,3.5rem)] font-semibold leading-[1.06] tracking-[-0.025em] text-ws-primary"
-              lines={[
-                { text: "Why learn with" },
-                { text: BRAND.wordmark, className: "text-ws-gold" },
-                { text: `${BRAND.eyebrow}?`, className: "text-ws-gold" },
-              ]}
-            />
-
-            <p className="max-w-xl text-[16px] leading-relaxed text-ws-muted md:text-[17px] lg:pt-2">
-              Because the world is changing. The skills that create opportunities
-              today are not necessarily the skills that created opportunities
-              yesterday. {BRAND.name} is built around the skills shaping tomorrow.
-            </p>
+        <RevealGroup className="grid gap-x-16 gap-y-5 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
+          <div>
+            <SectionLabel>Why {BRAND.wordmark}</SectionLabel>
+            <SectionTitle id="why-heading" className="mt-4 max-w-xl">
+              Why learn with {BRAND.name}?
+            </SectionTitle>
           </div>
+          <p className="max-w-lg text-[16px] leading-relaxed text-ws-muted md:text-[17px] lg:pb-1">
+            Because the world is changing. The skills that create opportunities
+            today are not necessarily the skills that created opportunities
+            yesterday. {BRAND.name} is built around the skills shaping tomorrow.
+          </p>
         </RevealGroup>
 
-        {/* Pillars — full width, one hairline, 1 → 2 → 3 columns. */}
-        <div className="mt-20 grid gap-10 border-t border-ws-hairline pt-12 sm:grid-cols-2 sm:gap-8 md:mt-24 lg:grid-cols-3">
+        <ul className="mt-10 grid gap-3 sm:grid-cols-2 md:mt-12 lg:grid-cols-3">
           {PILLARS.map((pillar, i) => (
-            <Reveal key={pillar.title} delay={(i % 3) * 0.09} y={18} duration={0.6}>
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-ws-brand/10 text-ws-gold">
-                <pillar.icon size={16} />
-              </span>
-              <h3 className="mt-4 text-[15px] font-semibold text-ws-primary">{pillar.title}</h3>
-              <p className="mt-1.5 max-w-xs text-[13px] leading-relaxed text-ws-muted">{pillar.line}</p>
+            <Reveal as="li" key={pillar.title} delay={(i % 3) * 0.07} y={18} duration={0.6}>
+              <div className="flex h-full flex-col rounded-[20px] border border-ws-hairline bg-ws-surface p-6 dark:border-transparent sm:p-7">
+                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-ws-brand/[0.12] text-ws-gold">
+                  <pillar.icon size={20} strokeWidth={1.75} />
+                </span>
+                <h3 className="mt-7 font-display text-[19px] font-semibold leading-snug tracking-[-0.015em] text-ws-primary">
+                  {pillar.title}
+                </h3>
+                <p className="mt-2 text-[14px] leading-relaxed text-ws-muted">{pillar.line}</p>
+              </div>
             </Reveal>
           ))}
-        </div>
+        </ul>
       </div>
     </section>
   )

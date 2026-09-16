@@ -27,19 +27,24 @@ export function BrowserFrame({
   children: React.ReactNode
 }) {
   return (
-    <div aria-hidden className="flex h-full flex-col overflow-hidden rounded-xl border border-ws-hairline bg-ws-surface shadow-2xl shadow-black/50">
+    <div aria-hidden className="flex h-full flex-col overflow-hidden rounded-[20px] border border-ws-hairline bg-ws-surface">
       <div className="flex shrink-0 items-center border-b border-ws-hairline px-4 py-2.5">
         <span className="flex w-16 gap-1.5" aria-hidden>
           <span className="h-2.5 w-2.5 rounded-full bg-ws-chip" />
           <span className="h-2.5 w-2.5 rounded-full bg-ws-chip" />
           <span className="h-2.5 w-2.5 rounded-full bg-ws-chip" />
         </span>
-        <span className="mx-auto min-w-0 truncate rounded-full bg-ws-sunken px-3.5 py-1 font-mono text-[11px] text-ws-subtle">
+        {/* Keyed on the route: when the pinned How-it-works stage moves to the
+            next step the address bar fades to the new URL instead of snapping. */}
+        <span
+          key={route}
+          className="ws-animate-fade mx-auto min-w-0 truncate rounded-full bg-ws-sunken px-3.5 py-1 font-mono text-[11px] text-ws-subtle"
+        >
           {route}
         </span>
         <span className="w-16" aria-hidden />
       </div>
-      <div className="min-h-0 flex-1">{children}</div>
+      <div className="relative min-h-0 flex-1">{children}</div>
     </div>
   )
 }

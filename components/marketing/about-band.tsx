@@ -1,75 +1,132 @@
 "use client"
 
 import Link from "next/link"
-import { LineMask } from "@/components/marketing/motion/line-mask"
-import { RevealGroup } from "@/components/marketing/motion/reveal"
+import { ArrowRightIcon } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { Reveal } from "@/components/marketing/motion/reveal"
+import { SectionLabel } from "@/components/marketing/section-heading"
 import { BRAND } from "@/lib/brand"
 
+/** The blueprint's own arc (§2, last line). A real sequence, so the one
+ *  stepped device on the page is earned here; the last stop is the outcome,
+ *  and the only word on the rule that takes gold. */
+const ARC = ["Interest", "Knowledge", "Skill", "Opportunity"] as const
+
 /**
- * ABOUT (spec §2) — set directly on the page, not in a panel. The statement
- * sits left and the argument right on the same baseline grid. The old
- * three-pillar strip is gone: the six spec pillars live in WhyBand, directly
- * below, and saying it twice was the one thing the old page did wrong.
+ * ABOUT (spec §2) — typographic. The purpose statement is set as one wide
+ * paragraph in the house hero register: Poppins Light 300, large, the weight
+ * the wallet hero gives its balance, borrowed here for words. Under it the
+ * interest → opportunity arc, then the remaining spec paragraphs in two body
+ * columns. "Welcome to…" is the small title beside the label — the statement
+ * is the picture, and nothing here duplicates the Why band's heading any more.
+ * Copy is §2 verbatim; only the typesetting changed.
  */
 export function AboutBand() {
   return (
-    <section className="relative py-24 md:py-32" aria-label="About the academy">
+    <section className="relative py-20 md:py-28" aria-labelledby="about-heading">
       <div className="mx-auto max-w-7xl px-6">
-        <RevealGroup>
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-ws-gold">
-            About
-          </p>
+        <div className="grid gap-x-12 gap-y-8 lg:grid-cols-[13rem_1fr]">
+          {/* Label column */}
+          <Reveal>
+            <SectionLabel>About</SectionLabel>
+            <h2
+              id="about-heading"
+              className="mt-3 font-display text-[17px] font-semibold leading-snug tracking-[-0.01em] text-ws-primary"
+            >
+              Welcome to {BRAND.name}.
+            </h2>
+          </Reveal>
 
-          {/* Statement left, argument right — aligned to one top edge. */}
-          <div className="mt-8 grid gap-x-16 gap-y-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
-            <LineMask
-              as="h2"
-              mode="inview"
-              className="font-display text-[clamp(2rem,4.4vw,3.5rem)] font-semibold leading-[1.06] tracking-[-0.025em] text-ws-primary"
-              lines={[
-                { text: "Welcome to" },
-                { text: BRAND.wordmark, className: "text-ws-gold" },
-                { text: `${BRAND.eyebrow}.`, className: "text-ws-gold" },
-              ]}
-            />
+          <div className="min-w-0">
+            {/* The statement */}
+            <Reveal as="p" className="text-[15px] text-ws-muted">
+              Our purpose is simple:
+            </Reveal>
+            <Reveal
+              as="p"
+              delay={0.06}
+              className="mt-4 max-w-4xl font-display text-[clamp(1.75rem,3.6vw,3.25rem)] font-light leading-[1.18] tracking-[-0.02em] text-ws-primary"
+            >
+              To help people learn valuable skills, develop practical
+              capabilities and create opportunities for themselves in the new
+              economy.
+            </Reveal>
 
-            <div className="space-y-4 text-[16px] leading-relaxed text-ws-muted md:text-[17px] lg:pt-2">
-              <p className="max-w-xl">
-                {BRAND.name} is the education and skills development arm of the
-                WorldStreet ecosystem.
-              </p>
-              <p className="max-w-xl">
-                Our purpose is simple: To help people learn valuable skills,
-                develop practical capabilities and create opportunities for
-                themselves in the new economy.
-              </p>
-              <p className="max-w-xl">
-                We bring together expert instructors, structured programs,
-                practical learning experiences, mentorship and a growing
-                ecosystem of opportunities.
-              </p>
-              <p className="max-w-xl">
-                From financial markets to artificial intelligence, from
-                blockchain to cybersecurity, from content creation to digital
-                business, {BRAND.name} is designed to help you move from
-                interest to knowledge, knowledge to skill, and skill to
-                opportunity.
-              </p>
-              <Link
-                href="/schools"
-                className="group inline-flex items-center gap-1.5 pt-3 text-[14px] font-semibold text-ws-gold"
+            {/* The arc — ordered, because it is one. */}
+            <Reveal delay={0.12}>
+              <ol
+                aria-label="From interest to opportunity"
+                className="mt-10 flex flex-wrap items-center gap-y-3 md:mt-12"
               >
-                <span className="relative">
-                  Explore the schools
-                  <span className="absolute -bottom-0.5 left-0 h-px w-full origin-left scale-x-0 bg-ws-gold transition-transform duration-200 ease-[var(--ws-ease)] group-hover:scale-x-100" />
-                </span>
-                <span aria-hidden className="transition-transform duration-200 group-hover:translate-x-0.5">
-                  →
-                </span>
-              </Link>
+                {ARC.map((stop, i) => {
+                  const last = i === ARC.length - 1
+                  return (
+                    <li key={stop} className="flex items-center">
+                      {i > 0 && (
+                        <span
+                          aria-hidden
+                          className="mx-3 h-px w-8 bg-ws-hairline sm:mx-4 sm:w-12 md:w-20 lg:w-28"
+                        />
+                      )}
+                      <span className="flex items-center gap-2.5">
+                        <span
+                          aria-hidden
+                          className={cn("size-1.5 rounded-full", last ? "bg-ws-brand" : "bg-ws-subtle")}
+                        />
+                        <span
+                          className={cn(
+                            "font-display text-[15px] font-semibold tracking-[-0.01em] md:text-[16px]",
+                            last ? "text-ws-gold" : "text-ws-primary"
+                          )}
+                        >
+                          {stop}
+                        </span>
+                      </span>
+                    </li>
+                  )
+                })}
+              </ol>
+            </Reveal>
+
+            {/* The argument — two body columns under one hairline. */}
+            <div className="mt-12 grid gap-x-12 gap-y-6 border-t border-ws-hairline pt-10 md:mt-14 md:grid-cols-2">
+              <Reveal delay={0.05} className="space-y-4 text-[15px] leading-relaxed text-ws-muted md:text-[16px]">
+                <p>
+                  {BRAND.name} is the education and skills development arm of
+                  the WorldStreet ecosystem.
+                </p>
+                <p>
+                  We bring together expert instructors, structured programs,
+                  practical learning experiences, mentorship and a growing
+                  ecosystem of opportunities.
+                </p>
+              </Reveal>
+              <Reveal delay={0.1} className="text-[15px] leading-relaxed text-ws-muted md:text-[16px]">
+                <p>
+                  From financial markets to artificial intelligence, from
+                  blockchain to cybersecurity, from content creation to digital
+                  business, {BRAND.name} is designed to help you move from
+                  interest to knowledge, knowledge to skill, and skill to
+                  opportunity.
+                </p>
+                <Link
+                  href="/schools"
+                  className="group mt-5 inline-flex items-center gap-1.5 text-[14px] font-semibold text-ws-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40"
+                >
+                  <span className="relative">
+                    Explore the schools
+                    <span className="absolute -bottom-0.5 left-0 h-px w-full origin-left scale-x-0 bg-ws-primary transition-transform duration-200 ease-[var(--ws-ease)] group-hover:scale-x-100" />
+                  </span>
+                  <ArrowRightIcon
+                    size={14}
+                    aria-hidden
+                    className="transition-transform duration-200 group-hover:translate-x-0.5"
+                  />
+                </Link>
+              </Reveal>
             </div>
           </div>
-        </RevealGroup>
+        </div>
       </div>
     </section>
   )

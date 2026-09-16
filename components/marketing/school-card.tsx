@@ -4,10 +4,13 @@ import type { School } from "@/lib/schools"
 import { SchoolIcon } from "@/components/shared/school-icon"
 
 /**
- * One school card (spec §4): icon in a gold wash, name, blurb, program count
- * and the [EXPLORE SCHOOL] affordance. The WHOLE card is the link — one tab
- * stop, one accessible name — so a grid of eight stays navigable. Server-safe
- * (no hooks): used by the landing grid and the /schools index.
+ * One school card (spec §4) for the /schools index: icon in a gold wash,
+ * name, blurb, program count and the [EXPLORE SCHOOL] affordance. The WHOLE
+ * card is the link — one tab stop, one accessible name — so a grid of eight
+ * stays navigable. v2 card shape: `card` fill, 20px corners, fill-separated
+ * in dark (hairline in light), hover lifts one ladder step. Server-safe (no
+ * hooks). The landing lists the schools as a directory instead
+ * (schools-grid.tsx).
  */
 export function SchoolCard({
   school,
@@ -23,20 +26,20 @@ export function SchoolCard({
   return (
     <Link
       href={`/schools/${school.slug}`}
-      className="group flex h-full flex-col rounded-lg border border-ws-hairline bg-ws-surface p-6 transition-colors duration-[var(--ws-motion-base)] hover:border-ws-brand/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40"
+      className="group flex h-full flex-col rounded-[20px] border border-ws-hairline bg-ws-surface p-6 transition-colors duration-[var(--ws-motion-base)] hover:bg-ws-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40 dark:border-transparent"
     >
-      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-ws-brand/10 text-ws-gold">
+      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-ws-brand/[0.12] text-ws-gold">
         <SchoolIcon name={school.icon} size={18} />
       </span>
-      <Heading className="mt-5 font-display text-[17px] font-semibold leading-snug tracking-[-0.01em] text-ws-primary">
+      <Heading className="mt-6 font-display text-[17px] font-semibold leading-snug tracking-[-0.01em] text-ws-primary">
         {school.name}
       </Heading>
-      <p className="mt-2 text-[13px] leading-relaxed text-ws-muted">{school.blurb}</p>
+      <p className="mt-2 text-[13.5px] leading-relaxed text-ws-muted">{school.blurb}</p>
       <span className="mt-auto flex items-center justify-between gap-3 pt-6 text-[13px]">
-        <span className="tabular-nums text-ws-subtle">
+        <span className="tabular-nums text-ws-muted">
           {count === 1 ? "1 program" : `${count} programs`}
         </span>
-        <span className="inline-flex items-center gap-1.5 font-semibold text-ws-gold">
+        <span className="inline-flex items-center gap-1.5 font-semibold text-ws-muted transition-colors duration-[var(--ws-motion-fast)] group-hover:text-ws-primary">
           Explore school
           <ArrowRightIcon
             size={14}

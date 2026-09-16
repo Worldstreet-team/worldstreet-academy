@@ -122,9 +122,12 @@ export function Marquee({
     >
       <div ref={trackRef} className="flex w-max gap-5 will-change-transform">
         {/* Enough copies to cover 2x the container: a single sparse copy
-            narrower than the viewport would leave a blank band + wrap snap. */}
+            narrower than the viewport would leave a blank band + wrap snap.
+            Copies after the first are duplicates for the eye only: aria-hidden
+            keeps them out of the accessibility tree and `inert` keeps their
+            links out of the tab order, so a keyboard user meets each card once. */}
         {Array.from({ length: copies }, (_, i) => (
-          <div className="flex shrink-0 gap-5" key={i} aria-hidden={i > 0 || undefined}>
+          <div className="flex shrink-0 gap-5" key={i} aria-hidden={i > 0 || undefined} inert={i > 0 || undefined}>
             {children}
           </div>
         ))}
