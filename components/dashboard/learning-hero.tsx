@@ -159,8 +159,16 @@ const COVER_CLASS =
   "aspect-[2/1] w-full @lg:aspect-[5/2] @2xl:aspect-auto @2xl:h-full @2xl:min-h-72 @2xl:rounded-[12px]"
 const COVER_SIZES = "(min-width: 1280px) 600px, (min-width: 768px) 60vw, 100vw"
 
+/** Without a photograph the cover is only the mark on a wash: fine beside the copy, dead space stacked over it on a phone, so it waits for the wide layout. */
 function HeroCover({ enrollment: e }: { enrollment: StudentEnrollment }) {
-  return <ProgramCover src={e.courseThumbnail} sizes={COVER_SIZES} mark="lg" className={COVER_CLASS} />
+  return (
+    <ProgramCover
+      src={e.courseThumbnail}
+      sizes={COVER_SIZES}
+      mark="lg"
+      className={cn(COVER_CLASS, !e.courseThumbnail && "hidden @2xl:block")}
+    />
+  )
 }
 
 function HeroTitle({ enrollment: e, eyebrow }: { enrollment: StudentEnrollment; eyebrow: string }) {

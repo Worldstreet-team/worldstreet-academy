@@ -23,7 +23,7 @@ const ARC = ["Interest", "Knowledge", "Skill", "Opportunity"] as const
  */
 export function AboutBand() {
   return (
-    <section className="relative py-20 md:py-28" aria-labelledby="about-heading">
+    <section className="relative py-14 sm:py-20 md:py-28" aria-labelledby="about-heading">
       <div className="mx-auto max-w-7xl px-6">
         <div className="grid gap-x-12 gap-y-8 lg:grid-cols-[13rem_1fr]">
           {/* Label column */}
@@ -54,9 +54,12 @@ export function AboutBand() {
 
             {/* The arc — ordered, because it is one. */}
             <Reveal delay={0.12}>
+              {/* One line with hairline connectors from sm; on a phone the four
+                  stops sit two by two (the line broke after "Skill" there,
+                  orphaning a connector and "Opportunity"). */}
               <ol
                 aria-label="From interest to opportunity"
-                className="mt-10 flex flex-wrap items-center gap-y-3 md:mt-12"
+                className="mt-10 grid grid-cols-2 gap-y-3 sm:flex sm:flex-wrap sm:items-center md:mt-12"
               >
                 {ARC.map((stop, i) => {
                   const last = i === ARC.length - 1
@@ -65,7 +68,7 @@ export function AboutBand() {
                       {i > 0 && (
                         <span
                           aria-hidden
-                          className="mx-3 h-px w-8 bg-ws-hairline sm:mx-4 sm:w-12 md:w-20 lg:w-28"
+                          className="mx-4 hidden h-px w-12 bg-ws-hairline sm:block md:w-20 lg:w-28"
                         />
                       )}
                       <span className="flex items-center gap-2.5">

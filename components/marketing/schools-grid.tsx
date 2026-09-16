@@ -21,7 +21,7 @@ import { SectionLabel, SectionTitle } from "@/components/marketing/section-headi
  */
 export function SchoolsGrid({ counts }: { counts: Record<SchoolSlug, number> }) {
   return (
-    <section id="schools" className="relative scroll-mt-24 py-20 md:py-28" aria-labelledby="schools-heading">
+    <section id="schools" className="relative scroll-mt-24 py-14 sm:py-20 md:py-28" aria-labelledby="schools-heading">
       <div className="mx-auto max-w-7xl px-6">
         <RevealGroup>
           <SectionLabel>Our schools</SectionLabel>

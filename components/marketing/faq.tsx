@@ -56,7 +56,7 @@ export function Faq() {
   const [open, setOpen] = React.useState<number | null>(null)
 
   return (
-    <section id="faq" className="relative isolate scroll-mt-24 py-20 md:py-28" aria-labelledby="faq-heading">
+    <section id="faq" className="relative isolate scroll-mt-24 py-14 sm:py-20 md:py-28" aria-labelledby="faq-heading">
       <div className="mx-auto grid max-w-7xl gap-12 px-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-16">
         {/* ── Heading column ── */}
         <div>

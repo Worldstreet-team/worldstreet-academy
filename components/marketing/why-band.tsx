@@ -55,7 +55,7 @@ const PILLARS = [
 
 export function WhyBand() {
   return (
-    <section className="relative py-20 md:py-28" aria-labelledby="why-heading">
+    <section className="relative py-14 sm:py-20 md:py-28" aria-labelledby="why-heading">
       <div className="mx-auto max-w-7xl px-6">
         <RevealGroup className="grid gap-x-16 gap-y-5 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
           <div>

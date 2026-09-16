@@ -21,7 +21,7 @@ export function Testimonials({ reviews }: { reviews: LandingReview[] }) {
   const shown = reviews.slice(0, 6)
 
   return (
-    <section className="relative isolate py-20 md:py-28" aria-labelledby="testimonials-heading">
+    <section className="relative isolate py-14 sm:py-20 md:py-28" aria-labelledby="testimonials-heading">
       <div className="mx-auto max-w-7xl px-6">
         <RevealGroup>
           <SectionLabel>Testimonials</SectionLabel>

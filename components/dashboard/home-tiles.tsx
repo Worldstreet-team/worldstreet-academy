@@ -294,16 +294,20 @@ export function InstructorsTile({ rows }: { rows: InstructorRow[] }) {
               <AvatarFallback>{initials(row.name)}</AvatarFallback>
             </Avatar>
             <div className="flex min-w-0 flex-1 flex-col">
-              <span className="flex min-w-0 items-center gap-2">
-                <Link
-                  href={`/dashboard/instructor/${row.instructorId}`}
-                  title={row.name}
-                  className="truncate text-[14px] font-medium underline-offset-2 outline-none hover:underline focus-visible:underline"
-                >
-                  {row.name}
-                </Link>
-                {row.isMentor && <StatusChip>Your mentor</StatusChip>}
-              </span>
+              {/* The chip has its own line: beside the name it cut a ten-letter
+                  name to "Sarah C…" in the narrow slot. */}
+              <Link
+                href={`/dashboard/instructor/${row.instructorId}`}
+                title={row.name}
+                className="truncate text-[14px] font-medium underline-offset-2 outline-none hover:underline focus-visible:underline"
+              >
+                {row.name}
+              </Link>
+              {row.isMentor && (
+                <span className="my-0.5 flex">
+                  <StatusChip>Your mentor</StatusChip>
+                </span>
+              )}
               {row.headline && (
                 <span className="truncate text-[12.5px] text-muted-foreground" title={row.headline}>
                   {row.headline}

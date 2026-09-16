@@ -18,7 +18,7 @@ export function FacultyTeaser({ faculty }: { faculty: FacultyMember[] }) {
   if (faculty.length === 0) return null
 
   return (
-    <section id="faculty" className="relative scroll-mt-24 py-20 md:py-28" aria-labelledby="faculty-teaser-heading">
+    <section id="faculty" className="relative scroll-mt-24 py-14 sm:py-20 md:py-28" aria-labelledby="faculty-teaser-heading">
       <div className="mx-auto max-w-7xl px-6">
         <RevealGroup>
           <SectionLabel>Faculty</SectionLabel>
