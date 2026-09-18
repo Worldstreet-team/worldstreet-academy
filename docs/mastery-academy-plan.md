@@ -530,11 +530,11 @@ Brand: "WorldStreet Academy" appears in 43 code locations; the lockup (mark + "W
 1. Art module, optimiser, eight covers · 2. Image-led school card; schools second on the landing · 3. `EnrollmentIntent` + pure gate rules · 4. Intent actions, gate loader, `fresh` mock persona · 5. `/dashboard/start` (school → program → package) · 6. The gate; checkout remembers the choice · 7. "Finish enrolling" dashboard hero · 8. Hero school picker; guest CTAs enter the funnel · 9. Art on every program surface · 10. Enrolment seal · 11. Pay-later emails (24 h / 72 h) · 13. Program cards that sell (school, instructor, outcomes peek) · 14. `/programs` school panels · 15. Student browse page on v2, by school · 16. Sticky school bar + certificate band on the landing · 17. Audit defects (Button `nativeButton`, program wording, retry on failed queries) · 18. Student program page: true price and figures, on-page ladder, v2 shape · 19. Meetings header; hosting controls for hosts only · 20. "Watch a free lesson" on the landing (hides at zero) · 21. Twelve program thumbnails (guarded R2 upload script; production `--apply` is owner-run) · 12. Docs, Go note, journey run (last).
 
 ### Exit criteria
-- [ ] No route from sign-up reaches an empty dashboard; instructors, admins, applicants and existing students are never gated; a gate failure opens the dashboard.
-- [ ] A school can be chosen in the landing's first viewport (1280 px and 390 px); the choice survives sign-in by URL and by cookie.
-- [ ] "Save and pay later" on the package step and on checkout; dashboard hero offers the order back; emails at 24 h and 72 h, at most once each, stopping on enrolment.
-- [ ] No public or student surface shows an empty art box.
-- [ ] `lib/actions/enrollments.ts` and `lib/wallet.ts` unchanged; no new dependency; no token change.
+- [x] No route from sign-up reaches an empty dashboard; instructors, admins, applicants and existing students are never gated; a gate failure opens the dashboard.
+- [x] A school can be chosen in the landing's first viewport (1280 px and 390 px); the choice survives sign-in by URL and by cookie.
+- [x] "Save and pay later" on the package step and on checkout; dashboard hero offers the order back; emails at 24 h and 72 h, at most once each, stopping on enrolment.
+- [x] No public or student surface shows an empty art box.
+- [x] `lib/actions/enrollments.ts` and `lib/wallet.ts` unchanged; no new dependency; no token change.
 
 ---
 
