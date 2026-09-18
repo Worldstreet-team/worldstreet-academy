@@ -220,6 +220,74 @@ export async function fetchBrowseCourses(options?: {
   }
 }
 
+export type FreePreview = {
+  lessonId: string
+  lessonTitle: string
+  /** Whole minutes; null when unknown. */
+  minutes: number | null
+  /** The lesson's poster, else the program's art. */
+  posterUrl: string | null
+  /** Public by the instructor's choice: only `isFree` lessons ever reach here. */
+  videoUrl: string
+  courseTitle: string
+  courseSlug: string
+  school: SchoolSlug | null
+}
+
+/**
+ * Free preview video lessons from published programs, for the landing. The
+ * same exposure rule as fetchPublicCourse: a videoUrl leaves the server only
+ * when the instructor marked the lesson `isFree`. One per program, so a single
+ * generous program cannot fill the rail.
+ */
+export async function fetchFreePreviewLessons(limit = 6): Promise<FreePreview[]> {
+  try {
+    await connectDB()
+    const lessons = await Lesson.find({
+      isFree: true,
+      isPublished: true,
+      type: "video",
+      videoUrl: { $nin: [null, ""] },
+    })
+      .sort({ order: 1 })
+      .limit(60)
+      .populate({ path: "course", match: { status: "published" }, select: "title slug school thumbnailUrl" })
+      .select("title videoUrl videoDuration videoThumbnailUrl course")
+      .lean()
+
+    const seen = new Set<string>()
+    const out: FreePreview[] = []
+    for (const lesson of lessons) {
+      const course = lesson.course as unknown as {
+        _id: { toString(): string }
+        title: string
+        slug: string
+        school?: string | null
+        thumbnailUrl: string | null
+      } | null
+      if (!course || !lesson.videoUrl) continue // populate `match` nulls unpublished programs
+      const courseId = course._id.toString()
+      if (seen.has(courseId)) continue
+      seen.add(courseId)
+      out.push({
+        lessonId: lesson._id.toString(),
+        lessonTitle: lesson.title,
+        minutes: lesson.videoDuration ? Math.max(1, Math.round(lesson.videoDuration / 60)) : null,
+        posterUrl: lesson.videoThumbnailUrl || programArt(course),
+        videoUrl: lesson.videoUrl,
+        courseTitle: course.title,
+        courseSlug: course.slug,
+        school: isSchoolSlug(course.school) ? course.school : null,
+      })
+      if (out.length >= limit) break
+    }
+    return out
+  } catch (error) {
+    console.error("Fetch free previews error:", error)
+    return []
+  }
+}
+
 // ============================================================================
 // PUBLIC COURSE DETAIL
 // ============================================================================

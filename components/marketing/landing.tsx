@@ -1,4 +1,4 @@
-import { fetchBrowseCourses, fetchFaculty, type BrowseCourse } from "@/lib/actions/student"
+import { fetchBrowseCourses, fetchFaculty, fetchFreePreviewLessons, type BrowseCourse } from "@/lib/actions/student"
 import { fetchLandingReviews } from "@/lib/actions/reviews"
 import { getCurrentUser } from "@/lib/auth/actions"
 import { registerUrl } from "@/lib/auth/login-url"
@@ -16,6 +16,7 @@ import { Testimonials, FinaleCta } from "@/components/marketing/reviews-finale"
 import { Faq } from "@/components/marketing/faq"
 import { CertificateBand } from "@/components/marketing/certificate-band"
 import { StickySchoolBar } from "@/components/marketing/sticky-school-bar"
+import { FreePreviewRail } from "@/components/marketing/free-preview-rail"
 
 // A new account returns to the school picker, never to the hub.
 const REGISTER_URL = registerUrl("/dashboard/start")
@@ -37,6 +38,7 @@ function futureDrops(published: BrowseCourse[]): BrowseCourse[] {
  * the band of words, the Schools grid, the About statement, the Why pillars,
  * the How-it-works timeline, the certificate band (spec §13), the catalogue
  * card grid (the ONLY section allowed to show course thumbnails), the
+ * "Watch a free lesson" rail (real free previews only; hidden at zero), the
  * Faculty teaser (hidden when there is no faculty), Upcoming drops (hidden
  * when nothing is scheduled), testimonials (real reviews), the FAQ, and the
  * finale CTA — plus a sticky school bar, fixed to the viewport, that follows
@@ -49,11 +51,12 @@ function futureDrops(published: BrowseCourse[]): BrowseCourse[] {
  * LandingReview fields plus the true "70% default" pass-mark line.
  */
 export async function Landing() {
-  const [user, courses, reviews, faculty] = await Promise.all([
+  const [user, courses, reviews, faculty, previews] = await Promise.all([
     getCurrentUser().catch(() => null),
     fetchBrowseCourses(),
     fetchLandingReviews(9),
     fetchFaculty(),
+    fetchFreePreviewLessons(),
   ])
 
   const signedIn = Boolean(user)
@@ -101,6 +104,9 @@ export async function Landing() {
 
       {/* Featured programs — the catalogue grid (the ONLY course-art section; hides below 3) */}
       <CatalogueGrid courses={gridCourses} signedIn={signedIn} />
+
+      {/* Watch a free lesson — real free previews only; hides at zero */}
+      <FreePreviewRail previews={previews} />
 
       {/* Faculty — up to four instructors and View faculty; hides at zero (spec §10) */}
       <FacultyTeaser faculty={faculty} />
