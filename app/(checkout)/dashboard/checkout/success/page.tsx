@@ -1,9 +1,10 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { ArrowRightIcon, CircleCheckIcon } from "lucide-react"
+import { ArrowRightIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { BRAND } from "@/lib/brand"
 import { getCheckoutConfirmation } from "@/lib/actions/enrollments"
+import { EnrolledSeal } from "@/components/checkout/enrolled-seal"
 import { MentorshipIntakeForm } from "@/components/checkout/mentorship-intake-form"
 
 /** Spec §12/§17 "Enrollment confirmed" — server-rendered from the enrollment, never from query params. */
@@ -29,10 +30,11 @@ export default async function CheckoutSuccessPage({
     <div className="px-4 pb-16">
       <div className="mx-auto w-full max-w-md space-y-8 py-16">
           <div className="space-y-4 text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-ws-success/10">
-              <CircleCheckIcon size={32} className="text-ws-success" aria-hidden />
-            </div>
-            <h1 className="font-display text-2xl font-semibold tracking-[-0.015em] text-ws-primary">
+            <EnrolledSeal />
+            <h1
+              className="rise font-display text-2xl font-semibold tracking-[-0.015em] text-ws-primary"
+              style={{ "--rise-delay": "520ms" } as React.CSSProperties}
+            >
               Enrollment confirmed
             </h1>
             <p className="text-sm leading-relaxed text-ws-muted">

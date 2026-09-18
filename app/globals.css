@@ -424,6 +424,25 @@ svg[viewBox="0 0 24 24"][color]:not(.lucide) > path:not(:first-child) {
   animation-delay: var(--rise-delay, 0ms);
 }
 
+/* ── Enrolment seal — one-shot, on "Enrollment confirmed" only ───────────────
+   The ring draws, then the tick. Plays once; nothing loops. */
+@keyframes ws-seal-ring {
+  from { stroke-dashoffset: 176; }
+  to   { stroke-dashoffset: 0; }
+}
+@keyframes ws-seal-tick {
+  from { stroke-dashoffset: 36; }
+  to   { stroke-dashoffset: 0; }
+}
+.ws-seal-ring {
+  stroke-dasharray: 176;
+  animation: ws-seal-ring 620ms var(--ws-ease) 120ms both;
+}
+.ws-seal-tick {
+  stroke-dasharray: 36;
+  animation: ws-seal-tick 320ms var(--ws-ease) 640ms both;
+}
+
 /* RollingAmount — the balance odometer. Adjacent digits roll in opposite
    directions via --rd (1 | -1); travel is in `em` so it scales with the
    font-size. Fires only when a value changes. */
@@ -460,8 +479,11 @@ svg[viewBox="0 0 24 24"][color]:not(.lucide) > path:not(:first-child) {
   .rise,
   .roll-in,
   .roll-out,
-  .ws-thumb-stretch {
+  .ws-thumb-stretch,
+  .ws-seal-ring,
+  .ws-seal-tick {
     animation: none;
+    stroke-dashoffset: 0;
   }
   .roll-out { display: none; }
 }
