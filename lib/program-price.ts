@@ -13,3 +13,8 @@ export function programPriceLabel(
   const usd = `$${course.price.toLocaleString("en-US")}`
   return course.tierCount > 1 ? `From ${usd}` : usd
 }
+
+/** A package's own price: whole USD, or "Free". */
+export function packagePriceLabel(price: number): string {
+  return price === 0 ? "Free" : `$${price.toLocaleString("en-US")}`
+}

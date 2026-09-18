@@ -1,6 +1,7 @@
 export { queryKeys } from "./keys"
 export { useEnrollments, useInvalidateEnrollments } from "./use-enrollments"
 export { useBookmarks, useBookmarkedIds, useToggleBookmark } from "./use-bookmarks"
+export { useMyEnrollmentIntent } from "./use-enrollment-intent"
 export { useBrowseCourses } from "./use-browse-courses"
 export { useInstructorCourses, useInvalidateInstructorCourses } from "./use-instructor-courses"
 export {

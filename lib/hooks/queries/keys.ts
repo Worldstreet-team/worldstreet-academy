@@ -3,6 +3,7 @@ export const queryKeys = {
   // ── Courses (Student) ──
   enrollments: ["enrollments"] as const,
   bookmarks: ["bookmarks"] as const,
+  enrollmentIntent: ["enrollment-intent"] as const,
   certificates: ["certificates"] as const,
   browseCourses: (filters?: { level?: string; pricing?: string }) =>
     filters ? ["browse-courses", filters] as const : ["browse-courses"] as const,
