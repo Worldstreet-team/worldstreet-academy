@@ -9,9 +9,9 @@ import { LineMask } from "@/components/marketing/motion/line-mask"
 import { EASE_INERTIA } from "@/components/marketing/motion/ease"
 import { addFrame, useMotionOK } from "@/components/marketing/motion/bus"
 import { BRAND } from "@/lib/brand"
-import { SCHOOLS, cheapestBySchool, countProgramsBySchool, type SchoolSlug } from "@/lib/schools"
+import { SCHOOLS, cheapestBySchool, countProgramsBySchool } from "@/lib/schools"
 import { schoolCover } from "@/lib/school-art"
-import { START_SCHOOL_COOKIE } from "@/lib/start-gate"
+import { useStartSchool } from "@/components/marketing/start-school-store"
 import { cn } from "@/lib/utils"
 
 /** Row drift speeds, px/s — alternating directions, deliberately unequal so
@@ -51,17 +51,12 @@ export function HeroWall({
   const rowRefs = React.useRef<Array<HTMLDivElement | null>>([])
   const positions = React.useRef<number[]>(ROW_SPEEDS.map(() => 0))
 
-  const [picked, setPicked] = React.useState<SchoolSlug | null>(null)
+  const picked = useStartSchool((s) => s.picked)
+  const pick = useStartSchool((s) => s.pick)
   const counts = React.useMemo(() => countProgramsBySchool(courses), [courses])
   const cheapest = React.useMemo(() => cheapestBySchool(courses), [courses])
   const pickedSchool = picked ? SCHOOLS.find((s) => s.slug === picked)! : null
   const pickedCover = schoolCover(picked)
-
-  function pick(slug: SchoolSlug) {
-    setPicked(slug)
-    // Survives the sign-up round trip even if the hub drops the return URL.
-    document.cookie = `${START_SCHOOL_COOKIE}=${slug}; path=/; max-age=2592000; samesite=lax`
-  }
 
   const art = courses.filter((c) => c.thumbnailUrl).map((c) => c.thumbnailUrl!)
   // Three rows, each cycled to at least 8 tiles, offset so seams never align.
@@ -91,6 +86,7 @@ export function HeroWall({
 
   return (
     <section
+      id="hero"
       className="relative isolate -mt-[4.25rem] flex min-h-[92svh] items-center overflow-hidden sm:-mt-[5.25rem]"
       aria-label={BRAND.name}
     >
@@ -196,12 +192,15 @@ export function HeroWall({
           the subhead's first line reaches x=598, and a 28rem figure would
           start at 576 and collide. Hidden below md, where no column is free
           of the text. She steps aside (opacity only) while a school's cover
-          holds her spot. */}
+          holds her spot — but only from lg, where the cover is promoted
+          above the overlay to replace her; below that the cover stays
+          veiled under the overlay, so fading her too would leave the hero
+          emptier rather than swapping one subject for another. */}
       <div
         aria-hidden
         className={cn(
           "pointer-events-none absolute bottom-0 right-0 -z-[5] hidden select-none transition-opacity duration-[var(--ws-motion-slow)] ease-[var(--ws-ease)] motion-reduce:transition-none md:block",
-          pickedCover && "opacity-0"
+          pickedCover && "lg:opacity-0"
         )}
       >
         <Image

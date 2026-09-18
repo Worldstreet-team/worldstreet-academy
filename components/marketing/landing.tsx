@@ -14,6 +14,8 @@ import { FacultyTeaser } from "@/components/faculty/faculty-teaser"
 import { UpcomingDrops } from "@/components/marketing/upcoming-drops"
 import { Testimonials, FinaleCta } from "@/components/marketing/reviews-finale"
 import { Faq } from "@/components/marketing/faq"
+import { CertificateBand } from "@/components/marketing/certificate-band"
+import { StickySchoolBar } from "@/components/marketing/sticky-school-bar"
 
 // A new account returns to the school picker, never to the hub.
 const REGISTER_URL = registerUrl("/dashboard/start")
@@ -33,10 +35,12 @@ function futureDrops(published: BrowseCourse[]): BrowseCourse[] {
 /**
  * The Academy landing at `/` — clean editorial composition, in order: hero,
  * the band of words, the Schools grid, the About statement, the Why pillars,
- * the How-it-works timeline, the catalogue card grid (the ONLY section
- * allowed to show course thumbnails), the Faculty teaser (hidden when there is
- * no faculty), Upcoming drops (hidden when nothing is scheduled), testimonials
- * (real reviews), the FAQ, and the finale CTA.
+ * the How-it-works timeline, the certificate band (spec §13), the catalogue
+ * card grid (the ONLY section allowed to show course thumbnails), the
+ * Faculty teaser (hidden when there is no faculty), Upcoming drops (hidden
+ * when nothing is scheduled), testimonials (real reviews), the FAQ, and the
+ * finale CTA — plus a sticky school bar, fixed to the viewport, that follows
+ * the visitor once the hero has scrolled out of view.
  *
  * This server component is the ONLY fetch point; sections are client leaves
  * that receive data as props. Every fetch already falls back to `[]`/null,
@@ -92,6 +96,9 @@ export async function Landing() {
       {/* How it works — the four-step journey (spec §11) */}
       <HowItWorks />
 
+      {/* Certification — what completing a program earns (spec §13) */}
+      <CertificateBand />
+
       {/* Featured programs — the catalogue grid (the ONLY course-art section; hides below 3) */}
       <CatalogueGrid courses={gridCourses} signedIn={signedIn} />
 
@@ -109,6 +116,9 @@ export async function Landing() {
 
       {/* Finale CTA (spec §16) */}
       <FinaleCta signedIn={signedIn} registerUrl={REGISTER_URL} />
+
+      {/* Follows the visitor once the hero scrolls away (spec §1) */}
+      <StickySchoolBar cheapest={schoolFrom} />
     </div>
   )
 }
