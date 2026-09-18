@@ -8,6 +8,7 @@
 <body>
 <canvas id="c"></canvas>
 <script src="scenes.js"></script>
+<script src="programs.js"></script>
 <script>
 /*
   WorldStreet Mastery Academy — school cover renderer.
@@ -40,7 +41,8 @@ const RIG = {
   elev: 12,                   // degrees above horizontal
   azim: 12,                   // degrees; > 0 = camera sits right of front
   frameH: 2.6,                // frame height (world units) at target distance
-  shift: [0.50, -0.06],       // lens shift (half-height units): object -> right, slightly low
+  shiftFrac: 0.3125,          // lens shift, x as a fraction of half-width: object centre at ~66% of the frame
+  shiftY: -0.06,              // lens shift, y in half-height units: slightly low
   aperture: 0.05,             // thin-lens radius
   exposure: 1.0,
   bloom: 0.10,
@@ -578,12 +580,13 @@ const post = { resolve: null, down: null, post: null };
 function ensurePostPrograms(){ if (!post.resolve){ post.resolve = program(RESOLVE_FS); post.down = program(DOWN_FS); post.post = program(POST_FS); } }
 
 // Render one scene. Returns a PNG data URL.
-window.renderCover = async function({ scene, width = 2400, height = 1500, spp = 64, tile = 600 }){
-  const S = window.SCENES[scene]; if (!S) throw new Error("unknown scene " + scene);
+window.renderCover = async function({ scene, width = 2400, height = 1500, spp = 64, tile = 600, format = "rgb" }){
+  const S = window.SCENES[scene] || (window.PROGRAMS || {})[scene]; if (!S) throw new Error("unknown scene " + scene);
+  const src0 = S.common ? S.common + "\n" : "";
   const t0 = performance.now();
   canvas.width = width; canvas.height = height;
   ensurePostPrograms();
-  const src = CORE_HEAD + "\n// ===== scene: " + scene + " =====\n" + S.glsl + "\n" + CORE_TAIL;
+  const src = CORE_HEAD + "\n// ===== scene: " + scene + " =====\n" + src0 + S.glsl + "\n" + CORE_TAIL;
   const prog = program(src);
 
   const acc = [tex(width, height, gl.RGBA32F, false), tex(width, height, gl.RGBA32F, false)];
@@ -616,7 +619,8 @@ window.renderCover = async function({ scene, width = 2400, height = 1500, spp = 
   gl.uniform2f(U("uRes"), width, height);
   gl.uniform3fv(U("uCamPos"), pos); gl.uniform3fv(U("uFwd"), fwd); gl.uniform3fv(U("uRight"), right); gl.uniform3fv(U("uUp"), up);
   gl.uniform1f(U("uTanHalf"), r.frameH*0.5/r.dist); gl.uniform1f(U("uFocus"), (S.focus || 0) + r.dist); gl.uniform1f(U("uAperture"), r.aperture);
-  gl.uniform2f(U("uShift"), r.shift[0], r.shift[1]);
+  // same horizontal placement at any aspect (16:10 covers, 16:9 program thumbnails)
+  gl.uniform2f(U("uShift"), r.shiftFrac*(width/height), r.shiftY);
   gl.uniform3fv(U("uLc"), Lc); gl.uniform3fv(U("uLu"), Lu); gl.uniform3fv(U("uLv"), Lv); gl.uniform3fv(U("uLn"), Ln); gl.uniform3fv(U("uLe"), Le); gl.uniform1fv(U("uLa"), La); gl.uniform1fv(U("uLk"), Lk);
   gl.uniform3fv(U("uAccent"), S.accent);
   gl.uniform1i(U("uPrev"), 0);
@@ -674,12 +678,27 @@ window.renderCover = async function({ scene, width = 2400, height = 1500, spp = 
   gl.uniform1f(P("uBloom"), r.bloom); gl.uniform1f(P("uExposure"), r.exposure*(S.exposure || 1)); gl.uniform1f(P("uGrain"), r.grain);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   gl.finish();
-  const url = canvas.toDataURL("image/png");
+  // Output: tightly packed top-down RGB (base64) for the Node PNG encoder, or a data URL.
+  let out;
+  if (format === "rgb"){
+    const px = new Uint8Array(width*height*4);
+    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    const rgb = new Uint8Array(width*height*3);
+    for (let y = 0; y < height; y++){
+      const s = (height - 1 - y)*width*4, d = y*width*3;
+      for (let x = 0; x < width; x++){ rgb[d + x*3] = px[s + x*4]; rgb[d + x*3 + 1] = px[s + x*4 + 1]; rgb[d + x*3 + 2] = px[s + x*4 + 2]; }
+    }
+    let bin = ""; const CH = 0x8000;
+    for (let i = 0; i < rgb.length; i += CH) bin += String.fromCharCode.apply(null, rgb.subarray(i, i + CH));
+    out = { rgb: btoa(bin) };
+  } else {
+    out = { url: canvas.toDataURL("image/png") };
+  }
 
   for (const t of [...acc, hdr, bright, ...chain.map((c) => c.t)]) gl.deleteTexture(t);
   for (const f of [...accF, hdrF, brightF, ...chain.map((c) => c.f)]) gl.deleteFramebuffer(f);
   gl.deleteProgram(prog);
-  return { url, ms: Math.round(performance.now() - t0) };
+  return Object.assign(out, { width, height, ms: Math.round(performance.now() - t0) });
 };
 window.RENDERER_READY = true;
 </script>

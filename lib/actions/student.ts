@@ -918,7 +918,7 @@ export async function fetchMyBookmarks(): Promise<StudentBookmark[]> {
       .populate({
         path: "course",
         match: { status: "published" },
-        select: "title thumbnailUrl instructor level pricing price rating enrolledCount school",
+        select: "title thumbnailUrl instructor level pricing price rating enrolledCount school slug",
         populate: {
           path: "instructor",
           select: "firstName lastName avatarUrl",
@@ -935,6 +935,7 @@ export async function fetchMyBookmarks(): Promise<StudentBookmark[]> {
           title: string
           thumbnailUrl: string
           school?: string | null
+          slug: string
           instructor: { firstName: string; lastName: string; avatarUrl: string | null }
           level: string
           pricing: string
@@ -1242,7 +1243,7 @@ export async function fetchInstructorPublicCourses(instructorId: string): Promis
       instructor: instructorId,
       status: "published",
     })
-      .select("title thumbnailUrl level pricing price totalLessons enrolledCount rating school")
+      .select("title thumbnailUrl level pricing price totalLessons enrolledCount rating school slug")
       .sort({ createdAt: -1 })
       .lean()
 
@@ -1283,7 +1284,7 @@ export async function fetchEnrolledCoursesFromInstructor(instructorId: string): 
       _id: { $in: enrolledCourseIds },
       instructor: instructorId,
     })
-      .select("title thumbnailUrl level pricing price totalLessons enrolledCount rating school")
+      .select("title thumbnailUrl level pricing price totalLessons enrolledCount rating school slug")
       .lean()
 
     return courses.map((course) => ({

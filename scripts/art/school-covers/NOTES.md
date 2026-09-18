@@ -1,51 +1,62 @@
-# WSA school covers: render notes
+# WSA school covers + program thumbnails: render notes
 
-Eight 2400×1500 (16:10) studio still lifes, one per school, rendered in code.
-No image model was involved. Every pixel comes from a small GPU path tracer
-running in headless Chromium.
+Eight 2400×1500 (16:10) school covers and twelve 2400×1350 (16:9) program
+thumbnails. They are studio still lifes rendered in code. No image model was
+involved. Every pixel comes from a small GPU path tracer running in headless
+Chromium.
 
 ```
 art/
-  src/renderer.html   core: WebGL2 path tracer, shared studio rig, post pipeline
-  src/scenes.js       the eight objects (SDF geometry, materials, accent hue)
-  src/render.mjs      Node driver: renders PNGs and builds the contact sheets
-  src/_montage.py     dev helper: quick 4x2 montage of a preview folder (PIL)
-  schools/<slug>.png  finals, 2400x1500
-  contact-cards.png   all eight at landing-card size (400x250, 20px gaps/radius, #0C0A09)
-  contact-hero.png    trading + ai-automation at 1280x800, 60% opacity, 85%->30% black gradient, headline left
-  backup/             v1 digital-media-creative + ai-automation finals, v1 card sheet, scenes.v1.js
-  preview/            960x600 working renders (safe to delete)
-  tmp/                patch scripts and the generated contact-sheet HTML (safe to delete)
+  src/renderer.html      core: WebGL2 path tracer, shared studio rig, post pipeline
+  src/scenes.js          the eight school covers (SDF geometry, materials, accent hue)
+  src/programs.js        the twelve program thumbnails (same contract; accent borrowed from the school)
+  src/render.mjs         Node driver: renders RGB PNGs and builds the contact sheets
+  src/_montage.py        dev helper: quick 4x2 montage of a preview folder (PIL)
+  schools/<slug>.png     cover finals, 2400x1500 RGB
+  programs/<slug>.png    program finals, 2400x1350 RGB (file = course slug)
+  contact-cards.png      all eight covers at landing-card size (400x250, 20px gaps/radius, #0C0A09)
+  contact-hero.png       trading + ai-automation at 1280x800, 60% opacity, 85%->30% black gradient, headline left
+  contact-programs.png   one row per school: its cover (gold outline) then its program cards (400x225)
+  backup/                v1 digital-media-creative + ai-automation finals, v1 card sheet, scenes.v1.js
+  preview/, preview-programs/   960px working renders (safe to delete)
+  tmp/                   patch scripts and the generated contact-sheet HTML (safe to delete)
 ```
 
 ## Re-render
 
-From `scripts/art/school-covers/` (needs Node 18+). Playwright is NOT a
-project dependency — install it globally first (`npm i -g playwright`), then
-either point `NODE_PATH` at the global `node_modules` or use `npx -p
-playwright`:
+From `scripts/art/school-covers/` (needs Node 22.2+, for `zlib.crc32` in the
+PNG encoder). Playwright is NOT a project dependency — install it globally
+first (`npm i -g playwright`), then either point `NODE_PATH` at the global
+`node_modules` or use `npx -p playwright`:
 
 ```
-NODE_PATH=$(npm root -g) node render.mjs all              # all eight finals (256 spp) + both contact sheets, ~6 min
-npx -p playwright node render.mjs cybersecurity            # one school
-NODE_PATH=$(npm root -g) node render.mjs all --preview     # 960x600 @ 48 spp into ../preview/ for fast iteration
-NODE_PATH=$(npm root -g) node render.mjs contact            # rebuild the contact sheets only
+NODE_PATH=$(npm root -g) node render.mjs all                       # 8 covers (256 spp) + cover contact sheets, ~6 min
+NODE_PATH=$(npm root -g) node render.mjs programs                  # 12 program thumbnails (256 spp) + contact-programs.png, ~12 min
+npx -p playwright node render.mjs cybersecurity                    # one school cover
+npx -p playwright node render.mjs program:cybersecurity            # the Cybersecurity *program* (its slug collides with the school's)
+NODE_PATH=$(npm root -g) node render.mjs data-analysis virtual-assistance   # any program slug(s)
+NODE_PATH=$(npm root -g) node render.mjs all programs --preview    # 960px @ 48 spp into ../preview/ and ../preview-programs/
+NODE_PATH=$(npm root -g) node render.mjs contact                   # rebuild every contact sheet from the finals
 NODE_PATH=$(npm root -g) node render.mjs ai-automation --spp=512   # more samples (GPU time is small; compile dominates)
 python _montage.py ../preview ../preview/_sheet.png   # optional preview montage (not copied into this repo)
 ```
 
-Outputs (PNGs) land relative to this script (`../schools`, `../preview`,
-`../tmp` next to wherever you run it from) — pass `--out=<dir>` to redirect
-them, then run `node scripts/optimize-art.mjs <dir>` from the repo root to
-produce the committed WebPs.
-
-Canvas export writes RGBA PNGs, with alpha fully opaque (the context is
-created with `alpha: false`). The shipped finals were flattened to RGB, which
-makes them about 35% smaller:
+Outputs (PNGs) land relative to this script (`../schools`, `../programs`,
+`../preview`, `../preview-programs`, `../tmp` next to wherever you run it
+from) — pass `--out=<dir>` to redirect them, then run `optimize-art.mjs` from
+the repo root to produce the committed WebPs:
 
 ```
-python -c "from PIL import Image;import glob;[Image.open(f).convert('RGB').save(f,optimize=True) for f in glob.glob('../schools/*.png')]"
+node scripts/optimize-art.mjs <schools-dir> public/art/schools 1600x1000
+node scripts/optimize-art.mjs <programs-dir> public/art/programs 1600x900
 ```
+
+`render.mjs` reads the pixels straight back off the GPU and encodes them as
+8-bit RGB PNGs (no alpha channel) with its own small encoder, so no
+flattening step is needed. Framing is aspect-independent: `RIG.shiftFrac`
+keeps the object centre at about 66% of the frame width, and `RIG.shiftY`
+sets the vertical lens shift, so a 16:9 program frame keeps the covers'
+vertical field and only gains width.
 
 Chromium runs on the real GPU (`--use-angle=d3d11`). `--swiftshader` switches
 to software GL. It works, but it is slow, so use preview sizes with it. Output
@@ -95,7 +106,7 @@ takes seconds, so raising `--spp` is cheap.
   - About 1% luma-weighted film grain plus triangular dither, so gradients
     never band.
 
-## Per image
+## Per image (school covers)
 
 | Slug | Object | Accent | Notes |
 |---|---|---|---|
@@ -108,11 +119,48 @@ takes seconds, so raising `--spp` is cheap.
 | digital-media-creative | Satin bead-blasted aluminium cine lens on its side, with a machined straight-knurl focus ring, engraved lathe grooves, gold index and mount rings, a gunmetal hood and a bulging multicoated front element (green to magenta). A clapperboard (brighter stripes, chalk-ruled slate) stands behind | magenta (`accentPower` 0.35) | Refinement pass v2. The earlier front element had been accidentally cut flat inside the hood; it is now a real cap. A polished horizontal cylinder in this rig mirrors only a thin cone of directions. At the old angle that cone ran through the accent box, which caused the magenta wash. The axis was swung 16° further left, so the cone misses the accent, and the barrel became a part-diffuse satin alloy (metal 0.55) that shades smoothly from key, bounce and accent. Magenta now reads as a rim with a slight mauve cast on the barrel. Still the quietest card, but in range. The v1 final is kept in `backup/`. |
 | digital-business-remote-careers | Cognac leather briefcase laid open, brass clasps and handle. A brass wire globe with a glowing core floats over the suede lining and lights the case from inside | coral | The only scene with a practical light: a sphere light, sampled with MIS. |
 
+## Per image (program thumbnails, 16:9)
+
+Each program borrows its school's accent hue and power and shares the
+identical rig; only the object changes. The file name is the course slug
+(`Course.slug`). `cybersecurity` is both a school slug and a program slug —
+the program's scene id is `program:cybersecurity`.
+
+| Slug | School accent | Object |
+|---|---|---|
+| forex-trading-mastery | emerald | Polished-brass balance (beam, three-rod pans) on a dark stone relief-map disc with raised bronze "continents" (seeded noise, not a real map) |
+| crypto-trading-mastery | emerald | Unmarked 12-sided crystal coin (IOR 1.7, pyramid-faceted faces, chamfered rim, thin gold bezel) hovering over four small brass candlesticks |
+| blockchain-technology-mastery | electric blue | Three clear glass blocks rising in a row, each holding meshed brass gears around a glowing axle core, joined by beams of light |
+| ai-ai-automation | violet | Articulated brass arm with a three-finger gripper setting a glass sphere into the empty first slot of a brass rail of spheres |
+| app-development-with-ai | cyan | Smoked-glass phone on a steel foot, with three layers of glowing wireframe UI (screen frame, cards, button and avatar) lifting off towards the viewer |
+| cybersecurity (`program:cybersecurity`) | teal | Satin brushed-steel heater shield with a polished rim and a keyhole, a brass key floating in front of it on the keyhole axis, on a steel foot |
+| data-analysis | amber | Walnut-handled brass magnifier over five polished marble columns; the lens really refracts the columns behind it |
+| content-creation-mastery | magenta | A ring light (warm-white diffuser, practical light) haloing a studio condenser mic in a shock mount |
+| video-editing-mastery | magenta | Brushed-aluminium jog dial on a black console, a satin reel standing behind, and a twisted, perforated film ribbon unspooling across the dial |
+| tech-sales-digital-marketing | coral | Brass megaphone standing on its grip, aimed up a four-step travertine staircase |
+| e-commerce-digital-business | coral | Travertine storefront arch (keystone, cornice, step) with a warmly glowing taped parcel in the doorway |
+| virtual-assistance | coral | Headset lying on a stack of three leather notebooks (cream page blocks), with a brass desk clock at 10:10 beside it |
+
+Weakest, after one iteration each:
+- **crypto-trading-mastery**: the crystal refracts the dark studio, so the coin
+  reads as a gold-bezelled dark gem with one bright facet glint, not as clear
+  crystal. The next step would be a few internal bright facets, or a soft
+  practical light under the coin.
+- **video-editing-mastery**: legible (reel, perforated film, jog dial), but the
+  mass sits low and it has the least sparkle.
+- **virtual-assistance**: reads well but sits slightly small and low next to
+  its siblings.
+
+Renderer fixes found on the way:
+- A glass block with objects inside must be unioned by `|d_glass|`, or the
+  march steps straight over the contents (see blockchain-technology-mastery).
+- WebGL GLSL forbids `?:` on structs.
+
 ## Contact sheet findings
 
-- **Cards (400×250)**: all eight read at a glance and sit together as one
-  series. The left third stays quiet under the label and chip. After the v2
-  pass, Digital Media sits in the same exposure range as the others: it is
+- **Cards (400×250)**: all eight covers read at a glance and sit together as
+  one series. The left third stays quiet under the label and chip. After the
+  v2 pass, Digital Media sits in the same exposure range as the others: it is
   still the quietest card, but the lens now reads as silver glass and metal.
 - **Hero (1280×800, 60% opacity under an 85%→30% black gradient)**: the
   headline and CTA are fully readable and the object never crosses the copy
@@ -121,6 +169,10 @@ takes seconds, so raising `--spp` is cheap.
   something closer to 85-100% image opacity under a 90%→0% gradient that stops
   at about 55% width. The left third is already dark in the source, so it
   needs little help.
+- **Program rows (contact-programs.png)**: every program reads distinctly
+  from its siblings under the same school (Forex's balance vs. Crypto's
+  crystal, Content Creation's mic vs. Video Editing's jog dial), and each
+  keeps its school's accent identifiable next to the cover.
 
 ## With more time
 
@@ -141,3 +193,5 @@ takes seconds, so raising `--spp` is cheap.
 - Per-scene variants cropped for 21:9. The current framing keeps each object
   inside the central 69% band, so a centred 21:9 crop keeps it whole, but the
   plinth drops out of frame.
+- A few internal bright facets (or a soft practical light) for the crypto
+  crystal coin, and a touch more mass for virtual-assistance.
