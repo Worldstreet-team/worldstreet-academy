@@ -10,7 +10,7 @@ import { AvailabilityCountdown } from "@/components/shared/availability-countdow
 import { levelChipStyle } from "@/components/shared/level-badge"
 import type { Course } from "@/lib/types"
 import type { BrowseCourse } from "@/lib/actions/student"
-import { BookmarkIcon, CirclePlayIcon, StarIcon } from "lucide-react"
+import { BookmarkIcon, CirclePlayIcon, GraduationCapIcon, StarIcon } from "lucide-react"
 
 type CourseData = Course | BrowseCourse
 
@@ -46,7 +46,9 @@ export function CourseCard({ course }: { course: CourseData }) {
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-muted-foreground/40 text-xs">No thumbnail</span>
+              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-ws-brand/10 text-ws-gold">
+                <GraduationCapIcon size={20} aria-hidden />
+              </span>
             </div>
           )}
           {/* Glassmorphic price badge */}

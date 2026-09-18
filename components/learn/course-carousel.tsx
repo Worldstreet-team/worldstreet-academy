@@ -14,6 +14,7 @@ import {
   CarouselNext,
 } from "@/components/ui/carousel"
 import type { BrowseCourse } from "@/lib/actions/student"
+import { GraduationCapIcon } from "lucide-react"
 
 export function CourseCarousel({ courses, title }: { courses: BrowseCourse[]; title: string }) {
   if (courses.length === 0) return null
@@ -52,7 +53,9 @@ export function CourseCarousel({ courses, title }: { courses: BrowseCourse[]; ti
                       />
                     ) : (
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-muted-foreground/40 text-xs">No thumbnail</span>
+                        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-ws-brand/10 text-ws-gold">
+                          <GraduationCapIcon size={20} aria-hidden />
+                        </span>
                       </div>
                     )}
                     <Badge

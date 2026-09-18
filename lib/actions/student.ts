@@ -5,6 +5,7 @@ import connectDB from "@/lib/db"
 import { Course, Enrollment, Bookmark, User, Lesson, type ICoursePackage, type IPackageEntitlements, type PackageKey } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth"
 import { isSchoolSlug, type SchoolSlug } from "@/lib/schools"
+import { programArt } from "@/lib/school-art"
 import { FULL_ACCESS, PACKAGE_RANK, canAccessLesson, effectiveLessonTier, entitlementsFor } from "@/lib/entitlements"
 import {
   getCourseAccess,
@@ -29,6 +30,7 @@ export type BrowseCourse = {
   description: string
   /** Spec §5 program blurb; null on legacy courses (fall back to `description`). */
   shortDescription: string | null
+  /** The program's art: its own thumbnail, else its school's cover (lib/school-art.ts). Null only when neither exists. */
   thumbnailUrl: string | null
   instructorId: string
   instructorName: string
@@ -190,7 +192,7 @@ export async function fetchBrowseCourses(options?: {
         slug: course.slug,
         description: course.description,
         shortDescription: course.shortDescription ?? null,
-        thumbnailUrl: course.thumbnailUrl,
+        thumbnailUrl: programArt(course),
         instructorId: instructor._id.toString(),
         instructorName: `${instructor.firstName} ${instructor.lastName}`,
         instructorAvatarUrl: instructor.avatarUrl,
@@ -298,7 +300,7 @@ export async function fetchPublicCourse(courseId: string): Promise<PublicCourse 
       id: course._id.toString(),
       title: course.title,
       description: course.description,
-      thumbnailUrl: course.thumbnailUrl,
+      thumbnailUrl: programArt(course),
       instructorId: instructor._id.toString(),
       instructorName: `${instructor.firstName} ${instructor.lastName || ""}`.trim(),
       instructorAvatarUrl: instructor.avatarUrl,
@@ -436,7 +438,7 @@ async function findProgram(filter: { slug: string } | { _id: string }): Promise<
     slug: course.slug,
     description: course.description,
     shortDescription: course.shortDescription ?? null,
-    thumbnailUrl: course.thumbnailUrl,
+    thumbnailUrl: programArt(course),
     instructorId: instructor._id.toString(),
     instructorName: `${instructor.firstName} ${instructor.lastName || ""}`.trim(),
     instructorAvatarUrl: instructor.avatarUrl,
@@ -674,7 +676,7 @@ export async function fetchOtherCourses(excludeCourseId: string): Promise<Browse
         slug: course.slug,
         description: course.description,
         shortDescription: course.shortDescription ?? null,
-        thumbnailUrl: course.thumbnailUrl,
+        thumbnailUrl: programArt(course),
         instructorId: instructor._id.toString(),
         instructorName: `${instructor.firstName} ${instructor.lastName}`,
         instructorAvatarUrl: instructor.avatarUrl,
@@ -714,7 +716,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
     const enrollments = await Enrollment.find({ user: user._id })
       .populate({
         path: "course",
-        select: "slug title thumbnailUrl instructor totalLessons availableAt status packages examRequired",
+        select: "slug title thumbnailUrl instructor totalLessons availableAt status packages examRequired school",
         populate: {
           path: "instructor",
           select: "firstName lastName avatarUrl instructorProfile.headline",
@@ -728,6 +730,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
       slug: string
       title: string
       thumbnailUrl: string
+      school?: string | null
       totalLessons?: number
       availableAt?: Date | null
       packages?: ICoursePackage[] | null
@@ -794,7 +797,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
         id: enrollment._id.toString(),
         courseId,
         courseTitle: course.title,
-        courseThumbnail: course.thumbnailUrl,
+        courseThumbnail: programArt(course),
         instructorName: `${course.instructor.firstName} ${course.instructor.lastName}`,
         instructorAvatarUrl: course.instructor.avatarUrl,
         progress: enrollment.progress,
@@ -842,7 +845,7 @@ export async function fetchMyBookmarks(): Promise<StudentBookmark[]> {
       .populate({
         path: "course",
         match: { status: "published" },
-        select: "title thumbnailUrl instructor level pricing price rating enrolledCount",
+        select: "title thumbnailUrl instructor level pricing price rating enrolledCount school",
         populate: {
           path: "instructor",
           select: "firstName lastName avatarUrl",
@@ -858,6 +861,7 @@ export async function fetchMyBookmarks(): Promise<StudentBookmark[]> {
           _id: { toString(): string }
           title: string
           thumbnailUrl: string
+          school?: string | null
           instructor: { firstName: string; lastName: string; avatarUrl: string | null }
           level: string
           pricing: string
@@ -865,12 +869,12 @@ export async function fetchMyBookmarks(): Promise<StudentBookmark[]> {
           rating: { average: number }
           enrolledCount: number
         }
-        
+
         return {
           id: bookmark._id.toString(),
           courseId: course._id.toString(),
           courseTitle: course.title,
-          courseThumbnail: course.thumbnailUrl,
+          courseThumbnail: programArt(course),
           instructorName: `${course.instructor.firstName} ${course.instructor.lastName}`,
           instructorAvatarUrl: course.instructor.avatarUrl,
           level: course.level,
@@ -1165,14 +1169,14 @@ export async function fetchInstructorPublicCourses(instructorId: string): Promis
       instructor: instructorId,
       status: "published",
     })
-      .select("title thumbnailUrl level pricing price totalLessons enrolledCount rating")
+      .select("title thumbnailUrl level pricing price totalLessons enrolledCount rating school")
       .sort({ createdAt: -1 })
       .lean()
-    
+
     return courses.map((course) => ({
       id: course._id.toString(),
       title: course.title,
-      thumbnailUrl: course.thumbnailUrl,
+      thumbnailUrl: programArt(course),
       level: course.level as "beginner" | "intermediate" | "advanced",
       pricing: course.pricing as "free" | "paid",
       price: course.price,
@@ -1206,13 +1210,13 @@ export async function fetchEnrolledCoursesFromInstructor(instructorId: string): 
       _id: { $in: enrolledCourseIds },
       instructor: instructorId,
     })
-      .select("title thumbnailUrl level pricing price totalLessons enrolledCount rating")
+      .select("title thumbnailUrl level pricing price totalLessons enrolledCount rating school")
       .lean()
-    
+
     return courses.map((course) => ({
       id: course._id.toString(),
       title: course.title,
-      thumbnailUrl: course.thumbnailUrl,
+      thumbnailUrl: programArt(course),
       level: course.level as "beginner" | "intermediate" | "advanced",
       pricing: course.pricing as "free" | "paid",
       price: course.price,

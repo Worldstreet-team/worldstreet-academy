@@ -25,7 +25,7 @@ import { CourseExamCard } from "@/components/courses/course-exam-card"
 import { CourseOutcomes } from "@/components/courses/course-outcomes"
 import { CourseReviews } from "@/components/courses/course-reviews"
 import { CourseCarousel } from "@/components/learn/course-carousel"
-import { BookOpenIcon, ChevronLeftIcon, ClockIcon, StarIcon, UsersIcon } from "lucide-react"
+import { BookOpenIcon, ChevronLeftIcon, ClockIcon, GraduationCapIcon, StarIcon, UsersIcon } from "lucide-react"
 import { RenderIcon } from "@/components/shared/render-icon"
 
 // Force dynamic rendering to show fresh instructor avatars
@@ -135,7 +135,9 @@ export default async function CourseDetailPage({
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-ws-muted">Course Thumbnail</span>
+              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-ws-brand/10 text-ws-gold">
+                <GraduationCapIcon size={20} aria-hidden />
+              </span>
             </div>
           )}
           {/* Gradient overlay */}
