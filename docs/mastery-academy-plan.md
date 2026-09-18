@@ -512,6 +512,32 @@ Brand: "WorldStreet Academy" appears in 43 code locations; the lockup (mark + "W
 
 ---
 
+## Phase 9 — School-first enrolment + the visual uplift (7–8 d)
+
+**Source:** owner voice note, 2026-09-16 — the UI is "a little bit mundane for an academy" beside Coursera and Udemy ("more pizzazz and more razzmatazz"); and "on the landing page, that's where people can pick the schools before they even have access to their dashboard … then it tells them to pay for the school, or … bookmark the school to pay later."
+
+**Goal:** a visitor picks a school on the landing, the choice survives sign-up, and before the dashboard opens they pay for it or save it to pay later; every school and program surface carries imagery and purposeful motion.
+
+**Depends on:** Phases 0–8 and the chrome-less `(checkout)` route group. Task plan: `docs/plans/mastery-phase-9.md`.
+
+### Decisions
+- **D11 — "Pay for the school" = pay for a program inside it.** Schools have no price. Five of eight schools hold one program, so the picker skips straight to its packages; the other three add one step. A true school pass is the Phase 10 candidate and needs owner prices first.
+- **D12 — "Bookmark the school" is a new `EnrollmentIntent` collection** (one row per user), never `Bookmark` (`{ user, course }`, read by Go). The money path does not write it; it converts lazily.
+- **D13 — The school-first gate lives in `(platform)/layout.tsx` and fails open.** Gated: `USER`, not an applicant, no enrollment, no intent.
+- **D14 — Colour comes from imagery, not tokens.** Eight code-owned school covers; a program without a thumbnail shows its school's cover (student read models only — instructors still see "No thumbnail").
+
+### Tasks
+1. Art module, optimiser, eight covers · 2. Image-led school card; schools second on the landing · 3. `EnrollmentIntent` + pure gate rules · 4. Intent actions, gate loader, `fresh` mock persona · 5. `/dashboard/start` (school → program → package) · 6. The gate; checkout remembers the choice · 7. "Finish enrolling" dashboard hero · 8. Hero school picker; guest CTAs enter the funnel · 9. Art on every program surface · 10. Enrolment seal · 11. Pay-later emails (24 h / 72 h) · 13. Program cards that sell (school, instructor, outcomes peek) · 14. `/programs` school panels · 15. Student browse page on v2, by school · 16. Sticky school bar + certificate band on the landing · 17. Audit defects (Button `nativeButton`, program wording, retry on failed queries) · 18. Student program page: true price and figures, on-page ladder, v2 shape · 19. Meetings header; hosting controls for hosts only · 20. "Watch a free lesson" on the landing (hides at zero) · 21. Twelve program thumbnails (guarded R2 upload script; production `--apply` is owner-run) · 12. Docs, Go note, journey run (last).
+
+### Exit criteria
+- [ ] No route from sign-up reaches an empty dashboard; instructors, admins, applicants and existing students are never gated; a gate failure opens the dashboard.
+- [ ] A school can be chosen in the landing's first viewport (1280 px and 390 px); the choice survives sign-in by URL and by cookie.
+- [ ] "Save and pay later" on the package step and on checkout; dashboard hero offers the order back; emails at 24 h and 72 h, at most once each, stopping on enrolment.
+- [ ] No public or student surface shows an empty art box.
+- [ ] `lib/actions/enrollments.ts` and `lib/wallet.ts` unchanged; no new dependency; no token change.
+
+---
+
 ## Risk register (top 6)
 
 1. **Tier bypass via mobile** until the Go patch lands — Phase 3 ships web + Go together, or with lesson tiers unset (services-only gating) so nobody pays for content they can't see and nobody sees content they didn't pay for.
