@@ -6,7 +6,16 @@ import { isSchoolSlug, type SchoolSlug } from "@/lib/schools"
  * surface falls back to the school's icon, so art lands one file at a time.
  * Add an entry only in the same commit as its file.
  */
-export const SCHOOL_COVERS: Partial<Record<SchoolSlug, string>> = {}
+export const SCHOOL_COVERS: Partial<Record<SchoolSlug, string>> = {
+  "trading-financial-markets": "/art/schools/trading-financial-markets.webp",
+  "blockchain-web3": "/art/schools/blockchain-web3.webp",
+  "ai-automation": "/art/schools/ai-automation.webp",
+  "software-app-development": "/art/schools/software-app-development.webp",
+  "cybersecurity": "/art/schools/cybersecurity.webp",
+  "data-analytics": "/art/schools/data-analytics.webp",
+  "digital-media-creative": "/art/schools/digital-media-creative.webp",
+  "digital-business-remote-careers": "/art/schools/digital-business-remote-careers.webp",
+}
 
 export function schoolCover(slug: string | null | undefined): string | null {
   return isSchoolSlug(slug) ? (SCHOOL_COVERS[slug] ?? null) : null

@@ -1,0 +1,687 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>WSA school cover renderer</title>
+<style>html,body{margin:0;background:#0C0A09}canvas{display:block;max-width:100vw;height:auto}</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script src="scenes.js"></script>
+<script>
+/*
+  WorldStreet Mastery Academy — school cover renderer.
+
+  A small progressive path tracer over a signed-distance-field scene, run in
+  WebGL2. Every image shares one studio rig (camera, lens, plinth, floor,
+  backdrop, lights); a scene in scenes.js supplies only the object SDF, its
+  materials and the accent hue.
+
+  Light transport per sample:
+    - thin-lens camera (depth of field) with gaussian pixel filter
+    - sphere-traced SDF + analytic floor plane
+    - next-event estimation on four gridded rectangular soft boxes (gold
+      key/rim, saturated accent, low warm bounce card, gold back kicker)
+      with MIS against BSDF sampling; the boxes are never seen by camera
+      rays, only in reflections and in the light they cast
+    - GGX microfacet metals / dielectrics, smooth or rough glass with Beer
+      absorption, optional emissive sphere light (scene-defined)
+  Samples accumulate in an RGBA32F buffer, rendered in scissor tiles so no
+  single draw trips the Windows GPU watchdog. A post pass adds a downsample-chain bloom,
+  a toe-preserving filmic shoulder, vignette, film grain and dither.
+
+  Everything is deterministic: the RNG is a PCG hash of (pixel, sample).
+*/
+
+// ---------------------------------------------------------------- shared rig
+const RIG = {
+  target: [0, 0.74, 0],       // point the lens is aimed at (object centre)
+  dist: 10.5,                 // camera distance to target
+  elev: 12,                   // degrees above horizontal
+  azim: 12,                   // degrees; > 0 = camera sits right of front
+  frameH: 2.6,                // frame height (world units) at target distance
+  shift: [0.50, -0.06],       // lens shift (half-height units): object -> right, slightly low
+  aperture: 0.05,             // thin-lens radius
+  exposure: 1.0,
+  bloom: 0.10,
+  grain: 0.010,
+  // soft boxes; grid = cos^k emission falloff (egg-crate) that keeps spill off floor and sweep
+  lights: [
+    // gold key / rim: upper left, behind the object
+    { pos: [-3.2, 3.9, -3.3], target: [0, 0.8, 0], size: [2.6, 1.4], color: [1.0, 0.64, 0.24], power: 30, grid: 6 },
+    // saturated accent: right, slightly behind (colour from the scene)
+    { pos: [4.2, 1.5, -0.7], target: [0, 0.7, 0], size: [1.1, 3.2], color: null, power: 26, grid: 3 },
+    // low warm bounce card in front: gives vertical metal faces something to mirror
+    { pos: [0.6, 0.1, 5.2], target: [0, 0.7, 0], size: [6.0, 1.6], color: [1.0, 0.86, 0.68], power: 1.4, grid: 1 },
+    // low gold kicker directly behind: top faces and silhouettes (never in frame)
+    { pos: [-0.6, 1.3, -4.8], target: [0, 0.7, 0], size: [3.2, 0.9], color: [1.0, 0.70, 0.32], power: 2.2, grid: 3 },
+  ],
+};
+
+// ---------------------------------------------------------------- GLSL core
+const VS = `#version 300 es
+layout(location=0) in vec2 aPos;
+void main(){ gl_Position = vec4(aPos, 0.0, 1.0); }`;
+
+const CORE_HEAD = `#version 300 es
+precision highp float;
+precision highp int;
+uniform vec2 uRes;
+uniform int uSample;
+uniform sampler2D uPrev;
+uniform vec3 uCamPos, uFwd, uRight, uUp;
+uniform float uTanHalf, uFocus, uAperture;
+uniform vec2 uShift;
+#define NL 4
+uniform vec3 uLc[NL], uLu[NL], uLv[NL], uLn[NL], uLe[NL];
+uniform float uLa[NL], uLk[NL];
+uniform vec3 uAccent;
+out vec4 fragColor;
+
+#define PI 3.14159265359
+#define TAU 6.28318530718
+#define FLOOR_Y -0.62
+#define PLINTH_R 1.18
+
+// ---- material ids (library) ----
+#define M_FLOOR 1
+#define M_PLINTH 2
+#define M_BRASS 3
+#define M_BRASS_BRUSHED 4
+#define M_BRONZE 5
+#define M_STEEL 6
+#define M_STEEL_BRUSHED 7
+#define M_DARKSTEEL 8
+#define M_GLASS 9
+#define M_GLASS_SMOKE 10
+#define M_GLASS_FROST 11
+#define M_MARBLE 12
+#define M_LEATHER 13
+#define M_SUEDE 14
+#define M_ANODIZED 15
+#define M_RUBBER 16
+#define M_PAINT_WHITE 17
+#define M_GOLD 18
+#define M_EMIT_ACCENT 19
+#define M_EMIT_WARM 20
+
+struct Mat { vec3 albedo; float metal; float rough; vec3 emit; float glass; float ior; vec3 absorb; };
+Mat mkMat(vec3 a, float metal, float rough){ Mat m; m.albedo=a; m.metal=metal; m.rough=rough; m.emit=vec3(0); m.glass=0.; m.ior=1.5; m.absorb=vec3(0); return m; }
+Mat mkGlass(vec3 tint, vec3 absorb, float rough){ Mat m = mkMat(tint, 0., rough); m.glass = 1.; m.absorb = absorb; return m; }
+
+// ---- RNG: PCG hash, seeded per pixel+sample ----
+uint gSeed;
+uint pcg(uint v){ uint s = v * 747796405u + 2891336453u; uint w = ((s >> ((s >> 28u) + 4u)) ^ s) * 277803737u; return (w >> 22u) ^ w; }
+float rnd(){ gSeed = pcg(gSeed); return float(gSeed) * (1.0/4294967296.0); }
+
+// ---- seeded value noise (materials only) ----
+float hash3(ivec3 c){ uvec3 u = uvec3(c + 65536); return float(pcg(u.x + pcg(u.y + pcg(u.z)))) * (1.0/4294967296.0); }
+float vnoise(vec3 p){
+  vec3 i = floor(p); vec3 f = fract(p); f = f*f*(3.0-2.0*f); ivec3 c = ivec3(i);
+  return mix(mix(mix(hash3(c), hash3(c+ivec3(1,0,0)), f.x), mix(hash3(c+ivec3(0,1,0)), hash3(c+ivec3(1,1,0)), f.x), f.y),
+             mix(mix(hash3(c+ivec3(0,0,1)), hash3(c+ivec3(1,0,1)), f.x), mix(hash3(c+ivec3(0,1,1)), hash3(c+ivec3(1,1,1)), f.x), f.y), f.z);
+}
+float fbm(vec3 p){ float a = 0.5, s = 0.0; for (int i = 0; i < 5; i++){ s += a*vnoise(p); p = p*2.03 + vec3(1.7, 9.2, 3.1); a *= 0.5; } return s; }
+float lum(vec3 c){ return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+
+// ---- SDF toolkit ----
+mat2 rot(float a){ float c = cos(a), s = sin(a); return mat2(c, s, -s, c); }
+float sdBox(vec3 p, vec3 b){ vec3 q = abs(p)-b; return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0); }
+float sdRoundBox(vec3 p, vec3 b, float r){ vec3 q = abs(p)-b+r; return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0) - r; }
+float sdCyl(vec3 p, float r, float h){ vec2 d = abs(vec2(length(p.xz), p.y)) - vec2(r, h); return min(max(d.x,d.y),0.0) + length(max(d,0.0)); }
+float sdRoundCyl(vec3 p, float r, float h, float rr){ vec2 d = vec2(length(p.xz)-r+rr, abs(p.y)-h+rr); return min(max(d.x,d.y),0.0) + length(max(d,0.0)) - rr; }
+float sdTorus(vec3 p, vec2 t){ vec2 q = vec2(length(p.xz)-t.x, p.y); return length(q)-t.y; }
+float sdCapsule(vec3 p, vec3 a, vec3 b, float r){ vec3 pa = p-a, ba = b-a; float h = clamp(dot(pa,ba)/dot(ba,ba), 0.0, 1.0); return length(pa-ba*h) - r; }
+float sdLink(vec3 p, float le, float r1, float r2){ vec3 q = vec3(p.x, max(abs(p.y)-le, 0.0), p.z); return length(vec2(length(q.xy)-r1, q.z)) - r2; }
+float sdEllipsoid(vec3 p, vec3 r){ float k0 = length(p/r); float k1 = length(p/(r*r)); return k0*(k0-1.0)/k1; }
+float sdSphere(vec3 p, float r){ return length(p) - r; }
+float smin(float a, float b, float k){ float h = clamp(0.5+0.5*(b-a)/k, 0.0, 1.0); return mix(b, a, h) - k*h*(1.0-h); }
+float smax(float a, float b, float k){ return -smin(-a, -b, k); }
+vec2 opU(vec2 a, vec2 b){ return a.x < b.x ? a : b; }
+
+// brushed-metal normal: streaks run along 'axis'
+vec3 brushN(vec3 n, vec3 p, vec3 axis, float amt){
+  vec3 a = axis - n*dot(axis, n); if (dot(a,a) < 1e-4) return n; a = normalize(a); vec3 b = cross(n, a);
+  float s = dot(p, b), t = dot(p, a);
+  float k = vnoise(vec3(s*380.0, t*3.0, 0.5)) + 0.6*vnoise(vec3(s*1100.0, t*7.0, 3.5));
+  return normalize(n + b*(k - 0.8)*amt);
+}
+`;
+
+// Library materials + rendering stage. Inserted after the scene chunk so the
+// scene's hooks (objMap, sceneMat, OBJ_C/OBJ_R, optional SPHERE_LIGHT) exist.
+const CORE_TAIL = `
+// ---------------------------------------------------------------- materials
+Mat libMat(int id, vec3 p, inout vec3 n){
+  if (id == M_FLOOR){ return mkMat(vec3(0.0065, 0.0056, 0.005), 0.0, 0.7); }
+  if (id == M_PLINTH){
+    // honed near-black stone with faint warm veining
+    float v = fbm(p*vec3(1.6, 3.2, 1.6) + 3.0);
+    float vein = smoothstep(0.035, 0.0, abs(sin((p.x*1.3 + p.z*0.7 + v*5.0))) * 0.35);
+    vec3 a = mix(vec3(0.026, 0.023, 0.020), vec3(0.055, 0.047, 0.040), vein*0.7);
+    a *= 0.85 + 0.3*vnoise(p*14.0);
+    return mkMat(a, 0.0, 0.2 + 0.1*vnoise(p*6.0));
+  }
+  if (id == M_BRASS){ return mkMat(vec3(0.93, 0.71, 0.37), 1.0, 0.15); }
+  if (id == M_BRASS_BRUSHED){ n = brushN(n, p, vec3(0,1,0), 0.06); return mkMat(vec3(0.90, 0.68, 0.35), 1.0, 0.24); }
+  if (id == M_BRONZE){ return mkMat(vec3(0.42, 0.26, 0.15), 1.0, 0.30); }
+  if (id == M_STEEL){ return mkMat(vec3(0.63, 0.63, 0.64), 1.0, 0.10); }
+  if (id == M_STEEL_BRUSHED){ n = brushN(n, p, vec3(0,1,0), 0.07); return mkMat(vec3(0.60, 0.60, 0.62), 1.0, 0.26); }
+  if (id == M_DARKSTEEL){ return mkMat(vec3(0.16, 0.155, 0.15), 1.0, 0.28); }
+  if (id == M_GLASS){ return mkGlass(vec3(1.0), vec3(0.20, 0.10, 0.14), 0.0); }
+  if (id == M_GLASS_SMOKE){ return mkGlass(vec3(1.0), vec3(1.6, 1.8, 2.1), 0.0); }
+  if (id == M_GLASS_FROST){ return mkGlass(vec3(1.0), vec3(0.3, 0.2, 0.2), 0.22); }
+  if (id == M_MARBLE){
+    // Calacatta-like: soft cloudy veins with a thin darker core, plus a faint secondary network
+    vec3 q = p*1.4;
+    float w = fbm(q*1.1 + 11.0);
+    float band = abs(sin(q.x*1.2 + q.y*2.2 + q.z*0.8 + w*6.0));
+    float vein = smoothstep(0.16, 0.0, band)*(0.55 + 0.45*fbm(q*3.0 + 5.0));
+    float haze = smoothstep(0.7, 0.0, band)*0.22;
+    float band2 = abs(sin(q.x*-2.3 + q.y*1.1 + q.z*2.9 + fbm(q*2.0 + 3.0)*8.0));
+    float vein2 = smoothstep(0.05, 0.0, band2)*0.35;
+    vec3 base = vec3(0.80, 0.77, 0.72)*(0.94 + 0.08*fbm(q*5.0));
+    vec3 a = mix(base, vec3(0.46, 0.42, 0.38), clamp(vein*0.75 + haze + vein2, 0.0, 1.0));
+    return mkMat(a, 0.0, 0.055);
+  }
+  if (id == M_LEATHER){
+    float g = vnoise(p*95.0) + 0.5*vnoise(p*210.0);
+    n = normalize(n + 0.07*(vec3(vnoise(p*120.0+1.0), vnoise(p*120.0+7.0), vnoise(p*120.0+13.0)) - 0.5));
+    vec3 a = vec3(0.24, 0.10, 0.042) * (0.82 + 0.25*g) * (0.85 + 0.3*fbm(p*3.0));
+    return mkMat(a, 0.0, 0.42 + 0.1*g);
+  }
+  if (id == M_SUEDE){ return mkMat(vec3(0.045, 0.028, 0.022)*(0.9+0.2*vnoise(p*60.0)), 0.0, 0.9); }
+  if (id == M_ANODIZED){ return mkMat(vec3(0.018, 0.017, 0.017), 0.0, 0.24); }
+  if (id == M_RUBBER){ return mkMat(vec3(0.012), 0.0, 0.72); }
+  if (id == M_PAINT_WHITE){ return mkMat(vec3(0.60, 0.58, 0.54), 0.0, 0.38); }
+  if (id == M_GOLD){ return mkMat(vec3(1.0, 0.76, 0.33), 1.0, 0.12); }
+  if (id == M_EMIT_ACCENT){ Mat m = mkMat(vec3(0.02), 0.0, 0.3); m.emit = uAccent*6.0; return m; }
+  if (id == M_EMIT_WARM){ Mat m = mkMat(vec3(0.02), 0.0, 0.3); m.emit = vec3(1.0, 0.8, 0.55)*6.0; return m; }
+  return mkMat(vec3(0.5), 0.0, 0.5);
+}
+Mat getMat(int id, vec3 p, inout vec3 n){
+  Mat m = mkMat(vec3(0.5), 0.0, 0.5);
+  if (sceneMat(id, p, n, m)) return m;
+  return libMat(id, p, n);
+}
+// per-surface transmittance for shadow rays crossing glass (0 = opaque)
+float glassAtten(int id){
+  if (id == M_GLASS) return 0.86;
+  if (id == M_GLASS_FROST) return 0.78;
+  if (id == M_GLASS_SMOKE) return 0.55;
+  return sceneGlassAtten(id);
+}
+
+// ---------------------------------------------------------------- scene
+float sdPlinth(vec3 p){ return sdRoundCyl(p - vec3(0.0, FLOOR_Y*0.5, 0.0), PLINTH_R, -FLOOR_Y*0.5, 0.035); }
+vec2 map(vec3 p){
+  vec2 r = vec2(sdPlinth(p), float(M_PLINTH));
+  float bs = length(p - OBJ_C) - OBJ_R;
+  if (bs < r.x){
+    vec2 o = bs > 0.02 ? vec2(bs, 0.0) : objMap(p);
+    if (o.x < r.x) r = o;
+  }
+  return r;
+}
+vec3 calcNormal(vec3 p){
+  const float e = 0.0003; const vec2 k = vec2(1.0, -1.0);
+  return normalize(k.xyy*map(p + k.xyy*e).x + k.yyx*map(p + k.yyx*e).x + k.yxy*map(p + k.yxy*e).x + k.xxx*map(p + k.xxx*e).x);
+}
+// the whole stage (plinth + object) sits inside this sphere: rays that miss it skip marching
+const vec3 STAGE_C = vec3(0.0, 0.45, 0.0);
+const float STAGE_R = 2.1;
+vec2 stageRange(vec3 ro, vec3 rd){
+  vec3 oc = ro - STAGE_C; float b = dot(oc, rd); float c = dot(oc, oc) - STAGE_R*STAGE_R; float h = b*b - c;
+  if (h < 0.0) return vec2(1.0, -1.0);
+  h = sqrt(h); return vec2(max(-b - h, 0.0), -b + h);
+}
+#ifndef STEP_K
+#define STEP_K 0.9
+#endif
+vec2 march(vec3 ro, vec3 rd){
+  vec2 rg = stageRange(ro, rd); if (rg.y < 0.0) return vec2(-1.0, 0.0);
+  float t = rg.x;
+  for (int i = 0; i < 300; i++){
+    vec2 h = map(ro + rd*t); float d = abs(h.x);
+    if (d < 2.0e-4 + 6.0e-5*t) return vec2(t, h.y);
+    t += d * STEP_K;
+    if (t > rg.y) break;
+  }
+  return vec2(-1.0, 0.0);
+}
+vec3 shadowT(vec3 ro, vec3 rd, float tmax){
+  vec2 rg = stageRange(ro, rd); if (rg.y < 0.0) return vec3(1.0);
+  float t = rg.x; float te = min(tmax, rg.y); vec3 tr = vec3(1.0);
+  for (int i = 0; i < 200; i++){
+    if (t > te) break;
+    vec2 h = map(ro + rd*t); float d = abs(h.x);
+    if (d < 2.0e-4 + 6.0e-5*t){
+      float g = glassAtten(int(h.y + 0.5));
+      if (g <= 0.0) return vec3(0.0);
+      tr *= g; t += 0.01; if (tr.x < 0.02) return vec3(0.0); continue;
+    }
+    t += d * STEP_K;
+  }
+  return tr;
+}
+
+// ---------------------------------------------------------------- backdrop
+vec3 backdrop(vec2 uv){
+  float aspect = uRes.x/uRes.y;
+  vec3 dark = vec3(0.0034, 0.0028, 0.0025);      // ~ #0C0A09
+  vec3 lift = vec3(0.0118, 0.0100, 0.0082);      // ~ #1C1917
+  vec2 d = (uv - vec2(0.66, 0.58)) * vec2(aspect, 1.0);
+  float g = exp(-dot(d, d)*2.4);
+  vec3 c = mix(dark, lift, g);
+  vec2 da = (uv - vec2(0.97, 0.62)) * vec2(aspect, 1.0);
+  c += uAccent * 0.0038 * exp(-dot(da, da)*4.0);           // accent spill on the sweep
+  vec2 dg = (uv - vec2(0.50, 0.86)) * vec2(aspect, 1.0);
+  c += vec3(1.0, 0.68, 0.30) * 0.0028 * exp(-dot(dg, dg)*5.0); // faint gold ambient above-left
+  return c;
+}
+vec3 env(vec3 rd){
+  vec3 c = mix(vec3(0.0035, 0.003, 0.0026), vec3(0.016, 0.0135, 0.011), smoothstep(-0.3, 0.8, rd.y));
+  c += uAccent * 0.010 * pow(max(dot(rd, normalize(vec3(1.0, 0.25, -0.3))), 0.0), 3.0);
+  c += vec3(1.0, 0.7, 0.35) * 0.010 * pow(max(dot(rd, normalize(vec3(-0.7, 0.6, -0.5))), 0.0), 3.0);
+  return c;
+}
+
+// ---------------------------------------------------------------- BSDF
+void onb(vec3 n, out vec3 t, out vec3 b){ float s = n.z >= 0.0 ? 1.0 : -1.0; float a = -1.0/(s + n.z); float bb = n.x*n.y*a; t = vec3(1.0 + s*n.x*n.x*a, s*bb, -s*n.x); b = vec3(bb, s + n.y*n.y*a, -n.y); }
+vec3 cosSample(vec3 n){ float u1 = rnd(), u2 = rnd(); float r = sqrt(u1), ph = TAU*u2; vec3 t, b; onb(n, t, b); return normalize(t*r*cos(ph) + b*r*sin(ph) + n*sqrt(max(0.0, 1.0-u1))); }
+vec3 sampleGGXh(vec3 n, float a){ float u1 = rnd(), u2 = rnd(); float ph = TAU*u1; float ct = sqrt((1.0-u2)/(1.0 + (a*a-1.0)*u2)); float st = sqrt(max(0.0, 1.0-ct*ct)); vec3 t, b; onb(n, t, b); return normalize(t*st*cos(ph) + b*st*sin(ph) + n*ct); }
+float D_GGX(float NoH, float a){ float a2 = a*a; float d = NoH*NoH*(a2-1.0) + 1.0; return a2/(PI*d*d); }
+float V_Smith(float NoV, float NoL, float a){ float a2 = a*a; float gv = NoL*sqrt(NoV*NoV*(1.0-a2)+a2); float gl = NoV*sqrt(NoL*NoL*(1.0-a2)+a2); return 0.5/max(gv+gl, 1e-6); }
+vec3 F_Schlick(vec3 f0, float c){ return f0 + (1.0-f0)*pow(1.0-clamp(c, 0.0, 1.0), 5.0); }
+float fresnelDiel(float cosI, float eta){ float s2 = eta*eta*(1.0-cosI*cosI); if (s2 >= 1.0) return 1.0; float cosT = sqrt(1.0-s2); float rs = (eta*cosI - cosT)/(eta*cosI + cosT); float rp = (cosI - eta*cosT)/(cosI + eta*cosT); return 0.5*(rs*rs + rp*rp); }
+float specProb(Mat m, float NoV){
+  if (m.metal > 0.99) return 1.0;
+  vec3 f0 = mix(vec3(0.04), m.albedo, m.metal);
+  float fs = lum(F_Schlick(f0, NoV)); float fd = lum(m.albedo)*(1.0-m.metal);
+  return clamp(fs/(fs + fd + 1e-4), 0.2, 0.9);
+}
+void evalBSDF(Mat m, vec3 n, vec3 v, vec3 l, out vec3 f, out float pdf){
+  float NoL = dot(n, l); float NoV = max(dot(n, v), 1e-4);
+  if (NoL <= 0.0){ f = vec3(0.0); pdf = 0.0; return; }
+  vec3 h = normalize(v + l); float NoH = max(dot(n, h), 0.0); float VoH = max(dot(v, h), 1e-4);
+  float a = max(m.rough*m.rough, 0.0012);
+  vec3 f0 = mix(vec3(0.04), m.albedo, m.metal);
+  vec3 F = F_Schlick(f0, VoH);
+  float D = D_GGX(NoH, a);
+  vec3 spec = D * V_Smith(NoV, NoL, a) * F;
+  vec3 diff = (1.0 - m.metal) * m.albedo / PI * (1.0 - F);
+  f = spec + diff;
+  float ps = specProb(m, NoV);
+  pdf = ps * D*NoH/(4.0*VoH) + (1.0 - ps)*NoL/PI;
+}
+vec3 sampleBSDF(Mat m, vec3 n, vec3 v){
+  float ps = specProb(m, max(dot(n, v), 1e-4));
+  if (rnd() < ps){ vec3 h = sampleGGXh(n, max(m.rough*m.rough, 0.0012)); return reflect(-v, h); }
+  return cosSample(n);
+}
+
+// ---------------------------------------------------------------- lights
+bool hitRL(int i, vec3 ro, vec3 rd, out float t){
+  float dn = dot(rd, uLn[i]); t = 0.0; if (dn >= 0.0) return false;
+  t = dot(uLc[i] - ro, uLn[i]) / dn; if (t <= 0.0) return false;
+  vec3 q = ro + rd*t - uLc[i];
+  return abs(dot(q, uLu[i])/dot(uLu[i], uLu[i])) <= 1.0 && abs(dot(q, uLv[i])/dot(uLv[i], uLv[i])) <= 1.0;
+}
+vec3 directLight(vec3 p, vec3 n, vec3 v, Mat m){
+  vec3 sum = vec3(0.0);
+  for (int i = 0; i < NL; i++){
+    vec3 pl = uLc[i] + uLu[i]*(2.0*rnd()-1.0) + uLv[i]*(2.0*rnd()-1.0);
+    vec3 d = pl - p; float d2 = dot(d, d); float dist = sqrt(d2); vec3 l = d/dist;
+    float cosL = -dot(l, uLn[i]); if (cosL <= 0.0) continue;
+    float NoL = dot(n, l); if (NoL <= 0.0) continue;
+    vec3 f; float pb; evalBSDF(m, n, v, l, f, pb);
+    if (max(f.x, max(f.y, f.z)) <= 0.0) continue;
+    vec3 vis = shadowT(p, l, dist - 0.02);
+    if (vis.x + vis.y + vis.z <= 0.0) continue;
+    float pdfL = d2/(uLa[i]*cosL);
+    float w = pdfL*pdfL/(pdfL*pdfL + pb*pb);
+    sum += f*NoL*uLe[i]*pow(cosL, uLk[i])*vis*w/pdfL;
+  }
+#ifdef SPHERE_LIGHT
+  {
+    vec3 d = SL_C - p; float d2 = dot(d, d); float dist = sqrt(d2); vec3 w = d/dist;
+    float ctm = sqrt(max(0.0, 1.0 - SL_R*SL_R/d2));
+    float u1 = rnd(), u2 = rnd(); float ct = 1.0 - u1*(1.0-ctm); float st = sqrt(max(0.0, 1.0-ct*ct)); float ph = TAU*u2;
+    vec3 t, b; onb(w, t, b); vec3 l = normalize(t*st*cos(ph) + b*st*sin(ph) + w*ct);
+    float NoL = dot(n, l);
+    if (NoL > 0.0){
+      float tb = dot(d, l); float tc = tb - sqrt(max(0.0, SL_R*SL_R - (d2 - tb*tb)));
+      vec3 vis = shadowT(p, l, tc - 0.015);
+      if (vis.x + vis.y + vis.z > 0.0){
+        vec3 f; float pb; evalBSDF(m, n, v, l, f, pb);
+        float pl = 1.0/(TAU*(1.0-ctm)); float wm = pl*pl/(pl*pl + pb*pb);
+        sum += f*NoL*SL_LE*vis*wm/pl;
+      }
+    }
+  }
+#endif
+  return sum;
+}
+
+// ---------------------------------------------------------------- integrator
+#ifndef MAX_DEPTH
+#define MAX_DEPTH 5
+#endif
+vec3 trace(vec3 ro, vec3 rd, vec2 suv){
+  vec3 L = vec3(0.0), T = vec3(1.0);
+  float lastPdf = 1.0; bool lastDelta = true; vec3 prevP = ro;
+  bool inGlass = false; vec3 sigma = vec3(0.0);
+  float fade = 0.0; vec3 bg = vec3(0.0);
+  for (int depth = 0; depth < MAX_DEPTH; depth++){
+    vec2 h = march(ro, rd);
+    float tS = h.x > 0.0 ? h.x : 1e9;
+    float tF = 1e9; if (rd.y < -1e-5){ float t = (FLOOR_Y - ro.y)/rd.y; if (t > 1e-4) tF = t; }
+    float tHit = min(tS, tF);
+    if (depth > 0){
+      bool hitL = false;
+      for (int i = 0; i < NL; i++){
+        float tl;
+        if (hitRL(i, ro, rd, tl) && tl < tHit){
+          float w = 1.0; float cosL = -dot(rd, uLn[i]);
+          if (!lastDelta){ float pl = tl*tl/(uLa[i]*cosL); w = lastPdf*lastPdf/(lastPdf*lastPdf + pl*pl); }
+          L += T*uLe[i]*pow(cosL, uLk[i])*w; hitL = true; break;
+        }
+      }
+      if (hitL) break;
+    }
+    if (tHit > 1e8){ L += T*(depth == 0 ? backdrop(suv) : env(rd)); break; }
+    vec3 p = ro + rd*tHit;
+    if (inGlass) T *= exp(-sigma*tHit);
+    vec3 ng; int id;
+    if (tF < tS){
+      ng = vec3(0.0, 1.0, 0.0); id = M_FLOOR;
+      if (depth == 0){ fade = smoothstep(1.8, 5.0, length(p.xz)); bg = backdrop(suv); }
+    } else { ng = calcNormal(p); id = int(h.y + 0.5); }
+    vec3 n = ng;
+    Mat m = getMat(id, p, n);
+    vec3 V = -rd;
+    if (m.emit.x + m.emit.y + m.emit.z > 0.0){
+      float w = 1.0;
+#ifdef SPHERE_LIGHT
+      if (id == SL_MAT && !lastDelta){ vec3 d = SL_C - prevP; float ctm = sqrt(max(0.0, 1.0 - SL_R*SL_R/dot(d, d))); float pl = 1.0/(TAU*(1.0-ctm)); w = lastPdf*lastPdf/(lastPdf*lastPdf + pl*pl); }
+#endif
+      L += T*m.emit*w;
+#ifdef SPHERE_LIGHT
+      if (id == SL_MAT) break;
+#endif
+    }
+    if (m.glass > 0.5){
+      bool entering = dot(rd, ng) < 0.0;
+      vec3 Ns = entering ? n : -n; vec3 Ng = entering ? ng : -ng;
+      vec3 H = Ns;
+      if (m.rough > 0.02){ H = sampleGGXh(Ns, m.rough*m.rough); if (dot(V, H) <= 0.0) H = Ns; }
+      float eta = entering ? 1.0/m.ior : m.ior;
+      float F = fresnelDiel(clamp(dot(V, H), 0.0, 1.0), eta);
+      vec3 rr = refract(rd, H, eta);
+      if (dot(rr, rr) < 0.5 || rnd() < F){ rd = reflect(rd, H); ro = p + Ng*2.5e-3; }
+      else { rd = rr; ro = p - Ng*2.5e-3; inGlass = entering; sigma = m.absorb; T *= m.albedo; }
+      lastDelta = true; prevP = p;
+      continue;
+    }
+    if (dot(ng, V) < 0.0){ ng = -ng; n = -n; }
+    if (dot(n, V) < 0.0) n = normalize(n + ng*(0.01 - dot(n, V)));
+    vec3 po = p + ng*1.5e-3;
+    L += T*directLight(po, n, V, m);
+    vec3 l = sampleBSDF(m, n, V);
+    if (dot(l, ng) <= 0.0) break;
+    vec3 f; float pdf; evalBSDF(m, n, V, l, f, pdf);
+    if (pdf <= 1e-7) break;
+    T *= f*max(dot(n, l), 0.0)/pdf;
+    lastPdf = pdf; lastDelta = false; prevP = p;
+    ro = po; rd = l;
+    if (depth >= 2){ float q = clamp(max(T.x, max(T.y, T.z)), 0.05, 0.95); if (rnd() > q) break; T /= q; }
+  }
+  if (fade > 0.0) L = mix(L, bg, fade);
+  return L;
+}
+
+void main(){
+  uvec2 ip = uvec2(gl_FragCoord.xy);
+  gSeed = pcg(pcg(pcg(ip.x + 17u) + ip.y*1013u) + uint(uSample)*7919u);
+  // gaussian pixel filter (sigma ~0.45 px)
+  float r1 = max(rnd(), 1e-7), r2 = rnd();
+  vec2 jit = sqrt(-2.0*log(r1)) * vec2(cos(TAU*r2), sin(TAU*r2)) * 0.45;
+  vec2 px = gl_FragCoord.xy + jit;
+  vec2 ndc = px/uRes*2.0 - 1.0;
+  float aspect = uRes.x/uRes.y;
+  vec2 s = vec2(ndc.x*aspect, ndc.y) - uShift;
+  vec3 dir = normalize(uFwd + (s.x*uRight + s.y*uUp)*uTanHalf);
+  // thin lens
+  vec3 fp = uCamPos + dir*(uFocus/dot(dir, uFwd));
+  float lr = sqrt(rnd())*uAperture, la = TAU*rnd();
+  vec3 ro = uCamPos + uRight*(lr*cos(la)) + uUp*(lr*sin(la));
+  vec3 rd = normalize(fp - ro);
+  vec3 c = trace(ro, rd, px/uRes);
+  float lc = lum(c); if (lc > 10.0) c *= 10.0/lc;           // firefly clamp
+  if (!(c.x == c.x && c.y == c.y && c.z == c.z)) c = vec3(0.0); // NaN guard
+  vec3 prev = texelFetch(uPrev, ivec2(gl_FragCoord.xy), 0).rgb;
+  fragColor = vec4(prev + c, 1.0);
+}
+`;
+
+const RESOLVE_FS = `#version 300 es
+precision highp float;
+uniform sampler2D uAcc; uniform float uInv; uniform int uMode;
+out vec4 o;
+void main(){
+  vec3 c = texelFetch(uAcc, ivec2(gl_FragCoord.xy), 0).rgb * uInv;
+  if (uMode == 1){ float l = dot(c, vec3(0.2126, 0.7152, 0.0722)); c *= smoothstep(0.7, 3.0, l); }
+  o = vec4(c, 1.0);
+}`;
+
+const DOWN_FS = `#version 300 es
+precision highp float;
+uniform sampler2D uSrc; uniform vec2 uDst;
+out vec4 o;
+void main(){
+  vec2 uv = gl_FragCoord.xy/uDst; vec2 st = 1.0/vec2(textureSize(uSrc, 0));
+  vec3 c = texture(uSrc, uv + vec2(-1.0, -1.0)*st).rgb + texture(uSrc, uv + vec2(1.0, -1.0)*st).rgb
+         + texture(uSrc, uv + vec2(-1.0, 1.0)*st).rgb + texture(uSrc, uv + vec2(1.0, 1.0)*st).rgb;
+  o = vec4(c*0.25, 1.0);
+}`;
+
+const POST_FS = `#version 300 es
+precision highp float;
+uniform sampler2D uHdr; uniform sampler2D uB1, uB2, uB3, uB4, uB5, uB6; uniform vec2 uRes;
+uniform float uBloom, uExposure, uGrain;
+out vec4 o;
+uint pcg(uint v){ uint s = v * 747796405u + 2891336453u; uint w = ((s >> ((s >> 28u) + 4u)) ^ s) * 277803737u; return (w >> 22u) ^ w; }
+// linear toe (no crushed darks) + exponential shoulder (no clipped whites)
+vec3 tone(vec3 x){ const float a = 0.6; vec3 over = max(x - a, 0.0); return min(x, a) + (1.0-a)*(1.0 - exp(-over/(1.0-a))); }
+vec3 toSRGB(vec3 c){ c = clamp(c, 0.0, 1.0); return mix(c*12.92, 1.055*pow(c, vec3(1.0/2.4)) - 0.055, step(0.0031308, c)); }
+vec3 tent(sampler2D s, vec2 uv){
+  vec2 ts = 1.0/vec2(textureSize(s, 0)); vec3 c = vec3(0.0);
+  for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++){
+    float w = (i == 0 ? 2.0 : 1.0)*(j == 0 ? 2.0 : 1.0);
+    c += w*texture(s, uv + vec2(float(i), float(j))*ts).rgb;
+  }
+  return c/16.0;
+}
+void main(){
+  vec2 uv = gl_FragCoord.xy/uRes;
+  vec3 c = texelFetch(uHdr, ivec2(gl_FragCoord.xy), 0).rgb;
+  vec3 b = tent(uB1, uv)*1.0 + tent(uB2, uv)*0.9 + tent(uB3, uv)*0.8 + tent(uB4, uv)*0.7 + tent(uB5, uv)*0.6 + tent(uB6, uv)*0.5;
+  c += b/4.5*uBloom;
+  c *= uExposure;
+  // gentle highlight desaturation so hot metal rolls to warm white, not neon
+  float L = dot(c, vec3(0.2126, 0.7152, 0.0722));
+  c = mix(c, vec3(L), smoothstep(1.2, 6.0, L)*0.35);
+  c = tone(c);
+  vec2 q = (uv - vec2(0.62, 0.52))*vec2(uRes.x/uRes.y, 1.0);
+  c *= 1.0 - 0.30*smoothstep(0.45, 1.45, length(q));
+  vec3 s = toSRGB(c);
+  uvec2 ip = uvec2(gl_FragCoord.xy);
+  uint h = pcg(ip.x*7919u ^ pcg(ip.y*104729u + 17u));
+  float n1 = float(h)/4294967296.0; h = pcg(h); float n2 = float(h)/4294967296.0; h = pcg(h); float n3 = float(h)/4294967296.0;
+  float g = (n1 + n2 + n3 - 1.5)*2.0;
+  float Ls = dot(s, vec3(0.2126, 0.7152, 0.0722));
+  s += g*uGrain*(0.45 + 0.55*sqrt(Ls));
+  h = pcg(h); float d1 = float(h)/4294967296.0; h = pcg(h); float d2 = float(h)/4294967296.0;
+  s += (d1 + d2 - 1.0)/255.0;
+  o = vec4(clamp(s, 0.0, 1.0), 1.0);
+}`;
+
+// ---------------------------------------------------------------- WebGL plumbing
+const canvas = document.getElementById("c");
+const gl = canvas.getContext("webgl2", { preserveDrawingBuffer: true, antialias: false, alpha: false, premultipliedAlpha: false });
+if (!gl) throw new Error("WebGL2 unavailable");
+if (!gl.getExtension("EXT_color_buffer_float")) throw new Error("EXT_color_buffer_float unavailable");
+gl.getExtension("OES_texture_float_linear");
+
+const vbo = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+gl.enableVertexAttribArray(0);
+gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+function shader(type, src){
+  const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)){
+    const log = gl.getShaderInfoLog(s);
+    const lines = src.split("\n"); const m = /0:(\d+)/.exec(log || ""); let ctx = "";
+    if (m){ const n = +m[1]; ctx = lines.slice(Math.max(0, n-4), n+2).map((l, i) => (n-3+i) + ": " + l).join("\n"); }
+    throw new Error("shader compile failed:\n" + log + "\n" + ctx);
+  }
+  return s;
+}
+function program(fs){
+  const p = gl.createProgram();
+  gl.attachShader(p, shader(gl.VERTEX_SHADER, VS)); gl.attachShader(p, shader(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error("link failed: " + gl.getProgramInfoLog(p));
+  return p;
+}
+function tex(w, h, internal, linear){
+  const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texStorage2D(gl.TEXTURE_2D, 1, internal, w, h);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, linear ? gl.LINEAR : gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, linear ? gl.LINEAR : gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return t;
+}
+function fbo(t){ const f = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, f); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0); return f; }
+
+const V3 = {
+  sub: (a, b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]],
+  cross: (a, b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]],
+  norm: (a) => { const l = Math.hypot(a[0], a[1], a[2]); return [a[0]/l, a[1]/l, a[2]/l]; },
+  scale: (a, s) => [a[0]*s, a[1]*s, a[2]*s],
+};
+
+const post = { resolve: null, down: null, post: null };
+function ensurePostPrograms(){ if (!post.resolve){ post.resolve = program(RESOLVE_FS); post.down = program(DOWN_FS); post.post = program(POST_FS); } }
+
+// Render one scene. Returns a PNG data URL.
+window.renderCover = async function({ scene, width = 2400, height = 1500, spp = 64, tile = 600 }){
+  const S = window.SCENES[scene]; if (!S) throw new Error("unknown scene " + scene);
+  const t0 = performance.now();
+  canvas.width = width; canvas.height = height;
+  ensurePostPrograms();
+  const src = CORE_HEAD + "\n// ===== scene: " + scene + " =====\n" + S.glsl + "\n" + CORE_TAIL;
+  const prog = program(src);
+
+  const acc = [tex(width, height, gl.RGBA32F, false), tex(width, height, gl.RGBA32F, false)];
+  const accF = acc.map(fbo);
+  for (const f of accF){ gl.bindFramebuffer(gl.FRAMEBUFFER, f); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); }
+  const hdr = tex(width, height, gl.RGBA16F, false), bright = tex(width, height, gl.RGBA16F, true);
+  const hdrF = fbo(hdr), brightF = fbo(bright);
+  const chain = []; { let bw = width, bh = height; for (let k = 0; k < 6; k++){ bw = Math.max(1, bw >> 1); bh = Math.max(1, bh >> 1); const t = tex(bw, bh, gl.RGBA16F, true); chain.push({ t, f: fbo(t), w: bw, h: bh }); } }
+
+  // camera
+  const r = Object.assign({}, RIG, S.rig || {});
+  const el = r.elev*Math.PI/180, az = r.azim*Math.PI/180, T = r.target;
+  const pos = [T[0] + r.dist*Math.sin(az)*Math.cos(el), T[1] + r.dist*Math.sin(el), T[2] + r.dist*Math.cos(az)*Math.cos(el)];
+  const fwd = V3.norm(V3.sub(T, pos)); const right = V3.norm(V3.cross(fwd, [0, 1, 0])); const up = V3.cross(right, fwd);
+
+  // lights
+  const Lc = [], Lu = [], Lv = [], Ln = [], Le = [], La = [], Lk = [];
+  for (const L of r.lights){
+    const n = V3.norm(V3.sub(L.target, L.pos));
+    const upv = Math.abs(n[1]) > 0.95 ? [0, 0, 1] : [0, 1, 0];
+    const u = V3.norm(V3.cross(upv, n)); const v = V3.cross(n, u);
+    const col = L.color || S.accent;
+    Lc.push(...L.pos); Lu.push(...V3.scale(u, L.size[0]/2)); Lv.push(...V3.scale(v, L.size[1]/2)); Ln.push(...n);
+    const pw = L.color ? L.power : L.power*(S.accentPower || 1);
+    Le.push(col[0]*pw, col[1]*pw, col[2]*pw); La.push(L.size[0]*L.size[1]); Lk.push(L.grid || 0);
+  }
+
+  gl.useProgram(prog);
+  const U = (n) => gl.getUniformLocation(prog, n);
+  gl.uniform2f(U("uRes"), width, height);
+  gl.uniform3fv(U("uCamPos"), pos); gl.uniform3fv(U("uFwd"), fwd); gl.uniform3fv(U("uRight"), right); gl.uniform3fv(U("uUp"), up);
+  gl.uniform1f(U("uTanHalf"), r.frameH*0.5/r.dist); gl.uniform1f(U("uFocus"), (S.focus || 0) + r.dist); gl.uniform1f(U("uAperture"), r.aperture);
+  gl.uniform2f(U("uShift"), r.shift[0], r.shift[1]);
+  gl.uniform3fv(U("uLc"), Lc); gl.uniform3fv(U("uLu"), Lu); gl.uniform3fv(U("uLv"), Lv); gl.uniform3fv(U("uLn"), Ln); gl.uniform3fv(U("uLe"), Le); gl.uniform1fv(U("uLa"), La); gl.uniform1fv(U("uLk"), Lk);
+  gl.uniform3fv(U("uAccent"), S.accent);
+  gl.uniform1i(U("uPrev"), 0);
+  const uSample = U("uSample");
+
+  const px = new Float32Array(4);
+  let src_ = 0;
+  for (let s = 0; s < spp; s++){
+    const dst = 1 - src_;
+    gl.useProgram(prog);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, accF[dst]); gl.viewport(0, 0, width, height);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, acc[src_]);
+    gl.uniform1i(uSample, s);
+    gl.enable(gl.SCISSOR_TEST);
+    for (let y = 0; y < height; y += tile) for (let x = 0; x < width; x += tile){
+      gl.scissor(x, y, Math.min(tile, width - x), Math.min(tile, height - y));
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      gl.flush();
+    }
+    gl.disable(gl.SCISSOR_TEST);
+    gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.FLOAT, px); // sync: keeps the GPU queue short
+    src_ = dst;
+    if (s % 4 === 3) await new Promise((res) => setTimeout(res, 0));
+  }
+
+  // resolve -> HDR (mode 0) and bright pass (mode 1)
+  gl.useProgram(post.resolve);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, acc[src_]);
+  gl.uniform1i(gl.getUniformLocation(post.resolve, "uAcc"), 0);
+  gl.uniform1f(gl.getUniformLocation(post.resolve, "uInv"), 1/spp);
+  for (const [f, mode] of [[hdrF, 0], [brightF, 1]]){
+    gl.bindFramebuffer(gl.FRAMEBUFFER, f); gl.viewport(0, 0, width, height);
+    gl.uniform1i(gl.getUniformLocation(post.resolve, "uMode"), mode);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+  // bloom: successive 2x downsamples of the bright pass
+  gl.useProgram(post.down);
+  gl.uniform1i(gl.getUniformLocation(post.down, "uSrc"), 0);
+  let prev = bright;
+  for (const lv of chain){
+    gl.bindFramebuffer(gl.FRAMEBUFFER, lv.f); gl.viewport(0, 0, lv.w, lv.h);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, prev);
+    gl.uniform2f(gl.getUniformLocation(post.down, "uDst"), lv.w, lv.h);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    prev = lv.t;
+  }
+
+  gl.useProgram(post.post);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, width, height);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, hdr);
+  const P = (n) => gl.getUniformLocation(post.post, n);
+  gl.uniform1i(P("uHdr"), 0);
+  chain.forEach((lv, k) => { gl.activeTexture(gl.TEXTURE1 + k); gl.bindTexture(gl.TEXTURE_2D, lv.t); gl.uniform1i(P("uB" + (k + 1)), 1 + k); });
+  gl.uniform2f(P("uRes"), width, height);
+  gl.uniform1f(P("uBloom"), r.bloom); gl.uniform1f(P("uExposure"), r.exposure*(S.exposure || 1)); gl.uniform1f(P("uGrain"), r.grain);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  gl.finish();
+  const url = canvas.toDataURL("image/png");
+
+  for (const t of [...acc, hdr, bright, ...chain.map((c) => c.t)]) gl.deleteTexture(t);
+  for (const f of [...accF, hdrF, brightF, ...chain.map((c) => c.f)]) gl.deleteFramebuffer(f);
+  gl.deleteProgram(prog);
+  return { url, ms: Math.round(performance.now() - t0) };
+};
+window.RENDERER_READY = true;
+</script>
+</body>
+</html>
