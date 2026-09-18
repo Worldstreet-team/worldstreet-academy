@@ -1,226 +1,206 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { Suspense, useMemo, useState } from "react"
 import Image from "next/image"
-import Link from "next/link"
+import { useSearchParams } from "next/navigation"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { Search01Icon } from "@hugeicons/core-free-icons"
 import { Topbar } from "@/components/platform/topbar"
-import { CourseGrid } from "@/components/courses/course-grid"
-import { CourseGridSkeleton } from "@/components/skeletons/course-skeletons"
-import { ArtSearch } from "@/components/shared/illustrations"
-import { levelChipStyle } from "@/components/shared/level-badge"
-import { type BrowseCourse } from "@/lib/actions/student"
-import { useBrowseCourses } from "@/lib/hooks/queries"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from "@/components/ui/popover"
+import { CourseCard, CourseCardSkeleton } from "@/components/platform/course-card"
+import { CardShell, EmptyState, PageHeader, Rise, Segmented, type SegmentedOption } from "@/components/ui/system"
+import { useBookmarkedIds, useBrowseCourses, useMyEnrollmentIntent, useToggleBookmark } from "@/lib/hooks/queries"
+import { programPriceLabel } from "@/lib/program-price"
+import { schoolCover } from "@/lib/school-art"
+import { SCHOOLS, isSchoolSlug, type SchoolSlug } from "@/lib/schools"
 import { cn } from "@/lib/utils"
-import { FilterIcon, SearchIcon } from "lucide-react"
 
-const LEVEL_TABS = ["All", "Beginner", "Intermediate", "Advanced"] as const
-type Level = (typeof LEVEL_TABS)[number]
+type Level = "All" | "Beginner" | "Intermediate" | "Advanced"
+const LEVELS: readonly SegmentedOption<Level>[] = [
+  { key: "All", label: "All levels" },
+  { key: "Beginner", label: "Beginner" },
+  { key: "Intermediate", label: "Intermediate" },
+  { key: "Advanced", label: "Advanced" },
+]
 
-const PRICE_FILTERS = ["All", "Free", "Paid"] as const
-type PriceFilter = (typeof PRICE_FILTERS)[number]
+const CHIP =
+  "flex h-10 shrink-0 items-center gap-2 rounded-full pl-1.5 pr-4 text-[13px] font-medium transition-colors duration-[var(--ws-motion-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
 
-export default function BrowseCoursesPage() {
+/*
+ * Browse programs — by school first (owner, 2026-09-16), then level, then a
+ * search. It opens on the learner's own school: `?school=` when linked, else
+ * the school they saved. The school chips are a filter, not tabs: raised when
+ * pressed, never gold. Level is the page's one Segmented.
+ */
+function BrowseProgramsInner() {
+  const paramSchool = useSearchParams().get("school")
+  const { data: intent } = useMyEnrollmentIntent()
   const [search, setSearch] = useState("")
-  const [activeLevel, setActiveLevel] = useState<Level>("All")
-  const [priceFilter, setPriceFilter] = useState<PriceFilter>("All")
+  const [level, setLevel] = useState<Level>("All")
+  // null = the learner has not touched the filter yet, so the default applies.
+  const [chosen, setChosen] = useState<SchoolSlug | "all" | null>(null)
+  const school: SchoolSlug | "all" = chosen ?? (isSchoolSlug(paramSchool) ? paramSchool : (intent?.school ?? "all"))
 
-  const filters = useMemo(() => ({
-    level: activeLevel,
-    pricing: priceFilter,
-  }), [activeLevel, priceFilter])
-
+  const filters = useMemo(() => ({ level, pricing: "All" }), [level])
   const { data: courses = [], isLoading } = useBrowseCourses(filters)
+  const bookmarkedIds = useBookmarkedIds()
+  const toggleBookmark = useToggleBookmark()
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return courses
-
-    const q = search.toLowerCase()
+  const shown = useMemo(() => {
+    const q = search.trim().toLowerCase()
     return courses.filter(
       (c) =>
-        c.title.toLowerCase().includes(q) ||
-        c.instructorName.toLowerCase().includes(q) ||
-        c.level.toLowerCase().includes(q)
+        (school === "all" || c.school === school) &&
+        (!q || c.title.toLowerCase().includes(q) || c.instructorName.toLowerCase().includes(q))
     )
-  }, [search, courses])
+  }, [courses, school, search])
+
+  const filtered = school !== "all" || level !== "All" || search.trim() !== ""
+
+  // Current time is read once per render to decide a card's "Not live yet"
+  // face; a stale value only self-corrects on the next render — the same
+  // tolerance `EnrollmentCard` already takes for the same decision.
+  // eslint-disable-next-line react-hooks/purity
+  const now = Date.now()
 
   return (
     <>
-      <Topbar title="Browse Courses" />
-      <div className="flex-1 p-4 md:p-6 lg:p-8 space-y-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-8">
-        <div className="space-y-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Browse Courses</h1>
-            <p className="text-muted-foreground mt-1">
-              Explore our catalog of courses across crypto, trading, and blockchain.
-            </p>
-          </div>
+      <Topbar title="Programs" />
+      <div className="flex-1 px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-6 sm:px-6 md:px-8 md:pb-12 md:pt-8 lg:px-12">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+          <Rise>
+            <PageHeader title="Programs" subtitle="Expert-led programs across eight schools. Start with yours." />
+          </Rise>
 
-          {/* Search + Filter row — DS SearchField: pill, chip fill, 16px
-              search glyph, static placeholder */}
-          <div className="flex items-center gap-3">
-            <div className="relative flex-1">
-              <SearchIcon
-                size={16}
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-ws-subtle pointer-events-none" />
-              <input
-                type="search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search courses"
-                className="h-11 md:h-10 w-full rounded-full bg-ws-chip pl-10 pr-4 text-base md:text-sm text-ws-primary placeholder:text-ws-subtle outline-none border border-transparent transition-colors duration-[var(--ws-motion-fast)] focus:border-ws-brand"
-              />
-            </div>
-            <Popover>
-              <PopoverTrigger
-                className="shrink-0 h-10 px-3 rounded-lg border bg-background hover:bg-muted/50 transition-colors flex items-center gap-2 text-sm font-medium"
-              >
-                <FilterIcon  size={16} className="text-muted-foreground" />
-                Filters
-                {(activeLevel !== "All" || priceFilter !== "All") && (
-                  <Badge className="h-4 w-4 p-0 text-[9px] flex items-center justify-center">
-                    {(activeLevel !== "All" ? 1 : 0) + (priceFilter !== "All" ? 1 : 0)}
-                  </Badge>
-                )}
-              </PopoverTrigger>
-              <PopoverContent side="bottom" align="end" className="p-4 w-64">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground">Level</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {LEVEL_TABS.map((level) => (
-                        <button
-                          key={level}
-                          type="button"
-                          onClick={() => setActiveLevel(level)}
-                          className={cn(
-                            "px-3 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap",
-                            activeLevel === level
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted text-muted-foreground hover:bg-muted/80"
-                          )}
-                        >
-                          {level}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground">Price</p>
-                    <div className="flex gap-1.5">
-                      {PRICE_FILTERS.map((pf) => (
-                        <button
-                          key={pf}
-                          type="button"
-                          onClick={() => setPriceFilter(pf)}
-                          className={cn(
-                            "flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
-                            priceFilter === pf
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted text-muted-foreground hover:bg-muted/80"
-                          )}
-                        >
-                          {pf}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  {(activeLevel !== "All" || priceFilter !== "All") && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      onClick={() => {
-                        setActiveLevel("All")
-                        setPriceFilter("All")
-                      }}
-                    >
-                      Clear filters
-                    </Button>
-                  )}
-                </div>
-              </PopoverContent>
-            </Popover>
-          </div>
-        </div>
-
-        {/* Search results with thumbnails (when searching) */}
-        {isLoading ? (
-          <CourseGridSkeleton count={9} />
-        ) : search.trim() && filtered.length > 0 ? (
-          <div className="space-y-2">
-            <p className="text-xs text-muted-foreground">
-              {filtered.length} result{filtered.length !== 1 ? "s" : ""} for &quot;{search}&quot;
-            </p>
-            <div className="space-y-1">
-              {filtered.slice(0, 6).map((course) => (
-                <Link
-                  key={course.id}
-                  href={`/dashboard/courses/${course.id}`}
-                  className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-muted/50 transition-colors"
-                >
-                  <div className="relative h-10 w-16 rounded-md bg-muted overflow-hidden shrink-0">
-                    {course.thumbnailUrl ? (
-                      <Image
-                        src={course.thumbnailUrl}
-                        alt={course.title}
-                        fill
-                        className="object-cover"
-                        sizes="64px"
-                      />
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-[8px] text-muted-foreground/40">No img</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{course.title}</p>
-                    <p className="text-[11px] text-muted-foreground truncate">
-                      {course.pricing === "free" ? "Free" : `$${course.price}`}
-                    </p>
-                  </div>
-                  <Badge
-                    variant="secondary"
-                    className="text-[10px] capitalize shrink-0"
-                    style={levelChipStyle(course.level)}
-                  >
-                    {course.level}
-                  </Badge>
-                </Link>
-              ))}
-            </div>
-            {filtered.length > 6 && (
-              <p className="text-xs text-muted-foreground text-center pt-2">
-                Showing 6 of {filtered.length} results
-              </p>
-            )}
-            <div className="border-t pt-4">
-              <CourseGrid courses={filtered as unknown as Parameters<typeof CourseGrid>[0]["courses"]} />
-            </div>
-          </div>
-        ) : filtered.length === 0 && search.trim() ? (
-          <div className="flex flex-col items-center justify-center py-16 text-sm text-muted-foreground">
-            <ArtSearch className="mb-4 w-40" />
-            <p>No courses match &quot;{search}&quot;</p>
-            <button
-              type="button"
-              onClick={() => setSearch("")}
-              className="text-primary text-xs mt-1 hover:underline"
+          <Rise delay={60} className="flex flex-col gap-4">
+            <div
+              role="group"
+              aria-label="School"
+              className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0"
             >
-              Clear search
-            </button>
-          </div>
-        ) : (
-          <CourseGrid courses={filtered as unknown as Parameters<typeof CourseGrid>[0]["courses"]} />
-        )}
+              <button
+                type="button"
+                aria-pressed={school === "all"}
+                onClick={() => setChosen("all")}
+                className={cn(
+                  CHIP,
+                  "pl-4",
+                  school === "all" ? "bg-accent text-foreground ring-1 ring-border" : "bg-card text-muted-foreground hover:bg-accent"
+                )}
+              >
+                All schools
+              </button>
+              {SCHOOLS.map((s) => {
+                const cover = schoolCover(s.slug)
+                const on = school === s.slug
+                return (
+                  <button
+                    key={s.slug}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => setChosen(s.slug)}
+                    className={cn(
+                      CHIP,
+                      !cover && "pl-4",
+                      on ? "bg-accent text-foreground ring-1 ring-border" : "bg-card text-muted-foreground hover:bg-accent"
+                    )}
+                  >
+                    {cover && (
+                      <Image src={cover} alt="" width={28} height={28} className="h-7 w-7 rounded-full object-cover" />
+                    )}
+                    {s.short}
+                  </button>
+                )
+              })}
+            </div>
+
+            <div className="flex flex-col gap-3 md:flex-row md:items-center">
+              <label className="relative flex-1">
+                <span className="sr-only">Search programs</span>
+                <HugeiconsIcon
+                  icon={Search01Icon}
+                  className="ws-icon-mono pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-ws-subtle"
+                  aria-hidden
+                />
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search programs"
+                  className="h-11 w-full rounded-full border border-transparent bg-ws-chip pl-10 pr-4 text-base text-ws-primary outline-none transition-colors duration-[var(--ws-motion-fast)] placeholder:text-ws-subtle focus:border-ws-brand md:h-10 md:text-sm"
+                />
+              </label>
+              <Segmented options={LEVELS} value={level} onChange={setLevel} size="sm" className="self-start md:self-auto" />
+            </div>
+          </Rise>
+
+          <Rise delay={120}>
+            {isLoading ? (
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {[0, 1, 2, 3, 4, 5].map((i) => (
+                  <CourseCardSkeleton key={i} />
+                ))}
+              </div>
+            ) : shown.length === 0 ? (
+              <CardShell>
+                <EmptyState
+                  illustration="noTransactions"
+                  title={filtered ? "No programs match" : "No programs published yet"}
+                  description={
+                    filtered
+                      ? "Try another school or level — every program is listed under All schools."
+                      : "New programs appear here as instructors publish them."
+                  }
+                  ctas={
+                    filtered
+                      ? [{ label: "Clear filters", onClick: () => { setChosen("all"); setLevel("All"); setSearch("") } }]
+                      : []
+                  }
+                />
+              </CardShell>
+            ) : (
+              <>
+                <p className="mb-3 text-[13px] tabular-nums text-muted-foreground" aria-live="polite">
+                  {shown.length === 1 ? "1 program" : `${shown.length} programs`}
+                </p>
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {shown.map((course) => (
+                    <CourseCard
+                      key={course.id}
+                      href={`/dashboard/courses/${course.id}`}
+                      title={course.title}
+                      thumbnailUrl={course.thumbnailUrl}
+                      price={course.price}
+                      pricing={course.pricing}
+                      priceLabel={programPriceLabel(course)}
+                      rating={course.rating}
+                      level={course.level}
+                      totalDuration={course.totalDuration}
+                      enrolledCount={course.enrolledCount}
+                      comingSoonAt={
+                        course.availableAt && new Date(course.availableAt).getTime() > now
+                          ? course.availableAt
+                          : null
+                      }
+                      isBookmarked={bookmarkedIds.has(course.id)}
+                      onToggleBookmark={() => toggleBookmark.mutate(course.id)}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </Rise>
+        </div>
       </div>
     </>
+  )
+}
+
+export default function BrowseProgramsPage() {
+  // useSearchParams needs a Suspense boundary in the app router (matches
+  // admin/enrollments and the exam pages' pattern).
+  return (
+    <Suspense fallback={null}>
+      <BrowseProgramsInner />
+    </Suspense>
   )
 }

@@ -47,6 +47,8 @@ type CourseCardProps = {
   /** Browse variant. */
   price?: number | null
   pricing?: string
+  /** Overrides the computed price text — browse passes "From $49" for a package ladder. */
+  priceLabel?: string
   rating?: number | null
   level?: string
   totalLessons?: number
@@ -78,6 +80,7 @@ export function CourseCard({
   completed,
   price,
   pricing,
+  priceLabel,
   rating,
   level,
   totalLessons,
@@ -207,11 +210,12 @@ export function CourseCard({
                 <div className="flex min-w-0 items-baseline gap-3">
                   <span className="text-[13px] font-semibold tabular-nums text-foreground">
                     {/* USD prices always carry 2 decimals (02-typography). */}
-                    {pricing === "free"
-                      ? "Free"
-                      : price != null
-                        ? `$${price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                        : ""}
+                    {priceLabel ??
+                      (pricing === "free"
+                        ? "Free"
+                        : price != null
+                          ? `$${price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          : "")}
                   </span>
                   {rating ? (
                     <span className="inline-flex items-center gap-1">
