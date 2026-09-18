@@ -10,17 +10,22 @@ import { programPriceLabel } from "@/lib/program-price"
 
 /**
  * One program on a school page (spec §5): title, blurb, level, price and the
- * [VIEW PROGRAM] affordance. The whole row is the link. Links to the program page.
+ * [VIEW PROGRAM] affordance. The whole row is the link: to the program page,
+ * or to `href` (the school picker's "Choose program").
+ *
+ * The card matches `SchoolCard`: 20px corners, separated by fill in dark,
+ * hover lightens one surface step, and the affordance is ink-on-hover, never
+ * gold — a list of rows would otherwise put gold on every one of them.
  */
-export function ProgramRow({ course }: { course: BrowseCourse }) {
+export function ProgramRow({ course, href }: { course: BrowseCourse; href?: string }) {
   const comingSoon =
     courseAvailability({ status: "published", availableAt: course.availableAt }) === "coming_soon"
 
   return (
     <li>
       <Link
-        href={`/programs/${course.slug}`}
-        className="group grid gap-5 rounded-lg border border-ws-hairline bg-ws-surface p-5 transition-colors duration-[var(--ws-motion-base)] hover:border-ws-brand/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40 sm:grid-cols-[9rem_1fr] sm:p-6"
+        href={href ?? `/programs/${course.slug}`}
+        className="group grid h-full gap-5 rounded-[20px] border border-ws-hairline bg-ws-surface p-5 transition-colors duration-[var(--ws-motion-base)] hover:bg-ws-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40 dark:border-transparent sm:grid-cols-[9rem_1fr] sm:p-6"
       >
         <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-md bg-ws-sunken sm:aspect-[4/3]">
           {course.thumbnailUrl ? (
@@ -58,15 +63,15 @@ export function ProgramRow({ course }: { course: BrowseCourse }) {
           <h3 className="mt-3 font-display text-xl font-semibold tracking-[-0.01em] text-ws-primary">
             {course.title}
           </h3>
-          <p className="mt-2 line-clamp-2 text-[14px] leading-relaxed text-ws-muted">
+          <p className="mt-2 line-clamp-3 text-[14px] leading-relaxed text-ws-muted">
             {course.shortDescription ?? course.description}
           </p>
           <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-5">
             <span className="text-[14px] font-semibold tabular-nums text-ws-primary">
               {programPriceLabel(course)}
             </span>
-            <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-ws-gold">
-              View program
+            <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-ws-muted transition-colors duration-[var(--ws-motion-fast)] group-hover:text-ws-primary">
+              {href ? "Choose program" : "View program"}
               <ArrowRightIcon
                 size={14}
                 aria-hidden
