@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
+import Link from "next/link"
 import { useQueryClient } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -11,6 +12,7 @@ import { purchaseCourse, checkEnrollment } from "@/lib/actions/enrollments"
 import { getMyWalletBalance, type MyWalletBalance } from "@/lib/actions/wallet"
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import { fetchProgramById, type ProgramDetail, type PublicPackage } from "@/lib/actions/student"
+import { saveEnrollmentIntent } from "@/lib/actions/enrollment-intent"
 import { PACKAGE_LABEL } from "@/lib/entitlements"
 import { SCHOOL_BY_SLUG } from "@/lib/schools"
 import { cn } from "@/lib/utils"
@@ -43,6 +45,12 @@ export default function CheckoutPage() {
   const [isSuccess, setIsSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [shortfallMinor, setShortfallMinor] = useState<number | null>(null)
+  // `saveEnrollmentIntent` revalidates `/dashboard`, which hands this route a
+  // fresh `user` reference from the layout on the next render — without this
+  // guard that retriggers the effect, which saves again, which revalidates
+  // again: an infinite loop. Keyed on course + package so a genuine switch
+  // still records.
+  const savedIntentKeyRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!courseId) {
@@ -61,10 +69,22 @@ export default function CheckoutPage() {
         return
       }
       setProgram(p)
+      if (p?.school) {
+        // Reaching checkout IS choosing (Phase 9): remember it, so an order the
+        // buyer walks away from can be finished from the dashboard, and the
+        // wallet-funding round trip is never stopped by the school-first gate.
+        const chosen = p.packages.find((k) => k.key === packageParam)
+        const packageKey = p.tierCount > 0 ? (chosen?.key ?? null) : null
+        const intentKey = `${p.id}:${packageKey ?? ""}`
+        if (savedIntentKeyRef.current !== intentKey) {
+          savedIntentKeyRef.current = intentKey
+          void saveEnrollmentIntent({ school: p.school, courseId: p.id, packageKey, source: "checkout" })
+        }
+      }
       setWallet(walletBalance)
       setIsLoading(false)
     })
-  }, [courseId, user, router])
+  }, [courseId, user, router, packageParam])
 
   // The URL carries the package, so the wallet-funding round trip (which
   // returns to this exact URL) keeps the buyer's choice. A single-tier program
@@ -381,6 +401,15 @@ export default function CheckoutPage() {
               </>
             )}
         </Button>
+
+          {!isSuccess && (
+            <Link
+              href="/dashboard?saved=1"
+              className="flex h-11 w-full items-center justify-center rounded-full text-sm font-medium text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:text-ws-primary"
+            >
+              Save and pay later
+            </Link>
+          )}
       </div>
     </div>
   )
