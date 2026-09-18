@@ -6,6 +6,7 @@ import { useSearchParams, useRouter } from "next/navigation"
 import { Topbar } from "@/components/platform/topbar"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import { PageHeader } from "@/components/ui/system"
 import { cn } from "@/lib/utils"
 import { rtkClient } from "@/lib/rtk-client"
 import { useUser } from "@/components/providers/user-provider"
@@ -206,6 +207,7 @@ export default function MeetingsPage() {
 
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const isHost = activeMeeting?.hostId === user.id
+  const canStart = user.role !== "USER"
 
   const waitingRef = useRef(waitingForApproval)
   waitingRef.current = waitingForApproval
@@ -1845,10 +1847,20 @@ export default function MeetingsPage() {
 
       <div className="flex-1 overflow-y-auto">
         <div className="px-4 md:px-6 pt-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6 space-y-6">
+          <PageHeader
+            title="Meetings"
+            subtitle={
+              canStart
+                ? "Start a session, or join one you've been invited to."
+                : "Join your live classes, mentorship sessions and invitations."
+            }
+          />
+
           {/* Quick actions hero */}
           <MeetingQuickActions
             onCreateNew={() => setShowCreate(true)}
             onJoin={handleJoinByLink}
+            canStart={canStart}
           />
 
           {/* Scheduled course classes (spec §12) */}
@@ -1874,6 +1886,7 @@ export default function MeetingsPage() {
                 isLoading={isLoadingMeetings}
                 userId={user.id}
                 onRejoin={handleRejoin}
+                canStart={canStart}
               />
             </section>
 

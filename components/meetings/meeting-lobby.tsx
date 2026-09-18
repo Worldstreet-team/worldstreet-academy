@@ -152,10 +152,13 @@ export function CreateMeetingModal({
 export function MeetingQuickActions({
   onCreateNew,
   onJoin,
+  canStart = true,
 }: {
   onCreateNew: () => void
   onSchedule?: () => void
   onJoin: (meetingId: string) => void
+  /** Hosts only. A learner sees Join alone. */
+  canStart?: boolean
 }) {
   const [meetingId, setMeetingId] = useState("")
   const [isJoining, setIsJoining] = useState(false)
@@ -169,30 +172,32 @@ export function MeetingQuickActions({
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    <div className={cn("grid grid-cols-1 gap-3", canStart && "sm:grid-cols-2")}>
       {/* Start Meeting card */}
-      <button
-        onClick={onCreateNew}
-        className="group relative flex flex-col items-start justify-center p-4 h-[120px] sm:h-[130px] rounded-lg bg-card border border-ws-hairline overflow-hidden transition-all hover:border-ws-hairline"
-      >
-        {/* Illustration positioned at right middle */}
-        <div className="absolute md:-right-8 -right-20 top-[54%] -translate-y-1/2 h-[102%] w-[65%] pointer-events-none">
-          <Image
-            src="/user/dashboard/create-new-meeting.png"
-            alt=""
-            fill
-            className="object-contain object-center-right"
-            priority
-          />
-        </div>
-        <div className="relative z-10 text-left">
-          <div className="w-9 h-9 rounded-lg bg-muted/80 flex items-center justify-center mb-2">
-            <VideoIcon  size={17} className="text-foreground" />
+      {canStart && (
+        <button
+          onClick={onCreateNew}
+          className="group relative flex flex-col items-start justify-center p-4 h-[120px] sm:h-[130px] rounded-lg bg-card border border-ws-hairline overflow-hidden transition-all hover:border-ws-hairline"
+        >
+          {/* Illustration positioned at right middle */}
+          <div className="absolute md:-right-8 -right-20 top-[54%] -translate-y-1/2 h-[102%] w-[65%] pointer-events-none">
+            <Image
+              src="/user/dashboard/create-new-meeting.png"
+              alt=""
+              fill
+              className="object-contain object-center-right"
+              priority
+            />
           </div>
-          <h3 className="font-semibold text-sm text-foreground">Start Meeting</h3>
-          <p className="text-muted-foreground text-[11px] mt-0.5">Start an instant meeting</p>
-        </div>
-      </button>
+          <div className="relative z-10 text-left">
+            <div className="w-9 h-9 rounded-lg bg-muted/80 flex items-center justify-center mb-2">
+              <VideoIcon  size={17} className="text-foreground" />
+            </div>
+            <h3 className="font-semibold text-sm text-foreground">Start Meeting</h3>
+            <p className="text-muted-foreground text-[11px] mt-0.5">Start an instant meeting</p>
+          </div>
+        </button>
+      )}
 
       {/* Join card */}
       <div className="flex flex-col justify-between gap-3 p-4 rounded-lg border border-ws-hairline bg-card">
@@ -240,11 +245,14 @@ export function ActiveMeetingsList({
   isLoading,
   userId,
   onRejoin,
+  canStart = true,
 }: {
   meetings: MeetingWithDetails[]
   isLoading: boolean
   userId: string
   onRejoin: (meeting: MeetingWithDetails) => void
+  /** Hosts only. A learner sees Join alone. */
+  canStart?: boolean
 }) {
   const invalidateMeetings = useInvalidateMeetings()
   // Cancel a scheduled class (the host's only undo for a mistyped one) — confirmed first.
@@ -304,7 +312,9 @@ export function ActiveMeetingsList({
         </div>
         <h3 className="font-semibold text-sm mb-1 text-foreground">No active meetings</h3>
         <p className="text-xs text-muted-foreground max-w-[240px] mx-auto leading-relaxed">
-          Start a meeting to collaborate with screen sharing, chat, and polls.
+          {canStart
+            ? "Start a meeting to collaborate with screen sharing, chat, and polls."
+            : "Live classes, mentorship sessions and invitations appear here when they start."}
         </p>
       </div>
     )
