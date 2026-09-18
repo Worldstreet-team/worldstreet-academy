@@ -1,7 +1,7 @@
 import { fetchBrowseCourses, fetchFaculty, type BrowseCourse } from "@/lib/actions/student"
 import { fetchLandingReviews } from "@/lib/actions/reviews"
 import { getCurrentUser } from "@/lib/auth/actions"
-import { countProgramsBySchool } from "@/lib/schools"
+import { cheapestBySchool, countProgramsBySchool } from "@/lib/schools"
 import { HeroWall } from "@/components/marketing/hero-wall"
 import { HowItWorks } from "@/components/marketing/how-it-works"
 import { WordsMarquee } from "@/components/marketing/words-marquee"
@@ -31,7 +31,7 @@ function futureDrops(published: BrowseCourse[]): BrowseCourse[] {
 
 /**
  * The Academy landing at `/` — clean editorial composition, in order: hero,
- * the band of words, the About statement, the Why pillars, the Schools grid,
+ * the band of words, the Schools grid, the About statement, the Why pillars,
  * the How-it-works timeline, the catalogue card grid (the ONLY section
  * allowed to show course thumbnails), the Faculty teaser (hidden when there is
  * no faculty), Upcoming drops (hidden when nothing is scheduled), testimonials
@@ -62,6 +62,7 @@ export async function Landing() {
 
   // ── Schools grid: program counts from the same published list.
   const schoolCounts = countProgramsBySchool(published)
+  const schoolFrom = cheapestBySchool(published)
 
   return (
     <div
@@ -78,14 +79,14 @@ export async function Landing() {
       {/* The band of words — the eight schools' vocabulary */}
       <WordsMarquee />
 
+      {/* Our schools — eight cards with live program counts (spec §4) */}
+      <SchoolsGrid counts={schoolCounts} cheapest={schoolFrom} />
+
       {/* About (spec §2) */}
       <AboutBand />
 
       {/* Why learn here — six pillars (spec §3) */}
       <WhyBand />
-
-      {/* Our schools — eight cards with live program counts (spec §4) */}
-      <SchoolsGrid counts={schoolCounts} />
 
       {/* How it works — the four-step journey (spec §11) */}
       <HowItWorks />

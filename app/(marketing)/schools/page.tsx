@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { ArrowRightIcon, CompassIcon } from "lucide-react"
-import { SCHOOLS, countProgramsBySchool } from "@/lib/schools"
+import { SCHOOLS, cheapestBySchool, countProgramsBySchool } from "@/lib/schools"
 import { fetchBrowseCourses } from "@/lib/actions/student"
 import { BRAND } from "@/lib/brand"
 import { appUrl } from "@/lib/app-url"
@@ -24,6 +24,7 @@ const STAGGER_MS = 45
 export default async function SchoolsPage() {
   const courses = await fetchBrowseCourses()
   const counts = countProgramsBySchool(courses)
+  const cheapest = cheapestBySchool(courses)
 
   return (
     <div className="mx-auto max-w-7xl px-6 pb-24 pt-10 md:pb-32 md:pt-16">
@@ -49,13 +50,23 @@ export default async function SchoolsPage() {
             className="rise"
             style={{ "--rise-delay": `${i * STAGGER_MS}ms` } as React.CSSProperties}
           >
-            <SchoolCard school={school} count={counts[school.slug]} headingLevel="h2" />
+            <SchoolCard
+              school={school}
+              count={counts[school.slug]}
+              fromPrice={cheapest[school.slug]}
+              headingLevel="h2"
+              priority={i < 3}
+              sizes="(min-width: 1280px) 400px, (min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+            />
           </li>
         ))}
 
         {/* Ninth tile — the way out for anyone who does not want to pick a
             school first. Quieter than a school card (sunken, not surface) so
-            it closes the grid without competing with it. */}
+            it closes the grid without competing with it. It keeps the cards'
+            16:10 frame, with the compass where the art would be, and pt-9
+            puts its heading on the same line as the cards' headings (which
+            sit below their overlapping icon chip). */}
         <li
           className="rise"
           style={{ "--rise-delay": `${SCHOOLS.length * STAGGER_MS}ms` } as React.CSSProperties}
@@ -63,33 +74,35 @@ export default async function SchoolsPage() {
           <Link
             href="/programs"
             data-school="browse-all"
-            className="ws-school group flex h-full flex-col rounded-[20px] border border-ws-hairline bg-ws-sunken p-7 transition-colors duration-[var(--ws-motion-base)] hover:bg-ws-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40"
+            className="ws-school group flex h-full flex-col overflow-hidden rounded-[20px] border border-ws-hairline bg-ws-sunken transition-colors duration-[var(--ws-motion-base)] hover:bg-ws-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40"
           >
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-ws-brand/[0.12] text-ws-gold transition-colors duration-[var(--ws-motion-base)] group-hover:bg-ws-brand/[0.18]">
+            <div className="flex aspect-[16/10] items-center justify-center border-b border-ws-hairline text-ws-gold">
               <span className="ws-school-glyph">
-                <CompassIcon size={20} />
+                <CompassIcon size={44} />
               </span>
-            </span>
-            <h2 className="mt-6 font-display text-[18px] font-semibold leading-snug tracking-[-0.01em] text-ws-primary">
-              Not sure where to start?
-            </h2>
-            <p className="mb-7 mt-2.5 text-[14px] leading-relaxed text-ws-muted">
-              See every program in one list, across all eight schools, and compare
-              what each one covers before you choose.
-            </p>
-            <span className="mt-auto flex items-center justify-between gap-3 border-t border-ws-hairline pt-5 text-[13px]">
-              <span className="tabular-nums text-ws-muted">
-                {courses.length === 1 ? "1 program" : `${courses.length} programs`}
+            </div>
+            <div className="flex flex-1 flex-col px-6 pb-6 pt-9">
+              <h2 className="font-display text-[18px] font-semibold leading-snug tracking-[-0.01em] text-ws-primary">
+                Not sure where to start?
+              </h2>
+              <p className="mb-6 mt-2 text-[14px] leading-relaxed text-ws-muted">
+                See every program in one list, across all eight schools, and compare
+                what each one covers before you choose.
+              </p>
+              <span className="mt-auto flex items-center justify-between gap-3 border-t border-ws-hairline pt-4 text-[13px]">
+                <span className="tabular-nums text-ws-muted">
+                  {courses.length === 1 ? "1 program" : `${courses.length} programs`}
+                </span>
+                <span className="inline-flex items-center gap-1.5 font-semibold text-ws-gold">
+                  Browse all
+                  <ArrowRightIcon
+                    size={14}
+                    aria-hidden
+                    className="transition-transform duration-200 group-hover:translate-x-0.5"
+                  />
+                </span>
               </span>
-              <span className="inline-flex items-center gap-1.5 font-semibold text-ws-gold">
-                Browse all
-                <ArrowRightIcon
-                  size={14}
-                  aria-hidden
-                  className="transition-transform duration-200 group-hover:translate-x-0.5"
-                />
-              </span>
-            </span>
+            </div>
           </Link>
         </li>
       </ul>
