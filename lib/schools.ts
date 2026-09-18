@@ -114,3 +114,22 @@ export function countProgramsBySchool(
   }
   return counts
 }
+
+/**
+ * Cheapest program per school, whole USD (0 = a free program exists), null
+ * when the school has no priced program. `price` is already the cheapest
+ * enabled package (Phase 0 rule), so this never re-derives package rules.
+ */
+export function cheapestBySchool(
+  items: ReadonlyArray<{ school: SchoolSlug | null; pricing: "free" | "paid"; price: number | null }>
+): Record<SchoolSlug, number | null> {
+  const out = Object.fromEntries(SCHOOLS.map((s) => [s.slug, null])) as Record<SchoolSlug, number | null>
+  for (const item of items) {
+    if (!item.school || !(item.school in out)) continue
+    const price = item.pricing === "free" ? 0 : item.price
+    if (price === null || price === undefined) continue
+    const current = out[item.school]
+    if (current === null || price < current) out[item.school] = price
+  }
+  return out
+}
