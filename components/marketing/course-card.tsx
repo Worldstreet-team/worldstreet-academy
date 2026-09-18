@@ -111,8 +111,14 @@ export function MarketingCourseCard({
               />
             </div>
           )}
+          {/* One line, always: truncated short of the wishlist button
+              (right-3 + 32px + an 8px gap), so a long school name never
+              wraps the pill on a narrow rail card. */}
           {course.school && (
-            <span className="absolute left-3 top-3 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.06em] text-white">
+            <span
+              title={SCHOOL_BY_SLUG[course.school].short}
+              className="absolute left-3 top-3 max-w-[calc(100%-4rem)] truncate rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.06em] text-white"
+            >
               {SCHOOL_BY_SLUG[course.school].short}
             </span>
           )}

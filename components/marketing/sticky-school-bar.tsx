@@ -9,9 +9,9 @@ import { cn } from "@/lib/utils"
 /**
  * Once the hero has scrolled away, its one action follows the visitor: the
  * school they picked (or the invitation to pick one) and the way in. It shows
- * only while the hero — and the hero's gold CTA — is off screen, so the page
- * still has one primary action in view. `inert` while hidden keeps it out of
- * the tab order.
+ * only while both the hero and the closing finale band — each with its own
+ * gold CTA — are off screen, so the page still has one primary action in
+ * view. `inert` while hidden keeps it out of the tab order.
  */
 export function StickySchoolBar({ cheapest }: { cheapest: Record<SchoolSlug, number | null> }) {
   const picked = useStartSchool((s) => s.picked)
@@ -20,8 +20,17 @@ export function StickySchoolBar({ cheapest }: { cheapest: Record<SchoolSlug, num
   React.useEffect(() => {
     const hero = document.getElementById("hero")
     if (!hero) return
-    const io = new IntersectionObserver(([entry]) => setShow(!entry.isIntersecting), { threshold: 0 })
+    const finale = document.getElementById("finale")
+    const inView = new Map<Element, boolean>()
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) inView.set(entry.target, entry.isIntersecting)
+        setShow(![...inView.values()].some(Boolean))
+      },
+      { threshold: 0 }
+    )
     io.observe(hero)
+    if (finale) io.observe(finale)
     return () => io.disconnect()
   }, [])
 

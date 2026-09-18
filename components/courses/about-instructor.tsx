@@ -260,12 +260,15 @@ function CourseCard({ course }: { course: InstructorCourse }) {
           {course.title}
         </p>
         <div className="flex items-center gap-1.5 mt-0.5">
-          <span className="text-[11px] text-muted-foreground">
-            {course.totalLessons} lessons
-          </span>
+          {/* A new program has no lessons yet: say nothing rather than "0 lessons". */}
+          {course.totalLessons > 0 && (
+            <span className="text-[11px] text-muted-foreground">
+              {course.totalLessons} lessons
+            </span>
+          )}
           {course.rating && (
             <>
-              <span className="text-muted-foreground/30">·</span>
+              {course.totalLessons > 0 && <span className="text-muted-foreground/30">·</span>}
               <div className="flex items-center gap-0.5">
                 <StarIcon
                   

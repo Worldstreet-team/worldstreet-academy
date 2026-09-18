@@ -68,7 +68,8 @@ export function FinaleCta({
   registerUrl: string
 }) {
   return (
-    <section className="relative isolate overflow-hidden border-t border-ws-hairline py-24 text-center md:py-32">
+    // `id="finale"`: the sticky school bar hides while this band is in view.
+    <section id="finale" className="relative isolate overflow-hidden border-t border-ws-hairline py-24 text-center md:py-32">
       <div
         aria-hidden
         className="absolute left-1/2 top-1/2 h-[20rem] w-[44rem] max-w-[120vw] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[120px]"

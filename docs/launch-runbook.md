@@ -186,7 +186,7 @@ curl -s "$SITE/schools/trading-financial-markets" | grep -o 'href="/programs/[^"
 - The school page links the Forex and Crypto programs. `curl -s "$SITE/programs/<forex slug>" | grep -o 'Forex Foundation\|Forex Mastery\|Private Forex Mentorship' | sort -u` prints all three package names.
 - A student with an old enrollment still sees it on `/dashboard/my-courses`.
 
-**Program thumbnails (Phase 9, owner-run, once):** `node scripts/optimize-art.mjs <src> <scratch>/programs 1600x900`, then `MONGODB_URI=<prod uri> node scripts/upload-program-art.mjs <scratch>/programs` (read every line of the dry run), then the same with `--apply`. It uploads to the public R2 bucket and sets `thumbnailUrl` only where a program has none; `--replace` overwrites. Re-running is a no-op. Roll back one program by clearing its `thumbnailUrl` — it falls back to its school cover.
+**Program thumbnails (Phase 9, owner-run, once):** `node scripts/optimize-art.mjs <src> <scratch>/programs 1600x900`, then `MONGODB_URI=<prod uri> node scripts/upload-program-art.mjs <scratch>/programs` (read every line of the dry run), then the same with `--apply`. It uploads to the public R2 bucket and sets `thumbnailUrl` only where a program has none; `--replace` overwrites. Re-running is a no-op. Roll back one program by clearing its `thumbnailUrl` — it falls back to its program art file (`PROGRAM_ART` in `lib/school-art.ts`, shipped in the image), then its school cover.
 
 ## 7. Certificate IDs — `scripts/backfill-certificate-ids.mjs`
 

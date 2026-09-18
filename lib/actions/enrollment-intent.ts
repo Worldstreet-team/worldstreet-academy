@@ -80,7 +80,9 @@ export async function saveEnrollmentIntent(input: SaveEnrollmentIntentInput): Pr
       { upsert: true }
     )
 
-    revalidatePath("/dashboard")
+    // No revalidatePath: the dashboard reads the intent through the query
+    // cache and the gate reads the DB per request, while a revalidation here
+    // re-rendered checkout's layout on every save.
     return { success: true, data: { checkoutHref: checkoutHrefFor(courseId, packageKey) } }
   } catch (error) {
     console.error("Save enrollment intent error:", error)

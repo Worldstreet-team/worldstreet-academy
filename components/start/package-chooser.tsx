@@ -82,7 +82,9 @@ export function PackageChooser({
   const panel = (
     <StartPanel cover={cover}>
       {multiTier ? (
-        <fieldset className="min-w-0">
+        // Disabled while saving: a tier changed mid-request would reach
+        // checkout with the old one.
+        <fieldset disabled={pending} className="min-w-0">
           <legend className={cn(eyebrow, "mb-3")}>Choose your package</legend>
           <div className="space-y-1.5">
             {packages.map((pkg) => {

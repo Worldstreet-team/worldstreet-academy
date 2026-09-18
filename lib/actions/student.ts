@@ -30,7 +30,7 @@ export type BrowseCourse = {
   description: string
   /** Spec §5 program blurb; null on legacy courses (fall back to `description`). */
   shortDescription: string | null
-  /** The program's art: its own thumbnail, else its school's cover (lib/school-art.ts). Null only when neither exists. */
+  /** The program's art: its own thumbnail, else its program art file, else its school's cover (`programArt`, lib/school-art.ts). Null only when none exists. */
   thumbnailUrl: string | null
   instructorId: string
   instructorName: string

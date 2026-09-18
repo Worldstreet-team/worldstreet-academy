@@ -1107,8 +1107,8 @@ export type FinishEnrollingEmailData = {
   schoolName: string
   /** Root-relative checkout path, query included. */
   checkoutPath: string
-  /** Whole USD; 0 = free. */
-  price: number
+  /** Whole USD; 0 = free; null = unknown, so the email quotes no price. */
+  price: number | null
   /** A ladder with no package chosen: quote "from $X". */
   fromPrice: boolean
   /** The second email says it is the last. */
@@ -1118,7 +1118,11 @@ export type FinishEnrollingEmailData = {
 function FinishEnrollingEmail({ data }: { data: FinishEnrollingEmailData }) {
   const url = `${APP_URL}${data.checkoutPath}`
   const priceLabel =
-    data.price === 0 ? "free" : `${data.fromPrice ? "from " : ""}$${data.price.toLocaleString("en-US")}`
+    data.price === null
+      ? null
+      : data.price === 0
+        ? "free"
+        : `${data.fromPrice ? "from " : ""}$${data.price.toLocaleString("en-US")}`
   return (
     <Html style={base}>
       <Head />
@@ -1129,7 +1133,7 @@ function FinishEnrollingEmail({ data }: { data: FinishEnrollingEmailData }) {
             <Text style={heading}>Your place is saved</Text>
             <Text style={sub}>
               {data.firstName ? `${data.firstName}, you` : "You"} chose <strong>{data.courseTitle}</strong> in the{" "}
-              {data.schoolName}. It is still here ({priceLabel}) whenever you are ready.
+              {data.schoolName}. It is still here{priceLabel ? ` (${priceLabel})` : ""} whenever you are ready.
             </Text>
             {data.final && <Text style={muted}>This is the last reminder we&apos;ll send about it.</Text>}
             <Section style={{ marginTop: "28px" }}>

@@ -46,7 +46,7 @@ export function FreePreviewRail({ previews }: { previews: FreePreview[] }) {
                         alt=""
                         fill
                         sizes="(max-width: 640px) 92vw, (max-width: 1024px) 46vw, 416px"
-                        className="object-cover transition-transform duration-600 ease-[var(--ws-ease-rise)] group-hover:scale-[1.03] motion-reduce:transition-none"
+                        className="object-cover transition-transform duration-600 ease-[var(--ws-ease-rise)] motion-safe:group-hover:scale-[1.03]"
                       />
                     )}
                     <span className="absolute inset-0 flex items-center justify-center bg-black/25">
@@ -77,10 +77,12 @@ export function FreePreviewRail({ previews }: { previews: FreePreview[] }) {
       </div>
 
       <Dialog open={open !== null} onOpenChange={(next) => !next && setOpen(null)}>
-        {/* sm:max-w-3xl repeats the unprefixed override: DialogContent's own
-            default carries `sm:max-w-sm`, and at >=640px that rule sits later
-            in the generated stylesheet than a bare `max-w-3xl` and would win
-            — so the dialog would stay small on desktop without it. */}
+        {/* sm:max-w-3xl repeats the unprefixed override. DialogContent merges
+            classes with `cn` (tailwind-merge), which resolves conflicts per
+            variant, last class wins: a bare `max-w-3xl` replaces only its bare
+            `max-w-[calc(100%-2rem)]`, so its `sm:max-w-sm` would survive and
+            keep the dialog small from 640px up. The later `sm:max-w-3xl`
+            is what drops it. */}
         <DialogContent className="max-w-3xl sm:max-w-3xl overflow-hidden p-0">
           {open && (
             <>

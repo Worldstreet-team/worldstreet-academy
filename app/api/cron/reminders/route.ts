@@ -259,8 +259,15 @@ export async function POST(request: NextRequest) {
 
       const final = now - intent.savedAt.getTime() >= 3 * DAY
       const stamp = new Date()
+      // `savedAt` pins the claim to the choice this sweep read: a re-save in
+      // between restarts the clock, and must not be stamped as nudged.
       const claimed = await EnrollmentIntent.findOneAndUpdate(
-        { _id: intent._id, status: "open", [final ? "nudges.h72SentAt" : "nudges.h24SentAt"]: null },
+        {
+          _id: intent._id,
+          status: "open",
+          savedAt: intent.savedAt,
+          [final ? "nudges.h72SentAt" : "nudges.h24SentAt"]: null,
+        },
         {
           $set: final
             ? { "nudges.h24SentAt": intent.nudges?.h24SentAt ?? stamp, "nudges.h72SentAt": stamp }
@@ -282,7 +289,7 @@ export async function POST(request: NextRequest) {
         courseTitle: program.title,
         schoolName: SCHOOL_BY_SLUG[intent.school].name,
         checkoutPath: `/dashboard/checkout?courseId=${courseId}${chosen ? `&package=${chosen.key}` : ""}`,
-        price: chosen ? chosen.price : (program.price ?? 0),
+        price: chosen ? chosen.price : program.price,
         fromPrice: !chosen && program.tierCount > 1,
         final,
       })

@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
-import Link from "next/link"
 import { useQueryClient } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -14,7 +13,7 @@ import { queryKeys } from "@/lib/hooks/queries/keys"
 import { fetchProgramById, type ProgramDetail, type PublicPackage } from "@/lib/actions/student"
 import { saveEnrollmentIntent } from "@/lib/actions/enrollment-intent"
 import { PACKAGE_LABEL } from "@/lib/entitlements"
-import { SCHOOL_BY_SLUG } from "@/lib/schools"
+import { SCHOOL_BY_SLUG, type SchoolSlug } from "@/lib/schools"
 import { cn } from "@/lib/utils"
 import {
   BookOpenIcon,
@@ -28,6 +27,23 @@ import {
 /** Package prices are whole dollars. */
 function dollars(price: number): string {
   return price === 0 ? "Free" : `$${price.toLocaleString("en-US")}`
+}
+
+/** One saved choice per program + package. */
+function intentKeyOf(courseId: string, packageKey: PublicPackage["key"] | null): string {
+  return `${courseId}:${packageKey ?? ""}`
+}
+
+/** Save this order as the learner's saved school. Resolves true once stored; never rejects. */
+function saveCheckoutIntent(
+  school: SchoolSlug,
+  courseId: string,
+  packageKey: PublicPackage["key"] | null
+): Promise<boolean> {
+  return saveEnrollmentIntent({ school, courseId, packageKey, source: "checkout" }).then(
+    (result) => result.success,
+    () => false
+  )
 }
 
 export default function CheckoutPage() {
@@ -45,12 +61,13 @@ export default function CheckoutPage() {
   const [isSuccess, setIsSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [shortfallMinor, setShortfallMinor] = useState<number | null>(null)
-  // `saveEnrollmentIntent` revalidates `/dashboard`, which hands this route a
-  // fresh `user` reference from the layout on the next render — without this
-  // guard that retriggers the effect, which saves again, which revalidates
-  // again: an infinite loop. Keyed on course + package so a genuine switch
-  // still records.
-  const savedIntentKeyRef = useRef<string | null>(null)
+  const [savingLater, setSavingLater] = useState(false)
+  const [saveLaterError, setSaveLaterError] = useState<string | null>(null)
+  // The save of this order as the learner's saved school, keyed by what it
+  // saved. "Save and pay later" and the wallet round trip wait on it: both
+  // lead into `(platform)`, whose school-first gate would bounce a brand-new
+  // learner to the picker if they arrived before the save landed.
+  const intentSaveRef = useRef<{ key: string; done: Promise<boolean> } | null>(null)
 
   useEffect(() => {
     if (!courseId) {
@@ -69,22 +86,10 @@ export default function CheckoutPage() {
         return
       }
       setProgram(p)
-      if (p?.school) {
-        // Reaching checkout IS choosing (Phase 9): remember it, so an order the
-        // buyer walks away from can be finished from the dashboard, and the
-        // wallet-funding round trip is never stopped by the school-first gate.
-        const chosen = p.packages.find((k) => k.key === packageParam)
-        const packageKey = p.tierCount > 0 ? (chosen?.key ?? null) : null
-        const intentKey = `${p.id}:${packageKey ?? ""}`
-        if (savedIntentKeyRef.current !== intentKey) {
-          savedIntentKeyRef.current = intentKey
-          void saveEnrollmentIntent({ school: p.school, courseId: p.id, packageKey, source: "checkout" })
-        }
-      }
       setWallet(walletBalance)
       setIsLoading(false)
     })
-  }, [courseId, user, router, packageParam])
+  }, [courseId, user, router])
 
   // The URL carries the package, so the wallet-funding round trip (which
   // returns to this exact URL) keeps the buyer's choice. A single-tier program
@@ -93,6 +98,48 @@ export default function CheckoutPage() {
   const selected: PublicPackage | null =
     packages.length === 1 ? packages[0] : (packages.find((p) => p.key === packageParam) ?? null)
 
+  // Reaching checkout IS choosing (Phase 9): remember it, so an order the
+  // buyer walks away from can be finished from the dashboard, and the
+  // wallet-funding round trip is never stopped by the school-first gate. Its
+  // own effect, keyed on plain values, so it saves once per program + package
+  // and never again for a re-render. A program with no school (legacy) saves
+  // nothing.
+  const intentSchool = program?.school ?? null
+  const intentCourseId = program?.id ?? null
+  const intentPackageKey =
+    program && program.tierCount > 0 ? (packages.find((p) => p.key === packageParam)?.key ?? null) : null
+
+  useEffect(() => {
+    if (!intentSchool || !intentCourseId) return
+    intentSaveRef.current = {
+      key: intentKeyOf(intentCourseId, intentPackageKey),
+      done: saveCheckoutIntent(intentSchool, intentCourseId, intentPackageKey),
+    }
+  }, [intentSchool, intentCourseId, intentPackageKey])
+
+  /** Waits for this order's save; re-attempts it once if it failed or never started. */
+  async function ensureIntentSaved(): Promise<boolean> {
+    if (!intentSchool || !intentCourseId) return false
+    const key = intentKeyOf(intentCourseId, intentPackageKey)
+    const current = intentSaveRef.current
+    if (current?.key === key && (await current.done)) return true
+    const retry = { key, done: saveCheckoutIntent(intentSchool, intentCourseId, intentPackageKey) }
+    intentSaveRef.current = retry
+    return retry.done
+  }
+
+  async function saveForLater() {
+    setSaveLaterError(null)
+    setSavingLater(true)
+    if (await ensureIntentSaved()) {
+      // Stays pending through the navigation.
+      router.push("/dashboard?saved=1")
+      return
+    }
+    setSaveLaterError("Couldn't save your choice — try again.")
+    setSavingLater(false)
+  }
+
   function choosePackage(key: PublicPackage["key"]) {
     if (!courseId) return
     setError(null)
@@ -100,11 +147,15 @@ export default function CheckoutPage() {
     router.replace(`/dashboard/checkout?courseId=${courseId}&package=${key}`, { scroll: false })
   }
 
-  function openFunding() {
+  async function openFunding() {
     if (!wallet) return
     // Internal wallet deposit page (default): navigate in-tab with the
     // shortfall prefilled and a redirect straight back to this checkout.
     if (wallet.fundingUrl.startsWith("/")) {
+      // The deposit page sits behind the school-first gate: let the save land
+      // first. Navigate either way — a learner who already has a school or an
+      // enrollment is never gated.
+      await ensureIntentSaved()
       const returnTo =
         typeof window !== "undefined"
           ? `${window.location.pathname}${window.location.search}`
@@ -402,13 +453,31 @@ export default function CheckoutPage() {
             )}
         </Button>
 
-          {!isSuccess && (
-            <Link
-              href="/dashboard?saved=1"
-              className="flex h-11 w-full items-center justify-center rounded-full text-sm font-medium text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:text-ws-primary"
-            >
-              Save and pay later
-            </Link>
+          {/* Only a program in a school can be saved: a legacy one has no
+              school to put on the dashboard, so the promise would be empty. */}
+          {!isSuccess && program.school && (
+            <div className="space-y-1">
+              <button
+                type="button"
+                onClick={saveForLater}
+                disabled={savingLater}
+                className="flex h-11 w-full items-center justify-center gap-2 rounded-full text-sm font-medium text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:text-ws-primary disabled:cursor-default disabled:hover:text-ws-muted"
+              >
+                {savingLater ? (
+                  <>
+                    <LoaderCircleIcon size={14} className="animate-spin" aria-hidden />
+                    Saving…
+                  </>
+                ) : (
+                  "Save and pay later"
+                )}
+              </button>
+              {saveLaterError && (
+                <p role="alert" className="text-center text-xs text-ws-danger">
+                  {saveLaterError}
+                </p>
+              )}
+            </div>
           )}
       </div>
     </div>

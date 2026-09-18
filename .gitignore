@@ -50,3 +50,12 @@ next-env.d.ts
 
 # Local project memory (Mastery Academy notes) — never commit
 /memory.md
+
+# Art renderer output (scripts/art/school-covers/render.mjs) — the shipped
+# files are the WebPs under public/art/; the renderer source stays tracked
+/scripts/art/schools/
+/scripts/art/programs/
+/scripts/art/preview/
+/scripts/art/preview-programs/
+/scripts/art/tmp/
+/scripts/art/contact-*.png

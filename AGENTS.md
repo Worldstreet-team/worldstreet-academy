@@ -22,7 +22,9 @@ pnpm seed                # scripts/seed.ts — demo instructor + courses
 
 pnpm 10.32.0 is enforced via `packageManager`. **No test runner is configured** — verification is manual/E2E, so there is no single-test command; do not invent one.
 
-`scripts/*.{ts,mjs}` are one-off maintenance jobs run directly (`npx tsx scripts/backfill-avatars.ts`, `node scripts/grant-admin.mjs`). They load `.env.local`. Several mutate production data (`reconcile-orders`, `migrate-exam-indexes`, `grandfather-instructors`) — read before running.
+`scripts/*.{ts,mjs}` are one-off maintenance jobs run directly (`npx tsx scripts/backfill-avatars.ts`, `node scripts/grant-admin.mjs`). They load `.env.local`. Several mutate production data (`reconcile-orders`, `migrate-exam-indexes`, `grandfather-instructors`, `upload-program-art`) — read before running.
+
+Art (Phase 9): `node scripts/optimize-art.mjs <dir> [out] [WxH]` converts source images to WebP (default `public/art/schools/`, 1600×1000) — no env, no database. The covers and program art are code-rendered by a path tracer in headless Chromium, source in `scripts/art/school-covers/` (global Playwright install; Playwright is not a project dependency — see that folder's `NOTES.md`). `upload-program-art.mjs` writes to production: it uploads program thumbnails to the public R2 bucket and sets `thumbnailUrl` where empty. Dry run by default; `--apply` refuses without `MONGODB_URI` on the command line.
 
 Deploys are Docker on Coolify, **not Vercel**. The Dockerfile copies `next.config.ts` into the runner on purpose: `next start` reads `images.remotePatterns` at runtime.
 
@@ -34,9 +36,14 @@ Imports use `@/*` → repo root. Zod is imported as `import { z } from "zod/v4"`
 
 ## Architecture
 
-**Route groups** — `(marketing)` public · `(auth)` local-dev sign-in only · `(platform)` `/dashboard/*` · `(instructor)` `/instructor/*` · `(admin)` `/admin/*`.
+**Route groups** — `(marketing)` public · `(auth)` local-dev sign-in only · `(platform)` `/dashboard/*` · `(checkout)` `/dashboard/checkout*` (chrome-less) · `(start)` `/dashboard/start` (chrome-less school picker) · `(instructor)` `/instructor/*` · `(admin)` `/admin/*`.
 
-`middleware.ts` enforces only *authentication* (plus an `x-next-pathname` header for server components). **Role gating lives in each group's `layout.tsx`** — instructor requires `INSTRUCTOR|ADMIN` else redirects to `/dashboard/become-instructor`; admin requires `ADMIN`. Put new gates there, not in middleware.
+`middleware.ts` enforces only *authentication* (plus an `x-next-pathname` header for server components). **Role gating lives in each group's `layout.tsx`** — instructor requires `INSTRUCTOR|ADMIN` else redirects to `/dashboard/become-instructor`; admin requires `ADMIN`. Put new gates there, not in middleware. `(platform)/layout.tsx` also holds the **school-first gate** (`needsSchoolChoice`, `lib/start-gate.ts`): a `USER` with no enrollment and no `EnrollmentIntent` is sent to `/dashboard/start`. It fails open. Exempt paths are listed in that module.
+
+**School first (Phase 9).** Each fact has one home; import it, never re-derive it inline:
+- `lib/start-gate.ts` + `lib/actions/enrollment-intent.ts` — the saved school (`EnrollmentIntent`, one per user, converted lazily when its enrollment exists; the money path never writes it).
+- `lib/school-art.ts` — school covers, `PROGRAM_ART` and `programArt` (the program's own uploaded thumbnail → its `PROGRAM_ART` file → its school's cover). Student and public read models apply it; instructor ones deliberately do not.
+- `lib/program-rail.ts` — what the student program page may print about price and size (an enrolled learner is never quoted a price; a ladder reads "From"; zeros are omitted).
 
 **Local-dev switch.** A `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` starting with `pk_test_` selects local `/login`; otherwise Clerk runs in satellite mode against `worldstreetgold.com`. This branch is repeated in `middleware.ts`, `app/layout.tsx`, and every authed layout — mirror it in any new auth redirect.
 
