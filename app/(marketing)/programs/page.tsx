@@ -1,13 +1,15 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import Image from "next/image"
 import { ArrowRightIcon } from "lucide-react"
-import { SCHOOLS, type SchoolSlug } from "@/lib/schools"
+import { SCHOOLS, type School, type SchoolSlug } from "@/lib/schools"
+import { schoolCover } from "@/lib/school-art"
 import { BRAND } from "@/lib/brand"
 import { appUrl } from "@/lib/app-url"
 import { fetchBrowseCourses, type BrowseCourse } from "@/lib/actions/student"
 import { getCachedUser } from "@/lib/auth/cached"
 import { MarketingCourseCard } from "@/components/marketing/course-card"
-import { SchoolIcon } from "@/components/shared/school-icon"
+import { cn } from "@/lib/utils"
 
 export const metadata: Metadata = {
   title: "Programs",
@@ -60,28 +62,11 @@ export default async function ProgramsPage() {
       {groups.map(({ school, courses: programs }) => (
         <section
           key={school.slug}
-          className="mt-16 border-t border-ws-hairline pt-10"
+          className="rise mt-14 grid gap-5 border-t border-ws-hairline pt-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]"
           aria-labelledby={`school-${school.slug}`}
         >
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2
-              id={`school-${school.slug}`}
-              className="flex items-center gap-3 font-display text-2xl font-semibold tracking-[-0.015em] text-ws-primary"
-            >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ws-brand/10 text-ws-gold">
-                <SchoolIcon name={school.icon} size={17} />
-              </span>
-              {school.name}
-            </h2>
-            <Link
-              href={`/schools/${school.slug}`}
-              className="inline-flex items-center gap-1 text-[13px] font-semibold text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:text-ws-gold"
-            >
-              About this school
-              <ArrowRightIcon size={14} aria-hidden />
-            </Link>
-          </div>
-          <ul className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <SchoolPanel school={school} count={programs.length} />
+          <ul className="grid content-start gap-5 sm:grid-cols-2">
             {programs.map((course) => (
               <li key={course.id}>
                 <MarketingCourseCard course={course} signedIn={signedIn} />
@@ -120,6 +105,52 @@ export default async function ProgramsPage() {
           </Link>
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * A school's face beside its programs. With one to three programs per school a
+ * bare three-column grid is mostly air; the cover fills it and says where you
+ * are. From lg it sticks while a longer list scrolls past. No gold here — a
+ * page of eight gold buttons would have no primary action.
+ */
+function SchoolPanel({ school, count }: { school: School; count: number }) {
+  const cover = schoolCover(school.slug)
+  return (
+    <div className="relative flex min-h-[18rem] flex-col justify-end overflow-hidden rounded-[20px] bg-ws-surface p-6 lg:sticky lg:top-24 lg:self-start">
+      {cover && (
+        <>
+          <Image
+            src={cover}
+            alt=""
+            fill
+            sizes="(max-width: 1024px) 100vw, 33vw"
+            className="object-cover object-[85%_15%]"
+          />
+          <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent" />
+        </>
+      )}
+      <div className={cn("relative", cover ? "max-w-[68%] text-white" : "text-ws-primary")}>
+        <h2 id={`school-${school.slug}`} className="font-display text-2xl font-semibold tracking-[-0.015em]">
+          {school.name}
+        </h2>
+        <p className={cn("mt-2 text-[14px] leading-relaxed", cover ? "text-white/80" : "text-ws-muted")}>
+          {school.tagline ?? school.blurb}
+        </p>
+        <p className={cn("mt-3 text-[13px] tabular-nums", cover ? "text-white/70" : "text-ws-subtle")}>
+          {count === 1 ? "1 program" : `${count} programs`}
+        </p>
+        <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-[13px] font-semibold">
+          <Link href={`/dashboard/start?school=${school.slug}`} className="inline-flex items-center gap-1 hover:underline">
+            Start with this school
+            <ArrowRightIcon size={14} aria-hidden />
+          </Link>
+          <Link href={`/schools/${school.slug}`} className={cn("hover:underline", cover ? "text-white/80" : "text-ws-muted")}>
+            About this school
+          </Link>
+        </div>
+      </div>
     </div>
   )
 }
