@@ -1,6 +1,7 @@
 import { fetchBrowseCourses, fetchFaculty, type BrowseCourse } from "@/lib/actions/student"
 import { fetchLandingReviews } from "@/lib/actions/reviews"
 import { getCurrentUser } from "@/lib/auth/actions"
+import { registerUrl } from "@/lib/auth/login-url"
 import { cheapestBySchool, countProgramsBySchool } from "@/lib/schools"
 import { HeroWall } from "@/components/marketing/hero-wall"
 import { HowItWorks } from "@/components/marketing/how-it-works"
@@ -14,8 +15,8 @@ import { UpcomingDrops } from "@/components/marketing/upcoming-drops"
 import { Testimonials, FinaleCta } from "@/components/marketing/reviews-finale"
 import { Faq } from "@/components/marketing/faq"
 
-const isLocalDev = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_")
-const REGISTER_URL = isLocalDev ? "/register" : "https://worldstreetgold.com/register"
+// A new account returns to the school picker, never to the hub.
+const REGISTER_URL = registerUrl("/dashboard/start")
 
 /** Published courses with a FUTURE availableAt, soonest first — real
  *  scheduling only; the drops section hides entirely when this is empty. */
@@ -73,7 +74,7 @@ export async function Landing() {
         } as React.CSSProperties
       }
     >
-      {/* Hero — claim and the two CTAs (spec §1) */}
+      {/* Hero — claim, the school picker and its CTA (spec §1) */}
       <HeroWall courses={published} signedIn={signedIn} registerUrl={REGISTER_URL} />
 
       {/* The band of words — the eight schools' vocabulary */}

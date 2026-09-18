@@ -26,6 +26,8 @@ export default clerkMiddleware(async (auth, request) => {
       const returnUrl = `https://academy.worldstreetgold.com${pathname}${request.nextUrl.search}`
       const authUrl = new URL("https://www.worldstreetgold.com/login")
       authUrl.searchParams.set("redirect", returnUrl)
+      // The hub's Clerk <SignIn/> reads redirect_url; `redirect` is the older contract.
+      authUrl.searchParams.set("redirect_url", returnUrl)
       return NextResponse.redirect(authUrl)
     }
   }
