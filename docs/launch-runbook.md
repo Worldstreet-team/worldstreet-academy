@@ -135,7 +135,7 @@ All three routes under `app/api/cron/` are `POST`, require `Authorization: Beare
 | Task | Path | Cron | What it does |
 |---|---|---|---|
 | academy-course-live | `/api/cron/course-live` | `*/5 * * * *` | Emails and notifies pre-enrolled students when a scheduled course goes live; stamps `liveNotifiedAt`. Phase 3 recorded it as not yet scheduled in production. |
-| academy-reminders | `/api/cron/reminders` | `*/10 * * * *` | T-24h and T-1h reminders for scheduled classes (students whose package includes live classes), interviews and mentorship sessions (the host and the student, while the student still holds mentorship). |
+| academy-reminders | `/api/cron/reminders` | `*/10 * * * *` | T-24h and T-1h reminders for scheduled classes (students whose package includes live classes), interviews and mentorship sessions (the host and the student, while the student still holds mentorship). Since Phase 9 it also sends pay-later nudge emails for open `EnrollmentIntent` rows (returns `nudged`) — no new scheduled task is needed for this. |
 | academy-earnings | `/api/cron/earnings` | `*/15 * * * *` | Clears matured instructor earnings to the wallet and applies refund clawbacks. |
 
 Coolify → academy app → Scheduled Tasks → Add, container = the academy app. The runner image (`node:22-alpine`) has no `curl`, so call the app from inside its own container with Node (swap the path for each task):

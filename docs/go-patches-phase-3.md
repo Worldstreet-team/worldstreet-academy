@@ -123,3 +123,16 @@ If Go ever writes `instructorProfile`, write dotted paths (`instructorProfile.he
 - **Who has mentorship (R-M).** `enrollment.packageKey == "executive"`, the course's `executive` package (found by key, ignoring `enabled`, as in R1) has `entitlements.mentorship`, and the enrollment's status is `active` or `completed`. Assignments follow R1's `entitlements.assignments`.
 - **`enrollments.mentorRoadmap`** — `{ text, updatedAt, updatedBy } | null` (additive). If mobile shows it, render it as plain text. Any wholesale enrollment write must carry it (and R9's `certificateId`): write dotted paths or keep the field.
 - **Web-only collections.** `mentorshipsessions`, `assignments` and `submissions` are written only by the web; Go may ignore them. If Go ever writes them, mirror the web rules: one `requested` session per enrollment (a partial unique index), and submission files only under the per-user prefix `worldstreet-academy/submissions/<assignmentId>/<userId>/` in the private resources bucket.
+
+## 6. Phase 9 — `enrollmentintents` (new collection)
+
+Go needs no patch: nothing it reads changed. Optional for mobile: `GET` the caller's row where `status: "open"` to show "Finish enrolling".
+
+| Field | Type | Meaning |
+|---|---|---|
+| `user` | ObjectId | The learner who saved a school. |
+| `school` | string (slug) | The saved school. |
+| `course` | ObjectId \| `null` | The saved program, if one was picked. |
+| `packageKey` | `null \| "basic" \| "standard" \| "executive"` | The saved tier, if one was picked. |
+| `status` | `"open" \| "converted" \| "dismissed"` | `open` until the learner enrolls (`converted`) or dismisses it. |
+| `savedAt` | date | When the intent was last saved. |
