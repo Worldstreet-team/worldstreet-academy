@@ -255,59 +255,11 @@ export default async function CourseDetailPage({
                 requirements={course.requirements}
                 targetAudience={course.targetAudience}
               />
-
-              {showLadder && <PackageLadder courseId={course.id} packages={packages} access={ladderAccess} />}
-
-              {/* Reviews */}
-              <CourseReviews courseId={course.id} />
-
-              {/* CBT exam — visible to enrolled students when the course has one */}
-              {isEnrolled && <CourseExamCard courseId={course.id} />}
-
-              {/* Curriculum with thumbnails and previews */}
-              <div className="space-y-3">
-                <h2 className="font-display text-lg font-semibold tracking-[-0.01em] text-ws-primary">
-                  Curriculum{" "}
-                  {course.lessons.length > 0 && (
-                    <span className="text-ws-muted font-sans font-normal text-sm">
-                      ({course.lessons.length} lessons)
-                    </span>
-                  )}
-                </h2>
-                {course.lessons.length > 0 ? (
-                  <LessonPreviewAccordion
-                    lessons={course.lessons}
-                    courseId={course.id}
-                    coursePricing={course.pricing}
-                    coursePrice={course.price}
-                  />
-                ) : (
-                  <p className="text-sm text-ws-muted py-4 text-center">
-                    Curriculum details coming soon.
-                  </p>
-                )}
-              </div>
-
-              {/* Included materials — locked until enrolled, but visible so buyers
-                  can see what the course comes with. */}
-              <CourseResources courseId={course.id} />
-
-              {/* About Instructor */}
-              <AboutInstructor
-                instructorId={course.instructorId}
-                instructorName={course.instructorName}
-                instructorAvatarUrl={course.instructorAvatarUrl}
-                instructorBio={course.instructorBio}
-                instructorHeadline={course.instructorHeadline}
-                otherCourses={otherInstructorCourses}
-                enrolledCourses={enrolledFromInstructor}
-                totalStudents={Math.max(course.instructorTotalStudents, course.enrolledCount)}
-                averageRating={instructorAvgRating}
-                canMessage={courseAccess ? courseAccess.entitlements.instructorQa : true}
-              />
             </div>
 
-            {/* Sticky buy rail — desktop only */}
+            {/* Sticky buy rail — desktop only. Ends here: the package ladder and
+                the sections below it need the full page width, not this
+                340px-narrower column (controller fix round 1). */}
             <aside className="hidden lg:sticky lg:top-20 lg:block">
               <div className="rounded-[20px] border border-ws-hairline bg-ws-surface p-6">
                 <div className="flex items-baseline justify-between gap-3">
@@ -343,6 +295,60 @@ export default async function CourseDetailPage({
                 </div>
               </div>
             </aside>
+          </div>
+
+          {/* Package ladder — full page width; the rail above ends before it so
+             three tiers get comfortable room instead of the 940px main column. */}
+          {showLadder && <PackageLadder courseId={course.id} packages={packages} access={ladderAccess} />}
+
+          <div className={showLadder ? "mt-10 space-y-6" : "space-y-6"}>
+            {/* Reviews */}
+            <CourseReviews courseId={course.id} />
+
+            {/* CBT exam — visible to enrolled students when the course has one */}
+            {isEnrolled && <CourseExamCard courseId={course.id} />}
+
+            {/* Curriculum with thumbnails and previews */}
+            <div className="space-y-3">
+              <h2 className="font-display text-lg font-semibold tracking-[-0.01em] text-ws-primary">
+                Curriculum{" "}
+                {course.lessons.length > 0 && (
+                  <span className="text-ws-muted font-sans font-normal text-sm">
+                    ({course.lessons.length} lessons)
+                  </span>
+                )}
+              </h2>
+              {course.lessons.length > 0 ? (
+                <LessonPreviewAccordion
+                  lessons={course.lessons}
+                  courseId={course.id}
+                  coursePricing={course.pricing}
+                  coursePrice={course.price}
+                />
+              ) : (
+                <p className="text-sm text-ws-muted py-4 text-center">
+                  Curriculum details coming soon.
+                </p>
+              )}
+            </div>
+
+            {/* Included materials — locked until enrolled, but visible so buyers
+                can see what the course comes with. */}
+            <CourseResources courseId={course.id} />
+
+            {/* About Instructor */}
+            <AboutInstructor
+              instructorId={course.instructorId}
+              instructorName={course.instructorName}
+              instructorAvatarUrl={course.instructorAvatarUrl}
+              instructorBio={course.instructorBio}
+              instructorHeadline={course.instructorHeadline}
+              otherCourses={otherInstructorCourses}
+              enrolledCourses={enrolledFromInstructor}
+              totalStudents={Math.max(course.instructorTotalStudents, course.enrolledCount)}
+              averageRating={instructorAvgRating}
+              canMessage={courseAccess ? courseAccess.entitlements.instructorQa : true}
+            />
           </div>
 
           {/* Related courses */}
