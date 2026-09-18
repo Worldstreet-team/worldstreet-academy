@@ -11,6 +11,7 @@ import {
   fetchInstructorPublicCourses,
   fetchEnrolledCoursesFromInstructor,
   fetchOtherCourses,
+  fetchProgramById,
 } from "@/lib/actions/student"
 import { checkEnrollment } from "@/lib/actions/enrollments"
 import { getCourseAccess } from "@/lib/course-access"
@@ -25,8 +26,11 @@ import { CourseExamCard } from "@/components/courses/course-exam-card"
 import { CourseOutcomes } from "@/components/courses/course-outcomes"
 import { CourseReviews } from "@/components/courses/course-reviews"
 import { CourseCarousel } from "@/components/learn/course-carousel"
-import { BookOpenIcon, ChevronLeftIcon, ClockIcon, GraduationCapIcon, StarIcon, UsersIcon } from "lucide-react"
-import { RenderIcon } from "@/components/shared/render-icon"
+import { ChevronLeftIcon, GraduationCapIcon, StarIcon } from "lucide-react"
+import { programRail, programStats } from "@/lib/program-rail"
+import { PackageLadder } from "@/components/programs/package-ladder"
+import type { ProgramAccess } from "@/components/programs/access"
+import { CardShell } from "@/components/ui/system"
 
 // Force dynamic rendering to show fresh instructor avatars
 export const revalidate = 0
@@ -40,17 +44,12 @@ export default async function CourseDetailPage({
   const course = await fetchPublicCourse(courseId)
   if (!course) notFound()
 
-  const totalHours = Math.floor(course.totalDuration / 60)
-  const totalMins = course.totalDuration % 60
-  const durationLabel =
-    totalHours > 0 ? `${totalHours}h ${totalMins}m` : `${totalMins}m`
-
   // Get first lesson ID for "Start Learning" button
   const firstLessonId = course.lessons[0]?.id ?? "none"
 
   // Fetch instructor courses + enrollment status + recommendations in parallel
   const currentUser = await getCurrentUser()
-  const [instructorCourses, enrolledFromInstructor, enrollmentStatus, otherCourses] =
+  const [instructorCourses, enrolledFromInstructor, enrollmentStatus, otherCourses, program] =
     await Promise.all([
       fetchInstructorPublicCourses(course.instructorId),
       fetchEnrolledCoursesFromInstructor(course.instructorId).catch(() => []),
@@ -58,11 +57,29 @@ export default async function CourseDetailPage({
         ? checkEnrollment(currentUser.id, courseId)
         : Promise.resolve({ isEnrolled: false, status: undefined as string | undefined, resumeLessonId: null }),
       fetchOtherCourses(courseId),
+      fetchProgramById(courseId),
     ])
   const isEnrolled = enrollmentStatus.isEnrolled
 
   // Q&A follows the package; visitors without an enrollment keep today's behaviour.
   const courseAccess = currentUser ? await getCourseAccess(currentUser.id, courseId) : null
+
+  const isComingSoon =
+    courseAvailability({ status: "published", availableAt: course.availableAt }) === "coming_soon"
+  const isPreEnrolled = enrollmentStatus.status === "pre_enrolled"
+
+  const rail = programRail({
+    isEnrolled,
+    packageName: courseAccess?.packageName ?? null,
+    pricing: course.pricing,
+    price: course.price,
+    tierCount: program?.tierCount ?? 0,
+  })
+  const stats = programStats(course)
+  const packages = program?.packages ?? []
+  // The on-page ladder answers "which package?" before checkout does.
+  const showLadder = !isEnrolled && !isPreEnrolled && packages.length > 1
+  const ladderAccess: ProgramAccess = isComingSoon ? { kind: "coming_soon" } : { kind: "open" }
 
   // Calculate instructor's average rating across all their courses
   const ratedInstructorCourses = instructorCourses.filter((c) => c.rating != null && c.rating > 0)
@@ -75,12 +92,6 @@ export default async function CourseDetailPage({
   const otherInstructorCourses = instructorCourses.filter(
     (c) => c.id !== course.id
   )
-
-  const priceLabel = course.pricing === "free" ? "Free" : `$${course.price}`
-
-  const isComingSoon =
-    courseAvailability({ status: "published", availableAt: course.availableAt }) === "coming_soon"
-  const isPreEnrolled = enrollmentStatus.status === "pre_enrolled"
 
   // Shared CTA — the exact enroll/continue/resume routing, rendered in both
   // the desktop rail and the mobile action bar. Scheduled courses get the
@@ -99,19 +110,16 @@ export default async function CourseDetailPage({
   ) : isEnrolled ? (
     <Link
       href={`/dashboard/courses/${course.id}/learn/${enrollmentStatus.resumeLessonId ?? firstLessonId}`}
-      className="flex h-11 flex-1 items-center justify-center rounded-sm bg-ws-brand px-5 text-sm font-semibold text-ws-brand-on transition-opacity hover:opacity-90"
+      className="flex h-11 flex-1 items-center justify-center rounded-full bg-ws-brand px-5 text-sm font-semibold text-ws-brand-on transition-opacity hover:opacity-90"
     >
-      Continue Learning
+      Continue learning
     </Link>
   ) : (
     <Link
-      href={`/dashboard/checkout?courseId=${course.id}`}
-      className="flex h-11 flex-1 items-center justify-center rounded-sm bg-ws-brand px-5 text-sm font-semibold text-ws-brand-on transition-opacity hover:opacity-90"
+      href={showLadder ? "#packages" : `/dashboard/checkout?courseId=${course.id}`}
+      className="flex h-11 flex-1 items-center justify-center rounded-full bg-ws-brand px-5 text-sm font-semibold text-ws-brand-on transition-opacity hover:opacity-90"
     >
-      Enroll Now
-      {course.pricing !== "free" && (
-        <span className="ml-1.5 font-normal opacity-80">· ${course.price}</span>
-      )}
+      {rail.buyLabel}
     </Link>
   )
 
@@ -147,7 +155,7 @@ export default async function CourseDetailPage({
           <div className="absolute bottom-0 inset-x-0 p-4 md:p-6 lg:p-8 space-y-3">
             <div className="flex items-center gap-2 flex-wrap">
               <Badge className="text-[10px] border border-white/20 bg-black/55 text-white">
-                {priceLabel}
+                {rail.headline}
               </Badge>
               <Badge
                 className="text-[10px] capitalize border border-white/20 bg-black/55 text-white"
@@ -187,8 +195,12 @@ export default async function CourseDetailPage({
                 </AvatarFallback>
               </Avatar>
               <span className="font-medium">{course.instructorName}</span>
-              <span className="text-white/50">·</span>
-              <span>{course.enrolledCount.toLocaleString()} students</span>
+              {course.enrolledCount > 0 && (
+                <>
+                  <span className="text-white/50">·</span>
+                  <span>{course.enrolledCount.toLocaleString()} enrolled</span>
+                </>
+              )}
             </div>
           </div>
 
@@ -214,46 +226,23 @@ export default async function CourseDetailPage({
           <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-8">
             <div className="min-w-0 space-y-6">
               {/* Quick stats */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {[
-                  {
-                    icon: BookOpenIcon,
-                    value: course.totalLessons,
-                    label: "Lessons",
-                  },
-                  { icon: ClockIcon, value: durationLabel, label: "Duration" },
-                  {
-                    icon: UsersIcon,
-                    value: course.enrolledCount.toLocaleString(),
-                    label: "Students",
-                  },
-                ].map((stat) => (
-                  <div
-                    key={stat.label}
-                    className="flex items-center gap-2.5 rounded-lg border border-ws-hairline bg-ws-surface p-3"
-                  >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ws-raised">
-                      <RenderIcon icon={stat.icon}
-                        
-                        size={16}
-                        className="text-ws-gold" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold leading-none tabular-nums text-ws-primary">
+              {stats.length > 0 && (
+                <CardShell className="h-auto flex-row divide-x divide-border">
+                  {stats.map((stat) => (
+                    <div key={stat.label} className="flex min-w-0 flex-1 flex-col gap-1 px-5 py-4">
+                      <span className="font-display text-[22px] font-light leading-none tabular-nums tracking-[-0.02em] text-foreground">
                         {stat.value}
-                      </p>
-                      <p className="text-[10px] text-ws-muted mt-0.5">
-                        {stat.label}
-                      </p>
+                      </span>
+                      <span className="text-[12px] text-muted-foreground">{stat.label}</span>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </CardShell>
+              )}
 
               {/* Description */}
               <div className="space-y-2">
                 <h2 className="font-display text-lg font-semibold tracking-[-0.01em] text-ws-primary">
-                  About this course
+                  About this program
                 </h2>
                 <p className="text-sm text-ws-muted leading-relaxed">
                   {course.description}
@@ -267,6 +256,8 @@ export default async function CourseDetailPage({
                 targetAudience={course.targetAudience}
               />
 
+              {showLadder && <PackageLadder courseId={course.id} packages={packages} access={ladderAccess} />}
+
               {/* Reviews */}
               <CourseReviews courseId={course.id} />
 
@@ -277,9 +268,11 @@ export default async function CourseDetailPage({
               <div className="space-y-3">
                 <h2 className="font-display text-lg font-semibold tracking-[-0.01em] text-ws-primary">
                   Curriculum{" "}
-                  <span className="text-ws-muted font-sans font-normal text-sm">
-                    ({course.lessons.length} lessons)
-                  </span>
+                  {course.lessons.length > 0 && (
+                    <span className="text-ws-muted font-sans font-normal text-sm">
+                      ({course.lessons.length} lessons)
+                    </span>
+                  )}
                 </h2>
                 {course.lessons.length > 0 ? (
                   <LessonPreviewAccordion
@@ -308,7 +301,7 @@ export default async function CourseDetailPage({
                 instructorHeadline={course.instructorHeadline}
                 otherCourses={otherInstructorCourses}
                 enrolledCourses={enrolledFromInstructor}
-                totalStudents={course.instructorTotalStudents}
+                totalStudents={Math.max(course.instructorTotalStudents, course.enrolledCount)}
                 averageRating={instructorAvgRating}
                 canMessage={courseAccess ? courseAccess.entitlements.instructorQa : true}
               />
@@ -316,39 +309,27 @@ export default async function CourseDetailPage({
 
             {/* Sticky buy rail — desktop only */}
             <aside className="hidden lg:sticky lg:top-20 lg:block">
-              <div className="rounded-lg border border-ws-hairline bg-ws-surface p-6">
+              <div className="rounded-[20px] border border-ws-hairline bg-ws-surface p-6">
                 <div className="flex items-baseline justify-between gap-3">
                   <p className="font-display text-3xl font-semibold tabular-nums tracking-[-0.02em] text-ws-primary">
-                    {priceLabel}
+                    {rail.headline}
                   </p>
                   <span className="rounded-full bg-ws-chip px-2.5 py-1 text-[11px] font-medium text-ws-muted">
-                    {course.pricing === "free" ? "Full access" : "One-time purchase"}
+                    {rail.note}
                   </span>
                 </div>
 
                 <dl className="mt-5 space-y-2.5 border-t border-ws-hairline pt-5 text-sm">
-                  <div className="flex items-center justify-between">
-                    <dt className="text-ws-muted">Lessons</dt>
-                    <dd className="font-medium tabular-nums text-ws-primary">
-                      {course.totalLessons}
-                    </dd>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <dt className="text-ws-muted">Duration</dt>
-                    <dd className="font-medium tabular-nums text-ws-primary">
-                      {durationLabel}
-                    </dd>
-                  </div>
+                  {stats.map((stat) => (
+                    <div key={stat.label} className="flex items-center justify-between">
+                      <dt className="text-ws-muted">{stat.label}</dt>
+                      <dd className="font-medium tabular-nums text-ws-primary">{stat.value}</dd>
+                    </div>
+                  ))}
                   <div className="flex items-center justify-between">
                     <dt className="text-ws-muted">Level</dt>
                     <dd className="font-medium capitalize text-ws-primary">
                       {course.level}
-                    </dd>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <dt className="text-ws-muted">Students</dt>
-                    <dd className="font-medium tabular-nums text-ws-primary">
-                      {course.enrolledCount.toLocaleString()}
                     </dd>
                   </div>
                 </dl>
@@ -367,21 +348,21 @@ export default async function CourseDetailPage({
           {/* Related courses */}
           {otherCourses.length > 0 && (
             <div className="mt-10">
-              <CourseCarousel courses={otherCourses} title="Students also viewed" />
+              <CourseCarousel courses={otherCourses} title="Learners also viewed" />
             </div>
           )}
         </div>
 
         {/* Mobile/tablet action bar — sits above the bottom nav on mobile,
             flush to the viewport bottom once the nav disappears at md */}
-        <div className="fixed inset-x-0 bottom-[60px] z-40 border-t border-ws-hairline bg-ws-surface px-4 py-3 md:bottom-0 lg:hidden">
+        <div className="fixed inset-x-0 bottom-[60px] z-40 rounded-t-[20px] border-t border-ws-hairline bg-ws-surface px-4 py-3 md:bottom-0 lg:hidden">
           <div className="mx-auto flex max-w-3xl items-center justify-between gap-4">
             <div className="min-w-0">
               <p className="text-[11px] text-ws-subtle">
-                {isEnrolled ? "Enrolled" : course.pricing === "free" ? "Full access" : "Price"}
+                {isEnrolled ? "Your package" : rail.note}
               </p>
               <p className="font-display text-xl font-semibold tabular-nums tracking-[-0.02em] text-ws-primary">
-                {priceLabel}
+                {isEnrolled ? rail.note : rail.headline}
               </p>
             </div>
             <div className="flex max-w-60 flex-1 justify-end">{cta}</div>
