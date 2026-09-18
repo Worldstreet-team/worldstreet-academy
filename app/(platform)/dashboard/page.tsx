@@ -37,6 +37,7 @@ import {
   useEnrollments,
   useMyAssessments,
   useMyCertificates,
+  useMyEnrollmentIntent,
   useToggleBookmark,
 } from "@/lib/hooks/queries"
 import { useNow } from "@/lib/hooks/use-now"
@@ -118,6 +119,7 @@ export default function DashboardPage() {
   const { data: assessments = [], isLoading: loadingAssessments } = useMyAssessments()
   const { data: bookmarks = [], isLoading: loadingBookmarks } = useBookmarks()
   const { data: browseCourses = [], isLoading: loadingBrowse } = useBrowseCourses()
+  const { data: intent = null } = useMyEnrollmentIntent()
   const bookmarkedIds = useBookmarkedIds()
   const toggleBookmark = useToggleBookmark()
 
@@ -207,6 +209,7 @@ export default function DashboardPage() {
                     <LearningHero
                       hero={hero}
                       hasEnrollments={enrollments.length > 0}
+                      intent={intent}
                       // The foot counts only once there is something real to count.
                       footer={
                         totals.open > 0 ? (

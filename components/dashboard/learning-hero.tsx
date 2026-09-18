@@ -3,6 +3,7 @@
 import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
+import { useQueryClient } from "@tanstack/react-query"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { PlayIcon } from "@hugeicons/core-free-icons"
 import { AvailabilityCountdown } from "@/components/shared/availability-countdown"
@@ -10,6 +11,7 @@ import { PackageChip, ProgramCover, ProgressTrack } from "@/components/platform/
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Balance, CardShell, Eyebrow, Skel, illustrations } from "@/components/ui/system"
+import { dismissEnrollmentIntent, type MyEnrollmentIntent } from "@/lib/actions/enrollment-intent"
 import type { StudentEnrollment } from "@/lib/actions/student"
 import { BRAND } from "@/lib/brand"
 import {
@@ -24,8 +26,10 @@ import {
   type LearningStep,
 } from "@/lib/dashboard-home"
 import { useUpcomingClasses } from "@/lib/hooks/queries"
+import { queryKeys } from "@/lib/hooks/queries/keys"
 import { useClientNow } from "@/lib/hooks/use-now"
-import { SCHOOLS } from "@/lib/schools"
+import { schoolCover } from "@/lib/school-art"
+import { SCHOOL_BY_SLUG, SCHOOLS } from "@/lib/schools"
 import { cn } from "@/lib/utils"
 
 /*
@@ -412,7 +416,66 @@ function StartHero({ returning }: { returning: boolean }) {
               ? "None of your programs open lessons right now. Pick a new one to keep going."
               : `Expert-led programs across ${SCHOOLS.length} schools. Start one and your lessons, classes and certificates gather here.`}
           </p>
-          <HeroActions primary={{ label: "Browse programs", href: "/dashboard/courses" }} className="mt-1" />
+          <HeroActions
+            primary={{
+              label: returning ? "Browse programs" : "Choose your school",
+              href: returning ? "/dashboard/courses" : "/dashboard/start?pick=1",
+            }}
+            className="mt-1"
+          />
+        </div>
+      </div>
+    </CardShell>
+  )
+}
+
+/** A school is saved and unpaid: its art, the exact order, one gold CTA — and a quiet way to put it down. */
+function FinishEnrollingHero({ intent }: { intent: MyEnrollmentIntent }) {
+  const queryClient = useQueryClient()
+  const school = SCHOOL_BY_SLUG[intent.school]
+  const cover = schoolCover(intent.school)
+  const price =
+    intent.price === null
+      ? null
+      : intent.price === 0
+        ? "Free"
+        : `${intent.fromPrice ? "from " : ""}$${intent.price.toLocaleString("en-US")}`
+
+  async function dismiss() {
+    await dismissEnrollmentIntent()
+    queryClient.invalidateQueries({ queryKey: queryKeys.enrollmentIntent })
+  }
+
+  return (
+    <CardShell className="@container overflow-hidden">
+      <div className="flex flex-col @xl:flex-row">
+        {cover && (
+          <div className="relative aspect-[16/9] w-full shrink-0 bg-ws-sunken @xl:aspect-auto @xl:w-[42%]">
+            <Image src={cover} alt="" fill sizes="(max-width: 768px) 100vw, 40vw" className="object-cover" />
+          </div>
+        )}
+        <div className="flex min-w-0 flex-1 flex-col items-start gap-3 p-6 @xl:p-8">
+          <Eyebrow>Saved for you</Eyebrow>
+          <h2 className="font-display text-[24px] font-semibold leading-[1.2] tracking-[-0.015em] @xl:text-[28px]">
+            {intent.courseTitle ?? school.name}
+          </h2>
+          <p className="max-w-md text-[14px] leading-relaxed text-muted-foreground">
+            {intent.courseTitle
+              ? [school.short, intent.packageName, price].filter(Boolean).join(" · ")
+              : "Your school is saved. Its programs appear here as they open."}
+          </p>
+          <HeroActions
+            primary={{ label: intent.courseId ? "Finish enrolling" : "View school", href: intent.href }}
+            secondary={{ label: "Choose another school", href: "/dashboard/start?pick=1" }}
+            className="mt-1"
+          />
+          <button
+            type="button"
+            onClick={dismiss}
+            className="text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Not now
+          </button>
         </div>
       </div>
     </CardShell>
@@ -424,11 +487,15 @@ export function LearningHero({
   hero,
   hasEnrollments,
   footer,
+  intent = null,
 }: {
   hero: HomeHero | null
   hasEnrollments: boolean
   footer?: React.ReactNode
+  /** The learner's saved-but-unpaid school; shown only while nothing opens the player. */
+  intent?: MyEnrollmentIntent | null
 }) {
+  if (!hero && intent) return <FinishEnrollingHero intent={intent} />
   if (!hero) return <StartHero returning={hasEnrollments} />
   if (hero.mode === "reserved") return <ReservedHero enrollment={hero.enrollment} footer={footer} />
   if (hero.mode === "seat_ready") return <SeatReadyHero enrollment={hero.enrollment} footer={footer} />
