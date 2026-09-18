@@ -39,3 +39,9 @@ export { ExamAttempt, type IExamAttempt, type IAttemptAnswer, type AttemptStatus
 export { MentorshipSession, type IMentorshipSession, type MentorshipSessionStatus } from "./mentorship-session"
 export { Assignment, type IAssignment, type AssignmentStatus } from "./assignment"
 export { Submission, type ISubmission, type ISubmissionFile, type SubmissionStatus } from "./submission"
+export {
+  EnrollmentIntent,
+  type IEnrollmentIntent,
+  type EnrollmentIntentStatus,
+  type EnrollmentIntentSource,
+} from "./enrollment-intent"
