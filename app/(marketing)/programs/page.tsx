@@ -9,7 +9,7 @@ import { appUrl } from "@/lib/app-url"
 import { fetchBrowseCourses, type BrowseCourse } from "@/lib/actions/student"
 import { getCachedUser } from "@/lib/auth/cached"
 import { MarketingCourseCard } from "@/components/marketing/course-card"
-import { cn } from "@/lib/utils"
+import { SchoolIcon } from "@/components/shared/school-icon"
 
 export const metadata: Metadata = {
   title: "Programs",
@@ -118,35 +118,33 @@ export default async function ProgramsPage() {
 function SchoolPanel({ school, count }: { school: School; count: number }) {
   const cover = schoolCover(school.slug)
   return (
-    <div className="relative flex min-h-[18rem] flex-col justify-end overflow-hidden rounded-[20px] bg-ws-surface p-6 lg:sticky lg:top-24 lg:self-start">
-      {cover && (
-        <>
-          <Image
-            src={cover}
-            alt=""
-            fill
-            sizes="(max-width: 1024px) 100vw, 33vw"
-            className="object-cover object-[85%_15%]"
-          />
-          <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent" />
-        </>
-      )}
-      <div className={cn("relative", cover ? "max-w-[68%] text-white" : "text-ws-primary")}>
-        <h2 id={`school-${school.slug}`} className="font-display text-2xl font-semibold tracking-[-0.015em]">
+    <div className="flex flex-col overflow-hidden rounded-[20px] border border-ws-hairline bg-ws-surface dark:border-transparent lg:sticky lg:top-24 lg:self-start">
+      <div className="relative aspect-[16/10] overflow-hidden bg-ws-sunken">
+        {cover ? (
+          <Image src={cover} alt="" fill sizes="(max-width: 1024px) 100vw, 33vw" className="object-cover" />
+        ) : (
+          <span className="flex h-full items-center justify-center text-ws-muted">
+            <SchoolIcon name={school.icon} size={44} />
+          </span>
+        )}
+      </div>
+      <div className="flex flex-col p-6">
+        <h2 id={`school-${school.slug}`} className="font-display text-2xl font-semibold tracking-[-0.015em] text-ws-primary">
           {school.name}
         </h2>
-        <p className={cn("mt-2 text-[14px] leading-relaxed", cover ? "text-white/80" : "text-ws-muted")}>
-          {school.tagline ?? school.blurb}
-        </p>
-        <p className={cn("mt-3 text-[13px] tabular-nums", cover ? "text-white/70" : "text-ws-subtle")}>
+        <p className="mt-2 text-[14px] leading-relaxed text-ws-muted">{school.tagline ?? school.blurb}</p>
+        <p className="mt-3 text-[13px] tabular-nums text-ws-subtle">
           {count === 1 ? "1 program" : `${count} programs`}
         </p>
         <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-[13px] font-semibold">
-          <Link href={`/dashboard/start?school=${school.slug}`} className="inline-flex items-center gap-1 hover:underline">
+          <Link
+            href={`/dashboard/start?school=${school.slug}`}
+            className="inline-flex items-center gap-1 text-ws-primary hover:underline"
+          >
             Start with this school
             <ArrowRightIcon size={14} aria-hidden />
           </Link>
-          <Link href={`/schools/${school.slug}`} className={cn("hover:underline", cover ? "text-white/80" : "text-ws-muted")}>
+          <Link href={`/schools/${school.slug}`} className="text-ws-muted hover:underline">
             About this school
           </Link>
         </div>
