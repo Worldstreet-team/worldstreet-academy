@@ -8,7 +8,7 @@ import { checkEnrollment } from "@/lib/actions/enrollments"
 import { getCachedUser } from "@/lib/auth/cached"
 import { courseAvailability } from "@/lib/types/course"
 import { ProgramHero } from "@/components/programs/program-hero"
-import { CourseOutcomes } from "@/components/courses/course-outcomes"
+import { ProgramOutcomes } from "@/components/programs/program-outcomes"
 import { WhatsIncluded } from "@/components/programs/whats-included"
 import { ProgramInstructor } from "@/components/programs/program-instructor"
 import { Faq } from "@/components/marketing/faq"
@@ -103,13 +103,11 @@ export default async function ProgramPage({ params }: Params) {
       />
       <div className="mx-auto max-w-7xl px-6">
         {hasOutcomes && (
-          <div className="mt-16">
-            <CourseOutcomes
-              whatYouWillLearn={program.whatYouWillLearn}
-              requirements={program.requirements}
-              targetAudience={program.targetAudience}
-            />
-          </div>
+          <ProgramOutcomes
+            whatYouWillLearn={program.whatYouWillLearn}
+            requirements={program.requirements}
+            targetAudience={program.targetAudience}
+          />
         )}
         <PackageLadder courseId={program.id} packages={program.packages} access={access} />
         <WhatsIncluded />

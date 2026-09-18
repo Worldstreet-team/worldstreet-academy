@@ -1,8 +1,10 @@
 import Link from "next/link"
-import { CheckIcon, StarIcon } from "lucide-react"
+import { CheckIcon, MinusIcon, StarIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { PublicPackage } from "@/lib/actions/student"
 import { PACKAGE_LABEL } from "@/lib/entitlements"
+import type { IPackageEntitlements } from "@/lib/db/models"
+import { SectionLabel } from "@/components/marketing/section-heading"
 import type { ProgramAccess } from "@/components/programs/access"
 
 function priceLabel(price: number): string {
@@ -22,11 +24,30 @@ const GRID: Record<number, string> = {
 }
 
 /**
+ * The six services a tier can carry, in the order a buyer climbs them. Used
+ * for the comparison table only — the per-card feature lists stay the
+ * instructor's own copy.
+ */
+const COMPARED: ReadonlyArray<{ key: keyof IPackageEntitlements; label: string }> = [
+  { key: "liveClasses", label: "Live classes" },
+  { key: "instructorQa", label: "Instructor Q&A" },
+  { key: "assignments", label: "Graded assignments" },
+  { key: "certificate", label: "Certificate of completion" },
+  { key: "mentorship", label: "1-on-1 mentorship" },
+  { key: "prioritySupport", label: "Priority support" },
+]
+
+/**
  * Spec §6 "Choose your learning experience": 1–3 tier cards side by side
  * (stacked on phones). The highlighted tier gets a raised surface, a gold
- * border wash and the "Most popular" chip — never a gold background. Tier key
- * labels (BASIC / STANDARD / EXECUTIVE 101) only make sense against siblings,
- * so a single-tier program shows none.
+ * ring and a "Most popular" cap — never a gold background. Tier key labels
+ * (BASIC / STANDARD / EXECUTIVE 101) only make sense against siblings, so a
+ * single-tier program shows none.
+ *
+ * Below the cards, multi-tier programs get a comparison table of the six
+ * entitlements. The cards sell each tier in the instructor's words; the table
+ * answers the question the cards can't — what actually differs — without
+ * making the visitor diff three bullet lists by eye.
  */
 export function PackageLadder({
   courseId,
@@ -38,6 +59,12 @@ export function PackageLadder({
   access: ProgramAccess
 }) {
   const multiTier = packages.length > 1
+  // Only compare rows where the tiers actually differ; a row that is off for
+  // every tier is noise, and one that is on for every tier belongs on a card.
+  const rows = COMPARED.filter((row) => {
+    const on = packages.filter((p) => p.entitlements[row.key]).length
+    return on > 0 && on < packages.length
+  })
 
   return (
     <section
@@ -45,65 +72,148 @@ export function PackageLadder({
       className="mt-16 scroll-mt-24 border-t border-ws-hairline pt-10"
       aria-labelledby="packages-heading"
     >
-      <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-ws-gold">Packages</p>
+      <SectionLabel>Packages</SectionLabel>
       <h2
         id="packages-heading"
         className="mt-3 font-display text-2xl font-semibold tracking-[-0.015em] text-ws-primary"
       >
         Choose your learning experience
       </h2>
+      {multiTier && (
+        <p className="mt-2 max-w-xl text-[15px] text-ws-muted">
+          Every package opens the full curriculum. What changes is how much of the
+          faculty&apos;s time and assessment comes with it.
+        </p>
+      )}
 
-      <ul className={cn("mt-8 grid gap-4", GRID[packages.length] ?? "md:grid-cols-3")}>
+      <ul className={cn("mt-8 grid items-start gap-4", GRID[packages.length] ?? "md:grid-cols-3")}>
         {packages.map((pkg) => (
           <li
             key={pkg.key}
             className={cn(
-              "relative flex flex-col rounded-lg border p-6",
-              pkg.highlight ? "border-ws-brand/40 bg-ws-raised" : "border-ws-hairline bg-ws-surface"
+              "relative flex h-full flex-col overflow-hidden rounded-[20px]",
+              pkg.highlight
+                ? "bg-ws-raised ring-1 ring-ws-brand/40"
+                : "border border-ws-hairline bg-ws-surface dark:border-transparent"
             )}
           >
             {pkg.highlight && (
-              <span className="absolute right-5 top-5 inline-flex items-center gap-1 rounded-full bg-ws-brand/10 px-2.5 py-1 text-[11px] font-semibold text-ws-gold">
-                <StarIcon size={12} fill="currentColor" aria-hidden />
+              <p className="flex items-center justify-center gap-1.5 bg-ws-brand/[0.12] py-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-ws-gold">
+                <StarIcon size={11} fill="currentColor" aria-hidden />
                 Most popular
-              </span>
-            )}
-            {multiTier && (
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ws-muted">
-                {PACKAGE_LABEL[pkg.key]}
               </p>
             )}
-            <p className="mt-3 font-display text-4xl font-light tabular-nums tracking-[-0.02em] text-ws-primary">
-              {priceLabel(pkg.price)}
-            </p>
-            <h3 className="mt-2 font-display text-xl font-semibold text-ws-primary">{pkg.name}</h3>
-            {pkg.tagline && <p className="mt-1 text-[14px] text-ws-muted">{pkg.tagline}</p>}
-            {pkg.features.length > 0 && (
-              <ul className="mt-6 space-y-2.5">
-                {pkg.features.map((feature, i) => (
-                  <li
-                    key={`${pkg.key}-${i}`}
-                    className="flex items-start gap-2.5 text-[14px] leading-relaxed text-ws-muted"
-                  >
-                    <CheckIcon size={15} className="mt-0.5 shrink-0 text-ws-muted" aria-hidden />
-                    {feature}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {access.kind !== "enrolled" && (
-              <div className="mt-auto pt-8">
-                <PackageCta
-                  courseId={courseId}
-                  pkg={pkg}
-                  access={access}
-                  primary={pkg.highlight || !multiTier}
-                />
-              </div>
-            )}
+            <div className="flex flex-1 flex-col p-6">
+              {multiTier && (
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ws-subtle">
+                  {PACKAGE_LABEL[pkg.key]}
+                </p>
+              )}
+              <p className="mt-3 font-display text-[40px] font-light leading-none tabular-nums tracking-[-0.02em] text-ws-primary">
+                {priceLabel(pkg.price)}
+              </p>
+              <h3 className="mt-3 font-display text-xl font-semibold text-ws-primary">{pkg.name}</h3>
+              {pkg.tagline && <p className="mt-1.5 text-[14px] leading-relaxed text-ws-muted">{pkg.tagline}</p>}
+
+              {access.kind !== "enrolled" && (
+                <div className="mt-6">
+                  <PackageCta
+                    courseId={courseId}
+                    pkg={pkg}
+                    access={access}
+                    primary={pkg.highlight || !multiTier}
+                  />
+                </div>
+              )}
+
+              {pkg.features.length > 0 && (
+                <ul className="mt-6 space-y-2.5 border-t border-ws-hairline pt-5">
+                  {pkg.features.map((feature, i) => (
+                    <li
+                      key={`${pkg.key}-${i}`}
+                      className="flex items-start gap-2.5 text-[14px] leading-relaxed text-ws-muted"
+                    >
+                      <CheckIcon size={15} className="mt-0.5 shrink-0 text-ws-subtle" aria-hidden />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </li>
         ))}
       </ul>
+
+      {multiTier && rows.length > 0 && (
+        <div className="mt-10">
+          <h3 className="font-display text-base font-semibold tracking-[-0.01em] text-ws-primary">
+            What changes between packages
+          </h3>
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[520px] border-collapse text-left">
+              <caption className="sr-only">
+                Services included in each package of this program
+              </caption>
+              <thead>
+                <tr className="border-b border-ws-hairline">
+                  <th scope="col" className="py-3 pr-4 text-[13px] font-medium text-ws-muted">
+                    Service
+                  </th>
+                  {packages.map((pkg) => (
+                    <th
+                      key={pkg.key}
+                      scope="col"
+                      className={cn(
+                        "px-3 py-3 text-center text-[13px] font-semibold text-ws-primary",
+                        pkg.highlight && "bg-ws-brand/[0.06]"
+                      )}
+                    >
+                      {PACKAGE_LABEL[pkg.key]}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.key} className="border-b border-ws-hairline last:border-0">
+                    <th
+                      scope="row"
+                      className="py-3 pr-4 text-[14px] font-normal text-ws-muted"
+                    >
+                      {row.label}
+                    </th>
+                    {packages.map((pkg) => {
+                      const on = pkg.entitlements[row.key]
+                      return (
+                        <td
+                          key={pkg.key}
+                          className={cn("px-3 py-3 text-center", pkg.highlight && "bg-ws-brand/[0.06]")}
+                        >
+                          {on ? (
+                            <CheckIcon
+                              size={16}
+                              className="mx-auto text-ws-primary"
+                              role="img"
+                              aria-label="Included"
+                            />
+                          ) : (
+                            <MinusIcon
+                              size={16}
+                              className="mx-auto text-ws-subtle"
+                              role="img"
+                              aria-label="Not included"
+                            />
+                          )}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </section>
   )
 }
@@ -127,7 +237,7 @@ function PackageCta({
   primary: boolean
 }) {
   const base =
-    "flex h-11 w-full items-center justify-center rounded-sm px-5 text-sm font-semibold transition-opacity duration-[var(--ws-motion-fast)]"
+    "flex h-12 w-full items-center justify-center rounded-full px-5 text-sm font-semibold transition-opacity duration-[var(--ws-motion-fast)]"
 
   if (access.kind === "coming_soon") {
     return <p className={cn(base, "bg-ws-chip text-ws-muted")}>Available at launch</p>
@@ -139,7 +249,7 @@ function PackageCta({
         base,
         primary
           ? "bg-ws-brand text-ws-brand-on hover:opacity-90"
-          : "border border-ws-hairline text-ws-primary transition-colors hover:border-ws-brand/40"
+          : "border border-ws-hairline text-ws-primary transition-colors hover:border-ws-brand/40 hover:bg-ws-raised"
       )}
     >
       {ctaLabel(pkg)}

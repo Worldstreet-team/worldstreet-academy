@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import { useQueryClient } from "@tanstack/react-query"
-import { Topbar } from "@/components/platform/topbar"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { useUser } from "@/components/providers/user-provider"
@@ -110,7 +109,7 @@ export default function CheckoutPage() {
     try {
       // The server derives identity from the session and the price from the
       // course's package; enrollment is only granted after the central
-      // Worldstreet wallet confirms the debit. No optimistic success. A program
+      // WorldStreet wallet confirms the debit. No optimistic success. A program
       // without a package ladder (tierCount 0) shows one synthesized tier — the
       // server ignores a key there, so none is sent.
       const result = await purchaseCourse({
@@ -143,40 +142,37 @@ export default function CheckoutPage() {
 
   if (isLoading) {
     return (
-      <>
-        <Topbar title="Checkout" />
-        <div className="flex-1 flex items-center justify-center">
-          <LoaderCircleIcon size={24} className="animate-spin text-ws-muted" />
-        </div>
-      </>
+      <div className="flex items-center justify-center py-24">
+        <LoaderCircleIcon size={24} className="animate-spin text-ws-muted" />
+      </div>
     )
   }
 
   if (!program || !courseId) {
     return (
-      <>
-        <Topbar title="Checkout" />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center space-y-3">
-            <p className="text-sm text-ws-muted">Program not found</p>
-            <Button variant="outline" onClick={() => router.back()}>
-              Go Back
-            </Button>
-          </div>
+      <div className="flex items-center justify-center py-24">
+        <div className="space-y-3 text-center">
+          <p className="text-sm text-ws-muted">Program not found</p>
+          <Button variant="outline" onClick={() => router.back()}>
+            Go Back
+          </Button>
         </div>
-      </>
+      </div>
     )
   }
 
   const price = selected ? selected.price : null
   const school = program.school ? SCHOOL_BY_SLUG[program.school] : null
   const multiTier = packages.length > 1
+  // The wallet is the only way a paid seat is bought, so when it is off the
+  // purchase cannot succeed — `purchaseCourse` fails closed before it touches
+  // money. Say so before the click rather than after it. A free program needs
+  // no debit, so it is never blocked. `wallet === null` is still loading.
+  const payBlocked = price !== null && price > 0 && wallet !== null && !wallet.enabled
 
   return (
-    <>
-      <Topbar title="Checkout" />
-      <div className="flex-1 overflow-y-auto pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-8">
-        <div className="max-w-lg mx-auto px-4 md:px-6 py-8 space-y-6">
+    <div className="pb-[max(2rem,env(safe-area-inset-bottom))]">
+      <div className="mx-auto max-w-lg space-y-6 px-4 py-8 md:px-6">
           {/* Back */}
           <button
             onClick={() => router.back()}
@@ -287,7 +283,7 @@ export default function CheckoutPage() {
                 </div>
                 {price > 0 && wallet?.enabled && (
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-ws-muted">Worldstreet balance</span>
+                    <span className="text-ws-muted">WorldStreet balance</span>
                     <span
                       className={cn(
                         "font-medium tabular-nums",
@@ -309,26 +305,39 @@ export default function CheckoutPage() {
             </div>
           )}
 
-          {/* Secure checkout note */}
-          <div className="flex items-center gap-2 justify-center text-xs text-ws-subtle">
-            <ShieldCheckIcon size={13} />
-            <span>
-              {!price
-                ? "Secure checkout"
-                : "Paid from your Worldstreet wallet — funding & withdrawals live on the Worldstreet dashboard"}
-            </span>
-          </div>
+          {/* How this is paid. "Secure checkout" itself lives in the
+              layout header, so it is not repeated here. */}
+          {price !== null && price > 0 && (
+            <p className="flex items-center justify-center gap-2 text-center text-xs text-ws-subtle">
+              <ShieldCheckIcon size={13} className="shrink-0" aria-hidden />
+              <span>
+                Paid from your WorldStreet wallet — funding &amp; withdrawals live on the
+                WorldStreet dashboard
+              </span>
+            </p>
+          )}
+
+          {/* Wallet off. Stated before the click, because no amount of trying
+              clears it — the CTA below is disabled for the same reason. */}
+          {payBlocked && (
+            <div className="space-y-1 rounded-lg border border-ws-warning/20 bg-ws-warning/10 px-4 py-3">
+              <p className="text-sm font-medium text-ws-warning">Payments are unavailable right now</p>
+              <p className="text-xs text-ws-muted">
+                You haven&apos;t been charged, and this program is still here when payments are back.
+              </p>
+            </div>
+          )}
 
           {/* Insufficient funds */}
           {shortfallMinor !== null && (
             <div className="rounded-lg bg-ws-warning/10 border border-ws-warning/20 px-4 py-3 space-y-2">
               <p className="text-sm font-medium text-ws-warning">Insufficient balance</p>
               <p className="text-xs text-ws-muted">
-                You need ${(shortfallMinor / 100).toFixed(2)} more in your Worldstreet wallet for this
-                package. Top up on the Worldstreet dashboard, then come back — your order will still be here.
+                You need ${(shortfallMinor / 100).toFixed(2)} more in your WorldStreet wallet for this
+                package. Top up on the WorldStreet dashboard, then come back — your order will still be here.
               </p>
               <Button variant="outline" size="sm" className="w-full" onClick={openFunding}>
-                Fund my Worldstreet wallet
+                Fund my WorldStreet wallet
               </Button>
             </div>
           )}
@@ -343,7 +352,11 @@ export default function CheckoutPage() {
           {/* CTA */}
           <Button
             onClick={handlePurchase}
-            disabled={!selected || isProcessing || isSuccess}
+            disabled={!selected || isProcessing || isSuccess || payBlocked}
+            // Gold is the page's primary action. With the wallet off there is
+            // no action to offer, so the CTA drops out of gold rather than
+            // sitting there dimmed and still claiming the eye.
+            variant={payBlocked ? "outline" : "default"}
             className="w-full h-12 text-sm font-semibold gap-2"
             size="lg"
           >
@@ -359,15 +372,16 @@ export default function CheckoutPage() {
               </>
             ) : !selected || price === null ? (
               "Choose a package to continue"
+            ) : payBlocked ? (
+              "Payments unavailable"
             ) : (
               <>
                 <CircleCheckIcon size={16} />
                 {price === 0 ? "Enrol for free" : `Pay ${dollars(price)}`}
               </>
             )}
-          </Button>
-        </div>
+        </Button>
       </div>
-    </>
+    </div>
   )
 }

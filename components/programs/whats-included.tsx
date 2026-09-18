@@ -12,6 +12,7 @@ import {
   UsersIcon,
   type LucideIcon,
 } from "lucide-react"
+import { SectionLabel } from "@/components/marketing/section-heading"
 
 /** Spec §9 — the eleven inclusions, verbatim and static. */
 const INCLUDED: ReadonlyArray<{ label: string; icon: LucideIcon }> = [
@@ -31,7 +32,7 @@ const INCLUDED: ReadonlyArray<{ label: string; icon: LucideIcon }> = [
 export function WhatsIncluded() {
   return (
     <section className="mt-16 border-t border-ws-hairline pt-10" aria-labelledby="included-heading">
-      <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-ws-gold">What&apos;s included</p>
+      <SectionLabel>What&apos;s included</SectionLabel>
       <h2
         id="included-heading"
         className="mt-3 font-display text-2xl font-semibold tracking-[-0.015em] text-ws-primary"
@@ -43,7 +44,7 @@ export function WhatsIncluded() {
         {INCLUDED.map(({ label, icon: Icon }) => (
           <li
             key={label}
-            className="flex items-center gap-3 rounded-md border border-ws-hairline bg-ws-surface px-4 py-3"
+            className="flex items-center gap-3 rounded-[14px] border border-ws-hairline bg-ws-surface px-4 py-3.5 transition-colors duration-[var(--ws-motion-base)] hover:bg-ws-raised dark:border-transparent"
           >
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ws-brand/10 text-ws-gold">
               <Icon size={15} aria-hidden />

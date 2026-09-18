@@ -1,7 +1,6 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import { ArrowRightIcon, CircleCheckIcon } from "lucide-react"
-import { Topbar } from "@/components/platform/topbar"
 import { Button } from "@/components/ui/button"
 import { BRAND } from "@/lib/brand"
 import { getCheckoutConfirmation } from "@/lib/actions/enrollments"
@@ -27,10 +26,8 @@ export default async function CheckoutSuccessPage({
     : `/dashboard/courses/${confirmation.courseId}`
 
   return (
-    <>
-      <Topbar title="Enrollment confirmed" />
-      <div className="flex-1 px-4 pb-24 md:pb-8">
-        <div className="mx-auto w-full max-w-md space-y-8 py-16">
+    <div className="px-4 pb-16">
+      <div className="mx-auto w-full max-w-md space-y-8 py-16">
           <div className="space-y-4 text-center">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-ws-success/10">
               <CircleCheckIcon size={32} className="text-ws-success" aria-hidden />
@@ -65,8 +62,7 @@ export default async function CheckoutSuccessPage({
               Go to dashboard
             </Button>
           </div>
-        </div>
       </div>
-    </>
+    </div>
   )
 }

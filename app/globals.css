@@ -466,6 +466,166 @@ svg[viewBox="0 0 24 24"][color]:not(.lucide) > path:not(:first-child) {
   .roll-out { display: none; }
 }
 
+/* ── School cards — one signature motion per school (/schools) ─────────────
+   Each of the eight schools hovers with a gesture drawn from what it
+   teaches: the market ticks up, the blocks snap into a chain, the bot
+   blinks, the brackets compile, the shield takes a hit, the bars grow from
+   the axis, the clapper claps, the case swings. Owner call (2026-09-16) —
+   the house default of "grids render instantly, hover stays chromatic" is
+   relaxed for this one page.
+
+   What the motion still obeys: transform and opacity only, one shot per
+   hover and never a loop, the CARD itself never scales (it lightens one
+   ladder step, as everywhere), and every gesture is off under reduced
+   motion. Only the glyph moves — the gold wash behind it holds still. */
+
+@keyframes ws-school-tick {
+  0%   { transform: translateY(0); }
+  30%  { transform: translateY(-3px); }
+  55%  { transform: translateY(-1px); }
+  80%  { transform: translateY(-4px); }
+  100% { transform: translateY(0); }
+}
+@keyframes ws-school-snap {
+  0%   { transform: translateX(-2px) rotate(-8deg); }
+  55%  { transform: translateX(1px) rotate(4deg); }
+  100% { transform: translateX(0) rotate(0deg); }
+}
+@keyframes ws-school-blink {
+  0%   { opacity: 1; transform: rotate(0deg); }
+  22%  { opacity: 0.3; transform: rotate(5deg); }
+  46%  { opacity: 1; transform: rotate(5deg); }
+  70%  { opacity: 0.4; transform: rotate(-3deg); }
+  100% { opacity: 1; transform: rotate(0deg); }
+}
+@keyframes ws-school-compile {
+  0%   { transform: scaleX(1); }
+  40%  { transform: scaleX(1.24); }
+  70%  { transform: scaleX(0.9); }
+  100% { transform: scaleX(1); }
+}
+@keyframes ws-school-guard {
+  0%   { transform: scale(1); }
+  28%  { transform: scale(0.82); }
+  62%  { transform: scale(1.07); }
+  100% { transform: scale(1); }
+}
+@keyframes ws-school-plot {
+  0%   { transform: scaleY(0.45); }
+  65%  { transform: scaleY(1.09); }
+  100% { transform: scaleY(1); }
+}
+@keyframes ws-school-clap {
+  0%   { transform: rotate(-18deg); }
+  45%  { transform: rotate(6deg); }
+  72%  { transform: rotate(-3deg); }
+  100% { transform: rotate(0deg); }
+}
+@keyframes ws-school-carry {
+  0%   { transform: rotate(0deg); }
+  30%  { transform: rotate(-9deg); }
+  62%  { transform: rotate(6deg); }
+  85%  { transform: rotate(-2deg); }
+  100% { transform: rotate(0deg); }
+}
+
+@keyframes ws-school-sweep {
+  0%   { transform: rotate(0deg); }
+  35%  { transform: rotate(-26deg); }
+  70%  { transform: rotate(15deg); }
+  100% { transform: rotate(0deg); }
+}
+
+/* The glyph is its own transform box so the wash behind it never moves. */
+.ws-school-glyph {
+  display: inline-flex;
+  transform-origin: var(--ws-school-origin, center);
+}
+
+/* One trigger; each school names its own gesture below. Keyboard users get
+   it too — the whole card is the link, so :focus-visible lands here. */
+.ws-school:hover .ws-school-glyph,
+.ws-school:focus-visible .ws-school-glyph {
+  animation: var(--ws-school-motion, ws-school-tick)
+             var(--ws-school-duration, 520ms)
+             var(--ws-ease);
+}
+
+.ws-school[data-school="trading-financial-markets"] {
+  --ws-school-motion: ws-school-tick;
+  --ws-school-duration: 560ms;
+}
+.ws-school[data-school="blockchain-web3"] {
+  --ws-school-motion: ws-school-snap;
+  --ws-school-duration: 460ms;
+}
+.ws-school[data-school="ai-automation"] {
+  --ws-school-motion: ws-school-blink;
+  --ws-school-duration: 700ms;
+}
+.ws-school[data-school="software-app-development"] {
+  --ws-school-motion: ws-school-compile;
+  --ws-school-duration: 500ms;
+}
+.ws-school[data-school="cybersecurity"] {
+  --ws-school-motion: ws-school-guard;
+  --ws-school-duration: 420ms;
+}
+.ws-school[data-school="data-analytics"] {
+  --ws-school-motion: ws-school-plot;
+  --ws-school-duration: 520ms;
+  --ws-school-origin: bottom center;
+}
+.ws-school[data-school="digital-media-creative"] {
+  --ws-school-motion: ws-school-clap;
+  --ws-school-duration: 400ms;
+  --ws-school-origin: bottom left;
+}
+.ws-school[data-school="digital-business-remote-careers"] {
+  --ws-school-motion: ws-school-carry;
+  --ws-school-duration: 620ms;
+  --ws-school-origin: top center;
+}
+
+/* The ninth tile is not a school — it is the "browse everything" way out, so
+   its compass needle sweeps and settles. */
+.ws-school[data-school="browse-all"] {
+  --ws-school-motion: ws-school-sweep;
+  --ws-school-duration: 640ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ws-school:hover .ws-school-glyph,
+  .ws-school:focus-visible .ws-school-glyph {
+    animation: none;
+  }
+}
+
+/* ── Scroll reveal, without a JS dependency ───────────────────────────────
+   `Reveal` (components/marketing/motion/reveal.tsx) is the landing's
+   entrance and stays that way, but it renders its subject at opacity 0 and
+   waits for hydration to raise it. That is fine for an FAQ; it is not fine
+   for the content someone is deciding to buy from, which is why the program
+   page's outcome tiles use this instead.
+
+   Default state is VISIBLE. The animation is layered on only where the
+   browser can drive it from scroll position, so a browser without
+   scroll-driven animations (or a visitor without JS, or with reduced motion)
+   simply gets the finished frame. */
+@keyframes ws-reveal-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .ws-reveal {
+      animation: ws-reveal-in both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 42%;
+    }
+  }
+}
+
 /* ---- Meeting reactions: one short one-shot rise, opacity + small travel ---- */
 @keyframes float-up {
   0% {
