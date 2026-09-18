@@ -31,7 +31,7 @@ export default async function CertificatesPage() {
               art={<ArtCertificate />}
               title="No certificates yet"
               description="Finish a course and pass the exam to earn your first certificate."
-              actionLabel="Browse courses"
+              actionLabel="Browse programs"
               actionHref="/dashboard/courses"
             />
           ) : (

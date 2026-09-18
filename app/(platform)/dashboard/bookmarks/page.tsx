@@ -5,12 +5,13 @@ import { Topbar } from "@/components/platform/topbar"
 import { CourseCard, CourseCardSkeleton } from "@/components/platform/course-card"
 import { EmptyState } from "@/components/shared/empty-state"
 import { ArtBookmarks } from "@/components/shared/illustrations"
+import { CardShell, EmptyState as RetryEmptyState } from "@/components/ui/system"
 import { useBookmarks, useToggleBookmark } from "@/lib/hooks/queries"
 import { SearchIcon } from "lucide-react"
 
 export default function BookmarksPage() {
   const [search, setSearch] = React.useState("")
-  const { data: bookmarks = [], isLoading } = useBookmarks()
+  const { data: bookmarks = [], isLoading, isError, refetch } = useBookmarks()
   const toggleBookmark = useToggleBookmark()
 
   const filteredCourses = React.useMemo(() => {
@@ -43,12 +44,20 @@ export default function BookmarksPage() {
                 <CourseCardSkeleton key={i} />
               ))}
             </div>
+          ) : isError ? (
+            <CardShell>
+              <RetryEmptyState
+                title="Couldn't load this"
+                description="Check your connection and try again."
+                ctas={[{ label: "Try again", onClick: () => refetch() }]}
+              />
+            </CardShell>
           ) : bookmarks.length === 0 ? (
             <EmptyState
               art={<ArtBookmarks />}
               title="Nothing saved yet"
               description="Tap the bookmark on any course to keep it here for later."
-              actionLabel="Browse courses"
+              actionLabel="Browse programs"
               actionHref="/dashboard/courses"
             />
           ) : (

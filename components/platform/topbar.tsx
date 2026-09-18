@@ -46,7 +46,7 @@ import { cn } from "@/lib/utils"
 /* ── Path → breadcrumb label map ────────────────────────── */
 const labelMap: Record<string, string> = {
   dashboard: "Dashboard",
-  courses: "Courses",
+  courses: "Programs",
   "my-courses": "My programs",
   bookmarks: "Bookmarks",
   profile: "Profile",
@@ -218,7 +218,7 @@ export function Topbar({ title, variant = "platform", breadcrumbOverrides }: Top
           >
             <HugeiconsIcon icon={Search01Icon} className="size-4 shrink-0 text-muted-foreground" />
             <span className="flex-1 truncate text-[13px] text-muted-foreground transition-colors duration-[var(--ws-motion-fast)] group-hover:text-foreground">
-              {variant === "admin" ? "Search…" : "Search courses, instructors…"}
+              {variant === "admin" ? "Search…" : "Search programs, instructors…"}
             </span>
             <kbd className="pointer-events-none hidden shrink-0 items-center rounded-md bg-background px-1.5 py-0.5 font-sans text-[10px] font-semibold text-muted-foreground ring-1 ring-border lg:inline-flex">
               {isApple ? "⌘K" : "Ctrl K"}

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { CardShell, EmptyState } from "@/components/ui/system"
 import {
   cancelMentorshipSession,
   getMyMentorship,
@@ -227,7 +228,7 @@ function SessionRow({ session, onChanged }: { session: MentorshipSessionView; on
 
 export default function MentorshipPage() {
   const queryClient = useQueryClient()
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: queryKeys.mentorship,
     queryFn: () => getMyMentorship(),
     staleTime: 30 * 1000,
@@ -246,6 +247,14 @@ export default function MentorshipPage() {
 
           {isLoading ? (
             <div className="h-48 animate-pulse rounded-lg bg-ws-surface" />
+          ) : isError ? (
+            <CardShell>
+              <EmptyState
+                title="Couldn't load this"
+                description="Check your connection and try again."
+                ctas={[{ label: "Try again", onClick: () => refetch() }]}
+              />
+            </CardShell>
           ) : programs.length === 0 && sessions.length === 0 ? (
             <div className="rounded-lg bg-ws-surface px-6 py-8">
               <p className="text-[15px] font-semibold text-ws-primary">Mentorship comes with Executive packages</p>

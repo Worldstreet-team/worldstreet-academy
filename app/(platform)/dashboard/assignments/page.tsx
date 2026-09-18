@@ -5,12 +5,13 @@ import { ChevronRightIcon } from "lucide-react"
 import { Topbar } from "@/components/platform/topbar"
 import { PageHeader } from "@/components/shared/page-header"
 import { ASSESSMENT_STATUS, assessmentKindLabel } from "@/components/dashboard/assignments-tile"
+import { CardShell, EmptyState } from "@/components/ui/system"
 import { useMyAssessments } from "@/lib/hooks/queries"
 import { cn } from "@/lib/utils"
 
 /** Every row behind the dashboard's Assignments tile. */
 export default function AssignmentsPage() {
-  const { data: assessments = [], isLoading } = useMyAssessments()
+  const { data: assessments = [], isLoading, isError, refetch } = useMyAssessments()
 
   return (
     <>
@@ -23,6 +24,14 @@ export default function AssignmentsPage() {
           />
           {isLoading ? (
             <div className="h-40 animate-pulse rounded-lg bg-ws-surface" />
+          ) : isError ? (
+            <CardShell>
+              <EmptyState
+                title="Couldn't load this"
+                description="Check your connection and try again."
+                ctas={[{ label: "Try again", onClick: () => refetch() }]}
+              />
+            </CardShell>
           ) : assessments.length === 0 ? (
             <div className="rounded-lg bg-ws-surface px-6 py-8">
               <p className="text-[15px] font-semibold text-ws-primary">Nothing to take or submit right now</p>

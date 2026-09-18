@@ -71,7 +71,7 @@ export default function NotificationsPage() {
   const [program, setProgram] = React.useState<string>("all")
   const [unreadOnly, setUnreadOnly] = React.useState(false)
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: inboxKey,
     queryFn: () => getMyNotifications(INBOX_LIMIT),
     staleTime: 30_000,
@@ -240,6 +240,14 @@ export default function NotificationsPage() {
               {[0, 1, 2, 3].map((i) => (
                 <RowSkeleton key={i} />
               ))}
+            </CardShell>
+          ) : isError ? (
+            <CardShell>
+              <EmptyState
+                title="Couldn't load this"
+                description="Check your connection and try again."
+                ctas={[{ label: "Try again", onClick: () => refetch() }]}
+              />
             </CardShell>
           ) : groups.length === 0 ? (
             <CardShell>

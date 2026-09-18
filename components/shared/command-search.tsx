@@ -55,7 +55,7 @@ function useCommandItems(courses: BrowseCourse[], isInstructor: boolean) {
     },
     {
       id: "page-browse",
-      label: "Browse Courses",
+      label: "Browse Programs",
       description: "Explore the course catalog",
       icon: SearchIcon,
       action: () => router.push("/dashboard/courses"),
@@ -210,7 +210,7 @@ function CommandList({
   }, [items])
 
   const sectionLabels: Record<string, string> = {
-    courses: "Courses",
+    courses: "Programs",
     pages: "Pages",
     tools: "Tools",
   }
@@ -317,7 +317,7 @@ function SearchInput({
         value={query}
         onChange={(e) => onQueryChange(e.target.value)}
         onKeyDown={onKeyDown}
-        placeholder="Search courses, pages, tools…"
+        placeholder="Search programs, pages, tools…"
         className="flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground/50"
       />
       {showEsc && (

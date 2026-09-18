@@ -246,7 +246,7 @@ export default async function LessonPage({
             <div className="lg:hidden">
               <Separator />
               <div className="mt-4">
-                <h3 className="font-semibold text-sm mb-3">Course Content</h3>
+                <h3 className="font-semibold text-sm mb-3">Program content</h3>
                 <MobileLessonList
                   lessons={lessons}
                   courseId={courseId}

@@ -214,7 +214,7 @@ export function LanguagePicker({ defaultLanguage, children }: LanguagePickerProp
   if (isMobile) {
     return (
       <Sheet open={open} onOpenChange={(o) => { if (!isTranslating) setOpen(o) }}>
-        <SheetTrigger render={<div className="w-full" />}>
+        <SheetTrigger render={<div className="w-full" />} nativeButton={false}>
           {triggerButton}
         </SheetTrigger>
         <SheetContent side="bottom" showCloseButton={false} className="px-0 pb-0 rounded-t-lg">
@@ -239,7 +239,7 @@ export function LanguagePicker({ defaultLanguage, children }: LanguagePickerProp
 
   return (
     <Popover open={open} onOpenChange={(o) => { if (!isTranslating) setOpen(o) }}>
-      <PopoverTrigger render={<div />}>
+      <PopoverTrigger render={<div />} nativeButton={false}>
         {triggerButton}
       </PopoverTrigger>
       <PopoverContent

@@ -51,6 +51,8 @@ function Button({
   loading = false,
   disabled,
   children,
+  render,
+  nativeButton,
   ...props
 }: ButtonPrimitive.Props &
   VariantProps<typeof buttonVariants> & { loading?: boolean }) {
@@ -59,6 +61,10 @@ function Button({
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
       disabled={disabled || loading}
+      render={render}
+      // A `render` target is a link or a custom element here, never a native
+      // <button>; callers can still say otherwise.
+      nativeButton={nativeButton ?? (render ? false : undefined)}
       {...props}
     >
       {loading && (

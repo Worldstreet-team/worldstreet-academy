@@ -61,7 +61,7 @@ export function LessonSidebar({
   return (
     <aside className="hidden lg:flex w-80 border-l flex-col shrink-0">
       <div className="p-4 border-b">
-        <h3 className="font-semibold text-sm">Course Content</h3>
+        <h3 className="font-semibold text-sm">Program content</h3>
         <p className="text-xs text-muted-foreground mt-1">
           {completedCount}/{lessons.length} lessons completed
         </p>
