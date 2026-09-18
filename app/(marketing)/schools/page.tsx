@@ -93,7 +93,7 @@ export default async function SchoolsPage() {
                 <span className="tabular-nums text-ws-muted">
                   {courses.length === 1 ? "1 program" : `${courses.length} programs`}
                 </span>
-                <span className="inline-flex items-center gap-1.5 font-semibold text-ws-gold">
+                <span className="inline-flex items-center gap-1.5 font-semibold text-ws-muted transition-colors duration-[var(--ws-motion-fast)] group-hover:text-ws-primary">
                   Browse all
                   <ArrowRightIcon
                     size={14}

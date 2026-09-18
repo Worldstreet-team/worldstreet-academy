@@ -5,6 +5,7 @@ import { notFound } from "next/navigation"
 import { ArrowLeftIcon } from "lucide-react"
 import { SCHOOL_BY_SLUG, isSchoolSlug } from "@/lib/schools"
 import { schoolCover } from "@/lib/school-art"
+import { cn } from "@/lib/utils"
 import { fetchBrowseCourses } from "@/lib/actions/student"
 import { SchoolIcon } from "@/components/shared/school-icon"
 import { ProgramRow } from "@/components/marketing/program-row"
@@ -47,41 +48,85 @@ export default async function SchoolPage({ params }: Params) {
         All schools
       </Link>
 
-      {/* The school's cover as a banner. 21:9 from sm, cropped at 65% so
-          every render keeps both its object and the top of its plinth; a
-          phone shows the whole 16:10 render instead of a 146px strip. The
-          hairline gives the frame an edge where the render's dark left third
-          meets the dark page. `unoptimized`: the source is 1600px and ~22KB,
-          and the optimiser's q75 re-encode is larger and bands the gradient. */}
-      {cover && (
-        <div className="rise relative mt-8 aspect-[16/10] overflow-hidden rounded-[20px] border border-ws-hairline bg-ws-sunken sm:aspect-[21/9]">
-          <Image src={cover} alt="" fill priority unoptimized className="object-cover object-[center_65%]" />
-        </div>
-      )}
-
-      <header className="mt-8 max-w-3xl">
-        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-ws-brand/10 text-ws-gold">
+      {/* With a cover, the header IS the banner from md: a 21:9 frame with
+          the icon, name, tagline and the one gold action on the render's
+          deliberately dark left side, over a left-to-right
+          `--ws-overlay-scrim` fade, so both the h1 and the CTA sit inside
+          the first viewport at 1280x800 and 1024x768. The render is dark in
+          both themes, so the text on it is white in both. The header does
+          not clip: an aspect-ratio box grows to fit its content only while
+          overflow is visible, so the cover carries its own rounded,
+          clipped frame behind the text. Below md the same elements stack
+          (the render, then the text in ink) — a narrower column to the
+          left of a 21:9 frame stops fitting the longer school names.
+          Cropped at 65% down (80% across once the frame outgrows 21:9) so
+          each object keeps the top of its plinth and stays on the right.
+          `unoptimized`: the source is 1600px and ~22KB, and the optimiser's
+          q75 re-encode is larger and bands the dark gradient. */}
+      <header
+        className={cn(
+          "mt-8",
+          cover
+            ? "rise relative md:flex md:aspect-[21/9] md:flex-col md:items-start md:justify-center md:px-14 md:py-10"
+            : "max-w-3xl"
+        )}
+      >
+        {cover && (
+          <div className="relative aspect-[16/10] overflow-hidden rounded-[20px] border border-ws-hairline bg-ws-sunken sm:aspect-[21/9] md:absolute md:inset-0 md:aspect-auto">
+            <Image
+              src={cover}
+              alt=""
+              fill
+              priority
+              unoptimized
+              className="object-cover object-[center_65%] md:object-[80%_65%]"
+            />
+            <span
+              aria-hidden
+              className="absolute inset-0 hidden bg-linear-to-r from-[var(--ws-overlay-scrim)] via-[var(--ws-overlay-scrim)] via-25% to-transparent to-60% md:block"
+            />
+          </div>
+        )}
+        <span
+          className={cn(
+            "relative flex h-12 w-12 items-center justify-center rounded-full bg-ws-brand/10 text-ws-gold",
+            cover && "mt-8 md:mt-0 md:text-ws-brand"
+          )}
+        >
           <SchoolIcon name={school.icon} size={22} />
         </span>
         <h1
-          className="mt-6 font-display font-semibold leading-[1.05] tracking-[-0.02em] text-ws-primary"
-          style={{ fontSize: "clamp(2rem, 4.5vw, 3.5rem)" }}
+          className={cn(
+            "relative mt-6 font-display text-[length:clamp(2rem,4.5vw,3.5rem)] font-semibold leading-[1.05] tracking-[-0.02em] text-ws-primary",
+            cover && "md:max-w-[min(28rem,40%)] md:text-[length:clamp(2rem,3.6vw,3rem)] md:text-white"
+          )}
         >
           {school.name}
         </h1>
         {school.tagline && (
-          <p className="mt-4 font-display text-xl font-medium text-ws-primary md:text-2xl">{school.tagline}</p>
+          <p
+            className={cn(
+              "relative mt-4 font-display text-xl font-medium text-ws-primary md:text-2xl",
+              cover && "md:max-w-[min(28rem,40%)] md:text-[22px] md:text-white/80"
+            )}
+          >
+            {school.tagline}
+          </p>
         )}
-        <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-ws-muted md:text-[17px]">
-          {school.intro ?? school.blurb}
-        </p>
         <Link
           href={`/dashboard/start?school=${school.slug}`}
-          className="mt-8 inline-flex h-12 items-center justify-center rounded-full bg-ws-brand px-7 text-[15px] font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90"
+          className="relative mt-8 inline-flex h-12 items-center justify-center rounded-full bg-ws-brand px-7 text-[15px] font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90"
         >
           Start with this school
         </Link>
       </header>
+
+      {/* The intro reads after the header at every size, so the reading order
+          matches what is on screen; on the cover it would make the overlay
+          taller than the frame. */}
+      <p className="mt-8 max-w-3xl text-[15px] leading-relaxed text-ws-muted md:mt-10 md:text-[17px]">
+        {school.intro ?? school.blurb}
+      </p>
 
       <section className="mt-16 border-t border-ws-hairline pt-10" aria-labelledby="programs-heading">
         <div className="flex flex-wrap items-baseline justify-between gap-3">

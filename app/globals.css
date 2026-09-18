@@ -488,18 +488,20 @@ svg[viewBox="0 0 24 24"][color]:not(.lucide) > path:not(:first-child) {
   .roll-out { display: none; }
 }
 
-/* ── School cards — one signature motion per school (/schools) ─────────────
+/* ── School cards — one signature motion per school (landing grid, /schools) ─
    Each of the eight schools hovers with a gesture drawn from what it
    teaches: the market ticks up, the blocks snap into a chain, the bot
    blinks, the brackets compile, the shield takes a hit, the bars grow from
    the axis, the clapper claps, the case swings. Owner call (2026-09-16) —
    the house default of "grids render instantly, hover stays chromatic" is
-   relaxed for this one page.
+   relaxed for these cards.
 
    What the motion still obeys: transform and opacity only, one shot per
    hover and never a loop, the CARD itself never scales (it lightens one
    ladder step, as everywhere), and every gesture is off under reduced
-   motion. Only the glyph moves — the gold wash behind it holds still. */
+   motion. The glyph plays its gesture and the cover image takes the one
+   sanctioned zoom (1 → 1.03 inside its clipped frame) — the gold wash
+   behind the glyph holds still. */
 
 @keyframes ws-school-tick {
   0%   { transform: translateY(0); }
