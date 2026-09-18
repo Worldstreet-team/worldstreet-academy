@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from "next/server"
 import connectDB from "@/lib/db"
-import { Course, Enrollment, Meeting, MentorshipSession, User } from "@/lib/db/models"
+import { Course, Enrollment, EnrollmentIntent, Meeting, MentorshipSession, User } from "@/lib/db/models"
 import { notifyUser } from "@/lib/notify"
-import { formatUtcDateTime, sendClassReminderEmail, sendInterviewReminderEmail, sendMentorshipEmail } from "@/lib/email"
+import {
+  formatUtcDateTime,
+  sendClassReminderEmail,
+  sendFinishEnrollingEmail,
+  sendInterviewReminderEmail,
+  sendMentorshipEmail,
+} from "@/lib/email"
 import { entitlementsFor, includesMentorship } from "@/lib/entitlements"
 import { getCourseAccess } from "@/lib/course-access"
 import { APP_URL } from "@/lib/app-url"
+import { fetchProgramById } from "@/lib/actions/student"
+import { SCHOOL_BY_SLUG, isSchoolSlug } from "@/lib/schools"
 
 /**
  * Where a class reminder sends its host: the instructor page, which starts the
@@ -27,6 +35,7 @@ const HOST_CLASS_PATH = "/instructor/meetings"
  *   window is stamped, so it never retries.
  * - Every other scheduled meeting (instructor interviews): host + invitees,
  *   interview wording, exactly as before.
+ * - Saved, unpaid programs (`EnrollmentIntent`): one email at 24 h, a last one at 72 h.
  *
  * Coolify scheduled task (~every 10 min):
  *   curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" \
@@ -221,5 +230,67 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, upcoming: upcoming.length, sent24, sent1 })
+  // ── Pay-later nudges (Phase 9): a saved, unpaid program gets one email at
+  // 24 h and a last one at 72 h. Marketing mail is claimed BEFORE it is sent
+  // (at most once) — the opposite of class reminders, which must never be
+  // skipped. A run that missed the 24 h window sends only the 72 h email.
+  let nudged = 0
+  const DAY = 24 * 3600 * 1000
+  const due = await EnrollmentIntent.find({
+    status: "open",
+    course: { $ne: null },
+    $or: [
+      { savedAt: { $lte: new Date(now - DAY) }, "nudges.h24SentAt": null },
+      { savedAt: { $lte: new Date(now - 3 * DAY) }, "nudges.h72SentAt": null },
+    ],
+  })
+    .sort({ savedAt: 1 })
+    .limit(100)
+
+  for (const intent of due) {
+    try {
+      if (!intent.course || !isSchoolSlug(intent.school)) continue
+      const courseId = intent.course.toString()
+
+      if (await Enrollment.exists({ user: intent.user, course: intent.course })) {
+        await EnrollmentIntent.updateOne({ _id: intent._id }, { $set: { status: "converted" } })
+        continue
+      }
+
+      const final = now - intent.savedAt.getTime() >= 3 * DAY
+      const stamp = new Date()
+      const claimed = await EnrollmentIntent.findOneAndUpdate(
+        { _id: intent._id, status: "open", [final ? "nudges.h72SentAt" : "nudges.h24SentAt"]: null },
+        {
+          $set: final
+            ? { "nudges.h24SentAt": intent.nudges?.h24SentAt ?? stamp, "nudges.h72SentAt": stamp }
+            : { "nudges.h24SentAt": stamp },
+        }
+      )
+      if (!claimed) continue
+
+      const [program, learner] = await Promise.all([
+        fetchProgramById(courseId),
+        User.findById(intent.user).select("firstName email").lean(),
+      ])
+      if (!program || program.status !== "published" || !learner?.email) continue
+
+      const chosen = intent.packageKey ? program.packages.find((p) => p.key === intent.packageKey) : undefined
+      await sendFinishEnrollingEmail({
+        to: learner.email,
+        firstName: learner.firstName ?? "",
+        courseTitle: program.title,
+        schoolName: SCHOOL_BY_SLUG[intent.school].name,
+        checkoutPath: `/dashboard/checkout?courseId=${courseId}${chosen ? `&package=${chosen.key}` : ""}`,
+        price: chosen ? chosen.price : (program.price ?? 0),
+        fromPrice: !chosen && program.tierCount > 1,
+        final,
+      })
+      nudged++
+    } catch (error) {
+      console.error("[cron/reminders] intent", intent._id.toString(), error)
+    }
+  }
+
+  return NextResponse.json({ ok: true, upcoming: upcoming.length, sent24, sent1, nudged })
 }

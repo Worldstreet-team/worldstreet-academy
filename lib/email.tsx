@@ -1097,3 +1097,76 @@ export async function sendCourseLiveEmail(data: CourseLiveEmailData) {
     return { success: false, error: "Failed to send email" }
   }
 }
+
+/* ─── Pay-later nudge (Phase 9) ─── */
+
+export type FinishEnrollingEmailData = {
+  to: string
+  firstName: string
+  courseTitle: string
+  schoolName: string
+  /** Root-relative checkout path, query included. */
+  checkoutPath: string
+  /** Whole USD; 0 = free. */
+  price: number
+  /** A ladder with no package chosen: quote "from $X". */
+  fromPrice: boolean
+  /** The second email says it is the last. */
+  final: boolean
+}
+
+function FinishEnrollingEmail({ data }: { data: FinishEnrollingEmailData }) {
+  const url = `${APP_URL}${data.checkoutPath}`
+  const priceLabel =
+    data.price === 0 ? "free" : `${data.fromPrice ? "from " : ""}$${data.price.toLocaleString("en-US")}`
+  return (
+    <Html style={base}>
+      <Head />
+      <Preview>{data.courseTitle} is saved for you</Preview>
+      <Body style={body}>
+        <Container style={card}>
+          <Section style={contentPad}>
+            <Text style={heading}>Your place is saved</Text>
+            <Text style={sub}>
+              {data.firstName ? `${data.firstName}, you` : "You"} chose <strong>{data.courseTitle}</strong> in the{" "}
+              {data.schoolName}. It is still here ({priceLabel}) whenever you are ready.
+            </Text>
+            {data.final && <Text style={muted}>This is the last reminder we&apos;ll send about it.</Text>}
+            <Section style={{ marginTop: "28px" }}>
+              <Button href={url} style={cta}>
+                Finish enrolling
+              </Button>
+            </Section>
+            <Hr style={{ borderColor: "#E4E4E9", margin: "24px 0 16px" }} />
+            <Link href={url} style={linkSmall}>
+              {url}
+            </Link>
+          </Section>
+        </Container>
+        <Section style={footer}>
+          <Text style={footerText}>{BRAND.name}</Text>
+        </Section>
+      </Body>
+    </Html>
+  )
+}
+
+export async function sendFinishEnrollingEmail(data: FinishEnrollingEmailData) {
+  if (!data.to) return { success: false, error: "No recipient" }
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: data.to,
+      subject: `Still thinking about ${data.courseTitle}?`,
+      react: React.createElement(FinishEnrollingEmail, { data }),
+    })
+    if (error) {
+      console.error("[Email] Finish enrolling failed:", error)
+      return { success: false, error: error.message }
+    }
+    return { success: true }
+  } catch (err) {
+    console.error("[Email] Finish enrolling error:", err)
+    return { success: false, error: "Failed to send email" }
+  }
+}
