@@ -9,6 +9,8 @@ import { levelChipStyle } from "@/components/shared/level-badge"
 import { WishlistButton, autoBookmark } from "@/components/marketing/wishlist-button"
 import type { BrowseCourse } from "@/lib/actions/student"
 import { programPriceLabel } from "@/lib/program-price"
+import { SCHOOL_BY_SLUG } from "@/lib/schools"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 export function formatDuration(totalMinutes: number): string {
   if (!totalMinutes || totalMinutes <= 0) return ""
@@ -53,6 +55,10 @@ export function dropDateLabel(availableAt: string): string {
  * chromatic (border → ws-brand/40) plus the one sanctioned zoom exception:
  * the thumbnail eases 1→1.03 inside its clipped frame over 600ms
  * `--ws-ease-rise` — the image moves, the card chrome stays static.
+ *
+ * The art carries the school's label; on hover the first three outcomes
+ * slide up over it (hidden when the program has none). The footer names the
+ * instructor.
  */
 export function MarketingCourseCard({
   course,
@@ -105,6 +111,30 @@ export function MarketingCourseCard({
               />
             </div>
           )}
+          {course.school && (
+            <span className="absolute left-3 top-3 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.06em] text-white">
+              {SCHOOL_BY_SLUG[course.school].short}
+            </span>
+          )}
+          {/* The Udemy move, inside the rules: on a hover-capable pointer the
+              first three outcomes slide up over the art. Solid fill (no glass),
+              transform only, and the full list lives on the program page, so
+              this is decoration for assistive tech. */}
+          {course.outcomes.length > 0 && (
+            <div
+              aria-hidden
+              className="absolute inset-x-0 bottom-0 hidden translate-y-full bg-ws-raised px-4 py-3 transition-transform duration-[320ms] ease-[var(--ws-ease-rise)] group-hover:translate-y-0 group-focus-within:translate-y-0 motion-reduce:transition-none md:block"
+            >
+              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-ws-subtle">You&apos;ll learn</p>
+              <ul className="mt-1.5 space-y-1">
+                {course.outcomes.map((line, i) => (
+                  <li key={i} className="line-clamp-1 text-[12.5px] text-ws-primary">
+                    {line}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
         {/* Body */}
@@ -135,8 +165,17 @@ export function MarketingCourseCard({
           <div className="mt-auto flex min-h-[calc(0.75rem+1.25rem)] items-center justify-between gap-2 border-t border-ws-hairline pt-3">
             {/* No lesson/duration counts: brand-new programs read "0 lessons"
                 and that is worse than saying nothing. */}
-            <span />
+            <span className="flex min-w-0 items-center gap-2">
+              <Avatar className="h-5 w-5 shrink-0">
+                {course.instructorAvatarUrl && <AvatarImage src={course.instructorAvatarUrl} alt="" />}
+                <AvatarFallback className="text-[9px]">{initials(course.instructorName)}</AvatarFallback>
+              </Avatar>
+              <span className="truncate text-[12px] text-ws-muted">{course.instructorName}</span>
+            </span>
             <span className="flex items-center gap-2">
+              {course.tierCount > 1 && (
+                <span className="text-[11px] tabular-nums text-ws-subtle">{course.tierCount} packages</span>
+              )}
               {course.rating !== null && (
                 <span className="inline-flex items-center gap-1 text-[12px] tabular-nums text-ws-muted">
                   <StarIcon size={11} fill="currentColor" className="text-ws-rating" />

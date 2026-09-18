@@ -50,6 +50,8 @@ export type BrowseCourse = {
   totalDuration: number
   enrolledCount: number
   rating: number | null
+  /** First three "what you'll learn" lines, for the card's hover peek. Empty until the program has outcomes. */
+  outcomes: string[]
 }
 
 export type StudentEnrollment = {
@@ -209,6 +211,7 @@ export async function fetchBrowseCourses(options?: {
         totalDuration: course.totalDuration || 0,
         enrolledCount: course.enrolledCount || 0,
         rating: course.rating?.average || null,
+        outcomes: (course.whatYouWillLearn ?? []).slice(0, 3),
       }
     })
   } catch (error) {
@@ -455,6 +458,7 @@ async function findProgram(filter: { slug: string } | { _id: string }): Promise<
     totalDuration: course.totalDuration || 0,
     enrolledCount: course.enrolledCount || 0,
     rating: course.rating?.average || null,
+    outcomes: whatYouWillLearn.slice(0, 3),
     ratingCount: course.rating?.count || 0,
     whatYouWillLearn,
     requirements: course.requirements ?? [],
@@ -693,6 +697,7 @@ export async function fetchOtherCourses(excludeCourseId: string): Promise<Browse
         totalDuration: course.totalDuration || 0,
         enrolledCount: course.enrolledCount || 0,
         rating: course.rating?.average || null,
+        outcomes: (course.whatYouWillLearn ?? []).slice(0, 3),
       }
     })
   } catch (error) {
