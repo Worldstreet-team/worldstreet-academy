@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useScroll, useSpring, useVelocity } from "motion/react"
 import { addFrame, useMotionOK } from "@/components/marketing/motion/bus"
 
 /** The eight schools' vocabulary. Words, not claims. */
@@ -17,8 +18,13 @@ const WORDS = [
   "Certification",
 ] as const
 
-/** px per second at full tilt. */
+/** px per second at rest. */
 const SPEED = 46
+
+/** Scroll speed (px/s) that adds one more SPEED to the drift… */
+const BOOST_PER = 450
+/** …up to this many extra SPEEDs (5× the resting drift in all). */
+const BOOST_MAX = 4
 
 /**
  * A single band of academic vocabulary drifting across the page.
@@ -32,6 +38,11 @@ const SPEED = 46
  * scrolling up pulls them back right. Position is integrated as a signed
  * delta and wrapped modulo one copy, so a reversal is seamless rather than a
  * jump — which is exactly what flipping a fixed `direction` flag would cause.
+ *
+ * Speed follows the reader too: the page's scroll velocity, through a spring,
+ * adds up to BOOST_MAX × SPEED while you scroll, and the spring lets it ease
+ * back to the resting drift over ~0.7s when you stop — the band surges with
+ * the hand on the wheel instead of ignoring it.
  */
 export function WordsMarquee() {
   const ok = useMotionOK()
@@ -40,6 +51,11 @@ export function WordsMarquee() {
   const posRef = React.useRef(0)
   const dirRef = React.useRef(-1) // -1 → drifts left (the resting direction)
   const [copies, setCopies] = React.useState(3)
+
+  // Scroll velocity, smoothed: fast attack off the wheel, soft release.
+  const { scrollY } = useScroll()
+  const velocity = useVelocity(scrollY)
+  const surge = useSpring(velocity, { stiffness: 160, damping: 38, mass: 0.6 })
 
   // Scroll direction, with a small deadzone so jitter can't flip the band.
   React.useEffect(() => {
@@ -75,13 +91,14 @@ export function WordsMarquee() {
       const copy = track?.children[0] as HTMLElement | undefined
       if (!track || !copy?.offsetWidth) return true
       const period = copy.offsetWidth
-      const next = posRef.current + (dirRef.current * SPEED * dt) / 1000
+      const boost = Math.min(Math.abs(surge.get()) / BOOST_PER, BOOST_MAX)
+      const next = posRef.current + (dirRef.current * SPEED * (1 + boost) * dt) / 1000
       // Positive modulo keeps the offset inside one period in both directions.
       posRef.current = ((next % period) + period) % period
       track.style.transform = `translate3d(${-posRef.current}px, 0, 0)`
       return true
     })
-  }, [ok])
+  }, [ok, surge])
 
   const row = (
     <div className="flex shrink-0 items-center">

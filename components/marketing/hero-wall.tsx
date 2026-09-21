@@ -1,333 +1,482 @@
 "use client"
 
 import * as React from "react"
-import Image from "next/image"
 import Link from "next/link"
-import { AnimatePresence, motion } from "motion/react"
-import type { BrowseCourse } from "@/lib/actions/student"
-import { LineMask } from "@/components/marketing/motion/line-mask"
+import {
+  AnimatePresence,
+  motion,
+  useMotionValueEvent,
+  useScroll,
+  useTransform,
+  type MotionValue,
+} from "motion/react"
+import { XIcon } from "lucide-react"
 import { EASE_INERTIA } from "@/components/marketing/motion/ease"
-import { addFrame, useMotionOK } from "@/components/marketing/motion/bus"
-import { BRAND } from "@/lib/brand"
-import { SCHOOLS, cheapestBySchool, countProgramsBySchool } from "@/lib/schools"
-import { schoolCover } from "@/lib/school-art"
+import { useMotionOK } from "@/components/marketing/motion/bus"
+import { HeroStage, HERO_SLIDES, slideOf, useHeroSlideshow } from "@/components/marketing/hero-stage"
+import { HeroPauseToggle, useSlideClock } from "@/components/marketing/hero-controls"
+import { HeroCopy } from "@/components/marketing/hero-copy"
+import { HeroChipScrollbar } from "@/components/marketing/hero-chip-scrollbar"
 import { useStartSchool } from "@/components/marketing/start-school-store"
+import { BRAND } from "@/lib/brand"
+import { SCHOOLS, SCHOOL_BY_SLUG, type School, type SchoolSlug } from "@/lib/schools"
+import { START_SCHOOL_COOKIE } from "@/lib/start-gate"
 import { cn } from "@/lib/utils"
 
-/** Row drift speeds, px/s — alternating directions, deliberately unequal so
- *  the five rows never phase-lock into a visible grid. */
-const ROW_SPEEDS = [-14, 11, -19, 15, -9]
+const MotionLink = motion.create(Link)
+
+/** The hand-off's resting values, written explicitly under reduced motion:
+ *  motion keeps the last inline value it wrote, and the first client pass
+ *  always runs with motion on, so `style={undefined}` could strand a block
+ *  mid-fade on a page restored part-way down. */
+const STILL = { y: 0, scale: 1, opacity: 1 }
+
+/** The chip pill's glide and the CTA's reshape. */
+const GLIDE = { type: "spring", stiffness: 420, damping: 38, mass: 0.9 } as const
+
+/** Forget the landing's school (the chips' "clear", or the active chip tapped again). */
+function clearPick() {
+  document.cookie = `${START_SCHOOL_COOKIE}=; path=/; max-age=0; samesite=lax`
+  useStartSchool.setState({ picked: null })
+}
 
 /**
- * §1 — HERO, Netflix-style. A wall of course art drifts behind the headline:
- * three rows sliding in opposite directions, dimmed under a stone overlay
- * that fades to transparency, with the hero text and CTAs on top. The wall is
- * pure scenery — aria-hidden, pointer-events-none, no links, no hearts.
+ * §1 — HERO. The claim holds still while a slideshow plays behind it: the
+ * student first, then the eight school covers, one every six seconds, each
+ * with a slow push-in and brought on by a soft travelling curtain (see
+ * `hero-stage.tsx`). Owner request, 2026-09-18 — the one auto-advancing
+ * loop in the app — and, by the owner's later call the same day, with no
+ * visible control row. What stays for WCAG 2.2.2 (`hero-controls.tsx`): one
+ * pause/play button, clipped out of sight until it takes keyboard focus, and
+ * the show holds still while the pointer rests on the chips or the CTAs,
+ * while keyboard focus is inside the hero, while the hero is off screen and
+ * while the tab is hidden. Reduced motion: no autoplay and no drift — the
+ * stage only changes when a school is chosen, with a short crossfade.
  *
- * Drift runs on the shared rAF bus with modulo wrap (same math as the words
- * marquee), so it is continuous, frame-rate independent, and reverses nothing
- * on scroll. Reduced motion: the wall stands still.
+ * The stage is a dark island (`data-ws-theme="platform"`): the covers are
+ * dark renders in both modes, so in light mode the hero is a rounded dark
+ * stage set into the paper — the same token scoping the Schools showcase
+ * panels use. Below lg the picture is a band across the top of the stage
+ * and the copy sits under it; from lg the picture fills the stage, behind a
+ * veil that keeps the copy column dark.
  *
- * Below the claim the hero asks one question — what do you want to master? —
- * and the eight schools answer as chips. Choosing one crossfades that
- * school's cover in behind the copy, states what it costs, and points the
- * gold CTA at `/dashboard/start?school=…` (owner, 2026-09-16: the school is
- * chosen on the landing, before the dashboard). From lg up the cover rises
- * ABOVE the overlay, masked to emerge from the page colour, and the student
- * steps aside for it — every cover's object sits where she stands. Narrower
- * screens keep it behind the veil. One-shot on the tap, instant under
- * reduced motion.
+ * "What do you want to master?" — choosing a school stops the slideshow on
+ * that school's cover (the curtain comes from the side the school lies on)
+ * and hands the copy to the school: its number, name, tagline (or blurb)
+ * and real facts, with the gold CTA reshaping to "Explore the School of …"
+ * → `/schools/<slug>`. The chosen chip's pill glides from chip to chip.
+ * Choosing it again, or "Clear", returns the default copy and resumes the
+ * slideshow. Every cell reserves its tallest variant, so nothing below it
+ * ever moves (`hero-copy.tsx`).
+ *
+ * The hand-off, as the hero scrolls away (a function of scroll only — see
+ * `useHeroLeave`): the picture trails the page inside the stage; the
+ * headline lifts, settles to 0.94 and dims but stays faintly lit to the
+ * last; the sub-copy, picker and CTA row dissolve sooner — each fully gone
+ * before it reaches the navbar — but only while crossing the top half of the
+ * screen, so the middle of the screen is never emptied. Reduced motion:
+ * none of it — the hero simply scrolls.
  */
 export function HeroWall({
-  courses,
+  counts,
+  cheapest,
   signedIn,
   registerUrl,
 }: {
-  courses: BrowseCourse[]
+  counts: Record<SchoolSlug, number>
+  cheapest: Record<SchoolSlug, number | null>
   signedIn: boolean
   registerUrl: string
 }) {
   const ok = useMotionOK()
-  const rowRefs = React.useRef<Array<HTMLDivElement | null>>([])
-  const positions = React.useRef<number[]>(ROW_SPEEDS.map(() => 0))
+  const heroRef = React.useRef<HTMLElement>(null)
+  const subRef = React.useRef<HTMLDivElement>(null)
+  const pickRef = React.useRef<HTMLDivElement>(null)
+  const chipRowRef = React.useRef<HTMLDivElement>(null)
+  const ctaRef = React.useRef<HTMLDivElement>(null)
+  const leave = useHeroLeave(ok, heroRef, subRef, pickRef, ctaRef)
 
   const picked = useStartSchool((s) => s.picked)
   const pick = useStartSchool((s) => s.pick)
-  const counts = React.useMemo(() => countProgramsBySchool(courses), [courses])
-  const cheapest = React.useMemo(() => cheapestBySchool(courses), [courses])
-  const pickedSchool = picked ? SCHOOLS.find((s) => s.slug === picked)! : null
-  const pickedCover = schoolCover(picked)
+  const school = picked ? SCHOOL_BY_SLUG[picked] : null
 
-  const art = courses.filter((c) => c.thumbnailUrl).map((c) => c.thumbnailUrl!)
-  // Three rows, each cycled to at least 8 tiles, offset so seams never align.
-  const rows =
-    art.length > 0
-      ? ROW_SPEEDS.map((_, r) =>
-          Array.from({ length: Math.max(10, art.length) }, (_, i) => art[(i + r * 3) % art.length]),
-        )
-      : []
-
+  const show = useHeroSlideshow(slideOf(picked))
+  const { go, target } = show
+  // A chosen school holds its own cover.
   React.useEffect(() => {
-    if (!ok || rows.length === 0) return
-    return addFrame((dt) => {
-      ROW_SPEEDS.forEach((speed, r) => {
-        const track = rowRefs.current[r]
-        const copy = track?.children[0] as HTMLElement | undefined
-        if (!track || !copy?.offsetWidth) return
-        const period = copy.offsetWidth
-        const next = positions.current[r] + (speed * dt) / 1000
-        positions.current[r] = ((next % period) + period) % period
-        track.style.transform = `translate3d(${-positions.current[r]}px, 0, 0)`
-      })
-      return true
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ok, rows.length])
+    if (picked) go(slideOf(picked))
+  }, [picked, go])
+
+  // ── When the show may run ──
+  const [paused, setPaused] = React.useState(false)
+  const [pointerHold, setPointerHold] = React.useState(false)
+  const [focusHold, setFocusHold] = React.useState(false)
+  const onScreen = useOnScreen(heroRef)
+  const tabVisible = useTabVisible()
+  const still = !ok || paused || !onScreen || !tabVisible
+  const auto = !still && !picked && !pointerHold && !focusHold
+  const holdOn = (e: React.PointerEvent) => {
+    if (e.pointerType === "mouse") setPointerHold(true)
+  }
+  const holdOff = () => setPointerHold(false)
+  useSlideClock(target, auto, () => go((target + 1) % HERO_SLIDES.length, 1))
+
+  const choose = (slug: SchoolSlug) => (picked === slug ? clearPick() : pick(slug))
+
+  const factsFor = React.useCallback(
+    (s: School) => {
+      const n = counts[s.slug]
+      if (!n) return null
+      const from = cheapest[s.slug]
+      return [
+        n === 1 ? "1 program" : `${n} programs`,
+        from === null ? null : from === 0 ? "free to start" : `from $${from.toLocaleString("en-US")}`,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    },
+    [counts, cheapest]
+  )
+
+  const cta = school ? `Explore the ${school.name}` : "Explore programs"
+  const secondary =
+    "inline-flex h-12 w-full items-center justify-center rounded-sm border border-ws-hairline px-7 text-[15px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:border-ws-brand/40 hover:text-ws-gold sm:w-auto"
 
   return (
     <section
+      ref={heroRef}
       id="hero"
-      className="relative isolate -mt-[4.25rem] flex min-h-[92svh] items-center overflow-hidden sm:-mt-[5.25rem]"
       aria-label={BRAND.name}
+      className="px-2 pt-2 sm:px-3 sm:pt-3"
+      // Keyboard focus anywhere in the hero holds the show; a mouse click does not.
+      onFocus={(e) => setFocusHold(e.target.matches(":focus-visible"))}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocusHold(false)
+      }}
     >
-      {/* ── The wall ── */}
-      {rows.length > 0 && (
-        <div aria-hidden className="pointer-events-none absolute inset-0 -z-20 select-none overflow-hidden">
-          {/* Oversized and rotated: the slant would otherwise expose bare
-              corners, so the field extends well past every edge. */}
-          <div className="absolute inset-[-22%] flex flex-col justify-center gap-2 rotate-[-8deg] sm:gap-2.5 md:gap-3">
-            {rows.map((tiles, r) => (
-              <div key={r} className="overflow-hidden" style={{ marginLeft: r % 2 ? "-7rem" : "-2.5rem" }}>
-                <div
-                  ref={(el) => {
-                    rowRefs.current[r] = el
-                  }}
-                  className="flex w-max will-change-transform"
-                >
-                  {[0, 1].map((copy) => (
-                    <div key={copy} className="flex shrink-0 gap-2 pr-2 sm:gap-2.5 sm:pr-2.5 md:gap-3 md:pr-3">
-                      {tiles.map((src, i) => (
-                        <div
-                          key={`${copy}-${i}`}
-                          className="relative aspect-[4/3] w-[11rem] shrink-0 overflow-hidden rounded-md sm:aspect-video sm:w-[14rem] md:w-[19rem] lg:w-[23rem]"
-                        >
-                          <Image
-                            src={src}
-                            alt=""
-                            fill
-                            sizes="(max-width: 640px) 11rem, (max-width: 768px) 14rem, (max-width: 1024px) 19rem, 23rem"
-                            draggable={false}
-                            className="object-cover opacity-70"
-                            priority={r === 1 && copy === 0 && i < 3}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  ))}
+      <div
+        data-ws-theme="platform"
+        className="relative isolate overflow-hidden rounded-[20px] bg-ws-page text-ws-primary [--band:15rem] sm:[--band:24rem] md:[--band:27rem]"
+      >
+        {/* The show's one control: first in the hero, seen only on keyboard focus. */}
+        {ok && <HeroPauseToggle paused={paused} onToggle={() => setPaused((p) => !p)} />}
+
+        {/* ── The stage: the picture trails the page as the hero leaves ── */}
+        <motion.div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 -z-20 select-none"
+          style={{ y: ok ? leave.stageY : 0 }}
+        >
+          <HeroStage show={show} ok={ok} drift={!still} />
+        </motion.div>
+
+        {/* ── The veil: keeps the copy on dark ground ──
+            Below lg the band fades into the stage under the copy. From lg
+            a left-heavy ramp holds the copy column, opening to the picture
+            from about the middle, and the foot settles into the stage. */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+          {/* Solid for 12rem past the band's foot: the picture lags the page
+              by up to 180px on the way out, and must never slip out from
+              under the veil. */}
+          <div className="absolute inset-x-0 top-0 h-[calc(var(--band)+12rem)] bg-[linear-gradient(to_bottom,transparent_0,transparent_calc(var(--band)*0.3),color-mix(in_oklab,var(--ws-bg-page)_55%,transparent)_calc(var(--band)*0.48),color-mix(in_oklab,var(--ws-bg-page)_88%,transparent)_calc(var(--band)*0.64),var(--ws-bg-page)_calc(var(--band)*0.86))] lg:hidden" />
+          <div className="absolute inset-0 hidden bg-[linear-gradient(90deg,var(--ws-bg-page)_0%,var(--ws-bg-page)_34%,color-mix(in_oklab,var(--ws-bg-page)_82%,transparent)_48%,color-mix(in_oklab,var(--ws-bg-page)_30%,transparent)_62%,transparent_74%)] lg:block xl:bg-[linear-gradient(90deg,var(--ws-bg-page)_0%,var(--ws-bg-page)_26%,color-mix(in_oklab,var(--ws-bg-page)_82%,transparent)_40%,color-mix(in_oklab,var(--ws-bg-page)_34%,transparent)_54%,transparent_66%)]" />
+          <div className="absolute inset-x-0 bottom-0 hidden h-2/5 bg-[linear-gradient(to_top,color-mix(in_oklab,var(--ws-bg-page)_70%,transparent),transparent)] lg:block" />
+        </div>
+
+        {/* ── The copy ──
+            Each scroll-linked wrapper sits OUTSIDE its block's own
+            animations (motion can't drive one property from both), so the
+            load sequence and the school swaps play untouched and the
+            hand-off layers on top of them. */}
+        <div className="mx-auto flex min-h-[calc(100svh-4rem)] w-full max-w-7xl flex-col px-6 pb-10 pt-[calc(var(--band)-6.5rem)] sm:min-h-[calc(100svh-4.75rem)] lg:justify-center lg:py-10">
+          <div className="w-full lg:relative">
+            <HeroCopy
+              school={school}
+              ok={ok}
+              factsFor={factsFor}
+              headStyle={ok ? { y: leave.headY, scale: leave.headScale, opacity: leave.headOpacity } : STILL}
+              subStyle={ok ? { y: leave.subY, opacity: leave.subOpacity } : STILL}
+              subRef={subRef}
+            />
+            <p className="sr-only" aria-live="polite">
+              {school ? [school.name, factsFor(school)].filter(Boolean).join(". ") : ""}
+            </p>
+
+            {/* lg+ widens the picker to 3xl so the eight chips sit in two
+                rows (three would push the CTA under a 768px fold). Phones
+                close every gap a step, with the shorter band and the
+                one-sentence sub-copy, so the gold CTA makes the first screen. */}
+            <motion.div
+              className="mt-6 max-w-2xl sm:mt-7 lg:max-w-3xl"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, ease: EASE_INERTIA, delay: 0.5 }}
+            >
+              {/* The picker and the CTA row fade on their own schedules. While
+                  faded they stop taking the pointer (see useHeroLeave), and any
+                  keyboard focus inside brings them back to full strength. */}
+              <motion.div
+                ref={pickRef}
+                className="focus-within:opacity-100!"
+                style={ok ? { y: leave.pickY, opacity: leave.pickOpacity } : STILL}
+                onPointerEnter={holdOn}
+                onPointerLeave={holdOff}
+              >
+                {/* "Clear" sits right after the question, inside the copy
+                    column — never out over the picture. */}
+                <div className="flex h-6 items-center gap-3">
+                  <p id="hero-pick" className="text-[14px] font-medium text-ws-primary">
+                    What do you want to master?
+                  </p>
+                  <AnimatePresence initial={false}>
+                    {school && (
+                      <motion.button
+                        key="clear"
+                        type="button"
+                        onClick={clearPick}
+                        aria-label="Clear the chosen school"
+                        initial={{ opacity: 0, x: 6 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 6 }}
+                        transition={{ duration: ok ? 0.2 : 0, ease: EASE_INERTIA }}
+                        className="inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-medium text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-raised hover:text-ws-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/50"
+                      >
+                        Clear
+                        <XIcon size={14} aria-hidden />
+                      </motion.button>
+                    )}
+                  </AnimatePresence>
                 </div>
-              </div>
-            ))}
+                {/* A choice list, not tabs: the chosen chip is raised, never
+                    gold — gold stays on the one CTA. Phones scroll the row
+                    sideways inside the gutter (with a visible scrollbar
+                    below it, owner 2026-09-18); sm+ wraps. */}
+                <motion.div
+                  ref={chipRowRef}
+                  layoutScroll
+                  role="group"
+                  aria-labelledby="hero-pick"
+                  className="-mx-6 mt-3 flex gap-2 overflow-x-auto px-6 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden"
+                >
+                  {SCHOOLS.map((s) => {
+                    const on = picked === s.slug
+                    return (
+                      <button
+                        key={s.slug}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={(e) => {
+                          choose(s.slug)
+                          // Phones: centre the chip in its sideways row (never scroll the page).
+                          const row = e.currentTarget.parentElement
+                          if (row && row.scrollWidth > row.clientWidth) {
+                            const c = e.currentTarget.getBoundingClientRect()
+                            const r = row.getBoundingClientRect()
+                            row.scrollBy({ left: c.left + c.width / 2 - (r.left + r.width / 2), behavior: ok ? "smooth" : "auto" })
+                          }
+                        }}
+                        className={cn(
+                          "group relative h-10 shrink-0 rounded-full px-3.5 text-[13px] font-medium transition-colors duration-[var(--ws-motion-base)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/50",
+                          on ? "text-ws-primary" : "text-ws-muted hover:text-ws-primary"
+                        )}
+                      >
+                        <span
+                          aria-hidden
+                          className="absolute inset-0 rounded-full bg-ws-surface/70 ring-1 ring-inset ring-ws-hairline transition-colors duration-[var(--ws-motion-fast)] group-hover:bg-ws-raised"
+                        />
+                        <AnimatePresence>
+                          {on && (
+                            <motion.span
+                              key="pill"
+                              layoutId="hero-chip-pill"
+                              aria-hidden
+                              className="absolute inset-0 bg-ws-raised ring-1 ring-inset ring-ws-primary/30"
+                              style={{ borderRadius: 999 }}
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              transition={ok ? { layout: GLIDE, opacity: { duration: 0.2 } } : { duration: 0 }}
+                            />
+                          )}
+                        </AnimatePresence>
+                        <span className="relative">{s.short}</span>
+                      </button>
+                    )
+                  })}
+                </motion.div>
+                <HeroChipScrollbar rowRef={chipRowRef} className="mt-1" />
+              </motion.div>
+
+              {/* `id="hero-cta"`: the sticky school bar takes over as this row fades. */}
+              <motion.div
+                ref={ctaRef}
+                id="hero-cta"
+                className="mt-5 flex flex-col gap-3 focus-within:opacity-100! sm:mt-6 sm:flex-row sm:items-center"
+                style={ok ? { y: leave.ctaY, opacity: leave.ctaOpacity } : STILL}
+                onPointerEnter={holdOn}
+                onPointerLeave={holdOff}
+              >
+                {/* The gold CTA reshapes to its new label (layout), its label
+                    rolling through; the secondary glides aside. */}
+                <MotionLink
+                  layout
+                  href={school ? `/schools/${school.slug}` : "/programs"}
+                  transition={{ layout: ok ? GLIDE : { duration: 0 } }}
+                  style={{ borderRadius: 7 }}
+                  className="relative inline-flex min-h-14 w-full items-center justify-center overflow-hidden bg-ws-brand px-6 py-2.5 text-center text-[15px] font-semibold leading-[1.2] text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-ws-page sm:min-h-12 sm:w-auto sm:px-8"
+                >
+                  <AnimatePresence mode="popLayout" initial={false}>
+                    <motion.span
+                      key={cta}
+                      layout="position"
+                      className="block"
+                      initial={ok ? { y: "130%", opacity: 0 } : { opacity: 0 }}
+                      animate={{ y: "0%", opacity: 1 }}
+                      exit={ok ? { y: "-130%", opacity: 0 } : { opacity: 0 }}
+                      transition={{ duration: ok ? 0.5 : 0.15, ease: EASE_INERTIA }}
+                    >
+                      {cta}
+                    </motion.span>
+                  </AnimatePresence>
+                </MotionLink>
+                {signedIn ? (
+                  <MotionLink layout="position" transition={{ layout: ok ? GLIDE : { duration: 0 } }} href="/dashboard" className={secondary}>
+                    Start learning
+                  </MotionLink>
+                ) : (
+                  <motion.a layout="position" transition={{ layout: ok ? GLIDE : { duration: 0 } }} href={registerUrl} className={secondary}>
+                    Start learning
+                  </motion.a>
+                )}
+              </motion.div>
+            </motion.div>
+
           </div>
         </div>
-      )}
-
-      {/* ── The chosen school's cover: a crossfade on the visitor's tap, not ambient motion ──
-          Below lg: under the overlay (-z-[15]), dimmed like the wall — the
-          copy spans nearly the full width there, so the art stays veiled.
-          lg+: above the overlay and just under the student (-z-[7]), at
-          near-full strength. Every cover's object sits at ~57–75% of the
-          frame, so the frame is pinned left (to the content column's edge
-          from xl, where the column centres) to keep the object clear of the
-          chips. The wrapper fades the art out under the navbar and into the
-          page at the bottom; the frame's own mask lets it emerge from the
-          page colour on the left. Dark: a long ramp — the render's shadows
-          ARE the page, so light ink reads over them. Light: a short ramp in
-          pixels, between the copy and the object (in frame coordinates the
-          chips end at 792px from xl and every object starts at ≥840px; at
-          lg they end at 696px, objects start at ≥715px), so the dark render
-          never runs behind dark ink. */}
-      <AnimatePresence>
-        {pickedCover && (
-          <motion.div
-            key={pickedCover}
-            aria-hidden
-            className="pointer-events-none absolute inset-0 -z-[15] select-none lg:-z-[7] lg:[mask-image:linear-gradient(to_bottom,transparent_6%,black_24%,black_80%,transparent)]"
-            initial={{ opacity: 0, scale: 1.02 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: ok ? 0.32 : 0, ease: EASE_INERTIA }}
-          >
-            <div className="absolute inset-y-0 left-0 right-0 opacity-40 max-lg:dark:opacity-60 lg:opacity-95 lg:[mask-image:linear-gradient(to_right,transparent_600px,black_720px)] xl:left-[max(0px,calc((100%_-_80rem)/2))] xl:[mask-image:linear-gradient(to_right,transparent_690px,black_840px)] lg:dark:[mask-image:linear-gradient(to_right,transparent_8%,black_50%)]">
-              <Image
-                src={pickedCover}
-                alt=""
-                fill
-                sizes="100vw"
-                draggable={false}
-                className="object-cover object-[64%_50%] lg:object-[25%_50%] xl:object-left"
-              />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ── Overlay: dark where the text lives, thinning to transparency ── */}
-      <div aria-hidden className="absolute inset-0 -z-10">
-        {/* Phones: an even veil, so the wall still reads behind the copy.
-            sm+: left-heavy, keeping the text column dark while the right
-            side opens to near-transparency. */}
-        <div className="absolute inset-0 bg-ws-page/50 sm:bg-gradient-to-r sm:from-ws-page sm:via-ws-page/80 sm:to-ws-page/25" />
-        <div className="absolute inset-0 bg-gradient-to-t from-ws-page via-ws-page/55 to-ws-page/40 sm:via-ws-page/35 sm:to-ws-page/60" />
-      </div>
-
-      {/* ── The student, bottom-right ──
-          Layered above the wall and its overlay (-z-[5] sits between the
-          overlay at -z-10 and the copy at z-0) so she reads as a subject in
-          front of the scenery, not another tile in it. Anchored to the
-          section's bottom edge and cropped by its overflow, so she rises out
-          of it. She sits opposite the left-aligned copy, which is why she can
-          run large here without fighting the headline: 36rem from xl, 40rem
-          from 2xl — measured to clear the longest glyph run by 67px at 1280
-          and 111px at 1440. lg stays at 25rem deliberately: at exactly 1024
-          the subhead's first line reaches x=598, and a 28rem figure would
-          start at 576 and collide. Hidden below md, where no column is free
-          of the text. She steps aside (opacity only) while a school's cover
-          holds her spot — but only from lg, where the cover is promoted
-          above the overlay to replace her; below that the cover stays
-          veiled under the overlay, so fading her too would leave the hero
-          emptier rather than swapping one subject for another. */}
-      <div
-        aria-hidden
-        className={cn(
-          "pointer-events-none absolute bottom-0 right-0 -z-[5] hidden select-none transition-opacity duration-[var(--ws-motion-slow)] ease-[var(--ws-ease)] motion-reduce:transition-none md:block",
-          pickedCover && "lg:opacity-0"
-        )}
-      >
-        <Image
-          src="/brand/hero-student.png"
-          alt=""
-          width={509}
-          height={491}
-          priority
-          className="h-auto w-[20rem] drop-shadow-[0_24px_60px_rgba(0,0,0,0.55)] lg:w-[25rem] xl:w-[36rem] 2xl:w-[40rem]"
-        />
-      </div>
-
-      {/* ── Hero text ── */}
-      <div className="relative mx-auto w-full max-w-7xl px-6 pb-24 pt-36 sm:pt-40 lg:pt-32">
-        <motion.p
-          className="text-[11px] font-medium uppercase tracking-[0.14em] text-ws-gold"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.3 }}
-        >
-          {BRAND.name}
-        </motion.p>
-        <LineMask
-          as="h1"
-          mode="mount"
-          delay={0.05}
-          className="mt-5 max-w-4xl font-display text-[clamp(2.75rem,6.5vw,5.5rem)] font-semibold leading-[1.02] tracking-[-0.03em] text-ws-primary"
-          lines={[
-            { text: "Learn Skills." },
-            { text: "Build Value." },
-            { text: "Own Your Future.", className: "text-ws-gold" },
-          ]}
-        />
-        <motion.p
-          className="mt-6 max-w-xl text-[15px] leading-relaxed text-ws-muted md:text-lg xl:max-w-2xl"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease: EASE_INERTIA, delay: 0.35 }}
-        >
-          Master practical, in-demand skills through expert-led programs
-          designed for the new and modern economy. Explore our schools,
-          choose your path and start building capabilities you can apply in
-          the real world.
-        </motion.p>
-        {/* xl widens the picker to 3xl so the eight chips sit in two rows and
-            the CTA clears the fold at 1280×800 — the student's visible edge
-            is ~20px beyond it there. lg keeps 2xl: she starts at 624. */}
-        <motion.div
-          className="mt-7 max-w-2xl xl:max-w-3xl"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease: EASE_INERTIA, delay: 0.5 }}
-        >
-          <p id="hero-pick" className="text-[14px] font-medium text-ws-primary">
-            What do you want to master?
-          </p>
-          {/* A choice list, not tabs: the chosen chip is raised, never gold —
-              gold stays on the one CTA. Phones scroll the row sideways inside
-              the gutter; sm+ wraps. */}
-          <div
-            role="group"
-            aria-labelledby="hero-pick"
-            className="-mx-6 mt-3 flex gap-2 overflow-x-auto px-6 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden"
-          >
-            {SCHOOLS.map((school) => (
-              <button
-                key={school.slug}
-                type="button"
-                aria-pressed={picked === school.slug}
-                onClick={() => pick(school.slug)}
-                className={cn(
-                  "h-10 shrink-0 rounded-full px-3.5 text-[13px] font-medium ring-1 ring-inset transition-colors duration-[var(--ws-motion-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40",
-                  picked === school.slug
-                    ? "bg-ws-raised text-ws-primary ring-ws-primary/25"
-                    : "bg-ws-surface/70 text-ws-muted ring-ws-hairline hover:bg-ws-raised hover:text-ws-primary"
-                )}
-              >
-                {school.short}
-              </button>
-            ))}
-          </div>
-
-          {/* Reserved height (two lines on phones, where it wraps), so
-              choosing a school never moves the buttons. */}
-          <p
-            className="mt-3 min-h-12 text-[14px] leading-6 tabular-nums text-ws-muted sm:min-h-6"
-            aria-live="polite"
-          >
-            {pickedSchool &&
-              [
-                counts[pickedSchool.slug] === 1 ? "1 program" : `${counts[pickedSchool.slug]} programs`,
-                cheapest[pickedSchool.slug] === null
-                  ? null
-                  : cheapest[pickedSchool.slug] === 0
-                    ? "free to start"
-                    : `from $${cheapest[pickedSchool.slug]!.toLocaleString("en-US")}`,
-                "pay now or save it for later",
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-          </p>
-
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <Link
-              href={pickedSchool ? `/dashboard/start?school=${pickedSchool.slug}` : "#schools"}
-              className="inline-flex min-h-14 w-full items-center justify-center rounded-sm bg-ws-brand px-6 py-2.5 text-center text-[15px] font-semibold leading-[1.2] text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90 sm:min-h-12 sm:w-auto sm:px-8"
-            >
-              {pickedSchool ? `Start with ${pickedSchool.short}` : "Choose your school"}
-            </Link>
-            {signedIn ? (
-              <Link
-                href="/dashboard"
-                className="inline-flex h-12 w-full items-center justify-center rounded-sm border border-ws-hairline px-7 text-[15px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:border-ws-brand/40 hover:text-ws-gold sm:w-auto"
-              >
-                Continue learning
-              </Link>
-            ) : (
-              <a
-                href={registerUrl}
-                className="inline-flex h-12 w-full items-center justify-center rounded-sm border border-ws-hairline px-7 text-[15px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:border-ws-brand/40 hover:text-ws-gold sm:w-auto"
-              >
-                Create an account
-              </a>
-            )}
-          </div>
-        </motion.div>
       </div>
     </section>
   )
+}
+
+/** Whether a real share of the hero is on screen (the show holds when it is not). */
+function useOnScreen(ref: React.RefObject<HTMLElement | null>) {
+  const [on, setOn] = React.useState(true)
+  React.useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const io = new IntersectionObserver(
+      (entries) => {
+        const e = entries[entries.length - 1]
+        setOn(e.isIntersecting && e.intersectionRatio >= 0.2)
+      },
+      { threshold: [0, 0.2, 0.4] }
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [ref])
+  return on
+}
+
+function useTabVisible() {
+  const [visible, setVisible] = React.useState(true)
+  React.useEffect(() => {
+    const sync = () => setVisible(document.visibilityState === "visible")
+    sync()
+    document.addEventListener("visibilitychange", sync)
+    return () => document.removeEventListener("visibilitychange", sync)
+  }, [])
+  return visible
+}
+
+/**
+ * The hero's hand-off. Every value is the identity with the page at rest,
+ * so the server render and the first client frame are the untouched hero.
+ *
+ * The picture and the headline run on the hero's own progress: 0 with its
+ * top at the navbar's foot, 1 once its bottom has passed under the bar. The
+ * bar is 57px on phones and 65px from sm; the offset uses 65, so a phone's
+ * hero rests at ~1% — a sub-pixel difference. The headline, the top of the
+ * column, is gone by ~0.5, so its whole hand-off sits inside that window.
+ * The picture's lag only ever opens a gap at the stage's top edge, which by
+ * then is under the navbar.
+ *
+ * The column below it fades by POSITION, not by hero progress: each block
+ * dissolves (and lifts a little) only while it crosses the top half of the
+ * viewport — from its top at 50% (42% for the CTA row) to its bottom just
+ * under the navbar. Content in the middle of the screen is always at full
+ * strength, so the hand-off never leaves an emptied screen, and the gold CTA
+ * is never a half-faded smudge mid-page. The sticky school bar rises as the
+ * CTA row passes 30% of the viewport (the row at about half strength), so a
+ * primary action is always in view. A faded control stops taking the
+ * pointer (set on the element, no re-render).
+ */
+function useHeroLeave(
+  ok: boolean,
+  heroRef: React.RefObject<HTMLElement | null>,
+  subRef: React.RefObject<HTMLDivElement | null>,
+  pickRef: React.RefObject<HTMLDivElement | null>,
+  ctaRef: React.RefObject<HTMLDivElement | null>
+) {
+  const { scrollYProgress: p } = useScroll({ target: heroRef, offset: ["start 65px", "end 65px"] })
+  const sub = useTopFade(subRef, "start 0.5", 18)
+  const pickFade = useTopFade(pickRef, "start 0.5", 16)
+  const cta = useTopFade(ctaRef, "start 0.42", 12)
+
+  const leave = {
+    // Depth: px the picture lags behind the page by the time the hero has gone.
+    stageY: useTransform(p, [0, 1], [0, 180]),
+    // The claim lifts, settles and dims — never fully out: it is the last to go.
+    headY: useTransform(p, [0, 0.5], [0, -44]),
+    headScale: useTransform(p, [0, 0.5], [1, 0.94]),
+    headOpacity: useTransform(p, [0, 0.5], [1, 0.22]),
+    subY: sub.y,
+    subOpacity: sub.opacity,
+    pickY: pickFade.y,
+    pickOpacity: pickFade.opacity,
+    ctaY: cta.y,
+    ctaOpacity: cta.opacity,
+  }
+
+  usePointerGate(pickRef, leave.pickOpacity, ok)
+  usePointerGate(ctaRef, leave.ctaOpacity, ok)
+  return leave
+}
+
+/**
+ * Fade-and-lift for one block as it crosses the top of the viewport: from
+ * `start` (its top at that fraction of the viewport) to its bottom at 14%,
+ * just under the navbar. Every hero block rests below its start line, so it
+ * rests at the identity.
+ */
+function useTopFade(
+  ref: React.RefObject<HTMLElement | null>,
+  start: `start ${number}`,
+  lift: number
+) {
+  const { scrollYProgress } = useScroll({ target: ref, offset: [start, "end 0.14"] })
+  return {
+    opacity: useTransform(scrollYProgress, [0, 1], [1, 0]),
+    y: useTransform(scrollYProgress, [0, 1], [0, -lift]),
+  }
+}
+
+/**
+ * A control faded (near-)invisible should not catch clicks or show a pointer
+ * cursor. Only while the fade is live — reduced motion never fades, so it
+ * never gates.
+ */
+function usePointerGate(
+  ref: React.RefObject<HTMLElement | null>,
+  opacity: MotionValue<number>,
+  ok: boolean
+) {
+  const gate = React.useCallback(
+    (v: number) => {
+      if (ref.current) ref.current.style.pointerEvents = ok && v < 0.08 ? "none" : ""
+    },
+    [ref, ok]
+  )
+  useMotionValueEvent(opacity, "change", gate)
+  // Re-evaluate when motion is switched on or off, and for a page opened mid-scroll.
+  React.useEffect(() => gate(opacity.get()), [gate, opacity])
 }

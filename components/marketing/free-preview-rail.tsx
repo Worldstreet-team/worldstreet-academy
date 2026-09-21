@@ -30,60 +30,62 @@ export function FreePreviewRail({ previews }: { previews: FreePreview[] }) {
           </SectionTitle>
         </RevealGroup>
 
-        <Reveal y={20} duration={0.65} className="mt-10">
-          <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {previews.map((preview) => (
-              <li key={preview.lessonId}>
-                <button
-                  type="button"
-                  onClick={() => setOpen(preview)}
-                  className="group flex h-full w-full flex-col overflow-hidden rounded-[20px] border border-ws-hairline bg-ws-surface text-left transition-colors duration-[var(--ws-motion-base)] hover:bg-ws-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40 dark:border-transparent"
-                >
-                  <span className="relative block aspect-video w-full overflow-hidden bg-ws-sunken">
-                    {preview.posterUrl && (
-                      <Image
-                        src={preview.posterUrl}
-                        alt=""
-                        fill
-                        sizes="(max-width: 640px) 92vw, (max-width: 1024px) 46vw, 416px"
-                        className="object-cover transition-transform duration-600 ease-[var(--ws-ease-rise)] motion-safe:group-hover:scale-[1.03]"
-                      />
-                    )}
-                    <span className="absolute inset-0 flex items-center justify-center bg-black/25">
-                      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/60 text-white">
-                        <PlayIcon size={18} fill="currentColor" aria-hidden />
-                      </span>
+        {/* Each card reveals on its own: stacked on a phone the list is
+            ~1000px tall, and one reveal for all of it left a blank screen
+            under the heading until a third of the list was in view. */}
+        <ul className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {previews.map((preview, i) => (
+            <Reveal as="li" key={preview.lessonId} delay={i * 0.06} y={20} duration={0.65}>
+              <button
+                type="button"
+                onClick={() => setOpen(preview)}
+                className="group flex h-full w-full flex-col overflow-hidden rounded-[20px] border border-ws-hairline bg-ws-surface text-left transition-colors duration-[var(--ws-motion-base)] hover:bg-ws-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40 dark:border-transparent"
+              >
+                <span className="relative block aspect-video w-full overflow-hidden bg-ws-sunken">
+                  {preview.posterUrl && (
+                    <Image
+                      src={preview.posterUrl}
+                      alt=""
+                      fill
+                      sizes="(max-width: 640px) 92vw, (max-width: 1024px) 46vw, 416px"
+                      className="object-cover transition-transform duration-600 ease-[var(--ws-ease-rise)] motion-safe:group-hover:scale-[1.03]"
+                    />
+                  )}
+                  <span className="absolute inset-0 flex items-center justify-center bg-black/25">
+                    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/60 text-white">
+                      <PlayIcon size={18} fill="currentColor" aria-hidden />
                     </span>
-                    {preview.minutes !== null && (
-                      <span className="absolute bottom-2.5 right-3 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-medium tabular-nums text-white">
-                        {preview.minutes} min
-                      </span>
-                    )}
                   </span>
-                  <span className="flex flex-1 flex-col p-4">
-                    <span className="text-[11px] font-medium uppercase tracking-[0.1em] text-ws-subtle">
-                      {preview.school ? SCHOOL_BY_SLUG[preview.school].short : "Free lesson"}
+                  {preview.minutes !== null && (
+                    <span className="absolute bottom-2.5 right-3 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-medium tabular-nums text-white">
+                      {preview.minutes} min
                     </span>
-                    <span className="mt-1.5 line-clamp-2 font-display text-[16px] font-semibold leading-[1.3] text-ws-primary">
-                      {preview.lessonTitle}
-                    </span>
-                    <span className="mt-1 text-[13px] text-ws-muted">{preview.courseTitle}</span>
+                  )}
+                </span>
+                <span className="flex flex-1 flex-col p-4">
+                  <span className="text-[11px] font-medium uppercase tracking-[0.1em] text-ws-subtle">
+                    {preview.school ? SCHOOL_BY_SLUG[preview.school].short : "Free lesson"}
                   </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </Reveal>
+                  <span className="mt-1.5 line-clamp-2 font-display text-[16px] font-semibold leading-[1.3] text-ws-primary">
+                    {preview.lessonTitle}
+                  </span>
+                  <span className="mt-1 text-[13px] text-ws-muted">{preview.courseTitle}</span>
+                </span>
+              </button>
+            </Reveal>
+          ))}
+        </ul>
       </div>
 
       <Dialog open={open !== null} onOpenChange={(next) => !next && setOpen(null)}>
-        {/* sm:max-w-3xl repeats the unprefixed override. DialogContent merges
-            classes with `cn` (tailwind-merge), which resolves conflicts per
-            variant, last class wins: a bare `max-w-3xl` replaces only its bare
-            `max-w-[calc(100%-2rem)]`, so its `sm:max-w-sm` would survive and
-            keep the dialog small from 640px up. The later `sm:max-w-3xl`
-            is what drops it. */}
-        <DialogContent className="max-w-3xl sm:max-w-3xl overflow-hidden p-0">
+        {/* DialogContent merges classes with `cn` (tailwind-merge), which
+            resolves conflicts per variant, last class wins. So this override
+            is sm-only: it replaces the base's `sm:max-w-sm` (which would keep
+            the dialog small from 640px up) and leaves its bare
+            `max-w-[calc(100%-2rem)]` — a bare `max-w-3xl` would replace that
+            too and run the dialog into both edges of a phone. The min()
+            keeps the same 1rem margin on a tablet narrower than 48rem. */}
+        <DialogContent className="overflow-hidden p-0 sm:max-w-[min(48rem,calc(100%-2rem))]">
           {open && (
             <>
               {/* Mounted only while open, so closing the dialog stops playback. */}

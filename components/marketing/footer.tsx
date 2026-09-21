@@ -19,7 +19,8 @@ const LEGAL_LINKS = [
 export function Footer({ showFaculty }: { showFaculty: boolean }) {
   return (
     <footer className="border-t bg-muted/40">
-      <div className="container mx-auto px-4 py-12">
+      {/* The page body's width and gutter, so the lockup lines up with the navbar's. */}
+      <div className="mx-auto max-w-7xl px-6 py-12">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
           <div className="col-span-2 md:col-span-1">
             {/* Unified ecosystem lockup (05-screens): gold wsa-mark 26px +

@@ -14,12 +14,12 @@ import { FacultyTeaser } from "@/components/faculty/faculty-teaser"
 import { UpcomingDrops } from "@/components/marketing/upcoming-drops"
 import { Testimonials, FinaleCta } from "@/components/marketing/reviews-finale"
 import { Faq } from "@/components/marketing/faq"
-import { CertificateBand } from "@/components/marketing/certificate-band"
 import { StickySchoolBar } from "@/components/marketing/sticky-school-bar"
 import { FreePreviewRail } from "@/components/marketing/free-preview-rail"
+import { ScrollProgress } from "@/components/marketing/motion/scroll-progress"
 
-// A new account returns to the school picker, never to the hub.
-const REGISTER_URL = registerUrl("/dashboard/start")
+// A new account starts at the schools (Homepage → School → Program), never at the hub.
+const REGISTER_URL = registerUrl("/schools")
 
 /** Published courses with a FUTURE availableAt, soonest first — real
  *  scheduling only; the drops section hides entirely when this is empty. */
@@ -36,13 +36,14 @@ function futureDrops(published: BrowseCourse[]): BrowseCourse[] {
 /**
  * The Academy landing at `/` — clean editorial composition, in order: hero,
  * the band of words, the Schools grid, the About statement, the Why pillars,
- * the How-it-works timeline, the certificate band (spec §13), the catalogue
+ * the How-it-works timeline, the catalogue
  * card grid (the ONLY section allowed to show course thumbnails), the
  * "Watch a free lesson" rail (real free previews only; hidden at zero), the
  * Faculty teaser (hidden when there is no faculty), Upcoming drops (hidden
  * when nothing is scheduled), testimonials (real reviews), the FAQ, and the
  * finale CTA — plus a sticky school bar, fixed to the viewport, that follows
- * the visitor once the hero has scrolled out of view.
+ * the visitor once the hero has scrolled out of view, and a gold reading-
+ * progress line on the navbar's foot.
  *
  * This server component is the ONLY fetch point; sections are client leaves
  * that receive data as props. Every fetch already falls back to `[]`/null,
@@ -81,8 +82,11 @@ export async function Landing() {
         } as React.CSSProperties
       }
     >
-      {/* Hero — claim, the school picker and its CTA (spec §1) */}
-      <HeroWall courses={published} signedIn={signedIn} registerUrl={REGISTER_URL} />
+      {/* Reading progress — a gold line on the navbar's foot, landing only */}
+      <ScrollProgress />
+
+      {/* Hero — the still claim over a slideshow, the school picker and its CTAs (spec §1) */}
+      <HeroWall counts={schoolCounts} cheapest={schoolFrom} signedIn={signedIn} registerUrl={REGISTER_URL} />
 
       {/* The band of words — the eight schools' vocabulary */}
       <WordsMarquee />
@@ -98,9 +102,6 @@ export async function Landing() {
 
       {/* How it works — the four-step journey (spec §11) */}
       <HowItWorks />
-
-      {/* Certification — what completing a program earns (spec §13) */}
-      <CertificateBand />
 
       {/* Featured programs — the catalogue grid (the ONLY course-art section; hides below 3) */}
       <CatalogueGrid courses={gridCourses} signedIn={signedIn} />

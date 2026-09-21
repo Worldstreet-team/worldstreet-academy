@@ -1,37 +1,18 @@
-"use client"
-
 import * as React from "react"
-import { cn } from "@/lib/utils"
 
 /**
- * The bar's chrome, split out because the navbar itself is a server component
- * (it reads auth) and this half needs scroll state.
+ * The bar's chrome: a full-width solid stone bar with a hairline foot, sticky
+ * at the top of every marketing page. Opaque and static — no glass, no
+ * scroll-state morph — so the page (the landing hero included) simply starts
+ * below it, and no page has to reserve or cancel space for it.
  *
- * At the top of the page it is invisible — no surface, no border — so the
- * hero wall runs edge to edge beneath it. Past 24px it condenses into a
- * floating glass pill: blurred stone, hairline, soft shadow. The header is
- * fixed, so the layout adds matching top padding and the hero cancels it.
+ * Content width and gutters match the page body (`max-w-7xl px-6`), so the
+ * lockup sits on the same left edge as every page heading.
  */
 export function NavbarShell({ children }: { children: React.ReactNode }) {
-  const [scrolled, setScrolled] = React.useState(false)
-
-  React.useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 24)
-    onScroll()
-    window.addEventListener("scroll", onScroll, { passive: true })
-    return () => window.removeEventListener("scroll", onScroll)
-  }, [])
-
   return (
-    <header className="fixed inset-x-0 top-0 z-50 px-3 pt-3 sm:px-5 sm:pt-4">
-      <div
-        className={cn(
-          "mx-auto flex h-14 max-w-7xl items-center justify-between gap-2 rounded-full border px-3 transition-[background-color,border-color,box-shadow,backdrop-filter] duration-[var(--ws-motion-base)] ease-[var(--ws-ease)] sm:h-16 sm:px-5",
-          scrolled
-            ? "border-ws-hairline bg-ws-surface/80 shadow-lg shadow-black/25 backdrop-blur-xl"
-            : "border-transparent bg-transparent"
-        )}
-      >
+    <header className="sticky top-0 z-50 border-b border-ws-hairline bg-ws-page">
+      <div className="mx-auto flex h-14 max-w-7xl items-center gap-2 px-6 sm:h-16 md:gap-3 lg:gap-4">
         {children}
       </div>
     </header>
