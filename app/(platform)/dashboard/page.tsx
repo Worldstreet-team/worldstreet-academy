@@ -29,6 +29,7 @@ import {
   learningTotals,
   notEnrolled,
   pickHero,
+  programsForTab,
 } from "@/lib/dashboard-home"
 import {
   useBookmarkedIds,
@@ -208,6 +209,8 @@ export default function DashboardPage() {
                   ) : (
                     <LearningHero
                       hero={hero}
+                      programs={programsForTab(enrollments, "in_progress", now)}
+                      now={now}
                       hasEnrollments={enrollments.length > 0}
                       intent={intent}
                       // The foot counts only once there is something real to count.

@@ -22,7 +22,6 @@ import {
   Logout01Icon,
   MentoringIcon,
   Message01Icon,
-  Search01Icon,
   Store01Icon,
   Task01Icon,
   TeachingIcon,
@@ -85,19 +84,17 @@ type NavItem = {
 /** Primary loop — the reasons a learner opens the Academy at all. */
 const learnItems: NavItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: DashboardSquare01Icon, match: (p) => p === "/dashboard" },
+  // No in-dashboard "Programs" catalogue beside this (owner, 2026-09-18) — a
+  // second, similar name was where learners got lost. A program's own pages
+  // (player, overview, exam) sit under My programs; browsing is the public
+  // /programs catalogue.
   {
     title: "My programs",
     href: "/dashboard/my-courses",
     icon: BookOpen01Icon,
     match: (p) =>
       p === "/dashboard/my-courses" ||
-      (p.startsWith("/dashboard/courses/") && p.includes("/learn")),
-  },
-  {
-    title: "Programs",
-    href: "/dashboard/courses",
-    icon: Search01Icon,
-    match: (p) => p === "/dashboard/courses",
+      (p.startsWith("/dashboard/courses/") && !p.includes("/certificate")),
   },
   {
     title: "Assignments",

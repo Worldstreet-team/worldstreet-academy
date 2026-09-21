@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, InfoIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
@@ -10,7 +10,8 @@ import { updateLastAccessed } from "@/lib/actions/enrollments"
 import { getCourseRatingSummary, getUserReview } from "@/lib/actions/reviews"
 import { getCourseWatchProgress } from "@/lib/actions/watch-progress"
 import { getCurrentUser } from "@/lib/auth"
-import { getCourseAccess, openPublishedLessonIds } from "@/lib/course-access"
+import { getCourseAccess, getLearnStart, openPublishedLessonIds } from "@/lib/course-access"
+import { CourseExamCard } from "@/components/courses/course-exam-card"
 import { MarkCompleteButton } from "@/components/learn/mark-complete-button"
 import { MessageInstructorButton } from "@/app/(platform)/dashboard/instructor/[instructorId]/message-instructor-button"
 import { LessonVideoPlayer } from "@/components/learn/lesson-video-player"
@@ -35,27 +36,32 @@ export default async function LessonPage({
   if (!course) notFound()
 
   // Content is gated on enrollment server-side; send non-enrolled users to the
-  // course page to enroll (or preview free lessons) instead of a broken player.
+  // course page, which forwards them to the program page to enroll.
   if (!course.hasAccess) redirect(`/dashboard/courses/${courseId}`)
 
   const lessons = course.lessons
-  
-  // Find the current lesson - if lessonId doesn't match, use first lesson
+  const coursePage = `/dashboard/courses/${courseId}`
+  const currentUser = await getCurrentUser()
+  // Course staff (admin, or the course's own instructor) have no enrollment,
+  // so `getCourseAccess` reads null for them.
+  const access = currentUser ? await getCourseAccess(currentUser.id, courseId) : null
+
   let currentLesson = lessons.find((l) => l.id === lessonId)
-  let actualLessonId = lessonId
-  
-  if (!currentLesson && lessons.length > 0) {
+  if (!currentLesson) {
+    // A stale or placeholder id (`/learn/first`): a learner goes to where they
+    // start, or to the course page's waiting state while nothing is open yet;
+    // staff previewing keep the first lesson.
+    const start = access && currentUser ? await getLearnStart(currentUser.id, courseId) : null
+    if (start) redirect(start.href)
+    if (access || lessons.length === 0) redirect(coursePage)
     currentLesson = lessons[0]
-    actualLessonId = lessons[0].id
   }
-  
-  if (!currentLesson) notFound()
+  const actualLessonId = currentLesson.id
 
   const currentIndex = lessons.findIndex((l) => l.id === actualLessonId)
   const prevLesson = currentIndex > 0 ? lessons[currentIndex - 1] : null
   const nextLesson = currentIndex < lessons.length - 1 ? lessons[currentIndex + 1] : null
 
-  const currentUser = await getCurrentUser()
   const [otherCourses, completedLessonIds, ratingSummary, userReview, watchProgress] = await Promise.all([
     fetchOtherCourses(courseId),
     getCompletedLessons(courseId),
@@ -80,10 +86,8 @@ export default async function LessonPage({
   const isLessonCompleted = completedLessonIds.includes(actualLessonId)
   // Progress is measured over the published lessons this package opens
   // (docs/go-patches-phase-3.md R3) — the same set `fetchMyEnrollments`'s
-  // `openLessons` counts. Course staff (admin, or the course's own instructor)
-  // have no enrollment, so `getCourseAccess` reads null for them; they see
-  // progress over every published lesson, same fallback as `fetchMyEnrollments`.
-  const access = currentUser ? await getCourseAccess(currentUser.id, courseId) : null
+  // `openLessons` counts. Staff (no `access`) see progress over every
+  // published lesson, same fallback as `fetchMyEnrollments`.
   const openLessonIds = access
     ? await openPublishedLessonIds(access)
     : new Set(lessons.filter((l) => l.isPublished).map((l) => l.id))
@@ -97,10 +101,12 @@ export default async function LessonPage({
       {/* Top Bar */}
       <header className="sticky top-0 z-30 bg-ws-surface flex h-12 md:h-14 items-center justify-between border-b border-ws-hairline px-3 md:px-4 shrink-0">
         <div className="flex items-center gap-2 md:gap-3 min-w-0">
+          {/* The course page forwards a learner straight back here, so Back
+              leaves for their programs; staff return to their preview. */}
           <Button
             variant="ghost"
             size="sm"
-            render={<Link href={`/dashboard/courses/${courseId}`} />}
+            render={<Link href={access ? "/dashboard/my-courses" : coursePage} />}
             className="shrink-0 gap-1.5 text-xs md:text-sm text-ws-muted hover:text-ws-primary"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -111,9 +117,22 @@ export default async function LessonPage({
             {course.title}
           </span>
         </div>
-        <span className="text-[10px] md:text-xs text-ws-muted tabular-nums shrink-0">
-          {currentIndex + 1}/{lessons.length} · {courseProgressPercent}%
-        </span>
+        <div className="flex shrink-0 items-center gap-1 md:gap-2">
+          {/* About, outcomes, reviews, instructor, bookmark — the program's
+              overview, kept one explicit click away from the lessons. */}
+          <Button
+            variant="ghost"
+            size="sm"
+            render={<Link href={`${coursePage}?view=overview`} aria-label="Program overview" />}
+            className="gap-1.5 text-xs md:text-sm text-ws-muted hover:text-ws-primary"
+          >
+            <InfoIcon className="h-4 w-4" aria-hidden />
+            <span className="hidden sm:inline">Overview</span>
+          </Button>
+          <span className="text-[10px] md:text-xs text-ws-muted tabular-nums">
+            {currentIndex + 1}/{lessons.length} · {courseProgressPercent}%
+          </span>
+        </div>
         {/* Course progress — thin brand fill along the header's bottom edge */}
         <div className="absolute inset-x-0 bottom-0 h-1 bg-ws-track">
           <div
@@ -261,6 +280,10 @@ export default async function LessonPage({
             {/* Knowledge check for this lesson (renders only when one exists) */}
             {!currentLesson.locked && <LessonQuizCard courseId={courseId} lessonId={actualLessonId} />}
 
+            {/* The program's final exam (renders only when one exists) — the
+                course page, which learners no longer stop on, was its door. */}
+            {access && <CourseExamCard courseId={courseId} />}
+
             {/* Downloadable materials for this lesson + the course */}
             <Separator />
             <CourseResources courseId={courseId} lessonId={actualLessonId} />
@@ -305,10 +328,10 @@ export default async function LessonPage({
               <div className="pt-2 border-t">
                 <CourseRating
                   courseId={courseId}
+                  courseTitle={course.title}
                   currentRating={ratingSummary?.average}
                   ratingCount={ratingSummary?.count}
-                  userRating={userReview?.rating}
-                  userReviewId={userReview?.id}
+                  review={userReview}
                   inline
                 />
               </div>

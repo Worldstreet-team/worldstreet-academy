@@ -10,7 +10,6 @@ export const TOUR_OPEN_GROUP_EVENT = "ws-tour:open-group"
 
 /** Sidebar rows the tour points at, by href. */
 const NAV_TOUR_KEYS: Record<string, string> = {
-  "/dashboard/courses": "browse-nav",
   "/dashboard/wallet": "wallet-nav",
   "/dashboard/help": "help-nav",
 }

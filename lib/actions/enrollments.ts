@@ -24,7 +24,7 @@ import { sendEnrollmentConfirmationEmail } from "@/lib/email"
 import { notifyAdmins, notifyUser } from "@/lib/notify"
 import { getCourseAccess, isLessonLockedFor, lockedLessonIds } from "@/lib/course-access"
 import { saveWithCertificateId } from "@/lib/certificate-id"
-import { PACKAGE_KEYS, canAccessLesson, packageFor, sellsPackages } from "@/lib/entitlements"
+import { PACKAGE_KEYS, packageFor, sellsPackages } from "@/lib/entitlements"
 import {
   createWalletCharge,
   refundWalletCharge,
@@ -688,13 +688,19 @@ export async function getEnrollmentProgress(
 }
 
 /**
- * Check if user is enrolled in a course
+ * Check if user is enrolled in a course. Server actions are callable from the
+ * browser with any arguments, so the userId must be the signed-in user's own —
+ * anyone else reads as "not enrolled" rather than revealing another learner's
+ * enrollment.
  */
 export async function checkEnrollment(
   userId: string,
   courseId: string
 ): Promise<{ isEnrolled: boolean; status?: string; resumeLessonId?: string | null }> {
   try {
+    const current = await getCurrentUser()
+    if (!current || current.id !== userId) return { isEnrolled: false }
+
     await connectDB()
 
     // Access-granting statuses only: a refunded/expired row still exists (kept
@@ -884,8 +890,6 @@ export type CheckoutConfirmation = {
   courseId: string
   courseTitle: string
   packageName: string | null
-  /** First lesson this package opens — "Start learning" lands there; null when the course has none. */
-  startLessonId: string | null
   /** Executive buyers who haven't sent their onboarding intake yet (D4). */
   needsIntake: boolean
   /** Executive buyers whose intake is already with their mentor. */
@@ -902,20 +906,18 @@ export async function getCheckoutConfirmation(courseId: string): Promise<Checkou
     const access = await getCourseAccess(user.id, courseId)
     if (!access) return null
 
-    const [course, enrollment, lessons] = await Promise.all([
+    const [course, enrollment] = await Promise.all([
       Course.findById(courseId).select("title").lean(),
       Enrollment.findById(access.enrollmentId).select("mentorshipIntake").lean(),
-      Lesson.find({ course: courseId }).sort({ order: 1 }).select("_id minPackageKey isFree").lean(),
     ])
     if (!course) return null
 
-    const start = lessons.find((lesson) => canAccessLesson(access.course, lesson, access))
+    // Where "Start learning" lands is `getLearnStart` (lib/course-access.ts), read by the page.
     const executive = access.packageKey === "executive" && access.entitlements.mentorship
     return {
       courseId,
       courseTitle: course.title,
       packageName: access.packageName,
-      startLessonId: start ? start._id.toString() : null,
       needsIntake: executive && !enrollment?.mentorshipIntake,
       intakeSent: executive && Boolean(enrollment?.mentorshipIntake),
     }

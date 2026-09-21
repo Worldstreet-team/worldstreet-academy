@@ -1,6 +1,6 @@
 import type { MyAssessment } from "@/lib/actions/exams"
-import type { StudentEnrollment } from "@/lib/actions/student"
-import type { IPackageEntitlements } from "@/lib/db/models"
+import type { ResumeLesson, StudentEnrollment } from "@/lib/actions/student"
+import type { IPackageEntitlements, LessonType } from "@/lib/db/models"
 
 /*
  * Pure selectors over the student's enrollments (`fetchMyEnrollments`). The
@@ -205,6 +205,81 @@ export function nextStepHref(enrollment: StudentEnrollment): string {
     default:
       return enrollmentHref(enrollment)
   }
+}
+
+/** "12 min", "1 h", "1 h 5 min" — a lesson's length. Anything under a minute reads "1 min". */
+export function formatLessonLength(seconds: number): string {
+  const minutes = Math.max(1, Math.round(seconds / 60))
+  if (minutes < 60) return `${minutes} min`
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  return rest ? `${hours} h ${rest} min` : `${hours} h`
+}
+
+const LESSON_KIND: Record<LessonType, string> = { video: "Video", text: "Reading", live: "Live session" }
+
+/**
+ * The chip on the hero's art: "Lesson 3 · Video · 12 min", or "Lesson 3 · 8
+ * min left" once a video is under way. Each clause only when it is known.
+ */
+export function lessonChipText(lesson: ResumeLesson): string {
+  const parts: string[] = []
+  if (lesson.number) parts.push(`Lesson ${lesson.number}`)
+  if (lesson.secondsLeft) {
+    parts.push(`${formatLessonLength(lesson.secondsLeft)} left`)
+  } else {
+    parts.push(LESSON_KIND[lesson.type])
+    if (lesson.durationSec) parts.push(formatLessonLength(lesson.durationSec))
+  }
+  return parts.join(" · ")
+}
+
+/** What the nudge counts toward, as a share of the open lessons. */
+const MILESTONES = [
+  [25, "a quarter of the way"],
+  [50, "halfway"],
+  [75, "three quarters of the way"],
+] as const
+
+/** On shorter programs a milestone is a lesson or two from the end, so the nudge counts to the end instead. */
+const MILESTONE_MIN_LESSONS = 8
+
+function sinceLabel(days: number): string {
+  if (days < 14) return `${days} days ago`
+  if (days < 60) return `${Math.floor(days / 7)} weeks ago`
+  return `${Math.floor(days / 30)} months ago`
+}
+
+/**
+ * The hero's line under the lesson track while lessons are left to play: how
+ * long since the last visit (from three days on), then the lessons to the next
+ * milestone — or, near the end and on short programs, to the certificate, the
+ * final exam or the finish. Every figure is counted from the enrollment; null
+ * when there is nothing to count.
+ */
+export function heroNudge(enrollment: StudentEnrollment, now: number): string | null {
+  const e = enrollment
+  const step = learningStep(e)
+  if (step !== "start" && step !== "resume") return null
+  const left = e.openLessons - e.completedOpenLessons
+  if (left <= 0) return null
+  const parts: string[] = []
+  const days = Math.floor((now - new Date(e.lastAccessedAt).getTime()) / DAY_MS)
+  if (step === "resume" && days >= 3) parts.push(`Last studied ${sinceLabel(days)}`)
+  parts.push(lessonsToGoal(e, left))
+  return parts.join(" · ")
+}
+
+function lessonsToGoal(e: StudentEnrollment, left: number): string {
+  if (e.openLessons >= MILESTONE_MIN_LESSONS) {
+    for (const [pct, label] of MILESTONES) {
+      const need = Math.ceil((pct * e.openLessons) / 100) - e.completedOpenLessons
+      if (need > 0 && need < left) return `${need} ${plural(need, "lesson")} to ${label}`
+    }
+  }
+  const lessons = `${left} ${plural(left, "lesson")}`
+  if (e.finalExamPending) return `${lessons}, then the final exam`
+  return e.entitlements.certificate ? `${lessons} to your certificate` : `${lessons} to go`
 }
 
 export type LearningTotals = {

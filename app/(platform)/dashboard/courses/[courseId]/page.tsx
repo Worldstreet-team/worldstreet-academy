@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
@@ -12,9 +12,10 @@ import {
   fetchEnrolledCoursesFromInstructor,
   fetchOtherCourses,
   fetchProgramById,
+  fetchProgramSlug,
 } from "@/lib/actions/student"
 import { checkEnrollment } from "@/lib/actions/enrollments"
-import { getCourseAccess } from "@/lib/course-access"
+import { getCourseAccess, getLearnStart } from "@/lib/course-access"
 import { CourseSchedulingCta } from "@/components/shared/course-scheduling-cta"
 import { courseAvailability } from "@/lib/types/course"
 import { getCurrentUser } from "@/lib/auth"
@@ -26,7 +27,7 @@ import { CourseExamCard } from "@/components/courses/course-exam-card"
 import { CourseOutcomes } from "@/components/courses/course-outcomes"
 import { CourseReviews } from "@/components/courses/course-reviews"
 import { CourseCarousel } from "@/components/learn/course-carousel"
-import { ChevronLeftIcon, GraduationCapIcon, StarIcon } from "lucide-react"
+import { ChevronLeftIcon, GraduationCapIcon, HourglassIcon, StarIcon } from "lucide-react"
 import { programRail, programStats } from "@/lib/program-rail"
 import { PackageLadder } from "@/components/programs/package-ladder"
 import type { ProgramAccess } from "@/components/programs/access"
@@ -35,31 +36,51 @@ import { CardShell } from "@/components/ui/system"
 // Force dynamic rendering to show fresh instructor avatars
 export const revalidate = 0
 
+/**
+ * Not a stop on the way to the lessons (owner, 2026-09-18). An enrolled
+ * learner is sent straight into the player where they start
+ * (`getLearnStart`), so dashboard cards, emails and old links land on the
+ * video; anyone else signed in goes to the public program page, the one place
+ * packages are chosen and bought. What stays here: `?view=overview` (the
+ * player's "Overview" link), the waiting state for a learner whose package
+ * opens no lesson yet, and course staff previewing.
+ */
 export default async function CourseDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ courseId: string }>
+  searchParams: Promise<{ view?: string | string[] }>
 }) {
-  const { courseId } = await params
+  const [{ courseId }, { view }] = await Promise.all([params, searchParams])
+  const currentUser = await getCurrentUser()
+
+  const start = currentUser ? await getLearnStart(currentUser.id, courseId) : null
+  if (start && view !== "overview") redirect(start.href)
+
   const course = await fetchPublicCourse(courseId)
   if (!course) notFound()
 
-  // Get first lesson ID for "Start Learning" button
-  const firstLessonId = course.lessons[0]?.id ?? "none"
-
-  // Fetch instructor courses + enrollment status + recommendations in parallel
-  const currentUser = await getCurrentUser()
-  const [instructorCourses, enrolledFromInstructor, enrollmentStatus, otherCourses, program] =
-    await Promise.all([
-      fetchInstructorPublicCourses(course.instructorId),
-      fetchEnrolledCoursesFromInstructor(course.instructorId).catch(() => []),
-      currentUser
-        ? checkEnrollment(currentUser.id, courseId)
-        : Promise.resolve({ isEnrolled: false, status: undefined as string | undefined, resumeLessonId: null }),
-      fetchOtherCourses(courseId),
-      fetchProgramById(courseId),
-    ])
+  const enrollmentStatus = currentUser
+    ? await checkEnrollment(currentUser.id, courseId)
+    : { isEnrolled: false, status: undefined as string | undefined }
   const isEnrolled = enrollmentStatus.isEnrolled
+  const isStaff = currentUser?.role === "ADMIN" || currentUser?.id === course.instructorId
+  if (!isEnrolled && !isStaff) {
+    const slug = await fetchProgramSlug(courseId)
+    if (!slug) notFound()
+    redirect(`/programs/${slug}`)
+  }
+  // Enrolled, but the package opens no published lesson yet.
+  const waiting = isEnrolled && !start
+
+  // Fetch instructor courses + recommendations in parallel
+  const [instructorCourses, enrolledFromInstructor, otherCourses, program] = await Promise.all([
+    fetchInstructorPublicCourses(course.instructorId),
+    fetchEnrolledCoursesFromInstructor(course.instructorId).catch(() => []),
+    fetchOtherCourses(courseId),
+    fetchProgramById(courseId),
+  ])
 
   // Q&A follows the package; visitors without an enrollment keep today's behaviour.
   const courseAccess = currentUser ? await getCourseAccess(currentUser.id, courseId) : null
@@ -93,10 +114,24 @@ export default async function CourseDetailPage({
     (c) => c.id !== course.id
   )
 
-  // Shared CTA — the exact enroll/continue/resume routing, rendered in both
-  // the desktop rail and the mobile action bar. Scheduled courses get the
-  // countdown + pre-enroll face until the customer is actually active.
-  const cta = isComingSoon || isPreEnrolled ? (
+  // Shared CTA, rendered in both the desktop rail and the mobile action bar.
+  // An enrolled learner continues where they start, or waits while nothing is
+  // open yet; the scheduling and buy faces are left for staff previewing (every
+  // other visitor was sent to the program page above).
+  const cta = isEnrolled ? (
+    start ? (
+      <Link
+        href={start.href}
+        className="flex h-11 flex-1 items-center justify-center rounded-full bg-ws-brand px-5 text-sm font-semibold text-ws-brand-on transition-opacity hover:opacity-90"
+      >
+        Continue learning
+      </Link>
+    ) : (
+      <span className="flex h-11 flex-1 items-center justify-center rounded-full bg-ws-chip px-5 text-sm font-medium text-ws-muted">
+        Lessons coming soon
+      </span>
+    )
+  ) : isComingSoon || isPreEnrolled ? (
     <CourseSchedulingCta
       courseId={course.id}
       availableAt={course.availableAt}
@@ -107,13 +142,6 @@ export default async function CourseDetailPage({
       price={course.price}
       signedIn={Boolean(currentUser)}
     />
-  ) : isEnrolled ? (
-    <Link
-      href={`/dashboard/courses/${course.id}/learn/${enrollmentStatus.resumeLessonId ?? firstLessonId}`}
-      className="flex h-11 flex-1 items-center justify-center rounded-full bg-ws-brand px-5 text-sm font-semibold text-ws-brand-on transition-opacity hover:opacity-90"
-    >
-      Continue learning
-    </Link>
   ) : (
     <Link
       href={showLadder ? "#packages" : `/dashboard/checkout?courseId=${course.id}`}
@@ -208,7 +236,7 @@ export default async function CourseDetailPage({
           <Button
             variant="ghost"
             size="icon-sm"
-            render={<Link href="/dashboard/courses" />}
+            render={<Link href="/dashboard/my-courses" />}
             className="absolute top-3 left-3 bg-black/30 text-white hover:bg-black/50 border border-white/10"
           >
             <ChevronLeftIcon  size={16} />
@@ -225,6 +253,32 @@ export default async function CourseDetailPage({
         <div className="p-4 md:p-6 lg:p-8">
           <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-8">
             <div className="min-w-0 space-y-6">
+              {waiting && (
+                <section
+                  aria-labelledby="waiting-heading"
+                  className="flex items-start gap-4 rounded-[20px] border border-ws-hairline bg-ws-surface p-5 md:p-6 dark:border-transparent"
+                >
+                  <span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-[9px] bg-ws-brand/10 text-ws-gold">
+                    <HourglassIcon size={18} />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ws-muted">
+                      You&apos;re enrolled{courseAccess?.packageName ? ` · ${courseAccess.packageName}` : ""}
+                    </p>
+                    <h2
+                      id="waiting-heading"
+                      className="mt-1 font-display text-lg font-semibold tracking-[-0.01em] text-ws-primary"
+                    >
+                      Your first lessons are being prepared
+                    </h2>
+                    <p className="mt-1.5 text-sm leading-relaxed text-ws-muted">
+                      Lessons open here as your instructor publishes them — you&apos;ll get a notification when
+                      the first one is live. Until then, this page is your program&apos;s home.
+                    </p>
+                  </div>
+                </section>
+              )}
+
               {/* Quick stats */}
               {stats.length > 0 && (
                 <CardShell className="h-auto flex-row divide-x divide-border">

@@ -4,22 +4,24 @@ import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useQueryClient } from "@tanstack/react-query"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { PlayIcon } from "@hugeicons/core-free-icons"
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react"
+import { BookOpen01Icon, LiveStreaming02Icon, PlayIcon } from "@hugeicons/core-free-icons"
 import { AvailabilityCountdown } from "@/components/shared/availability-countdown"
 import { PackageChip, ProgramCover, ProgressTrack } from "@/components/platform/program-bits"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { Balance, CardShell, Eyebrow, Skel, illustrations } from "@/components/ui/system"
+import { Balance, CardShell, Eyebrow, Segmented, Skel, illustrations } from "@/components/ui/system"
 import { dismissEnrollmentIntent, type MyEnrollmentIntent } from "@/lib/actions/enrollment-intent"
-import type { StudentEnrollment } from "@/lib/actions/student"
+import type { ResumeLesson, StudentEnrollment } from "@/lib/actions/student"
 import { BRAND } from "@/lib/brand"
 import {
   enrollmentHref,
   formatDateTime,
+  heroNudge,
   homeSummary,
   initials,
   learningStep,
+  lessonChipText,
   nextClass,
   nextStepHref,
   type HomeHero,
@@ -134,44 +136,164 @@ function SummaryLine({ enrollments, toDo, now, nextClassAt }: SummaryProps & { n
 
 /* ── The hero ─────────────────────────────────────────────────────────── */
 
+const HERO_COLUMNS = "grid flex-1 @2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]"
+const COPY_CLASS = "flex min-w-0 flex-col gap-5 p-5 sm:p-6 @2xl:p-8"
+const ART_CLASS = "order-first min-w-0 @2xl:order-none @2xl:min-h-80"
+const COVER_CLASS = "aspect-[16/9] w-full @lg:aspect-[2/1] @2xl:absolute @2xl:inset-0 @2xl:aspect-auto @2xl:h-full"
+const COVER_SIZES = "(min-width: 1280px) 640px, (min-width: 768px) 60vw, 100vw"
+
 /**
- * Photo right from ~672px of card width, stacked above the copy below it.
- * `footer` (the HeroStats cells) closes the card under both columns, so the
- * program and the student's totals read as one card.
+ * The stage: copy on the left and the program's art full-bleed on the right
+ * from ~672px of card width; the art stacks above the copy below that. `top`
+ * (the program switcher) stays put while the program under it changes:
+ * `contentKey` remounts the copy and the art, and `fade` cross-fades them in —
+ * set after a switch, never on the first paint. `footer` (the HeroStats cells)
+ * closes the card under both columns, so the program and the student's totals
+ * read as one card.
  */
 function HeroFrame({
-  cover,
+  art,
+  top,
   footer,
+  contentKey,
+  fade = false,
   children,
 }: {
-  cover: React.ReactNode
+  art: React.ReactNode
+  top?: React.ReactNode
   footer?: React.ReactNode
+  contentKey: string
+  fade?: boolean
   children: React.ReactNode
 }) {
+  const enter = fade ? "ws-animate-fade" : undefined
   return (
     <CardShell className="@container">
-      <div className="grid flex-1 @2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-        <div className="flex min-w-0 flex-col gap-6 p-5 sm:p-6 @2xl:p-8">{children}</div>
-        <div className="order-first min-w-0 @2xl:order-none @2xl:p-2 @2xl:pl-0">{cover}</div>
+      <div className={HERO_COLUMNS}>
+        <div className={COPY_CLASS}>
+          {top}
+          <div key={contentKey} className={cn("flex min-w-0 flex-1 flex-col gap-6", enter)}>
+            {children}
+          </div>
+        </div>
+        <div key={contentKey} className={cn("relative", ART_CLASS, enter)}>
+          {art}
+        </div>
       </div>
       {footer}
     </CardShell>
   )
 }
 
-const COVER_CLASS =
-  "aspect-[2/1] w-full @lg:aspect-[5/2] @2xl:aspect-auto @2xl:h-full @2xl:min-h-72 @2xl:rounded-[12px]"
-const COVER_SIZES = "(min-width: 1280px) 600px, (min-width: 768px) 60vw, 100vw"
+const LESSON_ICON: Record<ResumeLesson["type"], IconSvgElement> = {
+  video: PlayIcon,
+  text: BookOpen01Icon,
+  live: LiveStreaming02Icon,
+}
 
-/** Without a photograph the cover is only the mark on a wash: fine beside the copy, dead space stacked over it on a phone, so it waits for the wide layout. */
-function HeroCover({ enrollment: e }: { enrollment: StudentEnrollment }) {
+/**
+ * The program's art as the stage, flush to the card's edges and, in dark mode,
+ * melting into the card from the copy's side (from below when stacked). `play` puts the
+ * lesson's door on the art — a pointer shortcut to the gold CTA, so it stays
+ * out of the tab order — and `lesson` names that lesson in a chip. Without a
+ * photograph the cover is only the mark on a wash: fine beside the copy, dead
+ * space stacked over it on a phone, so it waits for the wide layout.
+ */
+function StageArt({
+  enrollment: e,
+  play = null,
+  lesson = null,
+}: {
+  enrollment: StudentEnrollment
+  play?: HeroLink | null
+  lesson?: ResumeLesson | null
+}) {
   return (
-    <ProgramCover
-      src={e.courseThumbnail}
-      sizes={COVER_SIZES}
-      mark="lg"
-      className={cn(COVER_CLASS, !e.courseThumbnail && "hidden @2xl:block")}
-    />
+    <div className={cn("relative h-full", !e.courseThumbnail && "hidden @2xl:block")}>
+      <ProgramCover src={e.courseThumbnail} sizes={COVER_SIZES} mark="lg" className={COVER_CLASS} />
+      {/* Dark only: on paper, white fading into a dark photograph is a grey haze, so light mode keeps the clean edge. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 hidden bg-linear-to-t from-card to-transparent to-45% dark:block @2xl:bg-linear-to-r @2xl:to-40%"
+      />
+      {play && (
+        <Link
+          href={play.href}
+          tabIndex={-1}
+          aria-hidden
+          className="ws-icon-mono absolute left-1/2 top-1/2 flex size-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white ring-1 ring-white/20 transition-colors duration-[var(--ws-motion-base)] hover:bg-black/75 @2xl:size-[72px]"
+        >
+          <HugeiconsIcon icon={PlayIcon} className="size-7 translate-x-px" />
+        </Link>
+      )}
+      {lesson && (
+        <span className="ws-icon-mono absolute bottom-3 left-3 inline-flex max-w-[calc(100%-1.5rem)] items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-[12px] font-semibold text-white tabular-nums @2xl:bottom-4 @2xl:left-auto @2xl:right-4">
+          <HugeiconsIcon icon={LESSON_ICON[lesson.type]} className="size-3.5 shrink-0" aria-hidden />
+          <span className="truncate">{lessonChipText(lesson)}</span>
+        </span>
+      )}
+    </div>
+  )
+}
+
+/** False on the first paint, true two frames later — so a transition plays once, on arrival. */
+function useArrived(): boolean {
+  const [arrived, setArrived] = React.useState(false)
+  React.useEffect(() => {
+    let inner = 0
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => setArrived(true))
+    })
+    return () => {
+      cancelAnimationFrame(outer)
+      cancelAnimationFrame(inner)
+    }
+  }, [])
+  return arrived
+}
+
+/** Past this many lessons a segment is too thin to read, so the track is one continuous bar. */
+const MAX_SEGMENTS = 40
+
+/**
+ * One segment per open lesson, in course order: gold where done, a gold ring
+ * on the lesson the CTA opens. The done segments fill left to right once, on
+ * arrival — transform only, staggered, and off under reduced motion.
+ */
+function LessonTrack({ marks, current, label }: { marks: boolean[]; current: number | null; label: string }) {
+  const arrived = useArrived()
+  const done = marks.filter(Boolean).length
+  if (marks.length === 0) return null
+  if (marks.length > MAX_SEGMENTS) {
+    return <ProgressTrack value={(done / marks.length) * 100} label={label} className="h-1.5" />
+  }
+  return (
+    <div
+      role="progressbar"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={marks.length}
+      aria-valuenow={done}
+      aria-valuetext={`${done} of ${marks.length} lessons done`}
+      className="flex w-full items-center gap-1"
+    >
+      {marks.map((isDone, i) => (
+        <span
+          key={i}
+          className={cn(
+            "relative h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-foreground/[0.08] dark:bg-surface-sunken",
+            i === current && !isDone && "ring-1 ring-primary"
+          )}
+        >
+          {isDone && (
+            <span
+              className="absolute inset-0 origin-left rounded-full bg-primary transition-transform duration-[var(--ws-motion-slow)] ease-[var(--ws-ease)] motion-reduce:transition-none"
+              style={{ transform: arrived ? "none" : "scaleX(0)", transitionDelay: `${Math.min(i * 40, 480)}ms` }}
+            />
+          )}
+        </span>
+      ))}
+    </div>
   )
 }
 
@@ -272,7 +394,11 @@ function continueFace(e: StudentEnrollment, step: LearningStep): HeroFace {
     case "start":
       return {
         eyebrow: "Up next",
-        primary: { label: "Start first lesson", href: enrollmentHref(e), icon: true },
+        primary: {
+          label: e.resumeLesson?.number ? `Start lesson ${e.resumeLesson.number}` : "Start first lesson",
+          href: enrollmentHref(e),
+          icon: true,
+        },
         secondary: viewProgram,
       }
     case "resume":
@@ -284,63 +410,148 @@ function continueFace(e: StudentEnrollment, step: LearningStep): HeroFace {
   }
 }
 
-/** The line under the progress track: where the player resumes, or what completes the program. */
-function StepNote({ enrollment: e, step }: { enrollment: StudentEnrollment; step: LearningStep }) {
+/** The line under the track at the last two steps: what completes the program. */
+function StepNote({ enrollment: e, step }: { enrollment: StudentEnrollment; step: "exam" | "finish" }) {
   const allDone = e.completedOpenLessons >= e.openLessons
-  if (step === "exam" || step === "finish") {
-    return (
-      <p className="text-[13px] text-muted-foreground">
-        {allDone ? "Every lesson is done. " : ""}
-        {step === "exam"
-          ? "Pass the final exam to complete the program."
-          : "Press Finish on the last lesson to complete the program."}
+  return (
+    <p className="text-[13px] text-muted-foreground">
+      {allDone ? "Every lesson is done. " : ""}
+      {step === "exam"
+        ? "Pass the final exam to complete the program."
+        : "Press Finish on the last lesson to complete the program."}
+    </p>
+  )
+}
+
+/** The lesson the gold CTA opens — the thing the hero is selling: its section in the eyebrow, its title large. */
+function NextLesson({ lesson, step }: { lesson: ResumeLesson; step: "start" | "resume" }) {
+  const lead = step === "start" ? "First lesson" : "Pick up at"
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <Eyebrow className="block truncate">{lesson.sectionTitle ? `${lead} · ${lesson.sectionTitle}` : lead}</Eyebrow>
+      <p
+        title={lesson.title}
+        className="line-clamp-2 font-display text-[18px] font-semibold leading-snug tracking-[-0.01em]"
+      >
+        {lesson.title}
       </p>
+    </div>
+  )
+}
+
+/**
+ * The per-lesson track and its reading. Before the first lesson is done a
+ * large 0% says nothing, so the track reads "Lesson 1 of 3"; from the first
+ * completion the house Balance figure carries the percentage.
+ */
+function LessonProgress({ enrollment: e, step }: { enrollment: StudentEnrollment; step: LearningStep }) {
+  const progress = Math.round(e.progress)
+  const current = (step === "start" || step === "resume") && e.resumeLesson?.number ? e.resumeLesson.number : null
+  const track = (
+    <LessonTrack marks={e.lessonTrack} current={current === null ? null : current - 1} label={`${e.courseTitle} progress`} />
+  )
+
+  if (e.completedOpenLessons === 0) {
+    return (
+      <div className="flex items-center gap-4">
+        <div className="min-w-0 flex-1">{track}</div>
+        <span className="shrink-0 text-[13px] font-semibold tabular-nums">
+          {current ? `Lesson ${current} of ${e.openLessons}` : `${e.openLessons} ${e.openLessons === 1 ? "lesson" : "lessons"}`}
+        </span>
+      </div>
     )
   }
-  if ((step !== "start" && step !== "resume") || !e.resumeLessonTitle) return null
+
   return (
-    <p className="flex min-w-0 items-baseline gap-2 text-[13px]">
-      <span className="shrink-0 text-muted-foreground">{step === "start" ? "Starts with" : "Resume at"}</span>
-      <span className="truncate font-medium" title={e.resumeLessonTitle}>
-        {e.resumeLessonTitle}
-      </span>
-    </p>
+    <div className="flex flex-col gap-3">
+      <div className="flex items-end justify-between gap-4">
+        <div className="flex items-start">
+          <span className="sr-only">{progress}% complete</span>
+          <span aria-hidden className="flex items-start">
+            <Balance value={String(progress)} className="text-[3.25rem] @2xl:text-[4rem]" />
+            <span className="mt-1.5 font-display text-[1.5rem] font-light leading-none text-muted-foreground @2xl:mt-2.5 @2xl:text-[1.75rem]">
+              %
+            </span>
+          </span>
+        </div>
+        <div className="flex flex-col items-end pb-1.5 text-right leading-tight">
+          <span className="text-[15px] font-semibold tabular-nums">
+            {e.completedOpenLessons} of {e.openLessons}
+          </span>
+          <span className="text-[13px] text-muted-foreground">lessons done</span>
+        </div>
+      </div>
+      {track}
+    </div>
   )
 }
 
 type HeroProps = { enrollment: StudentEnrollment; footer?: React.ReactNode }
 
-function ContinueHero({ enrollment: e, footer }: HeroProps) {
+type Switcher = { programs: StudentEnrollment[]; onChange: (id: string) => void }
+
+/** Whole words, short enough to sit in a Segmented option. */
+function switcherLabel(title: string): string {
+  const max = 26
+  if (title.length <= max) return title
+  const cut = title.slice(0, max + 1)
+  const space = cut.lastIndexOf(" ")
+  return `${(space > 12 ? cut.slice(0, space) : cut.slice(0, max)).replace(/[\s,:;–—-]+$/, "")}…`
+}
+
+/** The programs in progress, as the one tab system; it scrolls sideways where the options outrun the column. */
+function ProgramSwitcher({ programs, value, onChange }: Switcher & { value: string }) {
+  return (
+    <div
+      role="group"
+      aria-label="Your programs in progress"
+      className="-m-1 overflow-x-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
+      <Segmented
+        size="sm"
+        options={programs.map((p) => ({ key: p.id, label: switcherLabel(p.courseTitle) }))}
+        value={value}
+        onChange={onChange}
+      />
+    </div>
+  )
+}
+
+function ContinueHero({
+  enrollment: e,
+  footer,
+  now,
+  switcher,
+  fade,
+}: HeroProps & { now: number; switcher: Switcher | null; fade: boolean }) {
   const step = learningStep(e)
   const face = continueFace(e, step)
-  const progress = Math.round(e.progress)
+  const playing = step === "start" || step === "resume"
+  const lesson = playing ? e.resumeLesson : null
+  const nudge = heroNudge(e, now)
 
   return (
-    <HeroFrame cover={<HeroCover enrollment={e} />} footer={footer}>
+    <HeroFrame
+      art={<StageArt enrollment={e} play={face.primary.icon ? face.primary : null} lesson={lesson} />}
+      top={switcher && <ProgramSwitcher {...switcher} value={e.id} />}
+      footer={footer}
+      contentKey={e.id}
+      fade={fade}
+    >
       <HeroTitle enrollment={e} eyebrow={face.eyebrow} />
 
       <div className="mt-auto flex flex-col gap-6">
         {e.openLessons > 0 ? (
-          <div className="flex flex-col gap-3">
-            <div className="flex items-end justify-between gap-4">
-              <div className="flex items-start">
-                <span className="sr-only">{progress}% complete</span>
-                <span aria-hidden className="flex items-start">
-                  <Balance value={String(progress)} className="text-[3.25rem] @2xl:text-[4.25rem]" />
-                  <span className="mt-1.5 font-display text-[1.5rem] font-light leading-none text-muted-foreground @2xl:mt-2.5 @2xl:text-[1.875rem]">
-                    %
-                  </span>
-                </span>
-              </div>
-              <div className="flex flex-col items-end pb-1.5 text-right leading-tight">
-                <span className="text-[15px] font-semibold tabular-nums">
-                  {e.completedOpenLessons} of {e.openLessons}
-                </span>
-                <span className="text-[13px] text-muted-foreground">lessons done</span>
-              </div>
+          <div className="flex flex-col gap-4">
+            {lesson && (step === "start" || step === "resume") && <NextLesson lesson={lesson} step={step} />}
+            <div className="flex flex-col gap-2.5">
+              <LessonProgress enrollment={e} step={step} />
+              {step === "exam" || step === "finish" ? (
+                <StepNote enrollment={e} step={step} />
+              ) : (
+                nudge && <p className="text-[13px] text-muted-foreground tabular-nums">{nudge}</p>
+              )}
             </div>
-            <ProgressTrack value={progress} label={`${e.courseTitle} progress`} />
-            <StepNote enrollment={e} step={step} />
           </div>
         ) : (
           <p className="text-[14px] text-muted-foreground">
@@ -359,7 +570,7 @@ function ContinueHero({ enrollment: e, footer }: HeroProps) {
  */
 function SeatReadyHero({ enrollment: e, footer }: HeroProps) {
   return (
-    <HeroFrame cover={<HeroCover enrollment={e} />} footer={footer}>
+    <HeroFrame art={<StageArt enrollment={e} />} footer={footer} contentKey={e.id}>
       <HeroTitle enrollment={e} eyebrow="Seat ready" />
       <div className="mt-auto flex flex-col gap-6">
         <p className="text-[14px] text-muted-foreground">
@@ -373,7 +584,7 @@ function SeatReadyHero({ enrollment: e, footer }: HeroProps) {
 
 function ReservedHero({ enrollment: e, footer }: HeroProps) {
   return (
-    <HeroFrame cover={<HeroCover enrollment={e} />} footer={footer}>
+    <HeroFrame art={<StageArt enrollment={e} />} footer={footer} contentKey={e.id}>
       <HeroTitle enrollment={e} eyebrow="Seat reserved" />
       <div className="mt-auto flex flex-col gap-6">
         {e.courseAvailableAt && (
@@ -482,46 +693,71 @@ function FinishEnrollingHero({ intent }: { intent: MyEnrollmentIntent }) {
   )
 }
 
-/** `footer` is the student's totals (HeroStats); the Start hero has none to show, so it ignores it. */
+/** How many programs in progress the hero's switcher offers — the most recently opened first. */
+const SWITCHER_MAX = 4
+
+/**
+ * `footer` is the student's totals (HeroStats); the Start hero has none to
+ * show, so it ignores it. `programs` are the programs in progress, recent
+ * first: when the hero leads with one of them and there are two or more, the
+ * hero offers a switcher between them.
+ */
 export function LearningHero({
   hero,
+  programs = [],
+  now,
   hasEnrollments,
   footer,
   intent = null,
 }: {
   hero: HomeHero | null
+  programs?: StudentEnrollment[]
+  now: number
   hasEnrollments: boolean
   footer?: React.ReactNode
   /** The learner's saved-but-unpaid school; shown only while nothing opens the player. */
   intent?: MyEnrollmentIntent | null
 }) {
+  const [picked, setPicked] = React.useState<string | null>(null)
   if (!hero && intent) return <FinishEnrollingHero intent={intent} />
   if (!hero) return <StartHero returning={hasEnrollments} />
   if (hero.mode === "reserved") return <ReservedHero enrollment={hero.enrollment} footer={footer} />
   if (hero.mode === "seat_ready") return <SeatReadyHero enrollment={hero.enrollment} footer={footer} />
-  return <ContinueHero enrollment={hero.enrollment} footer={footer} />
+
+  const offered = programs.slice(0, SWITCHER_MAX)
+  const switchable = offered.length > 1 && offered.some((p) => p.id === hero.enrollment.id)
+  const shown = (switchable && offered.find((p) => p.id === picked)) || hero.enrollment
+  return (
+    <ContinueHero
+      enrollment={shown}
+      footer={footer}
+      now={now}
+      switcher={switchable ? { programs: offered, onChange: setPicked } : null}
+      fade={picked !== null}
+    />
+  )
 }
 
 /** The hero's shape while enrollments load, so nothing re-lays-out when they land. */
 export function LearningHeroSkeleton({ footer }: { footer?: React.ReactNode } = {}) {
   return (
     <CardShell className="@container" role="status" aria-busy="true" aria-label="Loading your programs">
-      <div className="grid flex-1 @2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-        <div className="flex min-w-0 flex-col gap-6 p-5 sm:p-6 @2xl:p-8">
+      <div className={HERO_COLUMNS}>
+        <div className={cn(COPY_CLASS, "gap-6")}>
           <div className="flex flex-col gap-3">
             <Skel className="h-3 w-32" />
             <Skel className="h-7 w-4/5" />
-            <Skel className="h-7 w-3/5" />
             <Skel className="h-5 w-36" />
           </div>
           <div className="mt-auto flex flex-col gap-3">
-            <Skel className="h-14 w-28" />
-            <Skel className="h-1 w-full rounded-full" />
+            <Skel className="h-3 w-40" />
+            <Skel className="h-5 w-3/5" />
+            <Skel className="h-1.5 w-full rounded-full" />
             <Skel className="h-3 w-48" />
           </div>
           <Skel className="h-11 w-40 rounded-full" />
         </div>
-        <div className="order-first min-w-0 @2xl:order-none @2xl:p-2 @2xl:pl-0">
+        <div className={cn("relative", ART_CLASS)}>
           <Skel className={cn(COVER_CLASS, "rounded-none")} />
         </div>
       </div>

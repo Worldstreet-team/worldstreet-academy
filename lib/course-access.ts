@@ -177,6 +177,48 @@ export async function openPublishedLessonIds(access: CourseAccess): Promise<Set<
   return openPublishedLessonIdsFromRows(access, lessons)
 }
 
+/** Where "Start learning" / "Continue learning" opens the player for one learner. */
+export type LearnStart = {
+  lessonId: string
+  /** `/dashboard/courses/<courseId>/learn/<lessonId>` */
+  href: string
+  /** The lesson they left off on, rather than the first one their package opens. */
+  resumed: boolean
+}
+
+/**
+ * The one answer to "where does this learner start?" — every start/continue
+ * CTA and the course page's redirect use it. The lesson they left off on
+ * (`Enrollment.lastAccessedLesson`) while it is published and their package
+ * still opens it; otherwise the first published lesson the package opens, in
+ * the player's order. Null without an access-granting enrollment (course staff
+ * have none) or while the package opens no published lesson yet — the course
+ * page shows its waiting state then.
+ */
+export async function getLearnStart(userId: string, courseId: string): Promise<LearnStart | null> {
+  if (!mongoose.isValidObjectId(userId) || !mongoose.isValidObjectId(courseId)) return null
+  await connectDB()
+  const [enrollment, course] = await Promise.all([
+    Enrollment.findOne({ user: userId, course: courseId, status: { $in: ["active", "completed"] } })
+      .select("_id status packageKey packageName lastAccessedLesson")
+      .lean(),
+    Course.findById(courseId).select("slug instructor packages").lean(),
+  ])
+  if (!enrollment || !course) return null
+  const access = courseAccessFromRows(enrollment, course)
+  if (!access) return null
+  const lessons = await Lesson.find({ course: courseId })
+    .sort({ order: 1 })
+    .select("_id minPackageKey isFree isPublished")
+    .lean()
+  const open = openPublishedLessonIdsFromRows(access, lessons)
+  const lastId = enrollment.lastAccessedLesson?.toString() ?? null
+  const resumed = lastId !== null && open.has(lastId)
+  const lessonId = resumed ? lastId : lessons.map((lesson) => lesson._id.toString()).find((id) => open.has(id))
+  if (!lessonId) return null
+  return { lessonId, href: `/dashboard/courses/${courseId}/learn/${lessonId}`, resumed }
+}
+
 /** True only when the user is enrolled on the lesson's course and their package can't open it. */
 export async function isLessonLockedFor(userId: string, lessonId: string): Promise<boolean> {
   if (!mongoose.isValidObjectId(lessonId)) return false

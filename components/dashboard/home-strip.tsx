@@ -2,6 +2,14 @@
 
 import type * as React from "react"
 import Link from "next/link"
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react"
+import {
+  BookOpen01Icon,
+  Calendar03Icon,
+  Certificate01Icon,
+  PlayCircleIcon,
+  Tick02Icon,
+} from "@hugeicons/core-free-icons"
 import { Skel } from "@/components/ui/system"
 import { splitClasses, type LearningTotals } from "@/lib/dashboard-home"
 import { useMyCertificates, useUpcomingClasses } from "@/lib/hooks/queries"
@@ -27,15 +35,44 @@ const CELL = cn(
   "@2xl:[&:not(:first-child)]:border-l @2xl:[&:nth-child(n+3)]:border-t-0"
 )
 
-/** One figure over its label. With `href`, the cell opens the page that lists what it counts. */
-function StatCell({ value, label, href }: { value: React.ReactNode; label: string; href?: string }) {
+/**
+ * An icon chip, then the figure over its label. `quiet` sets a word in the
+ * figure's place — what an empty count is waiting for — in muted ink on the
+ * same line height, so a row of zeros doesn't read as a report card. With
+ * `href`, the cell opens the page that lists what it counts.
+ */
+function StatCell({
+  icon,
+  value,
+  label,
+  href,
+  quiet = false,
+}: {
+  icon: IconSvgElement
+  value: React.ReactNode
+  label: string
+  href?: string
+  quiet?: boolean
+}) {
   const inner = (
-    <>
-      <span className="font-display text-[22px] font-semibold leading-none tracking-[-0.02em] tabular-nums">
-        {value}
+    <span className="flex min-w-0 items-center gap-3">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-foreground/[0.05]">
+        <HugeiconsIcon icon={icon} className="h-4 w-4 text-muted-foreground" aria-hidden />
       </span>
-      <span className="mt-2 truncate text-[12.5px] text-muted-foreground">{label}</span>
-    </>
+      <span className="flex min-w-0 flex-col">
+        <span
+          className={cn(
+            "truncate font-display leading-5 tabular-nums",
+            quiet
+              ? "text-[15px] font-medium text-muted-foreground"
+              : "text-[20px] font-semibold tracking-[-0.02em]"
+          )}
+        >
+          {value}
+        </span>
+        <span className="mt-1 truncate text-[12.5px] text-muted-foreground">{label}</span>
+      </span>
+    </span>
   )
   if (!href) return <div className={CELL}>{inner}</div>
   return (
@@ -69,10 +106,13 @@ export function HeroStats({
 }) {
   return (
     <div aria-label="Your learning at a glance" className={CELLS}>
-      <StatCell value={totals.inProgress} label="In progress" href="/dashboard/my-courses" />
-      {totals.completed > 0 && <StatCell value={totals.completed} label="Completed" href="/dashboard/my-courses" />}
+      <StatCell icon={BookOpen01Icon} value={totals.inProgress} label="In progress" href="/dashboard/my-courses" />
+      {totals.completed > 0 && (
+        <StatCell icon={Tick02Icon} value={totals.completed} label="Completed" href="/dashboard/my-courses" />
+      )}
       {totals.lessonsOpen > 0 && (
         <StatCell
+          icon={PlayCircleIcon}
           value={
             <>
               {totals.lessonsDone}
@@ -88,13 +128,17 @@ export function HeroStats({
   )
 }
 
+/** None earned yet: the cell says when one arrives instead of printing a zero. */
 function CertificatesStat() {
   const { data: certificates = [], isLoading } = useMyCertificates()
+  const none = !isLoading && certificates.length === 0
   return (
     <StatCell
-      value={isLoading ? <Skel className="h-5 w-8" /> : certificates.length}
-      label={certificates.length === 1 ? "Certificate" : "Certificates"}
+      icon={Certificate01Icon}
+      value={isLoading ? <Skel className="h-5 w-8" /> : none ? "On completion" : certificates.length}
+      label={none ? "Your certificate" : certificates.length === 1 ? "Certificate" : "Certificates"}
       href="/dashboard/certificates"
+      quiet={none}
     />
   )
 }
@@ -111,11 +155,14 @@ function ClassesStat({ now }: { now: number }) {
   const { data: classes = [], isLoading } = useUpcomingClasses()
   const { ahead } = splitClasses(classes, now)
   const more = classes.length >= CLASS_LIST_LIMIT
+  const none = !isLoading && ahead.length === 0
   return (
     <StatCell
-      value={isLoading ? <Skel className="h-5 w-8" /> : more ? `${ahead.length}+` : ahead.length}
+      icon={Calendar03Icon}
+      value={isLoading ? <Skel className="h-5 w-8" /> : none ? "None scheduled" : more ? `${ahead.length}+` : ahead.length}
       label={ahead.length === 1 && !more ? "Upcoming class" : "Upcoming classes"}
       href="/dashboard/meetings"
+      quiet={none}
     />
   )
 }
@@ -126,8 +173,13 @@ export function HeroStatsSkeleton() {
     <div role="status" aria-busy="true" aria-label="Loading your progress" className={CELLS}>
       {[0, 1, 2, 3].map((i) => (
         <div key={i} className={CELL}>
-          <Skel className="h-5 w-10" />
-          <Skel className="mt-2.5 h-3 w-20" />
+          <div className="flex items-center gap-3">
+            <Skel className="h-8 w-8 shrink-0 rounded-[9px]" />
+            <div className="flex flex-col">
+              <Skel className="h-5 w-10" />
+              <Skel className="mt-1.5 h-3 w-20" />
+            </div>
+          </div>
         </div>
       ))}
     </div>

@@ -2,7 +2,18 @@
 
 import mongoose from "mongoose"
 import connectDB from "@/lib/db"
-import { Course, Enrollment, Bookmark, User, Lesson, type ICoursePackage, type IPackageEntitlements, type PackageKey } from "@/lib/db/models"
+import {
+  Course,
+  Enrollment,
+  Bookmark,
+  User,
+  Lesson,
+  WatchProgress,
+  type ICoursePackage,
+  type IPackageEntitlements,
+  type LessonType,
+  type PackageKey,
+} from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth"
 import { isSchoolSlug, type SchoolSlug } from "@/lib/schools"
 import { programArt } from "@/lib/school-art"
@@ -97,6 +108,22 @@ export type StudentEnrollment = {
   finalExamPending: boolean
   /** The player's last lesson (course order) — the page that carries the Finish button. */
   lastLessonId: string | null
+  /** What the home hero shows about `resumeLessonId`; null when that lesson no longer exists. */
+  resumeLesson: ResumeLesson | null
+  /** The package's open lessons in course order, true where completed — the hero's per-lesson track. */
+  lessonTrack: boolean[]
+}
+
+export type ResumeLesson = {
+  title: string
+  type: LessonType
+  /** Video length in seconds; null for text and live lessons, or a video without a length. */
+  durationSec: number | null
+  sectionTitle: string | null
+  /** 1-based place among the package's open lessons; null when the package doesn't open it. */
+  number: number | null
+  /** Seconds left of a video the student stopped partway through; null otherwise. */
+  secondsLeft: number | null
 }
 
 export type StudentBookmark = {
@@ -821,7 +848,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
     const courseIds = enrollments.map((e) => (e.course as unknown as PopulatedCourse)._id.toString())
     const lessons = await Lesson.find({ course: { $in: courseIds } })
       .sort({ order: 1 })
-      .select("_id course title order minPackageKey isFree isPublished")
+      .select("_id course title order minPackageKey isFree isPublished type videoDuration sectionTitle")
       .lean()
     const lessonsByCourse = new Map<string, typeof lessons>()
     for (const lesson of lessons) {
@@ -830,6 +857,15 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
       if (list) list.push(lesson)
       else lessonsByCourse.set(key, [lesson])
     }
+
+    // Where the student stopped inside each resume video — one read for every enrollment.
+    const resumeIds = enrollments.flatMap((e) => (e.lastAccessedLesson ? [e.lastAccessedLesson.toString()] : []))
+    const watched = resumeIds.length
+      ? await WatchProgress.find({ user: user._id, lesson: { $in: resumeIds } })
+          .select("lesson currentTime duration completed")
+          .lean()
+      : []
+    const watchByLesson = new Map(watched.map((w) => [w.lesson.toString(), w]))
 
     return enrollments.map((enrollment) => {
       const course = enrollment.course as unknown as PopulatedCourse
@@ -865,6 +901,16 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
       const completedIds = new Set((enrollment.completedLessons ?? []).map((id) => id.toString()))
       const completedOpenLessons = [...openIds].filter((id) => completedIds.has(id)).length
       const entitlements = entitlementsFor({ packages }, { packageKey })
+      // The hero's lesson and track: the open lessons in course order, and the resume lesson's place among them.
+      const openInOrder = courseLessons.filter((l) => openIds.has(l._id.toString()))
+      const resumeRow = courseLessons.find((l) => l._id.toString() === resumeLessonId)
+      const resumeIndex = openInOrder.findIndex((l) => l._id.toString() === resumeLessonId)
+      const watch = resumeLessonId && !completedIds.has(resumeLessonId) ? watchByLesson.get(resumeLessonId) : undefined
+      // Past the first half-minute, with at least a minute still to play.
+      const secondsLeft =
+        watch && !watch.completed && watch.currentTime >= 30 && watch.duration - watch.currentTime >= 60
+          ? Math.round(watch.duration - watch.currentTime)
+          : null
 
       return {
         id: enrollment._id.toString(),
@@ -880,7 +926,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
         courseAvailableAt: course.availableAt ? new Date(course.availableAt).toISOString() : null,
         firstLessonId: firstLesson?._id.toString() || null,
         resumeLessonId,
-        resumeLessonTitle: courseLessons.find((l) => l._id.toString() === resumeLessonId)?.title ?? null,
+        resumeLessonTitle: resumeRow?.title ?? null,
         packageKey,
         packageName: enrollment.packageName ?? null,
         instructorId: course.instructor._id.toString(),
@@ -893,6 +939,17 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
         finalExamPending: !!course.examRequired && entitlements.certificate && !enrollment.examPassed,
         // The player lists every lesson in course order (`fetchCourseForLearning`); Finish renders on its last.
         lastLessonId: courseLessons[courseLessons.length - 1]?._id.toString() ?? null,
+        resumeLesson: resumeRow
+          ? {
+              title: resumeRow.title,
+              type: resumeRow.type,
+              durationSec: resumeRow.type === "video" && resumeRow.videoDuration ? resumeRow.videoDuration : null,
+              sectionTitle: resumeRow.sectionTitle || null,
+              number: resumeIndex >= 0 ? resumeIndex + 1 : null,
+              secondsLeft,
+            }
+          : null,
+        lessonTrack: openInOrder.map((l) => completedIds.has(l._id.toString())),
       }
     })
   } catch (error) {

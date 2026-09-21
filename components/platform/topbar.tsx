@@ -72,6 +72,14 @@ const labelMap: Record<string, string> = {
   exams: "Exams",
 }
 
+/**
+ * Crumbs whose own path is no page: `/dashboard/courses` only redirects to the
+ * public catalogue now (owner, 2026-09-18), so a program's pages sit under My programs.
+ */
+const crumbAliases: Record<string, { label: string; href: string }> = {
+  "/dashboard/courses": { label: "My programs", href: "/dashboard/my-courses" },
+}
+
 function buildCrumbs(pathname: string, overrides?: Record<string, string>) {
   const segments = pathname.split("/").filter(Boolean)
   const crumbs: { label: string; href: string }[] = []
@@ -81,7 +89,7 @@ function buildCrumbs(pathname: string, overrides?: Record<string, string>) {
     href += `/${seg}`
     // Check overrides first, then labelMap, then format the segment
     const label = overrides?.[seg] ?? labelMap[seg] ?? seg.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-    crumbs.push({ label, href })
+    crumbs.push(crumbAliases[href] ?? { label, href })
   }
   return crumbs
 }

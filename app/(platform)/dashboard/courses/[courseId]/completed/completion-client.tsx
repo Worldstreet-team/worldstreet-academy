@@ -4,18 +4,25 @@ import Link from "next/link"
 import { Award, BookOpen, GraduationCap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ArtCertificate } from "@/components/shared/illustrations"
+import { CourseRating, type OwnReview } from "@/components/learn/course-rating"
+import type { CourseRatingSummary } from "@/lib/actions/reviews"
 
 interface CourseCompletionClientProps {
   courseTitle: string
   courseId: string
   /** False when the package has no certificate (Basic) — no certificate actions. */
   hasCertificate: boolean
+  ratingSummary: CourseRatingSummary | null
+  /** The learner's own review, when they've left one. */
+  review: OwnReview | null
 }
 
 export function CourseCompletionClient({
   courseTitle,
   courseId,
   hasCertificate,
+  ratingSummary,
+  review,
 }: CourseCompletionClientProps) {
   return (
     <div className="min-h-[100dvh] flex items-center justify-center p-4">
@@ -45,6 +52,15 @@ export function CourseCompletionClient({
             amazing work!
           </p>
         </div>
+
+        {/* The moment a learner can best judge the whole program. */}
+        <CourseRating
+          courseId={courseId}
+          courseTitle={courseTitle}
+          currentRating={ratingSummary?.average}
+          ratingCount={ratingSummary?.count}
+          review={review}
+        />
 
         {/* Action Buttons */}
         {/* Gold stays on the one primary action: the certificate when the
