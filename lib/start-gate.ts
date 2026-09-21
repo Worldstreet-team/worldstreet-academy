@@ -1,4 +1,4 @@
-import { isSchoolSlug, type SchoolSlug } from "@/lib/schools"
+import { isSchoolSlug } from "@/lib/schools"
 
 /** First-party memory of a guest's landing-page choice (30 days). */
 export const START_SCHOOL_COOKIE = "wsa_school"
@@ -11,7 +11,10 @@ export type StartGateInput = {
   pathname: string
 }
 
-/** Reachable without a school: the picker, the till, the instructor door, and invite links. */
+/**
+ * Reachable without a school: the retired picker URL (now a redirect), the
+ * till, the instructor door, and invite links.
+ */
 const EXEMPT_PREFIXES = [
   "/dashboard/start",
   "/dashboard/checkout",
@@ -20,9 +23,10 @@ const EXEMPT_PREFIXES = [
 ] as const
 
 /**
- * School first (owner, 2026-09-16): a learner with no enrollment and no saved
- * school chooses one before the dashboard opens. Instructors, admins,
- * applicants and anyone who already has either are never asked.
+ * School first (owner, 2026-09-16; plan D15, 2026-09-18): a learner with no
+ * enrollment and no saved school is sent to the schools before the dashboard
+ * opens. Instructors, admins, applicants and anyone who already has either
+ * are never sent.
  */
 export function needsSchoolChoice(input: StartGateInput): boolean {
   if (input.role !== "USER") return false
@@ -31,28 +35,16 @@ export function needsSchoolChoice(input: StartGateInput): boolean {
   return !EXEMPT_PREFIXES.some((p) => input.pathname === p || input.pathname.startsWith(`${p}/`))
 }
 
-export type StartStep =
-  | { step: "school" }
-  | { step: "program"; school: SchoolSlug }
-  | { step: "package"; school: SchoolSlug; courseId: string }
-  | { step: "waitlist"; school: SchoolSlug }
-
 /**
- * Which screen `/dashboard/start` shows. A school with one program skips the
- * program step — for it, choosing the school IS choosing the program.
+ * Where the gate (and the retired `/dashboard/start`) sends a learner: the
+ * school they named — by URL or the `wsa_school` cookie — else every school.
+ * Always a public marketing page, so it can never bounce back into the gate.
+ *
+ * The all-schools target carries `?start=1` so `/schools` can say why the
+ * learner is there ("choose a program to get started"). The page shows that
+ * notice only to a signed-in learner the gate would still send, so an
+ * enrolled learner following an old `/dashboard/start` link never sees it.
  */
-export function resolveStartStep(args: {
-  school: string | null | undefined
-  program: string | null | undefined
-  /** Published program ids in that school. */
-  programIds: readonly string[]
-}): StartStep {
-  if (!isSchoolSlug(args.school)) return { step: "school" }
-  const school = args.school
-  if (args.programIds.length === 0) return { step: "waitlist", school }
-  if (args.program && args.programIds.includes(args.program)) {
-    return { step: "package", school, courseId: args.program }
-  }
-  if (args.programIds.length === 1) return { step: "package", school, courseId: args.programIds[0] }
-  return { step: "program", school }
+export function schoolsPathFor(school: string | null | undefined): string {
+  return isSchoolSlug(school) ? `/schools/${school}` : "/schools?start=1"
 }

@@ -36,12 +36,12 @@ Imports use `@/*` → repo root. Zod is imported as `import { z } from "zod/v4"`
 
 ## Architecture
 
-**Route groups** — `(marketing)` public · `(auth)` local-dev sign-in only · `(platform)` `/dashboard/*` · `(checkout)` `/dashboard/checkout*` (chrome-less) · `(start)` `/dashboard/start` (chrome-less school picker) · `(instructor)` `/instructor/*` · `(admin)` `/admin/*`.
+**Route groups** — `(marketing)` public · `(auth)` local-dev sign-in only · `(platform)` `/dashboard/*` · `(checkout)` `/dashboard/checkout*` (chrome-less) · `(start)` `/dashboard/start` (redirect only — the retired school picker forwards old links to `/schools[/<slug>]`; kept outside `(platform)` so the gate never runs on it) · `(instructor)` `/instructor/*` · `(admin)` `/admin/*`.
 
-`middleware.ts` enforces only *authentication* (plus an `x-next-pathname` header for server components). **Role gating lives in each group's `layout.tsx`** — instructor requires `INSTRUCTOR|ADMIN` else redirects to `/dashboard/become-instructor`; admin requires `ADMIN`. Put new gates there, not in middleware. `(platform)/layout.tsx` also holds the **school-first gate** (`needsSchoolChoice`, `lib/start-gate.ts`): a `USER` with no enrollment and no `EnrollmentIntent` is sent to `/dashboard/start`. It fails open. Exempt paths are listed in that module.
+`middleware.ts` enforces only *authentication* (plus an `x-next-pathname` header for server components). **Role gating lives in each group's `layout.tsx`** — instructor requires `INSTRUCTOR|ADMIN` else redirects to `/dashboard/become-instructor`; admin requires `ADMIN`. Put new gates there, not in middleware. `(platform)/layout.tsx` also holds the **school-first gate** (`needsSchoolChoice`, `lib/start-gate.ts`): a `USER` with no enrollment and no `EnrollmentIntent` is sent to `/schools` (or `/schools/<slug>` when the landing's `wsa_school` cookie names a school — `schoolsPathFor`). It fails open. Exempt paths are listed in that module. There is no "Step N of M" wizard: the journey is blueprint §17/§18, Homepage → School → Program → Package → Checkout — packages are chosen on `/programs/<slug>`, and checkout shows the chosen package as a summary (owner, 2026-09-18; plan D15).
 
 **School first (Phase 9).** Each fact has one home; import it, never re-derive it inline:
-- `lib/start-gate.ts` + `lib/actions/enrollment-intent.ts` — the saved school (`EnrollmentIntent`, one per user, converted lazily when its enrollment exists; the money path never writes it).
+- `lib/start-gate.ts` + `lib/actions/enrollment-intent.ts` — the saved school (`EnrollmentIntent`, one per user, saved when a learner reaches checkout, converted lazily when its enrollment exists; the money path never writes it).
 - `lib/school-art.ts` — school covers, `PROGRAM_ART` and `programArt` (the program's own uploaded thumbnail → its `PROGRAM_ART` file → its school's cover). Student and public read models apply it; instructor ones deliberately do not.
 - `lib/program-rail.ts` — what the student program page may print about price and size (an enrolled learner is never quoted a price; a ladder reads "From"; zeros are omitted).
 
@@ -75,6 +75,7 @@ A/V calls and live meetings use Cloudflare RealtimeKit (Dyte REST, `lib/realtime
 - Icons: `lucide-react` only (stroke 2, round caps). Do not add `@hugeicons` or any other icon set; never use emoji as icons. Runtime-chosen icons render via `components/shared/render-icon.tsx`.
 - Theming: `next-themes` toggles dark/light; `ThemeProvider` syncs the choice to `data-ws-theme="platform" | "platform-light"` on `<html>` so the shared tokens drive both palettes. Dark is the default.
 - Radii come from the token ladder only: 4/7/10/13/999 (`rounded-xs/sm/md/lg/full`). No `rounded-2xl/3xl`. Motion: 120/200/320ms with `var(--ws-ease)`, opacity/transform only, no infinite ambient loops, no hover scaling — hover lightens one surface step.
+- Owner, 2026-09-18: the landing hero may auto-advance a background slideshow (pause control, pauses off-screen/hidden tab, no autoplay under reduced motion) — the one exception to the no-loops rule.
 - Gold is reserved for primary CTAs, active nav and brand moments; accents appear only as ~13% washes behind icons. Money/stats use tabular numerals.
 - **Brand lockup** (ratified 2026-08-03, design-system 04-components → TopNav): gold wsa-mark 26px (`/brand/wsa-mark.png`, unboxed) + "WorldStreet" Poppins SemiBold 15 + gold uppercase app eyebrow ("ACADEMY"; "ADMIN" in the admin shell). Used in all three sidebars, the marketing navbar and footer — never a typed-letter "W" tile. Cross-app links live in the sidebar "WorldStreet apps" group with DS labels (Dashboard/Xstream/Social/Shop).
 - RSC-first — add `"use client"` only where interaction requires it.

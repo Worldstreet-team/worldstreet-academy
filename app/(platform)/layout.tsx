@@ -10,7 +10,7 @@ import { CallProvider } from "@/components/providers/call-provider"
 import { MeetingProvider } from "@/components/providers/meeting-provider"
 import { QueryProvider } from "@/components/providers/query-provider"
 import { getCachedUser } from "@/lib/auth/cached"
-import { needsSchoolChoice } from "@/lib/start-gate"
+import { START_SCHOOL_COOKIE, needsSchoolChoice, schoolsPathFor } from "@/lib/start-gate"
 import { getStartGateState } from "@/lib/start-gate-state"
 import { TranslateScript } from "@/components/translator/translate-script"
 import { DashboardTour } from "@/components/welcome/dashboard-tour"
@@ -27,10 +27,12 @@ export default async function PlatformLayout({
     redirect(isLocalDev ? "/login" : "https://www.worldstreetgold.com/login")
   }
 
-  // School first (owner, 2026-09-16): a learner with no enrollment and no
-  // saved school chooses one before the dashboard opens. Fails OPEN — a gate
-  // that cannot read its state must never lock anyone out. `redirect()` throws
-  // by design, so it stays outside the catch.
+  // School first (owner, 2026-09-16; plan D15, 2026-09-18): a learner with no
+  // enrollment and no saved school is sent to the schools — the one the
+  // landing's `wsa_school` cookie names, else all eight — to choose a program
+  // and a package there. Fails OPEN — a gate that cannot read its state must
+  // never lock anyone out. `redirect()` throws by design, so it stays outside
+  // the catch.
   if (user.role === "USER") {
     const pathname = (await headers()).get("x-next-pathname") ?? ""
     const gate = await getStartGateState(user.id).catch(() => null)
@@ -38,7 +40,7 @@ export default async function PlatformLayout({
       gate &&
       needsSchoolChoice({ role: user.role, instructorStatus: user.instructorStatus, pathname, ...gate })
     ) {
-      redirect("/dashboard/start")
+      redirect(schoolsPathFor((await cookies()).get(START_SCHOOL_COOKIE)?.value))
     }
   }
 
