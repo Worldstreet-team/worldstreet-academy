@@ -1,11 +1,14 @@
 import type { Metadata } from "next"
-import Link from "next/link"
-import { ArrowRightIcon, CompassIcon } from "lucide-react"
-import { SCHOOLS, cheapestBySchool, countProgramsBySchool } from "@/lib/schools"
-import { fetchBrowseCourses } from "@/lib/actions/student"
-import { BRAND } from "@/lib/brand"
+import { fetchBrowseCourses, fetchFacultyCount, fetchFreePreviewLessons } from "@/lib/actions/student"
+import { getCachedUser } from "@/lib/auth/cached"
+import { getStartGateState } from "@/lib/start-gate-state"
+import { needsSchoolChoice } from "@/lib/start-gate"
 import { appUrl } from "@/lib/app-url"
-import { SchoolCard } from "@/components/marketing/school-card"
+import { SchoolsIndex } from "@/components/schools-index/schools-index"
+import { GateNotice } from "@/components/schools-index/gate-notice"
+import { FreeLessons } from "@/components/schools-index/free-lessons"
+import { BrowseAll } from "@/components/schools-index/browse-all"
+import { LEVEL_ORDER, buildSchoolsIndex, type LevelFilter } from "@/components/schools-index/model"
 
 export const metadata: Metadata = {
   title: "Schools",
@@ -14,98 +17,83 @@ export const metadata: Metadata = {
   alternates: { canonical: appUrl("/schools") },
 }
 
-// Program counts come from the live catalogue.
+// Programs, prices and free lessons come from the live catalogue.
 export const revalidate = 0
 
-/** Cards step in 45ms apart, so the grid reads left-to-right on arrival. */
-const STAGGER_MS = 45
+type Search = { searchParams: Promise<Record<string, string | string[] | undefined>> }
 
-/** `/schools` — spec §4 as a page: the eight schools with live program counts. */
-export default async function SchoolsPage() {
-  const courses = await fetchBrowseCourses()
-  const counts = countProgramsBySchool(courses)
-  const cheapest = cheapestBySchool(courses)
+const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value)
+
+/**
+ * The gate's welcome, for a signed-in learner the school-first gate would
+ * still send here (`?start=1` alone is not enough: an enrolled learner can
+ * follow an old `/dashboard/start` link too). Fails closed to no notice.
+ */
+async function gateWelcome(): Promise<{ firstName: string } | null> {
+  const user = await getCachedUser()
+  if (!user || user.role !== "USER") return null
+  const gate = await getStartGateState(user.id).catch(() => null)
+  if (!gate) return null
+  const sent = needsSchoolChoice({
+    role: user.role,
+    instructorStatus: user.instructorStatus,
+    pathname: "/dashboard",
+    ...gate,
+  })
+  return sent ? { firstName: (user.firstName ?? "").trim() } : null
+}
+
+/**
+ * `/schools` — "Explore our schools" (blueprint §4, §17): the step between
+ * the homepage and a school. A header with the eight covers and the real
+ * totals, a search that narrows schools and their programs as you type, each
+ * school as an editorial row listing its actual programs, then free lessons
+ * and the full program list for anyone not ready to pick a school.
+ *
+ * Every figure is read from the published catalogue; anything that would be
+ * zero is left out rather than shown.
+ */
+export default async function SchoolsPage({ searchParams }: Search) {
+  const params = await searchParams
+  const start = first(params.start) === "1"
+  const q = (first(params.q) ?? "").slice(0, 80)
+  const levelParam = first(params.level)
+  const level: LevelFilter = LEVEL_ORDER.find((l) => l === levelParam) ?? "all"
+
+  const [courses, previews, facultyCount, welcome] = await Promise.all([
+    fetchBrowseCourses(),
+    fetchFreePreviewLessons(9),
+    fetchFacultyCount(),
+    start ? gateWelcome().catch(() => null) : Promise.resolve(null),
+  ])
+
+  const data = buildSchoolsIndex(courses)
+  const inSchools = data.schools.flatMap((s) => s.programs)
+  const priced = inSchools.map((p) => p.price).filter((p): p is number => p !== null)
+  const art = Array.from(
+    new Set([...inSchools, ...data.others].map((p) => p.art).filter((a): a is string => Boolean(a)))
+  )
 
   return (
-    <div className="mx-auto max-w-7xl px-6 pb-24 pt-10 md:pb-32 md:pt-16">
-      <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-ws-gold">Our schools</p>
-      <h1
-        className="mt-4 max-w-3xl font-display font-semibold leading-[1.05] tracking-[-0.02em] text-ws-primary"
-        style={{ fontSize: "clamp(2rem, 4.5vw, 3.5rem)" }}
-      >
-        Explore the Schools of {BRAND.name}
-      </h1>
-      <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-ws-muted md:text-[17px]">
-        Your future can take many directions. Choose the school that matches your
-        interests, goals and ambitions.
-      </p>
+    <div className="pb-24 md:pb-32">
+      <SchoolsIndex
+        data={data}
+        stats={{
+          schools: data.schools.length,
+          programs: inSchools.length,
+          from: priced.length ? Math.min(...priced) : null,
+          instructors: facultyCount,
+          freeLessons: previews.length,
+        }}
+        initialQuery={q}
+        initialLevel={data.levels.length > 1 ? level : "all"}
+        notice={welcome ? <GateNotice firstName={welcome.firstName} /> : null}
+      />
 
-      {/* Three across on desktop: eight schools plus the closing tile fill a
-          clean 3x3. Each card rises on a stagger and carries its own hover
-          gesture (see "one signature motion per school" in globals.css). */}
-      <ul className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {SCHOOLS.map((school, i) => (
-          <li
-            key={school.slug}
-            className="rise"
-            style={{ "--rise-delay": `${i * STAGGER_MS}ms` } as React.CSSProperties}
-          >
-            <SchoolCard
-              school={school}
-              count={counts[school.slug]}
-              fromPrice={cheapest[school.slug]}
-              headingLevel="h2"
-              priority={i < 3}
-              sizes="(min-width: 1280px) 400px, (min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-            />
-          </li>
-        ))}
-
-        {/* Ninth tile — the way out for anyone who does not want to pick a
-            school first. Quieter than a school card (sunken, not surface) so
-            it closes the grid without competing with it. It keeps the cards'
-            16:10 frame, with the compass where the art would be, and pt-9
-            puts its heading on the same line as the cards' headings (which
-            sit below their overlapping icon chip). */}
-        <li
-          className="rise"
-          style={{ "--rise-delay": `${SCHOOLS.length * STAGGER_MS}ms` } as React.CSSProperties}
-        >
-          <Link
-            href="/programs"
-            data-school="browse-all"
-            className="ws-school group flex h-full flex-col overflow-hidden rounded-[20px] border border-ws-hairline bg-ws-sunken transition-colors duration-[var(--ws-motion-base)] hover:bg-ws-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40"
-          >
-            <div className="flex aspect-[16/10] items-center justify-center border-b border-ws-hairline text-ws-gold">
-              <span className="ws-school-glyph">
-                <CompassIcon size={44} />
-              </span>
-            </div>
-            <div className="flex flex-1 flex-col px-6 pb-6 pt-9">
-              <h2 className="font-display text-[18px] font-semibold leading-snug tracking-[-0.01em] text-ws-primary">
-                Not sure where to start?
-              </h2>
-              <p className="mb-6 mt-2 text-[14px] leading-relaxed text-ws-muted">
-                See every program in one list, across all eight schools, and compare
-                what each one covers before you choose.
-              </p>
-              <span className="mt-auto flex items-center justify-between gap-3 border-t border-ws-hairline pt-4 text-[13px]">
-                <span className="tabular-nums text-ws-muted">
-                  {courses.length === 1 ? "1 program" : `${courses.length} programs`}
-                </span>
-                <span className="inline-flex items-center gap-1.5 font-semibold text-ws-muted transition-colors duration-[var(--ws-motion-fast)] group-hover:text-ws-primary">
-                  Browse all
-                  <ArrowRightIcon
-                    size={14}
-                    aria-hidden
-                    className="transition-transform duration-200 group-hover:translate-x-0.5"
-                  />
-                </span>
-              </span>
-            </div>
-          </Link>
-        </li>
-      </ul>
+      <div className="mx-auto mt-28 max-w-7xl space-y-24 px-6 md:mt-40 md:space-y-32">
+        <FreeLessons lessons={previews} />
+        <BrowseAll total={data.total} art={art} showFaculty={facultyCount > 0} />
+      </div>
     </div>
   )
 }
