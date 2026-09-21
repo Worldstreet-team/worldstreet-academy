@@ -1,8 +1,10 @@
 import Link from "next/link"
-import { BadgeCheckIcon, ChevronRightIcon, UsersIcon } from "lucide-react"
+import { ArrowRightIcon, BookOpenIcon, UsersIcon } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { facultyHref } from "@/lib/faculty"
-import { SectionLabel } from "@/components/marketing/section-heading"
+import { ClampedText } from "@/components/programs/clamped-text"
+import { initialsOf, plural } from "@/components/programs/format"
+import { PROGRAM_H2, SECTION_SCROLL_MT } from "@/components/programs/section-title"
 
 /**
  * Public instructor block (spec §6 "instructor"). No Message button — that
@@ -11,21 +13,24 @@ import { SectionLabel } from "@/components/marketing/section-heading"
  * only signed-in visitors get the dashboard profile (it would bounce a guest
  * through the login wall).
  *
- * Full width, split two ways: identity on the left, the bio on the right.
- * The old max-w-3xl card left half the row empty at desktop, which read as a
- * gap in the page rather than a deliberate margin.
+ * One card: identity row (large avatar, name, headline), the stats that are
+ * real (students when any, programs when more than this one), then the bio,
+ * clamped with Show more.
  */
 export function ProgramInstructor({
   id,
+  sectionId,
   username,
   name,
   avatarUrl,
   headline,
   bio,
   totalStudents,
+  programCount,
   signedIn,
 }: {
   id: string
+  sectionId: string
   /** Faculty URL key; null when the instructor isn't faculty, so there is no page to link. */
   username: string | null
   name: string
@@ -33,70 +38,72 @@ export function ProgramInstructor({
   headline: string | null
   bio: string | null
   totalStudents: number
+  /** Published programs this instructor teaches, this one included. */
+  programCount: number
   signedIn: boolean
 }) {
-  const initials = name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase()
-
   const profileHref = username ? facultyHref(username) : signedIn ? `/dashboard/instructor/${id}` : null
+  const stats = [
+    totalStudents > 0 ? { icon: UsersIcon, label: plural(totalStudents, "student") } : null,
+    programCount > 1 ? { icon: BookOpenIcon, label: plural(programCount, "program") } : null,
+  ].filter(Boolean) as Array<{ icon: typeof UsersIcon; label: string }>
 
   return (
-    <section className="mt-16 border-t border-ws-hairline pt-10" aria-labelledby="instructor-heading">
-      <SectionLabel>Faculty</SectionLabel>
-      <h2
-        id="instructor-heading"
-        className="mt-3 font-display text-2xl font-semibold tracking-[-0.015em] text-ws-primary"
-      >
-        About the instructor
+    <section id={sectionId} aria-labelledby="instructor-heading" className={SECTION_SCROLL_MT}>
+      <h2 id="instructor-heading" className={PROGRAM_H2}>
+        Your instructor
       </h2>
 
-      <div className="mt-8 grid gap-8 rounded-[20px] border border-ws-hairline bg-ws-surface p-6 dark:border-transparent md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] md:gap-12 md:p-8">
-        <div className="flex gap-5">
-          <Avatar className="h-20 w-20 shrink-0">
+      <div className="mt-5 rounded-[20px] border border-ws-hairline bg-ws-surface p-6 dark:border-transparent sm:p-8">
+        <div className="flex items-center gap-5">
+          <Avatar className="size-20 shrink-0 sm:size-24">
             {avatarUrl && <AvatarImage src={avatarUrl} alt="" />}
-            <AvatarFallback className="bg-ws-brand/10 text-base font-semibold text-ws-gold">
-              {initials}
+            <AvatarFallback className="bg-ws-raised text-lg font-semibold text-ws-primary">
+              {initialsOf(name)}
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0">
-            <p className="flex items-center gap-1.5 font-display text-xl font-semibold text-ws-primary">
-              {name}
-              <BadgeCheckIcon
-                size={16}
-                className="shrink-0 text-ws-gold"
-                role="img"
-                aria-label="Verified instructor"
-              />
+            <p className="font-display text-[22px] font-semibold leading-tight tracking-[-0.015em] text-ws-primary">
+              {profileHref ? (
+                <Link
+                  href={profileHref}
+                  className="rounded-sm transition-colors duration-[var(--ws-motion-fast)] hover:underline hover:decoration-ws-hairline hover:underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40"
+                >
+                  {name}
+                </Link>
+              ) : (
+                name
+              )}
             </p>
-            {headline && <p className="mt-1 text-[14px] leading-relaxed text-ws-muted">{headline}</p>}
-            {totalStudents > 0 && (
-              <p className="mt-3 inline-flex items-center gap-1.5 text-[13px] text-ws-muted">
-                <UsersIcon size={13} aria-hidden />
-                <span className="font-medium tabular-nums text-ws-primary">
-                  {totalStudents.toLocaleString("en-US")}
-                </span>
-                {totalStudents === 1 ? "student" : "students"}
-              </p>
+            {headline && <p className="mt-1.5 text-[15px] leading-snug text-ws-muted">{headline}</p>}
+            {stats.length > 0 && (
+              <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-[14px]">
+                {stats.map(({ icon: Icon, label }) => (
+                  <li key={label} className="inline-flex items-center gap-1.5 text-ws-muted">
+                    <Icon size={15} aria-hidden />
+                    <span className="tabular-nums text-ws-primary">{label}</span>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
         </div>
 
-        <div className="min-w-0">
-          {bio && <p className="text-[15px] leading-relaxed text-ws-muted">{bio}</p>}
-          {profileHref && (
-            <Link
-              href={profileHref}
-              className="mt-5 inline-flex items-center gap-1 text-[13px] font-semibold text-ws-gold hover:underline"
-            >
-              {username ? "View faculty profile" : "View full profile"}
-              <ChevronRightIcon size={14} aria-hidden />
-            </Link>
-          )}
-        </div>
+        {bio && (
+          <div className="mt-6 border-t border-ws-hairline pt-6">
+            <ClampedText text={bio} lines={5} className="text-[15px] leading-relaxed text-ws-muted" />
+          </div>
+        )}
+
+        {profileHref && (
+          <Link
+            href={profileHref}
+            className="mt-6 inline-flex h-11 items-center gap-2 rounded-full border border-ws-hairline px-5 text-[14px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40"
+          >
+            {username ? "View faculty profile" : "View full profile"}
+            <ArrowRightIcon size={15} aria-hidden />
+          </Link>
+        )}
       </div>
     </section>
   )

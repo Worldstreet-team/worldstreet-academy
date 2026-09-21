@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils"
 import type { PublicPackage } from "@/lib/actions/student"
 import { PACKAGE_LABEL } from "@/lib/entitlements"
 import type { IPackageEntitlements } from "@/lib/db/models"
-import { SectionLabel } from "@/components/marketing/section-heading"
+import { PROGRAM_H2 } from "@/components/programs/section-title"
 import type { ProgramAccess } from "@/components/programs/access"
 
 function priceLabel(price: number): string {
@@ -18,7 +18,6 @@ function ctaLabel(pkg: PublicPackage): string {
 }
 
 const GRID: Record<number, string> = {
-  1: "md:max-w-md",
   2: "md:grid-cols-2",
   3: "md:grid-cols-3",
 }
@@ -48,15 +47,24 @@ const COMPARED: ReadonlyArray<{ key: keyof IPackageEntitlements; label: string }
  * entitlements. The cards sell each tier in the instructor's words; the table
  * answers the question the cards can't — what actually differs — without
  * making the visitor diff three bullet lists by eye.
+ *
+ * A lone package is not a ladder: it renders as ONE wide card — name, price
+ * and action on the left, its features in two columns on the right — instead
+ * of a third-width card stranded beside empty space.
+ *
+ * `className` lets a page restyle the section's outer spacing and scroll
+ * margin (the program page clears a taller sticky header than the dashboard).
  */
 export function PackageLadder({
   courseId,
   packages,
   access,
+  className,
 }: {
   courseId: string
   packages: PublicPackage[]
   access: ProgramAccess
+  className?: string
 }) {
   const multiTier = packages.length > 1
   // Only compare rows where the tiers actually differ; a row that is off for
@@ -69,15 +77,11 @@ export function PackageLadder({
   return (
     <section
       id="packages"
-      className="mt-16 scroll-mt-24 border-t border-ws-hairline pt-10"
+      className={cn("mt-16 scroll-mt-24 border-t border-ws-hairline pt-10", className)}
       aria-labelledby="packages-heading"
     >
-      <SectionLabel>Packages</SectionLabel>
-      <h2
-        id="packages-heading"
-        className="mt-3 font-display text-2xl font-semibold tracking-[-0.015em] text-ws-primary"
-      >
-        Choose your learning experience
+      <h2 id="packages-heading" className={PROGRAM_H2}>
+        {multiTier ? "Choose your learning experience" : "Enrol in this program"}
       </h2>
       {multiTier && (
         <p className="mt-2 max-w-xl text-[15px] text-ws-muted">
@@ -86,63 +90,67 @@ export function PackageLadder({
         </p>
       )}
 
-      <ul className={cn("mt-8 grid items-start gap-4", GRID[packages.length] ?? "md:grid-cols-3")}>
-        {packages.map((pkg) => (
-          <li
-            key={pkg.key}
-            className={cn(
-              "relative flex h-full flex-col overflow-hidden rounded-[20px]",
-              pkg.highlight
-                ? "bg-ws-raised ring-1 ring-ws-brand/40"
-                : "border border-ws-hairline bg-ws-surface dark:border-transparent"
-            )}
-          >
-            {pkg.highlight && (
-              <p className="flex items-center justify-center gap-1.5 bg-ws-brand/[0.12] py-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-ws-gold">
-                <StarIcon size={11} fill="currentColor" aria-hidden />
-                Most popular
-              </p>
-            )}
-            <div className="flex flex-1 flex-col p-6">
-              {multiTier && (
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ws-subtle">
-                  {PACKAGE_LABEL[pkg.key]}
+      {!multiTier && packages[0] ? (
+        <SinglePackage courseId={courseId} pkg={packages[0]} access={access} />
+      ) : (
+        <ul className={cn("mt-8 grid items-start gap-4", GRID[packages.length] ?? "md:grid-cols-3")}>
+          {packages.map((pkg) => (
+            <li
+              key={pkg.key}
+              className={cn(
+                "relative flex h-full flex-col overflow-hidden rounded-[20px]",
+                pkg.highlight
+                  ? "bg-ws-raised ring-1 ring-ws-brand/40"
+                  : "border border-ws-hairline bg-ws-surface dark:border-transparent"
+              )}
+            >
+              {pkg.highlight && (
+                <p className="flex items-center justify-center gap-1.5 bg-ws-brand/[0.12] py-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-ws-gold">
+                  <StarIcon size={11} fill="currentColor" aria-hidden />
+                  Most popular
                 </p>
               )}
-              <p className="mt-3 font-display text-[40px] font-light leading-none tabular-nums tracking-[-0.02em] text-ws-primary">
-                {priceLabel(pkg.price)}
-              </p>
-              <h3 className="mt-3 font-display text-xl font-semibold text-ws-primary">{pkg.name}</h3>
-              {pkg.tagline && <p className="mt-1.5 text-[14px] leading-relaxed text-ws-muted">{pkg.tagline}</p>}
+              <div className="flex flex-1 flex-col p-6">
+                {multiTier && (
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ws-subtle">
+                    {PACKAGE_LABEL[pkg.key]}
+                  </p>
+                )}
+                <p className="mt-3 font-display text-[40px] font-light leading-none tabular-nums tracking-[-0.02em] text-ws-primary">
+                  {priceLabel(pkg.price)}
+                </p>
+                <h3 className="mt-3 font-display text-xl font-semibold text-ws-primary">{pkg.name}</h3>
+                {pkg.tagline && <p className="mt-1.5 text-[14px] leading-relaxed text-ws-muted">{pkg.tagline}</p>}
 
-              {access.kind !== "enrolled" && (
-                <div className="mt-6">
-                  <PackageCta
-                    courseId={courseId}
-                    pkg={pkg}
-                    access={access}
-                    primary={pkg.highlight || !multiTier}
-                  />
-                </div>
-              )}
+                {access.kind !== "enrolled" && (
+                  <div className="mt-6">
+                    <PackageCta
+                      courseId={courseId}
+                      pkg={pkg}
+                      access={access}
+                      primary={pkg.highlight || !multiTier}
+                    />
+                  </div>
+                )}
 
-              {pkg.features.length > 0 && (
-                <ul className="mt-6 space-y-2.5 border-t border-ws-hairline pt-5">
-                  {pkg.features.map((feature, i) => (
-                    <li
-                      key={`${pkg.key}-${i}`}
-                      className="flex items-start gap-2.5 text-[14px] leading-relaxed text-ws-muted"
-                    >
-                      <CheckIcon size={15} className="mt-0.5 shrink-0 text-ws-subtle" aria-hidden />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </li>
-        ))}
-      </ul>
+                {pkg.features.length > 0 && (
+                  <ul className="mt-6 space-y-2.5 border-t border-ws-hairline pt-5">
+                    {pkg.features.map((feature, i) => (
+                      <li
+                        key={`${pkg.key}-${i}`}
+                        className="flex items-start gap-2.5 text-[14px] leading-relaxed text-ws-muted"
+                      >
+                        <CheckIcon size={15} className="mt-0.5 shrink-0 text-ws-subtle" aria-hidden />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
 
       {multiTier && rows.length > 0 && (
         <div className="mt-10">
@@ -215,6 +223,57 @@ export function PackageLadder({
         </div>
       )}
     </section>
+  )
+}
+
+/**
+ * The lone package, as one wide card: the offer (name, tagline, price, action)
+ * on the left; what it includes — the instructor's own feature lines — in two
+ * columns on the right. Stacks on phones.
+ */
+function SinglePackage({
+  courseId,
+  pkg,
+  access,
+}: {
+  courseId: string
+  pkg: PublicPackage
+  access: ProgramAccess
+}) {
+  const features = pkg.features.length > 0
+  return (
+    <div
+      className={cn(
+        "mt-8 grid overflow-hidden rounded-[20px] border border-ws-hairline bg-ws-surface dark:border-transparent",
+        features && "md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]"
+      )}
+    >
+      <div className={cn("flex flex-col p-6 sm:p-8", features && "md:bg-ws-raised/40")}>
+        <h3 className="font-display text-xl font-semibold text-ws-primary">{pkg.name}</h3>
+        {pkg.tagline && <p className="mt-1.5 text-[14px] leading-relaxed text-ws-muted">{pkg.tagline}</p>}
+        <p className="mt-5 font-display text-[44px] font-light leading-none tabular-nums tracking-[-0.025em] text-ws-primary">
+          {priceLabel(pkg.price)}
+        </p>
+        {access.kind !== "enrolled" && (
+          <div className="mt-6 md:mt-auto md:pt-8">
+            <PackageCta courseId={courseId} pkg={pkg} access={access} primary />
+          </div>
+        )}
+      </div>
+      {features && (
+        <div className="border-t border-ws-hairline p-6 sm:p-8 md:border-l md:border-t-0">
+          <p className="text-[14px] font-semibold text-ws-primary">What&apos;s in it</p>
+          <ul className="mt-4 grid gap-x-8 gap-y-3 sm:grid-cols-2">
+            {pkg.features.map((feature, i) => (
+              <li key={`${pkg.key}-${i}`} className="flex items-start gap-2.5 text-[14px] leading-relaxed text-ws-muted">
+                <CheckIcon size={15} className="mt-[3px] shrink-0 text-ws-subtle" aria-hidden />
+                {feature}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
   )
 }
 

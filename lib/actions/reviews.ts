@@ -12,10 +12,12 @@ import { getCurrentUser } from "@/lib/auth"
 // VALIDATION SCHEMAS
 // ============================================================================
 
+// Title and text are optional: a review without either is a rating. On an
+// update, null clears them.
 const CreateReviewSchema = z.object({
-  rating: z.number().min(1).max(5),
-  title: z.string().min(3).max(100).optional(),
-  content: z.string().min(10).max(2000).optional(),
+  rating: z.number().int().min(1).max(5),
+  title: z.string().trim().min(3).max(100).nullable().optional(),
+  content: z.string().trim().min(10).max(2000).nullable().optional(),
 })
 
 const UpdateReviewSchema = CreateReviewSchema.partial()
@@ -105,7 +107,7 @@ export async function submitReview(
     // Update course rating
     await updateCourseRating(courseId)
 
-    revalidatePath(`/courses/${courseId}`)
+    await revalidateReviewPages(courseId)
 
     return {
       success: true,
@@ -157,7 +159,7 @@ export async function updateReview(
       await updateCourseRating(review.course.toString())
     }
 
-    revalidatePath(`/courses/${review.course}`)
+    await revalidateReviewPages(review.course.toString())
 
     return { success: true }
   } catch (error) {
@@ -189,7 +191,7 @@ export async function deleteReview(userId: string, reviewId: string) {
     // Update course rating
     await updateCourseRating(courseId)
 
-    revalidatePath(`/courses/${courseId}`)
+    await revalidateReviewPages(courseId)
 
     return { success: true }
   } catch (error) {
@@ -440,6 +442,18 @@ export async function getUserReview(
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
+
+/**
+ * The public pages that print a program's reviews or rating: its program
+ * page, its school's page, and the landing's testimonials. (`/courses/<id>`
+ * only redirects, so revalidating it refreshed nothing.)
+ */
+async function revalidateReviewPages(courseId: string) {
+  const course = await Course.findById(courseId).select("slug school").lean()
+  if (course?.slug) revalidatePath(`/programs/${course.slug}`)
+  if (course?.school) revalidatePath(`/schools/${course.school}`)
+  revalidatePath("/")
+}
 
 /**
  * Recalculate and update course rating aggregate
