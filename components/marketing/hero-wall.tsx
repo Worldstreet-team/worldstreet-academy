@@ -13,7 +13,7 @@ import {
 import { XIcon } from "lucide-react"
 import { EASE_INERTIA } from "@/components/marketing/motion/ease"
 import { useMotionOK } from "@/components/marketing/motion/bus"
-import { HeroStage, HERO_SLIDES, slideOf, useHeroSlideshow } from "@/components/marketing/hero-stage"
+import { HeroStage, PEOPLE_COUNT, slideOf, useHeroSlideshow } from "@/components/marketing/hero-stage"
 import { HeroPauseToggle, useSlideClock } from "@/components/marketing/hero-controls"
 import { HeroCopy } from "@/components/marketing/hero-copy"
 import { HeroChipScrollbar } from "@/components/marketing/hero-chip-scrollbar"
@@ -41,11 +41,13 @@ function clearPick() {
 }
 
 /**
- * §1 — HERO. The claim holds still while a slideshow plays behind it: the
- * student first, then the eight school covers, one every six seconds, each
- * with a slow push-in and brought on by a soft travelling curtain (see
- * `hero-stage.tsx`). Owner request, 2026-09-18 — the one auto-advancing
- * loop in the app — and, by the owner's later call the same day, with no
+ * §1 — HERO. The claim holds still while a slideshow plays behind it: four
+ * students (green-screen cutouts, each holding something with the gold W
+ * mark), one every six seconds, each with a slow push-in and brought on by a
+ * soft travelling curtain (see `hero-stage.tsx`). Owner request, 2026-09-18
+ * — the one auto-advancing loop in the app; on 2026-09-21 the school covers
+ * left the rotation and the students replaced them — and, by the owner's
+ * later call the same day, with no
  * visible control row. What stays for WCAG 2.2.2 (`hero-controls.tsx`): one
  * pause/play button, clipped out of sight until it takes keyboard focus, and
  * the show holds still while the pointer rests on the chips or the CTAs,
@@ -65,9 +67,9 @@ function clearPick() {
  * and hands the copy to the school: its number, name, tagline (or blurb)
  * and real facts, with the gold CTA reshaping to "Explore the School of …"
  * → `/schools/<slug>`. The chosen chip's pill glides from chip to chip.
- * Choosing it again, or "Clear", returns the default copy and resumes the
- * slideshow. Every cell reserves its tallest variant, so nothing below it
- * ever moves (`hero-copy.tsx`).
+ * Choosing it again, or "Clear", returns the default copy and the student the
+ * show was on, and resumes the slideshow. Every cell reserves its tallest
+ * variant, so nothing below it ever moves (`hero-copy.tsx`).
  *
  * The hand-off, as the hero scrolls away (a function of scroll only — see
  * `useHeroLeave`): the picture trails the page inside the stage; the
@@ -102,9 +104,14 @@ export function HeroWall({
 
   const show = useHeroSlideshow(slideOf(picked))
   const { go, target } = show
-  // A chosen school holds its own cover.
+  // The student the show was on — where "Clear" returns to.
+  const lastPerson = React.useRef(0)
   React.useEffect(() => {
-    if (picked) go(slideOf(picked))
+    if (target < PEOPLE_COUNT) lastPerson.current = target
+  }, [target])
+  // A chosen school holds its own cover; clearing it brings the students back.
+  React.useEffect(() => {
+    go(picked ? slideOf(picked) : lastPerson.current)
   }, [picked, go])
 
   // ── When the show may run ──
@@ -119,7 +126,8 @@ export function HeroWall({
     if (e.pointerType === "mouse") setPointerHold(true)
   }
   const holdOff = () => setPointerHold(false)
-  useSlideClock(target, auto, () => go((target + 1) % HERO_SLIDES.length, 1))
+  // Only the students rotate; the curtain always comes on from the right.
+  useSlideClock(target, auto, () => go((target + 1) % PEOPLE_COUNT, 1))
 
   const choose = (slug: SchoolSlug) => (picked === slug ? clearPick() : pick(slug))
 

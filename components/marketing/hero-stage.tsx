@@ -8,19 +8,40 @@ import { cn } from "@/lib/utils"
 
 export type HeroSlide = {
   src: string
-  /** The school this cover belongs to; null for the student portrait. */
+  /** The school this cover belongs to; null for a student portrait. */
   school: SchoolSlug | null
   /** Accessible name for the slide's indicator. */
   label: string
+  /**
+   * Student portraits only: the cutout's pixel size, and `wide` for the seated
+   * laptop shot (landscape — sized by width, not height).
+   */
+  size?: { width: number; height: number; wide?: boolean }
 }
 
 /**
- * The hero's slides: the student portrait first (the owner's "girl holding
- * books"), then every school cover in school order. A school without a cover
- * file simply has no slide — picking it holds the portrait.
+ * The students the slideshow cycles through (owner, 2026-09-21): green-screen
+ * cutouts, each holding something with the gold W mark, all turned toward the
+ * copy. The first is the owner's "girl holding books" and is the one the
+ * server paints.
+ */
+const PEOPLE: readonly HeroSlide[] = [
+  { src: "/brand/hero/student-notebook.webp", school: null, label: "A WorldStreet student with her notebook", size: { width: 1115, height: 1420 } },
+  { src: "/brand/hero/student-laptop.webp", school: null, label: "A WorldStreet student at his laptop", size: { width: 1400, height: 1042, wide: true } },
+  { src: "/brand/hero/student-tablet.webp", school: null, label: "A WorldStreet learner with her tablet", size: { width: 974, height: 1420 } },
+  { src: "/brand/hero/student-camera.webp", school: null, label: "A WorldStreet student with his camera", size: { width: 1056, height: 1420 } },
+]
+
+/** The slideshow runs over slides 0 … PEOPLE_COUNT − 1; the school covers follow. */
+export const PEOPLE_COUNT = PEOPLE.length
+
+/**
+ * The hero's slides: the students, then every school cover in school order.
+ * Covers appear only when a school is chosen; a school without a cover file
+ * simply has no slide — picking it holds the first student.
  */
 export const HERO_SLIDES: readonly HeroSlide[] = [
-  { src: "/brand/hero-student.png", school: null, label: "A WorldStreet student" },
+  ...PEOPLE,
   ...SCHOOLS.flatMap((s): HeroSlide[] => {
     const src = SCHOOL_COVERS[s.slug]
     return src ? [{ src, school: s.slug, label: s.name }] : []
@@ -33,7 +54,7 @@ export function slideOf(school: SchoolSlug | null): number {
   return i === -1 ? 0 : i
 }
 
-/** Dwell per slide — the indicator's fill time. */
+/** Dwell per student slide. */
 export const SLIDE_MS = 6000
 /**
  * The curtain between two slides. Its soft edge crosses the open (right)
@@ -339,7 +360,7 @@ function Curtain({
         <div className={cn(BAND, "overflow-hidden")}>
           <div ref={push} className={cn("absolute inset-0", portrait ? "origin-[80%_30%]" : "origin-[74%_58%]")}>
             {portrait ? (
-              <Portrait i={i} src={slide.src} onLoaded={onLoaded} />
+              <Portrait i={i} slide={slide} onLoaded={onLoaded} />
             ) : (
               <Cover i={i} src={slide.src} onLoaded={onLoaded} />
             )}
@@ -389,23 +410,53 @@ function Cover({ i, src, onLoaded }: { i: number; src: string; onLoaded: (i: num
   )
 }
 
-function Portrait({ i, src, onLoaded }: { i: number; src: string; onLoaded: (i: number) => void }) {
+/**
+ * A student cutout, inside the band. Below lg the student hangs from the
+ * band's top so the face sits in its clear upper half; the rest runs on under
+ * the veil and is clipped at the band's foot. From lg the student stands on
+ * the stage's foot. Standing portraits are sized by HEIGHT at every width, so
+ * each face lands in the same place whatever the cutout's proportions, and a
+ * short screen can never clip a head (lg: 80% of the stage). The seated laptop
+ * shot is landscape: below lg it is sized by width (so the laptop and its
+ * mark stay in frame), from lg by a lower height, so it never reaches under
+ * the headline.
+ */
+const PORTRAIT_FIT = {
+  tall: {
+    className: "h-[19.75rem] w-auto sm:h-[27.5rem] md:h-[30.5rem] lg:h-[80%]",
+    sizes: "(min-width: 1536px) 40rem, (min-width: 1024px) 32rem, (min-width: 768px) 24rem, (min-width: 640px) 21.5rem, 15.5rem",
+  },
+  wide: {
+    className: "h-auto w-[23rem] max-w-[96%] sm:w-[34rem] md:w-[38rem] lg:h-[64%] lg:w-auto lg:max-w-none",
+    sizes: "(min-width: 1536px) 52rem, (min-width: 1024px) 44rem, (min-width: 768px) 38rem, (min-width: 640px) 34rem, 23rem",
+  },
+} as const
+
+function Portrait({ i, slide, onLoaded }: { i: number; slide: HeroSlide; onLoaded: (i: number) => void }) {
+  const size = slide.size ?? { width: 1115, height: 1420 }
+  const fit = PORTRAIT_FIT[size.wide ? "wide" : "tall"]
   return (
     <div className="absolute inset-0">
-      {/* The studio she stands in: the covers' warm key light, drawn with the
+      {/* The studio they stand in: the covers' warm key light, drawn with the
           house ambient glow — hero pages only (01-foundations → Atmosphere). */}
       <div className="absolute inset-0 bg-[radial-gradient(60%_70%_at_82%_38%,var(--ws-glow-brand),transparent_70%)]" />
       <div className="absolute inset-0 bg-[radial-gradient(34%_42%_at_80%_34%,var(--ws-glow-brand),transparent_72%)]" />
       <Image
-        src={src}
+        src={slide.src}
         alt=""
-        width={509}
-        height={491}
-        priority
+        width={size.width}
+        height={size.height}
+        // The first student is the server-painted slide (and the likely LCP);
+        // the rest mount at idle as eager images, like the covers.
+        priority={i === 0}
+        loading={i === 0 ? undefined : "eager"}
         draggable={false}
         onLoad={() => onLoaded(i)}
-        sizes="(min-width: 1536px) 40rem, (min-width: 1280px) 36rem, (min-width: 1024px) 25rem, (min-width: 768px) 24rem, (min-width: 640px) 21rem, 15rem"
-        className="absolute bottom-0 right-0 h-auto w-[15rem] drop-shadow-[0_24px_60px_rgba(0,0,0,0.55)] sm:w-[21rem] md:w-[24rem] lg:w-[25rem] xl:w-[36rem] 2xl:w-[40rem]"
+        sizes={fit.sizes}
+        className={cn(
+          "absolute right-0 top-4 drop-shadow-[0_24px_60px_rgba(0,0,0,0.55)] sm:top-6 lg:bottom-0 lg:top-auto",
+          fit.className
+        )}
       />
     </div>
   )

@@ -85,7 +85,7 @@ export async function Landing() {
       {/* Reading progress — a gold line on the navbar's foot, landing only */}
       <ScrollProgress />
 
-      {/* Hero — the still claim over a slideshow, the school picker and its CTAs (spec §1) */}
+      {/* Hero — the still claim over a slideshow of students, the school picker and its CTAs (spec §1) */}
       <HeroWall counts={schoolCounts} cheapest={schoolFrom} signedIn={signedIn} registerUrl={REGISTER_URL} />
 
       {/* The band of words — the eight schools' vocabulary */}
