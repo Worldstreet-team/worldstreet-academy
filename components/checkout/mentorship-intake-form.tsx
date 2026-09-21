@@ -20,7 +20,7 @@ export function MentorshipIntakeForm({ courseId }: { courseId: string }) {
 
   return (
     <form
-      className="space-y-4 rounded-lg bg-ws-surface p-5"
+      className="space-y-4 rounded-[20px] border border-ws-hairline bg-ws-surface p-5 dark:border-transparent sm:p-6"
       onSubmit={(e) => {
         e.preventDefault()
         setError(null)

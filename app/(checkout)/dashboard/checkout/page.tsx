@@ -1,484 +1,104 @@
-"use client"
+import type { Metadata } from "next"
+import Link from "next/link"
+import { redirect } from "next/navigation"
+import { ReceiptTextIcon } from "lucide-react"
+import { getCachedUser } from "@/lib/auth/cached"
+import { checkEnrollment } from "@/lib/actions/enrollments"
+import { getMyWalletBalance } from "@/lib/actions/wallet"
+import { fetchProgramById } from "@/lib/actions/student"
+import { fetchProgramCurriculum } from "@/lib/actions/program-page"
+import { PACKAGE_RANK } from "@/lib/entitlements"
+import { courseAvailability, type CourseStatus } from "@/lib/types/course"
+import { CheckoutView, type CheckoutFacts } from "@/components/checkout/checkout-view"
 
-import { useState, useEffect, useRef } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import Image from "next/image"
-import { useQueryClient } from "@tanstack/react-query"
-import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
-import { useUser } from "@/components/providers/user-provider"
-import { purchaseCourse, checkEnrollment } from "@/lib/actions/enrollments"
-import { getMyWalletBalance, type MyWalletBalance } from "@/lib/actions/wallet"
-import { queryKeys } from "@/lib/hooks/queries/keys"
-import { fetchProgramById, type ProgramDetail, type PublicPackage } from "@/lib/actions/student"
-import { saveEnrollmentIntent } from "@/lib/actions/enrollment-intent"
-import { PACKAGE_LABEL } from "@/lib/entitlements"
-import { SCHOOL_BY_SLUG, type SchoolSlug } from "@/lib/schools"
-import { cn } from "@/lib/utils"
-import {
-  BookOpenIcon,
-  CheckIcon,
-  ChevronLeftIcon,
-  CircleCheckIcon,
-  LoaderCircleIcon,
-  ShieldCheckIcon,
-} from "lucide-react"
-
-/** Package prices are whole dollars. */
-function dollars(price: number): string {
-  return price === 0 ? "Free" : `$${price.toLocaleString("en-US")}`
+export const metadata: Metadata = {
+  title: "Checkout",
+  robots: { index: false, follow: false },
 }
 
-/** One saved choice per program + package. */
-function intentKeyOf(courseId: string, packageKey: PublicPackage["key"] | null): string {
-  return `${courseId}:${packageKey ?? ""}`
-}
+type Search = { courseId?: string | string[]; package?: string | string[] }
 
-/** Save this order as the learner's saved school. Resolves true once stored; never rejects. */
-function saveCheckoutIntent(
-  school: SchoolSlug,
-  courseId: string,
-  packageKey: PublicPackage["key"] | null
-): Promise<boolean> {
-  return saveEnrollmentIntent({ school, courseId, packageKey, source: "checkout" }).then(
-    (result) => result.success,
-    () => false
+/**
+ * `/dashboard/checkout?courseId=<id>&package=<key>` — the last step of
+ * Homepage → School → Program → Package → Checkout (blueprint §18).
+ *
+ * Everything that can be settled before the buyer acts is settled here, on
+ * the server, so the page never renders a choice that belongs elsewhere:
+ *   · already enrolled → the confirmation page;
+ *   · not live yet → the program page (its scheduling CTA is the right door);
+ *   · a multi-package program without a valid `package` → the program page's
+ *     package chooser, where the choice now lives (a single-price program
+ *     needs no package);
+ *   · otherwise the order, with the wallet balance already read.
+ */
+export default async function CheckoutPage({ searchParams }: { searchParams: Promise<Search> }) {
+  const params = await searchParams
+  // Only a well-formed id reaches the database; anything else is "not found".
+  const courseId = typeof params.courseId === "string" && /^[a-f0-9]{24}$/i.test(params.courseId) ? params.courseId : null
+  const packageParam = typeof params.package === "string" ? params.package : null
+
+  // The layout redirects a signed-out visitor; this only narrows the type.
+  const user = await getCachedUser()
+  if (!user) return null
+
+  const [program, enrollment] = courseId
+    ? await Promise.all([fetchProgramById(courseId), checkEnrollment(user.id, courseId)])
+    : [null, null]
+  if (!program || !enrollment) return <ProgramNotFound />
+
+  if (enrollment.isEnrolled) redirect(`/dashboard/checkout/success?courseId=${program.id}`)
+
+  if (courseAvailability({ status: program.status as CourseStatus, availableAt: program.availableAt }) === "coming_soon") {
+    redirect(`/programs/${program.slug}`)
+  }
+
+  const selected =
+    program.packages.length === 1
+      ? program.packages[0]
+      : (program.packages.find((p) => p.key === packageParam) ?? null)
+  if (!selected) redirect(`/programs/${program.slug}#packages`)
+
+  const [wallet, curriculum] = await Promise.all([getMyWalletBalance(), fetchProgramCurriculum(program.id)])
+
+  // A lesson's `tier` is set only when it sits above the program's cheapest
+  // tier; the chosen package opens it when its rank reaches that tier.
+  const open = curriculum.filter((l) => !l.tier || PACKAGE_RANK[l.tier] <= PACKAGE_RANK[selected.key])
+  const facts: CheckoutFacts = {
+    lessons: curriculum.length,
+    openLessons: open.length,
+    openVideoSec: open.reduce((sum, l) => sum + (l.durationSec ?? 0), 0),
+  }
+
+  return (
+    <CheckoutView
+      program={program}
+      packageKey={selected.key}
+      wallet={wallet}
+      facts={facts}
+      reservedSeat={enrollment.status === "pre_enrolled"}
+    />
   )
 }
 
-export default function CheckoutPage() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const user = useUser()
-  const queryClient = useQueryClient()
-
-  const courseId = searchParams.get("courseId")
-  const packageParam = searchParams.get("package")
-  const [program, setProgram] = useState<ProgramDetail | null>(null)
-  const [wallet, setWallet] = useState<MyWalletBalance | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [isSuccess, setIsSuccess] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [shortfallMinor, setShortfallMinor] = useState<number | null>(null)
-  const [savingLater, setSavingLater] = useState(false)
-  const [saveLaterError, setSaveLaterError] = useState<string | null>(null)
-  // The save of this order as the learner's saved school, keyed by what it
-  // saved. "Save and pay later" and the wallet round trip wait on it: both
-  // lead into `(platform)`, whose school-first gate would bounce a brand-new
-  // learner to the picker if they arrived before the save landed.
-  const intentSaveRef = useRef<{ key: string; done: Promise<boolean> } | null>(null)
-
-  useEffect(() => {
-    if (!courseId) {
-      setIsLoading(false)
-      return
-    }
-    // Fetch program, enrollment state and central wallet balance in parallel
-    Promise.all([
-      fetchProgramById(courseId),
-      user ? checkEnrollment(user.id, courseId) : Promise.resolve({ isEnrolled: false }),
-      getMyWalletBalance(),
-    ]).then(([p, enrollment, walletBalance]) => {
-      if (enrollment.isEnrolled) {
-        // Already enrolled — skip checkout entirely
-        router.replace(`/dashboard/checkout/success?courseId=${courseId}`)
-        return
-      }
-      setProgram(p)
-      setWallet(walletBalance)
-      setIsLoading(false)
-    })
-  }, [courseId, user, router])
-
-  // The URL carries the package, so the wallet-funding round trip (which
-  // returns to this exact URL) keeps the buyer's choice. A single-tier program
-  // needs no choice.
-  const packages = program?.packages ?? []
-  const selected: PublicPackage | null =
-    packages.length === 1 ? packages[0] : (packages.find((p) => p.key === packageParam) ?? null)
-
-  // Reaching checkout IS choosing (Phase 9): remember it, so an order the
-  // buyer walks away from can be finished from the dashboard, and the
-  // wallet-funding round trip is never stopped by the school-first gate. Its
-  // own effect, keyed on plain values, so it saves once per program + package
-  // and never again for a re-render. A program with no school (legacy) saves
-  // nothing.
-  const intentSchool = program?.school ?? null
-  const intentCourseId = program?.id ?? null
-  const intentPackageKey =
-    program && program.tierCount > 0 ? (packages.find((p) => p.key === packageParam)?.key ?? null) : null
-
-  useEffect(() => {
-    if (!intentSchool || !intentCourseId) return
-    intentSaveRef.current = {
-      key: intentKeyOf(intentCourseId, intentPackageKey),
-      done: saveCheckoutIntent(intentSchool, intentCourseId, intentPackageKey),
-    }
-  }, [intentSchool, intentCourseId, intentPackageKey])
-
-  /** Waits for this order's save; re-attempts it once if it failed or never started. */
-  async function ensureIntentSaved(): Promise<boolean> {
-    if (!intentSchool || !intentCourseId) return false
-    const key = intentKeyOf(intentCourseId, intentPackageKey)
-    const current = intentSaveRef.current
-    if (current?.key === key && (await current.done)) return true
-    const retry = { key, done: saveCheckoutIntent(intentSchool, intentCourseId, intentPackageKey) }
-    intentSaveRef.current = retry
-    return retry.done
-  }
-
-  async function saveForLater() {
-    setSaveLaterError(null)
-    setSavingLater(true)
-    if (await ensureIntentSaved()) {
-      // Stays pending through the navigation.
-      router.push("/dashboard?saved=1")
-      return
-    }
-    setSaveLaterError("Couldn't save your choice — try again.")
-    setSavingLater(false)
-  }
-
-  function choosePackage(key: PublicPackage["key"]) {
-    if (!courseId) return
-    setError(null)
-    setShortfallMinor(null)
-    router.replace(`/dashboard/checkout?courseId=${courseId}&package=${key}`, { scroll: false })
-  }
-
-  async function openFunding() {
-    if (!wallet) return
-    // Internal wallet deposit page (default): navigate in-tab with the
-    // shortfall prefilled and a redirect straight back to this checkout.
-    if (wallet.fundingUrl.startsWith("/")) {
-      // The deposit page sits behind the school-first gate: let the save land
-      // first. Navigate either way — a learner who already has a school or an
-      // enrollment is never gated.
-      await ensureIntentSaved()
-      const returnTo =
-        typeof window !== "undefined"
-          ? `${window.location.pathname}${window.location.search}`
-          : `/dashboard/checkout?courseId=${courseId}`
-      const params = new URLSearchParams({ redirect: returnTo })
-      if (shortfallMinor && shortfallMinor > 0) params.set("suggestMinor", String(shortfallMinor))
-      router.push(`${wallet.fundingUrl}?${params.toString()}`)
-      return
-    }
-    // External override (central dashboard) — keep the legacy new-tab flow.
-    const returnTo = typeof window !== "undefined" ? window.location.href : ""
-    const url = `${wallet.fundingUrl}${wallet.fundingUrl.includes("?") ? "&" : "?"}redirect=${encodeURIComponent(returnTo)}`
-    window.open(url, "_blank", "noopener")
-  }
-
-  async function handlePurchase() {
-    if (!program || !user || !selected) return
-    setIsProcessing(true)
-    setError(null)
-    setShortfallMinor(null)
-
-    try {
-      // The server derives identity from the session and the price from the
-      // course's package; enrollment is only granted after the central
-      // WorldStreet wallet confirms the debit. No optimistic success. A program
-      // without a package ladder (tierCount 0) shows one synthesized tier — the
-      // server ignores a key there, so none is sent.
-      const result = await purchaseCourse({
-        courseId: program.id,
-        packageKey: program.tierCount > 0 ? selected.key : undefined,
-      })
-
-      if (result.success) {
-        // Money moved outside the query cache — mark every wallet figure
-        // stale, the top bar's balance chip included.
-        queryClient.invalidateQueries({ queryKey: queryKeys.wallet })
-        setIsSuccess(true)
-        router.push(`/dashboard/checkout/success?courseId=${program.id}`)
-      } else {
-        if (result.code === "insufficient_funds") {
-          setShortfallMinor(result.shortfallMinor ?? null)
-          setError(null)
-          // Refresh the displayed balance to what the wallet reported
-          getMyWalletBalance().then(setWallet)
-        } else {
-          setError(result.error || "Something went wrong")
-        }
-        setIsProcessing(false)
-      }
-    } catch {
-      setError("Something went wrong. You have not been charged.")
-      setIsProcessing(false)
-    }
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <LoaderCircleIcon size={24} className="animate-spin text-ws-muted" />
-      </div>
-    )
-  }
-
-  if (!program || !courseId) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <div className="space-y-3 text-center">
-          <p className="text-sm text-ws-muted">Program not found</p>
-          <Button variant="outline" onClick={() => router.back()}>
-            Go Back
-          </Button>
-        </div>
-      </div>
-    )
-  }
-
-  const price = selected ? selected.price : null
-  const school = program.school ? SCHOOL_BY_SLUG[program.school] : null
-  const multiTier = packages.length > 1
-  // The wallet is the only way a paid seat is bought, so when it is off the
-  // purchase cannot succeed — `purchaseCourse` fails closed before it touches
-  // money. Say so before the click rather than after it. A free program needs
-  // no debit, so it is never blocked. `wallet === null` is still loading.
-  const payBlocked = price !== null && price > 0 && wallet !== null && !wallet.enabled
-
+function ProgramNotFound() {
   return (
-    <div className="pb-[max(2rem,env(safe-area-inset-bottom))]">
-      <div className="mx-auto max-w-lg space-y-6 px-4 py-8 md:px-6">
-          {/* Back */}
-          <button
-            onClick={() => router.back()}
-            className="flex items-center gap-1.5 text-sm text-ws-muted hover:text-ws-primary transition-colors"
-          >
-            <ChevronLeftIcon size={14} />
-            Back
-          </button>
-
-          {/* Program */}
-          <div className="rounded-lg border border-ws-hairline bg-ws-surface overflow-hidden">
-            <div className="relative aspect-[21/9] bg-ws-raised">
-              {program.thumbnailUrl ? (
-                <Image src={program.thumbnailUrl} alt={program.title} fill className="object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <BookOpenIcon size={32} className="text-ws-subtle" />
-                </div>
-              )}
-            </div>
-            <div className="p-4">
-              {school && (
-                <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-ws-muted">{school.short}</p>
-              )}
-              <h1 className="mt-1 text-base font-semibold text-ws-primary">{program.title}</h1>
-              <p className="mt-0.5 text-xs text-ws-muted">
-                by {program.instructorName} · <span className="tabular-nums">{program.totalLessons}</span> lessons
-              </p>
-            </div>
-          </div>
-
-          {/* Package switcher — doubles as the ladder when no package is chosen */}
-          {multiTier && (
-            <fieldset className="min-w-0 space-y-2">
-              <legend className="mb-2 text-sm font-semibold text-ws-primary">
-                {selected ? "Your package" : "Choose your package"}
-              </legend>
-              {packages.map((pkg) => {
-                const active = pkg.key === selected?.key
-                return (
-                  <label
-                    key={pkg.key}
-                    className={cn(
-                      "flex cursor-pointer items-center gap-3 rounded-lg border p-4 transition-colors duration-[var(--ws-motion-fast)] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ws-brand/40",
-                      active ? "border-ws-brand/40 bg-ws-raised" : "border-ws-hairline bg-ws-surface hover:bg-ws-raised"
-                    )}
-                  >
-                    <input
-                      type="radio"
-                      name="package"
-                      value={pkg.key}
-                      checked={active}
-                      onChange={() => choosePackage(pkg.key)}
-                      className="sr-only"
-                    />
-                    <span
-                      aria-hidden
-                      className={cn(
-                        "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border",
-                        active ? "border-ws-brand bg-ws-brand text-ws-brand-on" : "border-ws-hairline"
-                      )}
-                    >
-                      {active && <CheckIcon size={10} strokeWidth={3} />}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-ws-muted">
-                        {PACKAGE_LABEL[pkg.key]}
-                      </span>
-                      <span className="block truncate text-sm font-medium text-ws-primary">{pkg.name}</span>
-                      {pkg.tagline && <span className="block truncate text-xs text-ws-muted">{pkg.tagline}</span>}
-                    </span>
-                    <span className="font-display text-lg font-light tabular-nums text-ws-primary">
-                      {dollars(pkg.price)}
-                    </span>
-                  </label>
-                )
-              })}
-            </fieldset>
-          )}
-
-          {/* What the chosen package includes (collapsed) */}
-          {selected && selected.features.length > 0 && (
-            <details className="rounded-lg border border-ws-hairline bg-ws-surface px-4 py-3">
-              <summary className="cursor-pointer text-sm font-medium text-ws-primary">
-                What&apos;s included <span className="tabular-nums text-ws-muted">({selected.features.length})</span>
-              </summary>
-              <ul className="mt-3 space-y-2">
-                {selected.features.map((feature, i) => (
-                  <li key={`${selected.key}-${i}`} className="flex items-start gap-2 text-[13px] leading-relaxed text-ws-muted">
-                    <CheckIcon size={14} className="mt-0.5 shrink-0" aria-hidden />
-                    {feature}
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
-
-          {/* Order Summary */}
-          {selected && price !== null && (
-            <div className="rounded-lg border border-ws-hairline bg-ws-surface p-4 space-y-4">
-              <h2 className="text-sm font-semibold text-ws-primary">Order summary</h2>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="min-w-0 truncate text-ws-muted">
-                    {program.tierCount > 0 ? selected.name : "Program price"}
-                  </span>
-                  <span className="font-medium tabular-nums text-ws-primary">{dollars(price)}</span>
-                </div>
-                {price > 0 && wallet?.enabled && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-ws-muted">WorldStreet balance</span>
-                    <span
-                      className={cn(
-                        "font-medium tabular-nums",
-                        wallet.usdAvailable >= price ? "text-ws-primary" : "text-ws-danger"
-                      )}
-                    >
-                      ${wallet.usdAvailable.toFixed(2)}
-                    </span>
-                  </div>
-                )}
-                <Separator />
-                <div className="flex items-baseline justify-between">
-                  <span className="text-sm font-semibold text-ws-primary">Total</span>
-                  <span className="font-display text-3xl font-light tabular-nums tracking-[-0.02em] text-ws-primary">
-                    {dollars(price)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* How this is paid. "Secure checkout" itself lives in the
-              layout header, so it is not repeated here. */}
-          {price !== null && price > 0 && (
-            <p className="flex items-center justify-center gap-2 text-center text-xs text-ws-subtle">
-              <ShieldCheckIcon size={13} className="shrink-0" aria-hidden />
-              <span>
-                Paid from your WorldStreet wallet — funding &amp; withdrawals live on the
-                WorldStreet dashboard
-              </span>
-            </p>
-          )}
-
-          {/* Wallet off. Stated before the click, because no amount of trying
-              clears it — the CTA below is disabled for the same reason. */}
-          {payBlocked && (
-            <div className="space-y-1 rounded-lg border border-ws-warning/20 bg-ws-warning/10 px-4 py-3">
-              <p className="text-sm font-medium text-ws-warning">Payments are unavailable right now</p>
-              <p className="text-xs text-ws-muted">
-                You haven&apos;t been charged, and this program is still here when payments are back.
-              </p>
-            </div>
-          )}
-
-          {/* Insufficient funds */}
-          {shortfallMinor !== null && (
-            <div className="rounded-lg bg-ws-warning/10 border border-ws-warning/20 px-4 py-3 space-y-2">
-              <p className="text-sm font-medium text-ws-warning">Insufficient balance</p>
-              <p className="text-xs text-ws-muted">
-                You need ${(shortfallMinor / 100).toFixed(2)} more in your WorldStreet wallet for this
-                package. Top up on the WorldStreet dashboard, then come back — your order will still be here.
-              </p>
-              <Button variant="outline" size="sm" className="w-full" onClick={openFunding}>
-                Fund my WorldStreet wallet
-              </Button>
-            </div>
-          )}
-
-          {/* Error */}
-          {error && (
-            <div className="rounded-lg bg-ws-danger/10 border border-ws-danger/20 px-4 py-3">
-              <p className="text-sm text-ws-danger">{error}</p>
-            </div>
-          )}
-
-          {/* CTA */}
-          <Button
-            onClick={handlePurchase}
-            disabled={!selected || isProcessing || isSuccess || payBlocked}
-            // Gold is the page's primary action. With the wallet off there is
-            // no action to offer, so the CTA drops out of gold rather than
-            // sitting there dimmed and still claiming the eye.
-            variant={payBlocked ? "outline" : "default"}
-            className="w-full h-12 text-sm font-semibold gap-2"
-            size="lg"
-          >
-            {isSuccess ? (
-              <>
-                <CircleCheckIcon size={16} />
-                Enrolled! Redirecting...
-              </>
-            ) : isProcessing ? (
-              <>
-                <LoaderCircleIcon size={16} className="animate-spin" />
-                Processing...
-              </>
-            ) : !selected || price === null ? (
-              "Choose a package to continue"
-            ) : payBlocked ? (
-              "Payments unavailable"
-            ) : (
-              <>
-                <CircleCheckIcon size={16} />
-                {price === 0 ? "Enrol for free" : `Pay ${dollars(price)}`}
-              </>
-            )}
-        </Button>
-
-          {/* Only a program in a school can be saved: a legacy one has no
-              school to put on the dashboard, so the promise would be empty. */}
-          {!isSuccess && program.school && (
-            <div className="space-y-1">
-              <button
-                type="button"
-                onClick={saveForLater}
-                disabled={savingLater}
-                className="flex h-11 w-full items-center justify-center gap-2 rounded-full text-sm font-medium text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:text-ws-primary disabled:cursor-default disabled:hover:text-ws-muted"
-              >
-                {savingLater ? (
-                  <>
-                    <LoaderCircleIcon size={14} className="animate-spin" aria-hidden />
-                    Saving…
-                  </>
-                ) : (
-                  "Save and pay later"
-                )}
-              </button>
-              {saveLaterError && (
-                <p role="alert" className="text-center text-xs text-ws-danger">
-                  {saveLaterError}
-                </p>
-              )}
-            </div>
-          )}
+    <div className="flex flex-1 items-center justify-center px-4 py-24">
+      <div className="flex max-w-sm flex-col items-center text-center">
+        <span className="flex size-12 items-center justify-center rounded-full bg-ws-surface text-ws-muted">
+          <ReceiptTextIcon size={20} aria-hidden />
+        </span>
+        <h1 className="mt-5 font-display text-[22px] font-semibold tracking-[-0.015em] text-ws-primary">
+          This order isn&apos;t available
+        </h1>
+        <p className="mt-2 text-[14px] leading-relaxed text-ws-muted">
+          The program in this link couldn&apos;t be found, or it isn&apos;t open for enrollment. Nothing has been charged.
+        </p>
+        <Link
+          href="/programs"
+          className="mt-6 flex h-11 items-center justify-center rounded-full bg-ws-brand px-6 text-[14px] font-semibold text-ws-brand-on transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-brand/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40 focus-visible:ring-offset-2 focus-visible:ring-offset-ws-page"
+        >
+          Browse programs
+        </Link>
       </div>
     </div>
   )

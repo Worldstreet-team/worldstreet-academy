@@ -38,20 +38,21 @@ export default async function CheckoutLayout({ children }: { children: React.Rea
         <div className="flex min-h-svh flex-col bg-ws-page">
           {/* The lockup is not a link: mid-payment is the wrong moment to
               offer a way out of the flow. The page's own Back control is. */}
+          {/* Same measure as the pages' content column, so the lockup sits
+              over the order and "Secure checkout" over the payment card. */}
           <header className="border-b border-ws-hairline">
-            <div className="mx-auto flex h-16 w-full max-w-lg items-center justify-between gap-4 px-4 md:px-6">
+            <div className="mx-auto flex h-16 w-full max-w-[1120px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
               <BrandLockup alt="" />
-              <p className="inline-flex items-center gap-1.5 text-[12px] font-medium text-ws-muted">
+              <p className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-ws-muted">
                 <ShieldCheckIcon size={14} aria-hidden />
                 Secure checkout
               </p>
             </div>
           </header>
-          {/* justify-center parks a short order in the middle of the screen;
-              a tall one (three packages expanded) simply grows the main and
-              scrolls, because the scroll container is the document, not this
-              box — so nothing gets clipped off the top. */}
-          <main className="flex flex-1 flex-col justify-center">{children}</main>
+          {/* Checkout starts at the top of the page (a two-column order reads
+              top-down); the confirmation and not-found screens centre
+              themselves with flex-1. */}
+          <main className="flex flex-1 flex-col">{children}</main>
         </div>
       </UserProvider>
     </QueryProvider>
