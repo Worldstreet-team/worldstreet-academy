@@ -29,10 +29,12 @@ import { EASE_LUX } from "@/components/marketing/motion/ease"
 import { PROGRAM_H2, SECTION_SCROLL_MT } from "@/components/programs/section-title"
 import { CheckoutLink, usePackageSelection } from "@/components/programs/package-selection"
 import { PackageCompare } from "@/components/programs/package-compare"
+import { OfferEnds, PackageDiscount, PackageDuration } from "@/components/programs/package-offer"
 import {
   SERVICES,
   actionLabel,
   breakdownsOf,
+  discountOf,
   lessonLine,
   lowestWith,
   servicesOf,
@@ -243,6 +245,7 @@ function OptionCard({ pkg, selected, onSelect }: { pkg: PublicPackage; selected:
             {packagePriceLabel(pkg.price)}
           </span>
         </span>
+        <PackageDiscount pkg={pkg} className="mt-2 flex justify-end text-[13px]" />
         {pkg.tagline && (
           <span className="mt-1.5 block text-pretty text-[13.5px] leading-relaxed text-ws-muted">{pkg.tagline}</span>
         )}
@@ -283,6 +286,7 @@ function Breakdown({
               <h3 className="mt-2 font-display text-[26px] font-semibold leading-tight tracking-[-0.02em] text-ws-primary">
                 {pkg.name}
               </h3>
+              <PackageDuration duration={pkg.duration} className="mt-3" />
             </>
           )}
         </Stack>
@@ -294,6 +298,7 @@ function Breakdown({
             Paid from your WorldStreet wallet at checkout
           </p>
         </div>
+        <OfferTerms pkg={selected} comingSoon={comingSoon} className="mt-4" />
       </div>
 
       <div className="border-t border-ws-hairline p-5 sm:p-8">
@@ -552,6 +557,20 @@ function OfferAction({ pkg, single, comingSoon }: { pkg: PublicPackage; single: 
   )
 }
 
+/**
+ * Under the action: the struck list price, the saving and, while the tier can
+ * be bought, "Offer ends in …". Nothing for a tier without a launch discount.
+ */
+function OfferTerms({ pkg, comingSoon, className }: { pkg: PublicPackage; comingSoon: boolean; className?: string }) {
+  if (!discountOf(pkg)) return null
+  return (
+    <div key={pkg.key} className={cn("ws-animate-fade flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[13.5px]", className)}>
+      <PackageDiscount pkg={pkg} />
+      {!comingSoon && <OfferEnds pkg={pkg} />}
+    </div>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Single price
 // ---------------------------------------------------------------------------
@@ -576,7 +595,9 @@ function SingleOffer({ comingSoon, lessons }: { comingSoon: boolean; lessons: Le
       <p className="mt-3 font-display text-[52px] font-light leading-none tabular-nums tracking-[-0.03em] text-ws-primary">
         {packagePriceLabel(pkg.price)}
       </p>
+      <PackageDiscount pkg={pkg} className="mt-3 flex text-[14px]" />
       {pkg.tagline && <p className="mt-3 text-pretty text-[14.5px] leading-relaxed text-ws-muted">{pkg.tagline}</p>}
+      <PackageDuration duration={pkg.duration} className="mt-3" />
       {lessonsText && (
         <p className="mt-3 inline-flex items-center gap-1.5 text-[13px] tabular-nums text-ws-muted">
           <ListVideoIcon size={14} aria-hidden />
@@ -588,6 +609,7 @@ function SingleOffer({ comingSoon, lessons }: { comingSoon: boolean; lessons: Le
   const action = (
     <>
       <OfferAction pkg={pkg} single comingSoon={comingSoon} />
+      {!comingSoon && <OfferEnds pkg={pkg} className="mt-3 block" />}
       {!comingSoon && pkg.price > 0 && (
         <p className="mt-3 flex items-center gap-2 text-[13px] text-ws-muted">
           <ShieldCheckIcon size={15} className="shrink-0 text-ws-subtle" aria-hidden />

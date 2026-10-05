@@ -35,6 +35,14 @@ export interface ICoursePackage {
   name: string
   tagline: string
   price: number
+  /**
+   * The price before the launch discount, whole USD. Display only: shown
+   * struck through beside `price` when it is higher. Checkout always charges
+   * `price`. null = no discount to show.
+   */
+  listPrice: number | null
+  /** How long the package runs, as copy ("9 weeks"). null = not stated. */
+  duration: string | null
   features: string[]
   highlight: boolean
   ctaLabel: string | null
@@ -217,6 +225,8 @@ const CourseSchema = new Schema<ICourse>(
             name: { type: String, required: true, trim: true, maxlength: 60 },
             tagline: { type: String, default: "", maxlength: 120 },
             price: { type: Number, required: true, min: 0 },
+            listPrice: { type: Number, default: null, min: 0 },
+            duration: { type: String, default: null, trim: true, maxlength: 40 },
             features: { type: [String], default: [] },
             highlight: { type: Boolean, default: false },
             ctaLabel: { type: String, default: null, maxlength: 40 },

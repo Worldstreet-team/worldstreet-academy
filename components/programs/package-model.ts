@@ -49,6 +49,26 @@ export function defaultPackageKey(packages: PublicPackage[]): PackageKey {
   return (packages.find((p) => p.highlight) ?? packages[0]).key
 }
 
+/** The tier a "from" price quotes: the cheapest, the first of equals in ladder order. */
+export function cheapestOf(packages: PublicPackage[]): PublicPackage {
+  return packages.reduce((low, p) => (p.price < low.price ? p : low))
+}
+
+/**
+ * The launch discount on a package (owner, 2026-10-03): the pre-discount
+ * price to strike through and the whole percent saved, rounded down so the
+ * chip never overstates it. null when the package has no list price above
+ * its price. The discount holds until the live cohort starts (lib/cohort.ts);
+ * checkout always charges `price`.
+ */
+export function discountOf(
+  pkg: Pick<PublicPackage, "price" | "listPrice">
+): { listPrice: number; percent: number } | null {
+  const list = pkg.listPrice
+  if (list == null || list <= pkg.price) return null
+  return { listPrice: list, percent: Math.floor(((list - pkg.price) / list) * 100) }
+}
+
 /**
  * Checkout for one package. A ladder-less program has no real package to
  * name (the server ignores a key there), so its link carries none.
@@ -147,13 +167,15 @@ export function breakdownsOf(packages: PublicPackage[]): Record<string, PackageB
 // Compare packages — feature × tier
 // ---------------------------------------------------------------------------
 
-export type CompareCell = boolean | string
+/** true/false = included or not; a string is printed as is; null = not stated. */
+export type CompareCell = boolean | string | null
 export type CompareRow = { label: string; cells: CompareCell[] }
 export type CompareGroup = { title: string; rows: CompareRow[] }
 
 /**
- * The comparison table, built from the same data as the cards: lessons (when
- * the curriculum is published), the services, then every feature line grouped
+ * The comparison table, built from the same data as the cards: the duration
+ * (when any tier states one), lessons (when the curriculum is published), the
+ * services, then every feature line grouped
  * by the tier that first lists it. A group is titled "Included from Basic" /
  * "Added in Standard" only when its lines really do carry up the ladder;
  * otherwise it says where they are first listed.
@@ -171,6 +193,9 @@ export function comparisonOf(
   })
 
   const services: CompareRow[] = []
+  if (packages.some((p) => p.duration)) {
+    services.push({ label: "Duration", cells: packages.map((p) => p.duration || null) })
+  }
   if (lessons && lessons.total > 0) {
     services.push({
       label: "Lessons",
