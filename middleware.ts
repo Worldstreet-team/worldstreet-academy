@@ -4,7 +4,9 @@ import {
   REFERRAL_COOKIE,
   REFERRAL_COOKIE_MAX_AGE,
   REFERRAL_PARAM,
+  SELLER_LINK_COOKIE,
   normalizeReferralCode,
+  sellerLinkValue,
 } from "@/lib/referral-link"
 
 const isProtectedRoute = createRouteMatcher(["/dashboard(.*)", "/instructor(.*)", "/admin(.*)"])
@@ -30,7 +32,21 @@ export default clerkMiddleware(async (auth, request) => {
     const cookieHeader = requestHeaders.get("cookie")
     requestHeaders.set("cookie", `${cookieHeader ? `${cookieHeader}; ` : ""}${REFERRAL_COOKIE}=${refCode}`)
   }
+  // A code on a program page is also kept per course, last touch wins
+  // (SELLER_LINK_COOKIE): a seller's own link must still credit the seller
+  // when this visitor followed someone else's link before.
+  const linkedSlug = pathname.match(/^\/programs\/([^/]+)\/?$/)?.[1] ?? null
+  const courseRefCode = linkedSlug ? normalizeReferralCode(request.nextUrl.searchParams.get(REFERRAL_PARAM)) : null
   const withReferral = (response: NextResponse) => {
+    if (linkedSlug && courseRefCode) {
+      response.cookies.set(SELLER_LINK_COOKIE, sellerLinkValue(linkedSlug, courseRefCode), {
+        path: "/",
+        sameSite: "lax",
+        maxAge: REFERRAL_COOKIE_MAX_AGE,
+        httpOnly: true,
+        secure: !isLocalDev,
+      })
+    }
     if (refCode) {
       response.cookies.set(REFERRAL_COOKIE, refCode, {
         path: "/",

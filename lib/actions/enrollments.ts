@@ -29,6 +29,7 @@ import { courseKindOf } from "@/lib/course-kind"
 import {
   isFirstPaidPurchase,
   referralCookieCode,
+  sellerLinkCookieCode,
   referralCreditReference,
   referrerFor,
   splitSale,
@@ -413,7 +414,14 @@ export async function purchaseCourse(input: { courseId: string; packageKey?: Pac
     let referrer: Referrer | null = null
     if (isPaid && order) {
       try {
-        referrer = await referrerFor(user.id, await referralCookieCode())
+        // A seller's own link to this very course beats an older first-touch
+        // code (SELLER_LINK_COOKIE); anything else follows the usual order.
+        const sellerCode = courseKind === "marketplace" ? await sellerLinkCookieCode(course.slug) : null
+        const sellerRef = sellerCode ? await referrerFor(user.id, sellerCode) : null
+        referrer =
+          sellerRef && sellerRef.userId === sellerId && sellerRef.source === "link"
+            ? sellerRef
+            : await referrerFor(user.id, await referralCookieCode())
         split = splitSale({ kind: courseKind, sellerId, buyerId: user.id, referrer })
         if (split.attribution) {
           await Order.updateOne({ _id: order._id }, { $set: { attribution: split.attribution } })

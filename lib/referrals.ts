@@ -12,7 +12,7 @@ import {
   type CourseKind,
   type OrderAttributionKind,
 } from "@/lib/db/models"
-import { REFERRAL_COOKIE, normalizeReferralCode } from "@/lib/referral-link"
+import { REFERRAL_COOKIE, SELLER_LINK_COOKIE, normalizeReferralCode, sellerLinkCodeFor } from "@/lib/referral-link"
 import { maskedName } from "@/lib/masked-name"
 
 /**
@@ -80,6 +80,15 @@ export async function referralOwner(code: string): Promise<{ id: string; authUse
 export async function referralCookieCode(): Promise<string | null> {
   try {
     return normalizeReferralCode((await cookies()).get(REFERRAL_COOKIE)?.value)
+  } catch {
+    return null
+  }
+}
+
+/** The code this request's buyer last followed on `slug`'s own page, or null. */
+export async function sellerLinkCookieCode(slug: string): Promise<string | null> {
+  try {
+    return sellerLinkCodeFor((await cookies()).get(SELLER_LINK_COOKIE)?.value, slug)
   } catch {
     return null
   }
