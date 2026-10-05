@@ -1,4 +1,4 @@
-"use server"
+import "server-only"
 
 import { Types } from "mongoose"
 import connectDB from "@/lib/db"
