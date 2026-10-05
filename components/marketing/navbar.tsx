@@ -56,6 +56,8 @@ export async function Navbar({ showFaculty }: { showFaculty: boolean }) {
   const sheetLinks: MarketingNavLink[] = [
     { href: "/schools", label: "All schools" },
     { href: "/programs", label: "All programs" },
+    { href: "/marketplace", label: "Marketplace" },
+    { href: "/new-economy", label: "New Economy — free" },
     ...(showFaculty ? [{ href: "/faculty", label: "Faculty" }] : []),
     { href: "/#how-it-works", label: "How it works" },
     ...(user && !gated ? [{ href: "/dashboard", label: "My Learning" }] : []),
@@ -82,13 +84,17 @@ export async function Navbar({ showFaculty }: { showFaculty: boolean }) {
       <NavSearch className="hidden min-w-0 max-w-md flex-1 md:block" />
 
       <div className="flex shrink-0 items-center gap-1 sm:gap-1.5 md:ml-auto">
-        {/* Text links from lg. Measured at 1024: with Faculty too the search
-            drops under ~200px, so Faculty — and a signed-in user's two extra
-            links — wait for xl (Faculty for 2xl beside both of them). Below
-            lg they are all in the sheet. */}
+        {/* Text links from lg: Programs and the Marketplace (the Academy's
+            two halves, owner 2026-10-03). Measured at 1024: with Faculty too
+            the search drops under ~200px, so Faculty — and a signed-in user's
+            two extra links — wait for xl (Faculty for 2xl beside both of
+            them). Below lg they are all in the sheet, with New Economy. */}
         <nav aria-label="Site" className="hidden items-center lg:flex">
           <Link href="/programs" className={barLinkClass}>
             Programs
+          </Link>
+          <Link href="/marketplace" className={barLinkClass}>
+            Marketplace
           </Link>
           {showFaculty && (
             <Link
