@@ -376,6 +376,9 @@ function EarningsTab() {
                         {e.kind === "adjustment" && (
                           <Badge variant="destructive" className="text-[8px]">clawback</Badge>
                         )}
+                        {e.kind === "referral" && (
+                          <Badge variant="secondary" className="text-[8px]">referral</Badge>
+                        )}
                       </p>
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-muted-foreground">

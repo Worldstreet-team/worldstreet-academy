@@ -1,5 +1,11 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server"
 import { NextResponse } from "next/server"
+import {
+  REFERRAL_COOKIE,
+  REFERRAL_COOKIE_MAX_AGE,
+  REFERRAL_PARAM,
+  normalizeReferralCode,
+} from "@/lib/referral-link"
 
 const isProtectedRoute = createRouteMatcher(["/dashboard(.*)", "/instructor(.*)", "/admin(.*)"])
 
@@ -12,6 +18,32 @@ export default clerkMiddleware(async (auth, request) => {
   const requestHeaders = new Headers(request.headers)
   requestHeaders.set("x-next-pathname", pathname)
 
+  // Referral links (owner, 2026-10-05): any page with a valid `?ref=CODE`
+  // stores the code for 30 days, so it survives sign-up on the hub. First
+  // touch wins — a valid code already stored is never replaced. The code is
+  // also added to this request's own cookies, so a user created while
+  // rendering it (lib/auth/sync.ts) is already attributed.
+  const refCode = normalizeReferralCode(request.cookies.get(REFERRAL_COOKIE)?.value)
+    ? null
+    : normalizeReferralCode(request.nextUrl.searchParams.get(REFERRAL_PARAM))
+  if (refCode) {
+    const cookieHeader = requestHeaders.get("cookie")
+    requestHeaders.set("cookie", `${cookieHeader ? `${cookieHeader}; ` : ""}${REFERRAL_COOKIE}=${refCode}`)
+  }
+  const withReferral = (response: NextResponse) => {
+    if (refCode) {
+      response.cookies.set(REFERRAL_COOKIE, refCode, {
+        path: "/",
+        sameSite: "lax",
+        maxAge: REFERRAL_COOKIE_MAX_AGE,
+        httpOnly: true,
+        // Local dev runs on http://localhost; everywhere else is https.
+        secure: !isLocalDev,
+      })
+    }
+    return response
+  }
+
   if (isProtectedRoute(request)) {
     const { userId } = await auth()
 
@@ -20,7 +52,7 @@ export default clerkMiddleware(async (auth, request) => {
         // Local dev: redirect to local sign-in
         const loginUrl = new URL("/login", request.url)
         loginUrl.searchParams.set("redirect_url", `${pathname}${request.nextUrl.search}`)
-        return NextResponse.redirect(loginUrl)
+        return withReferral(NextResponse.redirect(loginUrl))
       }
 
       const returnUrl = `https://academy.worldstreetgold.com${pathname}${request.nextUrl.search}`
@@ -28,13 +60,15 @@ export default clerkMiddleware(async (auth, request) => {
       authUrl.searchParams.set("redirect", returnUrl)
       // The hub's Clerk <SignIn/> reads redirect_url; `redirect` is the older contract.
       authUrl.searchParams.set("redirect_url", returnUrl)
-      return NextResponse.redirect(authUrl)
+      return withReferral(NextResponse.redirect(authUrl))
     }
   }
 
-  return NextResponse.next({
-    request: { headers: requestHeaders },
-  })
+  return withReferral(
+    NextResponse.next({
+      request: { headers: requestHeaders },
+    })
+  )
 }, isLocalDev
   ? {
       signInUrl: "/login",

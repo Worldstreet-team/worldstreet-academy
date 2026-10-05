@@ -11,8 +11,8 @@ import {
   Order,
   PaymentEvent,
   Earning,
-  INSTRUCTOR_REVENUE_SHARE,
   EARNINGS_CLEARING_DAYS,
+  REFERRAL_COMMISSION_RATE,
   type IOrder,
   type OrderStatus,
   type PackageKey,
@@ -25,6 +25,15 @@ import { notifyAdmins, notifyUser } from "@/lib/notify"
 import { getCourseAccess, isLessonLockedFor, lockedLessonIds } from "@/lib/course-access"
 import { saveWithCertificateId } from "@/lib/certificate-id"
 import { PACKAGE_KEYS, packageFor, sellsPackages } from "@/lib/entitlements"
+import { courseKindOf } from "@/lib/course-kind"
+import {
+  isFirstPaidPurchase,
+  referralCookieCode,
+  referralCreditReference,
+  referrerFor,
+  splitSale,
+  type Referrer,
+} from "@/lib/referrals"
 import {
   createWalletCharge,
   refundWalletCharge,
@@ -391,10 +400,45 @@ export async function purchaseCourse(input: { courseId: string; packageKey?: Pac
 
     if (order) await transitionOrder(order, "enrolled")
 
+    // Who made the sale (owner, 2026-10-05): the code in the buyer's `wsa_ref`
+    // cookie, else whoever their account says invited them. It sets the
+    // seller's share and whether a referral commission is owed (the truth
+    // table is `splitSale` in lib/referrals.ts). The money has already moved,
+    // so nothing here may fail the purchase: on any error it is logged and the
+    // sale is booked as the Academy's, with no code.
+    const courseKind = courseKindOf(course)
+    const sellerId = course.instructor.toString()
+    const academySale = splitSale({ kind: courseKind, sellerId, buyerId: user.id, referrer: null })
+    let split = academySale
+    let referrer: Referrer | null = null
+    if (isPaid && order) {
+      try {
+        referrer = await referrerFor(user.id, await referralCookieCode())
+        split = splitSale({ kind: courseKind, sellerId, buyerId: user.id, referrer })
+        if (split.attribution) {
+          await Order.updateOne({ _id: order._id }, { $set: { attribution: split.attribution } })
+        }
+      } catch (err) {
+        console.error("[Referrals] attribution failed — booked as an Academy sale:", err)
+        referrer = null
+        split = academySale
+      }
+      // A link they arrived through also answers "Who invited you?" for an
+      // account that has no answer yet (first answer wins).
+      if (referrer?.source === "link") {
+        const { code, userId } = referrer
+        await User.updateOne(
+          { _id: user.id, referredBy: null },
+          { $set: { referredBy: { text: code, at: new Date(), code, userId } } }
+        ).catch((err) => console.error("[Referrals] failed to save who invited the buyer:", err))
+      }
+    }
+
     // Instructor earnings: ledger row stays pending through the clearing
     // window, then clears into their central wallet balance.
     if (isPaid) {
-      const feeMinor = Math.round(amountMinor * (1 - INSTRUCTOR_REVENUE_SHARE))
+      const availableAt = new Date(Date.now() + EARNINGS_CLEARING_DAYS * 24 * 60 * 60 * 1000)
+      const feeMinor = Math.round(amountMinor * (1 - split.share))
       const netMinor = amountMinor - feeMinor
       const instructor = await User.findById(course.instructor).select("authUserId")
       if (instructor?.authUserId) {
@@ -412,7 +456,7 @@ export async function purchaseCourse(input: { courseId: string; packageKey?: Pac
             netMinor,
             currency: "USD",
             status: "pending",
-            availableAt: new Date(Date.now() + EARNINGS_CLEARING_DAYS * 24 * 60 * 60 * 1000),
+            availableAt,
             // Same generation suffix as the charge: a re-purchase is a new sale
             // and must earn again, but the enrollment id is unchanged so the
             // bare reference would collide with the original (refunded) sale.
@@ -426,6 +470,43 @@ export async function purchaseCourse(input: { courseId: string; packageKey?: Pac
           console.error("[Earnings] failed to record sale earning:", err)
         }
       }
+
+      // The referral commission (owner, 2026-10-05): 10% of the referred
+      // person's FIRST paid enrollment, ever, out of the Academy's share, to
+      // the referrer's wallet after the same clearing window. Only on a
+      // "referral" sale — never a self-referral, never on a sale the seller's
+      // own link made. The referrer may be any user, not only faculty.
+      const commissionMinor = Math.round(amountMinor * REFERRAL_COMMISSION_RATE)
+      if (split.attribution?.kind === "referral" && referrer && order && commissionMinor > 0) {
+        try {
+          if (referrer.userId !== user.id && (await isFirstPaidPurchase(user.id, order._id.toString()))) {
+            await Earning.create({
+              enrollment: enrollment._id,
+              order: order._id,
+              course: course._id,
+              instructor: referrer.userId,
+              instructorAuthUserId: referrer.authUserId,
+              student: user.id,
+              kind: "referral",
+              grossMinor: amountMinor,
+              feeMinor: amountMinor - commissionMinor,
+              netMinor: commissionMinor,
+              currency: "USD",
+              status: "pending",
+              availableAt,
+              // One per buyer, ever (see referralCreditReference).
+              creditReference: referralCreditReference(user.id),
+              chargeId,
+              note: `referral: ${Math.round(REFERRAL_COMMISSION_RATE * 100)}% of the referred learner's first paid enrollment, code ${referrer.code}`,
+            })
+          }
+        } catch (err) {
+          // A duplicate reference is this buyer's one commission, already recorded.
+          if ((err as { code?: number }).code !== 11000) {
+            console.error("[Referrals] failed to record the referral commission:", err)
+          }
+        }
+      }
     }
 
     // Update course + instructor aggregates. Pre-enrollment already counted
@@ -436,7 +517,7 @@ export async function purchaseCourse(input: { courseId: string; packageKey?: Pac
     await User.findByIdAndUpdate(course.instructor, {
       $inc: {
         ...(isActivation ? {} : { "instructorProfile.totalStudents": 1 }),
-        "instructorProfile.totalEarnings": isPaid ? (price * INSTRUCTOR_REVENUE_SHARE) : 0,
+        "instructorProfile.totalEarnings": isPaid ? price * split.share : 0,
       },
     })
 

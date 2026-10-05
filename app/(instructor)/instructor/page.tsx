@@ -17,6 +17,7 @@ import {
   BookOpen,
   ChartLine,
   DollarSign,
+  Gift,
   Plus,
   Search,
   Star,
@@ -43,6 +44,12 @@ const quickActions = [
     caption: "View performance",
     href: "/instructor/analytics",
     icon: ChartLine,
+  },
+  {
+    title: "Refer & earn",
+    caption: "10% of a referral's first purchase",
+    href: "/dashboard/referrals",
+    icon: Gift,
   },
 ]
 
@@ -212,7 +219,7 @@ export default function InstructorDashboard() {
           {/* Quick Actions */}
           <div className="space-y-3 border-t border-ws-hairline pt-8">
             <h2 className="text-sm font-semibold text-ws-primary">Quick Actions</h2>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {quickActions.map((qa) => {
                 const Icon = qa.icon
                 return (

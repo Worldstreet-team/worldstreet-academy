@@ -1,8 +1,39 @@
 "use server"
 
+import { Types } from "mongoose"
 import connectDB from "@/lib/db"
-import { User } from "@/lib/db/models"
+import { User, type IUser } from "@/lib/db/models"
+import { referralCookieCode, referralOwner } from "@/lib/referrals"
 import type { AuthUser } from "./types"
+
+/**
+ * Who invited this person, from the `wsa_ref` cookie the middleware set when
+ * they arrived through someone's link (owner, 2026-10-05): the code's owner,
+ * unless that is `selfId`. Null when there's no usable code. Never throws —
+ * signing in must not depend on it.
+ */
+async function invitedByLink(selfId: string | null): Promise<IUser["referredBy"]> {
+  try {
+    const code = await referralCookieCode()
+    if (!code) return null
+    const owner = await referralOwner(code)
+    if (!owner || owner.id === selfId) return null
+    return { text: code, at: new Date(), code, userId: new Types.ObjectId(owner.id) }
+  } catch (err) {
+    console.error("[Referrals] couldn't read who invited this user:", err)
+    return null
+  }
+}
+
+/** Saves the link's inviter on an account with no answer yet — first answer wins. */
+async function attributeExisting(user: { _id: Types.ObjectId; referredBy?: IUser["referredBy"] }) {
+  if (user.referredBy) return
+  const referredBy = await invitedByLink(user._id.toString())
+  if (!referredBy) return
+  await User.updateOne({ _id: user._id, referredBy: null }, { $set: { referredBy } }).catch((err) =>
+    console.error("[Referrals] couldn't save who invited this user:", err)
+  )
+}
 
 /**
  * Map auth service role to our DB role
@@ -107,6 +138,7 @@ export async function syncUserToLocal(authUser: AuthUser, updateNames = true): P
         user.avatarUrl = generateDefaultAvatarUrl(`${user.firstName} ${user.lastName}`.trim())
       }
       await user.save()
+      await attributeExisting(user)
     } else {
       // Create new user
       const emailPrefix = authUser.email.split("@")[0]
@@ -114,7 +146,9 @@ export async function syncUserToLocal(authUser: AuthUser, updateNames = true): P
       const firstName = authUser.firstName || emailPrefix || "User"
       const lastName = authUser.lastName || ""
       const avatarUrl = generateDefaultAvatarUrl(`${firstName} ${lastName}`.trim())
-      
+      // A new account can't own a code yet, so any link's owner is someone else.
+      const referredBy = await invitedByLink(null)
+
       user = await User.create({
         authUserId: authUser.userId,
         email: authUser.email.toLowerCase(),
@@ -124,6 +158,7 @@ export async function syncUserToLocal(authUser: AuthUser, updateNames = true): P
         avatarUrl,
         role: mapRole(authUser.role),
         verified: authUser.isVerified,
+        referredBy,
       })
     }
   } else {
@@ -151,6 +186,7 @@ export async function syncUserToLocal(authUser: AuthUser, updateNames = true): P
     }
 
     await user.save()
+    await attributeExisting(user)
   }
 
   return {

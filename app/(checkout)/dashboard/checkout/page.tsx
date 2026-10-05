@@ -9,6 +9,8 @@ import { getEspeeCheckoutState } from "@/lib/actions/manual-payments"
 import { fetchProgramById } from "@/lib/actions/student"
 import { fetchProgramCurriculum } from "@/lib/actions/program-page"
 import { PACKAGE_RANK } from "@/lib/entitlements"
+import { referralCookieCode, referrerFor } from "@/lib/referrals"
+import { maskedName } from "@/lib/masked-name"
 import { courseAvailability, type CourseStatus } from "@/lib/types/course"
 import { CheckoutView, type CheckoutFacts } from "@/components/checkout/checkout-view"
 
@@ -32,7 +34,8 @@ type Search = { courseId?: string | string[]; package?: string | string[] }
  *     needs no package);
  *   · otherwise the order, with the wallet balance already read — and, when
  *     ESPEE is on (owner meeting 2026-10-03), the ESPEE details and any proof
- *     of the buyer's for this program that is already under review.
+ *     of the buyer's for this program that is already under review — and who
+ *     invited the buyer, when their link or account names someone.
  */
 export default async function CheckoutPage({ searchParams }: { searchParams: Promise<Search> }) {
   const params = await searchParams
@@ -61,10 +64,11 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
       : (program.packages.find((p) => p.key === packageParam) ?? null)
   if (!selected) redirect(`/programs/${program.slug}#packages`)
 
-  const [wallet, curriculum, espee] = await Promise.all([
+  const [wallet, curriculum, espee, inviter] = await Promise.all([
     getMyWalletBalance(),
     fetchProgramCurriculum(program.id),
     getEspeeCheckoutState(program.id),
+    invitedByName(user.id),
   ])
 
   // A lesson's `tier` is set only when it sits above the program's cheapest
@@ -84,8 +88,24 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
       facts={facts}
       reservedSeat={enrollment.status === "pre_enrolled"}
       espee={espee}
+      inviter={inviter}
     />
   )
+}
+
+/**
+ * Who this purchase will be credited to (owner, 2026-10-05) — the code in the
+ * buyer's `wsa_ref` cookie, else their account's `referredBy` — as
+ * "First L.", never an email. Null when nobody, or when it can't be read.
+ */
+async function invitedByName(buyerId: string): Promise<string | null> {
+  try {
+    const referrer = await referrerFor(buyerId, await referralCookieCode())
+    return referrer ? maskedName(referrer.firstName, referrer.lastName) : null
+  } catch (error) {
+    console.error("Checkout referrer lookup error:", error)
+    return null
+  }
 }
 
 function ProgramNotFound() {

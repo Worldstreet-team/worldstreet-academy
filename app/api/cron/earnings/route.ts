@@ -14,6 +14,11 @@ import { createWalletCredit, createWalletCharge, isInsufficientBalance, walletEn
  *
  * Idempotent by construction: wallet credits dedupe on creditReference and
  * clawback charges carry the same reference as their Idempotency-Key.
+ *
+ * Every kind clears here: sale shares, referral commissions (owner,
+ * 2026-10-05) and clawbacks. `instructorAuthUserId` is simply the earner's
+ * wallet subject — a referrer may be a plain USER, and nothing here reads a
+ * role.
  */
 export async function POST(request: NextRequest) {
   const secret = process.env.CRON_SECRET
@@ -46,7 +51,8 @@ export async function POST(request: NextRequest) {
         await createWalletCredit(earning.instructorAuthUserId, {
           amountMinor: earning.netMinor,
           reference: earning.creditReference,
-          description: `Academy earnings: ${courseTitle}`,
+          description:
+            earning.kind === "referral" ? `Academy referral commission: ${courseTitle}` : `Academy earnings: ${courseTitle}`,
           metadata: { earningId: earning._id.toString(), courseId: String(earning.course) },
         })
       } else {
