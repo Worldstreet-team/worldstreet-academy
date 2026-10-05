@@ -6,6 +6,7 @@ import { PACKAGE_LABEL } from "@/lib/entitlements"
 import type { IPackageEntitlements } from "@/lib/db/models"
 import { PROGRAM_H2 } from "@/components/programs/section-title"
 import type { ProgramAccess } from "@/components/programs/access"
+import { OfferEnds, PackageDiscount, PackageDuration } from "@/components/programs/package-offer"
 
 function priceLabel(price: number): string {
   return price === 0 ? "Free" : `$${price.toLocaleString("en-US")}`
@@ -73,6 +74,7 @@ export function PackageLadder({
     const on = packages.filter((p) => p.entitlements[row.key]).length
     return on > 0 && on < packages.length
   })
+  const hasDuration = packages.some((p) => p.duration)
 
   return (
     <section
@@ -119,8 +121,10 @@ export function PackageLadder({
                 <p className="mt-3 font-display text-[40px] font-light leading-none tabular-nums tracking-[-0.02em] text-ws-primary">
                   {priceLabel(pkg.price)}
                 </p>
+                <PackageDiscount pkg={pkg} className="mt-2.5 flex text-[14px]" />
                 <h3 className="mt-3 font-display text-xl font-semibold text-ws-primary">{pkg.name}</h3>
                 {pkg.tagline && <p className="mt-1.5 text-[14px] leading-relaxed text-ws-muted">{pkg.tagline}</p>}
+                <PackageDuration duration={pkg.duration} className="mt-3" />
 
                 {access.kind !== "enrolled" && (
                   <div className="mt-6">
@@ -130,6 +134,7 @@ export function PackageLadder({
                       access={access}
                       primary={pkg.highlight || !multiTier}
                     />
+                    {access.kind === "open" && <OfferEnds pkg={pkg} className="mt-3 block text-center" />}
                   </div>
                 )}
 
@@ -152,7 +157,7 @@ export function PackageLadder({
         </ul>
       )}
 
-      {multiTier && rows.length > 0 && (
+      {multiTier && (rows.length > 0 || hasDuration) && (
         <div className="mt-10">
           <h3 className="font-display text-base font-semibold tracking-[-0.01em] text-ws-primary">
             What changes between packages
@@ -160,7 +165,7 @@ export function PackageLadder({
           <div className="mt-4 overflow-x-auto">
             <table className="w-full min-w-[520px] border-collapse text-left">
               <caption className="sr-only">
-                Services included in each package of this program
+                How long each package of this program runs and the services it includes
               </caption>
               <thead>
                 <tr className="border-b border-ws-hairline">
@@ -182,6 +187,26 @@ export function PackageLadder({
                 </tr>
               </thead>
               <tbody>
+                {hasDuration && (
+                  <tr className="border-b border-ws-hairline last:border-0">
+                    <th scope="row" className="py-3 pr-4 text-[14px] font-normal text-ws-muted">
+                      Duration
+                    </th>
+                    {packages.map((pkg) => (
+                      <td
+                        key={pkg.key}
+                        className={cn(
+                          "px-3 py-3 text-center text-[14px] font-medium text-ws-primary",
+                          pkg.highlight && "bg-ws-brand/[0.06]"
+                        )}
+                      >
+                        {pkg.duration ?? (
+                          <MinusIcon size={16} className="mx-auto text-ws-subtle" role="img" aria-label="Not stated" />
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                )}
                 {rows.map((row) => (
                   <tr key={row.key} className="border-b border-ws-hairline last:border-0">
                     <th
@@ -251,12 +276,15 @@ function SinglePackage({
       <div className={cn("flex flex-col p-6 sm:p-8", features && "md:bg-ws-raised/40")}>
         <h3 className="font-display text-xl font-semibold text-ws-primary">{pkg.name}</h3>
         {pkg.tagline && <p className="mt-1.5 text-[14px] leading-relaxed text-ws-muted">{pkg.tagline}</p>}
+        <PackageDuration duration={pkg.duration} className="mt-3" />
         <p className="mt-5 font-display text-[44px] font-light leading-none tabular-nums tracking-[-0.025em] text-ws-primary">
           {priceLabel(pkg.price)}
         </p>
+        <PackageDiscount pkg={pkg} className="mt-2.5 flex text-[14px]" />
         {access.kind !== "enrolled" && (
           <div className="mt-6 md:mt-auto md:pt-8">
             <PackageCta courseId={courseId} pkg={pkg} access={access} primary />
+            {access.kind === "open" && <OfferEnds pkg={pkg} className="mt-3 block text-center" />}
           </div>
         )}
       </div>

@@ -5,7 +5,8 @@ import { cn } from "@/lib/utils"
 import { PACKAGE_LABEL } from "@/lib/entitlements"
 import { packagePriceLabel } from "@/lib/program-price"
 import { RollingAmount } from "@/components/ui/rolling-amount"
-import { actionLabel } from "@/components/programs/package-model"
+import { actionLabel, cheapestOf } from "@/components/programs/package-model"
+import { OfferEnds, PackageDiscount } from "@/components/programs/package-offer"
 import { CheckoutLink, jumpToPackages, usePackageSelection } from "@/components/programs/package-selection"
 
 const CTA =
@@ -29,9 +30,11 @@ const CTA =
  * end. Rendered only while there is something to buy (access "open").
  */
 export function ProgramStickyBar({ title, fromPrice }: { title: string; fromPrice: number }) {
-  const { multiTier, selected, engaged } = usePackageSelection()
+  const { packages, multiTier, selected, engaged } = usePackageSelection()
   const [show, setShow] = React.useState(false)
   const choosing = multiTier && !engaged
+  // The tier whose price is quoted: the entry tier while choosing, else the pick.
+  const quoted = choosing ? cheapestOf(packages) : selected
 
   React.useEffect(() => {
     const targets = [...document.querySelectorAll<HTMLElement>("[data-purchase], [data-offer-cta]")]
@@ -59,7 +62,11 @@ export function ProgramStickyBar({ title, fromPrice }: { title: string; fromPric
       )}
     >
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
-        <p className="hidden min-w-0 truncate font-display text-[15px] font-semibold text-ws-primary md:block">{title}</p>
+        {/* From md the title sits on the left, with the offer's countdown under it. */}
+        <div className="hidden min-w-0 md:block">
+          <p className="truncate font-display text-[15px] font-semibold text-ws-primary">{title}</p>
+          <OfferEnds pkg={quoted} className="mt-1 block truncate text-[12.5px]" />
+        </div>
         <div className="flex w-full min-w-0 items-center justify-between gap-4 md:w-auto md:justify-end md:gap-6">
           <div className="min-w-0 leading-none">
             {multiTier && (
@@ -70,13 +77,19 @@ export function ProgramStickyBar({ title, fromPrice }: { title: string; fromPric
                 {choosing ? "From" : PACKAGE_LABEL[selected.key]}
               </p>
             )}
-            <RollingAmount
-              value={packagePriceLabel(choosing ? fromPrice : selected.price)}
-              className={cn(
-                "font-display text-[22px] font-light tracking-[-0.02em] text-ws-primary",
-                multiTier && "mt-1"
-              )}
-            />
+            <span className={cn("flex items-baseline gap-2", multiTier && "mt-1")}>
+              <RollingAmount
+                value={packagePriceLabel(choosing ? fromPrice : selected.price)}
+                className="font-display text-[22px] font-light tracking-[-0.02em] text-ws-primary"
+              />
+              {/* Phones: the struck price only — the chip joins it from sm. */}
+              <PackageDiscount
+                key={quoted.key}
+                pkg={quoted}
+                className="ws-animate-fade flex-nowrap text-[13px]"
+                chipClassName="hidden sm:inline-flex"
+              />
+            </span>
           </div>
           {choosing ? (
             <a href="#packages" onClick={jumpToPackages} className={CTA}>

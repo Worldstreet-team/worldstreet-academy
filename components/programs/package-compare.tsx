@@ -10,10 +10,11 @@ import { useMotionOK } from "@/components/marketing/motion/bus"
 import { EASE_LUX } from "@/components/marketing/motion/ease"
 import { usePackageSelection } from "@/components/programs/package-selection"
 import { comparisonOf, type CompareCell, type LessonAccess } from "@/components/programs/package-model"
+import { PackageDiscount } from "@/components/programs/package-offer"
 
 /**
  * "Compare packages" — the feature × tier table, folded by default. Rows are
- * the same data as the cards: lessons, services, then every feature line
+ * the same data as the cards: duration, lessons, services, then every feature line
  * grouped by the tier that first lists it ("Everything in Basic" resolved, so
  * a Standard column really shows Basic's lines ticked). The selected tier's
  * column is lit; its header is a button, so a visitor can choose from here.
@@ -113,6 +114,11 @@ export function PackageCompare({ lessons }: { lessons: LessonAccess | null }) {
                         <span className="mt-1 font-display text-[20px] font-light leading-none tabular-nums text-ws-primary">
                           {packagePriceLabel(pkg.price)}
                         </span>
+                        <PackageDiscount
+                          pkg={pkg}
+                          chip="compact"
+                          className="mt-1.5 flex flex-col gap-y-1 text-[11.5px] font-normal"
+                        />
                         <span className="sr-only">{active ? " (selected)" : " — select this package"}</span>
                       </button>
                     </th>
@@ -161,6 +167,9 @@ export function PackageCompare({ lessons }: { lessons: LessonAccess | null }) {
 }
 
 function Cell({ value }: { value: CompareCell }) {
+  if (value === null) {
+    return <MinusIcon size={16} className="mx-auto text-ws-subtle/70" role="img" aria-label="Not stated" />
+  }
   if (typeof value === "string") {
     return <span className="text-[13.5px] font-medium tabular-nums text-ws-primary">{value}</span>
   }

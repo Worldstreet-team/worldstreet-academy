@@ -8,7 +8,8 @@ import type { PackageKey } from "@/lib/db/models"
 import { PACKAGE_LABEL } from "@/lib/entitlements"
 import { packagePriceLabel } from "@/lib/program-price"
 import { RollingAmount } from "@/components/ui/rolling-amount"
-import { actionLabel, checkoutHref, defaultPackageKey } from "@/components/programs/package-model"
+import { actionLabel, checkoutHref, cheapestOf, defaultPackageKey } from "@/components/programs/package-model"
+import { OfferEnds, PackageDiscount } from "@/components/programs/package-offer"
 
 type Selection = {
   courseId: string
@@ -144,6 +145,8 @@ export function SelectedOffer({ fromPrice }: { fromPrice: number }) {
   const { packages, tierCount, multiTier, selected, engaged } = usePackageSelection()
   const choosing = multiTier && !engaged
   const price = choosing ? fromPrice : selected.price
+  // The tier whose price is quoted: the entry tier while choosing, else the pick.
+  const quoted = choosing ? cheapestOf(packages) : selected
   // The price sits right above the button here, so the button never repeats it.
   const { text } = actionLabel(selected, !multiTier)
   // Spec §8: a single-price program reads "FOUNDING PRICE: $199" — its one tier's name.
@@ -158,6 +161,7 @@ export function SelectedOffer({ fromPrice }: { fromPrice: number }) {
         />
         {choosing && fromPrice > 0 && <span className="text-[14px] font-medium text-ws-muted">to start</span>}
       </p>
+      <PackageDiscount key={quoted.key} pkg={quoted} className="ws-animate-fade mt-2.5 flex text-[14px]" />
 
       {/* The sub-line crossfades between "what's on offer" and "what you picked". */}
       {(multiTier || singleName) && (
@@ -199,6 +203,7 @@ export function SelectedOffer({ fromPrice }: { fromPrice: number }) {
             <ArrowRightIcon size={16} aria-hidden className="-mr-1" />
           </CheckoutLink>
         )}
+        <OfferEnds pkg={quoted} className="mt-3 block text-center" />
       </div>
     </>
   )

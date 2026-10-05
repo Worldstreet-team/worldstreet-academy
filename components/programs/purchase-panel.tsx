@@ -25,6 +25,8 @@ import { WishlistButton } from "@/components/marketing/wishlist-button"
 import type { ProgramAccess } from "@/components/programs/access"
 import { PreviewTrigger } from "@/components/programs/preview-player"
 import { SelectedOffer } from "@/components/programs/package-selection"
+import { PackageDiscount } from "@/components/programs/package-offer"
+import { cheapestOf } from "@/components/programs/package-model"
 import { formatLength, plural } from "@/components/programs/format"
 
 /** What the curriculum says about the program — counted from published lessons, never the stored counters. */
@@ -160,6 +162,8 @@ export function PurchasePanel({
                 </span>
                 {multiTier && fromPrice > 0 && <span className="text-[14px] font-medium text-ws-muted">to start</span>}
               </p>
+              {/* No "Offer ends in" here: nothing can be bought until launch. */}
+              <PackageDiscount pkg={cheapestOf(program.packages)} className="mt-2.5 flex text-[14px]" />
               {multiTier && (
                 <p className="mt-2.5 text-[13.5px] text-ws-muted">
                   <span className="tabular-nums">{program.packages.length}</span> packages ·{" "}
