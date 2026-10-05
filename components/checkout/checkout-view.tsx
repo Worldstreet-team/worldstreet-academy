@@ -6,6 +6,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
 import {
+  ArrowRightLeftIcon,
   BadgeCheckIcon,
   BookOpenIcon,
   CheckIcon,
@@ -15,6 +16,7 @@ import {
   LockKeyholeIcon,
   MailIcon,
   PackageCheckIcon,
+  ReceiptTextIcon,
   RotateCcwIcon,
   ShieldCheckIcon,
   WalletIcon,
@@ -22,16 +24,22 @@ import {
 import { purchaseCourse } from "@/lib/actions/enrollments"
 import { getMyWalletBalance, type MyWalletBalance } from "@/lib/actions/wallet"
 import { saveEnrollmentIntent } from "@/lib/actions/enrollment-intent"
+import { saveReferral, type EspeeCheckoutState } from "@/lib/actions/manual-payments"
 import type { ProgramDetail, PublicPackage } from "@/lib/actions/student"
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import { PACKAGE_LABEL } from "@/lib/entitlements"
 import { BRAND } from "@/lib/brand"
 import { SCHOOL_BY_SLUG, type SchoolSlug } from "@/lib/schools"
+import { espeeAmount } from "@/lib/espee"
 import { cn } from "@/lib/utils"
 import { RollingAmount } from "@/components/ui/rolling-amount"
+import { Segmented } from "@/components/ui/system"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Disclosure } from "@/components/checkout/disclosure"
 import { MobileSummary, OrderCard } from "@/components/checkout/order-summary"
 import { Appear, PayButton, ShortfallPanel, type PayPhase } from "@/components/checkout/payment-parts"
+import { EspeeAction, EspeePanel, useEspeeProof } from "@/components/checkout/espee-panel"
 import {
   LEVEL_LABEL,
   centsUsd,
@@ -51,6 +59,13 @@ export type CheckoutFacts = {
   /** Video length of the lessons the chosen package opens, in seconds. */
   openVideoSec: number
 }
+
+type PayMethod = "wallet" | "espee"
+
+const METHOD_OPTIONS = [
+  { key: "wallet", label: "WorldStreet wallet" },
+  { key: "espee", label: "ESPEE transfer" },
+] as const satisfies readonly { key: PayMethod; label: string }[]
 
 /** One saved choice per program + package. */
 function intentKeyOf(courseId: string, packageKey: PublicPackage["key"] | null): string {
@@ -74,7 +89,9 @@ function saveCheckoutIntent(
  * everything that can be decided before the buyer acts: the program exists
  * and is live, the buyer isn't enrolled, and the package is the one they chose
  * on the program page. So there is no package picker here — only the order,
- * the wallet, and one button.
+ * the wallet, and one button. When ESPEE is on (owner meeting 2026-10-03) a
+ * paid order also offers an ESPEE transfer: the learner sends it outside our
+ * system, uploads the receipt, and an admin opens the program.
  *
  * Desktop: order details on the left, the payment card pinned on the right.
  * Phone: a collapsible order summary under the header (Shopify's pattern), the
@@ -87,6 +104,7 @@ export function CheckoutView({
   wallet: initialWallet,
   facts,
   reservedSeat,
+  espee,
 }: {
   program: ProgramDetail
   packageKey: PublicPackage["key"]
@@ -94,6 +112,8 @@ export function CheckoutView({
   facts: CheckoutFacts
   /** The buyer holds a pre-launch reservation on this program; paying activates it. */
   reservedSeat: boolean
+  /** "Pay with ESPEE": whether it's offered, our details, and the buyer's proof for this program. */
+  espee: EspeeCheckoutState
 }) {
   const router = useRouter()
   const queryClient = useQueryClient()
@@ -107,12 +127,16 @@ export function CheckoutView({
   const [declinedShortfallMinor, setDeclinedShortfallMinor] = React.useState<number | null>(null)
   const [refreshing, setRefreshing] = React.useState(false)
   const [savingLater, setSavingLater] = React.useState(false)
+  const [savedLater, setSavedLater] = React.useState(false)
   const [saveLaterError, setSaveLaterError] = React.useState<string | null>(null)
   // The save of this order as the learner's saved school, keyed by what it
-  // saved. "Save and pay later" and the wallet round trip wait on it: both
-  // lead into `(platform)`, whose school-first gate would bounce a brand-new
-  // learner away if they arrived before the save landed.
+  // saved — the pay-later reminder emails read it. "Save and pay later"
+  // waits on it, so its confirmation is true. (A saved school no longer opens
+  // the dashboard: owner meeting 2026-10-03, no dashboard without paying.)
   const intentSaveRef = React.useRef<{ key: string; done: Promise<boolean> } | null>(null)
+  // "Who invited you?" — optional, saved before the learner pays or leaves.
+  const [invitedBy, setInvitedBy] = React.useState("")
+  const referralSavedRef = React.useRef<string | null>(null)
 
   const price = selected.price
   const priceMinor = Math.round(price * 100)
@@ -129,18 +153,30 @@ export function CheckoutView({
   const shortfallMinor = declinedShortfallMinor ?? (knownShortfallMinor > 0 ? knownShortfallMinor : null)
   const shortfall = !payBlocked && shortfallMinor !== null && shortfallMinor > 0
 
+  // ESPEE is offered on a paid order while it's on — and a proof already
+  // under review is always shown, even if the option has since been turned off.
+  const espeeShown = isPaid && (espee.enabled || espee.open !== null)
+  const [method, setMethod] = React.useState<PayMethod>(
+    espeeShown && (espee.open !== null || !wallet.enabled) ? "espee" : "wallet"
+  )
+  const byEspee = espeeShown && method === "espee"
+  const espeeForm = useEspeeProof({
+    courseId: program.id,
+    packageKey: program.tierCount > 0 ? selected.key : undefined,
+  })
+
   const school = program.school ? SCHOOL_BY_SLUG[program.school] : null
   const multiTier = program.tierCount > 1
   const line = packageLine(program, selected)
   const programHref = `/programs/${program.slug}`
   const changeHref = `${programHref}?package=${selected.key}#packages`
 
-  // Reaching checkout IS choosing (Phase 9): remember it, so an order the
-  // buyer walks away from can be finished from the dashboard, and the
-  // wallet-funding round trip is never stopped by the school-first gate. Its
-  // own effect, keyed on plain values, so it saves once per program + package
-  // and never again for a re-render. A program with no school (legacy) saves
-  // nothing; a program without a ladder saves no package key.
+  // Reaching checkout IS choosing (Phase 9): remember it, so the pay-later
+  // reminder emails can bring the buyer back to an order they walked away
+  // from. Its own effect, keyed on plain values, so it saves once per
+  // program + package and never again for a re-render. A program with no
+  // school (legacy) saves nothing; a program without a ladder saves no
+  // package key.
   const intentSchool = program.school
   const intentCourseId = program.id
   const intentPackageKey = program.tierCount > 0 ? selected.key : null
@@ -164,15 +200,25 @@ export function CheckoutView({
     return retry.done
   }
 
+  /** Stores the "Who invited you?" answer once. Never rejects and never blocks: payment goes ahead either way. */
+  async function saveInvite() {
+    const text = invitedBy.trim().slice(0, 80)
+    if (!text || referralSavedRef.current === text) return
+    const result = await saveReferral(text).catch(() => null)
+    if (result?.success) referralSavedRef.current = text
+  }
+
   async function saveForLater() {
     setSaveLaterError(null)
     setSavingLater(true)
+    void saveInvite()
+    // The order stays on this page: the dashboard opens only once a program is
+    // paid for (owner meeting 2026-10-03), so going there would bounce them.
     if (await ensureIntentSaved()) {
-      // Stays pending through the navigation.
-      router.push("/dashboard?saved=1")
-      return
+      setSavedLater(true)
+    } else {
+      setSaveLaterError("Couldn't save your choice — try again.")
     }
-    setSaveLaterError("Couldn't save your choice — try again.")
     setSavingLater(false)
   }
 
@@ -192,10 +238,9 @@ export function CheckoutView({
     // Internal wallet deposit page (default): navigate in-tab with the
     // shortfall prefilled and a redirect straight back to this checkout.
     if (wallet.fundingUrl.startsWith("/")) {
-      // The deposit page sits behind the school-first gate: let the save land
-      // first. Navigate either way — a learner who already has a school or an
-      // enrollment is never gated.
-      await ensureIntentSaved()
+      // The deposit page is exempt from the gate; the saves still land first
+      // so the pay-later reminder and the referral survive the round trip.
+      await Promise.all([ensureIntentSaved(), saveInvite()])
       const returnTo = `${window.location.pathname}${window.location.search}`
       const params = new URLSearchParams({ redirect: returnTo })
       if (shortfallMinor && shortfallMinor > 0) params.set("suggestMinor", String(shortfallMinor))
@@ -214,6 +259,7 @@ export function CheckoutView({
     setError(null)
 
     try {
+      await saveInvite()
       // The server derives identity from the session and the price from the
       // course's package; enrollment is only granted after the central
       // WorldStreet wallet confirms the debit. No optimistic success. A program
@@ -253,11 +299,16 @@ export function CheckoutView({
     }
   }
 
-  const busy = phase !== "idle"
+  const busy = phase !== "idle" || espeeForm.submitting
 
   /** The page's one primary action — rendered in the payment card on desktop and in the bottom bar on a phone. */
   function primaryAction(where: "card" | "bar") {
     const id = where === "card" ? "checkout-pay" : "checkout-pay-bar"
+    if (byEspee) {
+      return (
+        <EspeeAction id={id} open={espee.open !== null} form={espeeForm} onSubmit={() => espeeForm.submit(saveInvite)} />
+      )
+    }
     if (payBlocked) {
       // Gold is the page's primary action. With the wallet off there is no
       // action to offer, so the CTA drops out of gold rather than sitting
@@ -347,9 +398,11 @@ export function CheckoutView({
               Complete your enrollment
             </h1>
             <p className="mt-2 text-[15px] leading-relaxed text-ws-muted">
-              {isPaid
-                ? "Review your order, then pay from your WorldStreet wallet."
-                : "Review your order, then confirm your free enrollment."}
+              {!isPaid
+                ? "Review your order, then confirm your free enrollment."
+                : byEspee
+                  ? "Review your order, then send the ESPEE transfer and upload your receipt."
+                  : "Review your order, then pay from your WorldStreet wallet."}
             </p>
           </div>
 
@@ -375,7 +428,18 @@ export function CheckoutView({
                 {isPaid ? "Payment" : "Your enrollment"}
               </h2>
 
-              {isPaid && (
+              {espeeShown && (
+                <Segmented
+                  options={METHOD_OPTIONS}
+                  value={method}
+                  onChange={setMethod}
+                  size="sm"
+                  grow
+                  className="mt-4"
+                />
+              )}
+
+              {isPaid && !byEspee && (
                 <div className="mt-4 flex items-center gap-3 rounded-[14px] bg-ws-sunken p-3.5">
                   <span
                     aria-hidden
@@ -419,7 +483,7 @@ export function CheckoutView({
                   {wholeUsd(price)}
                 </span>
               </div>
-              <Appear show={isPaid && wallet.enabled && !shortfall}>
+              <Appear show={isPaid && !byEspee && wallet.enabled && !shortfall}>
                 <p className="flex items-baseline justify-between gap-3 pt-2.5 text-[13px] text-ws-muted">
                   <span>Wallet balance after</span>
                   <RollingAmount value={centsUsd(wallet.usdAvailableMinor - priceMinor)} className="font-medium" />
@@ -428,7 +492,7 @@ export function CheckoutView({
 
               {/* Wallet off. Stated before the click, because no amount of
                   trying clears it — the CTA is disabled for the same reason. */}
-              <Appear show={payBlocked}>
+              <Appear show={payBlocked && !byEspee}>
                 <div className="mt-5 rounded-[14px] bg-warning-chip p-4">
                   <p className="text-[14px] font-semibold text-warning">Payments are unavailable right now</p>
                   <p className="mt-1 text-[13px] leading-relaxed text-ws-muted">
@@ -438,7 +502,7 @@ export function CheckoutView({
               </Appear>
 
               {/* Not enough in the wallet — how much, and the way through. */}
-              <Appear show={shortfall && shortfallMinor !== null}>
+              <Appear show={shortfall && !byEspee && shortfallMinor !== null}>
                 <ShortfallPanel
                   shortfallMinor={shortfallMinor ?? 0}
                   balanceMinor={wallet.usdAvailableMinor}
@@ -448,33 +512,69 @@ export function CheckoutView({
                 />
               </Appear>
 
-              <Appear show={error !== null}>
+              <Appear show={error !== null && !byEspee}>
                 <p role="alert" className="mt-5 rounded-[14px] bg-debit-chip px-4 py-3 text-[13.5px] leading-relaxed text-debit">
                   {error}
                 </p>
               </Appear>
 
+              {byEspee && <EspeePanel espee={espee} priceMinor={priceMinor} form={espeeForm} />}
+
+              {/* Who referred this buyer (owner meeting 2026-10-03) — asked once:
+                  the first answer is kept. Codes and payouts come later. */}
+              {!espee.referredBy && phase !== "success" && !(byEspee && espee.open) && (
+                <div className="mt-5 space-y-1.5">
+                  <Label htmlFor="checkout-invited-by">
+                    Who invited you? <span className="font-normal text-ws-muted">· optional</span>
+                  </Label>
+                  <Input
+                    id="checkout-invited-by"
+                    value={invitedBy}
+                    onChange={(e) => setInvitedBy(e.target.value)}
+                    maxLength={80}
+                    autoComplete="off"
+                    placeholder="Their name or username"
+                    disabled={busy}
+                  />
+                </div>
+              )}
+
               <div className="mt-6 hidden lg:block">{primaryAction("card")}</div>
 
               {/* Only a program in a school can be saved: a legacy one has no
                   school to put on the dashboard, so the promise would be empty. */}
-              {program.school && phase !== "success" && (
+              {program.school && phase !== "success" && !(byEspee && espee.open) && (
                 <div className="mt-2 lg:mt-2.5">
-                  <button
-                    type="button"
-                    onClick={saveForLater}
-                    disabled={savingLater || busy}
-                    className="flex h-11 w-full items-center justify-center gap-2 rounded-full text-[14px] font-medium text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-raised hover:text-ws-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40 disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-ws-muted"
-                  >
-                    {savingLater ? (
-                      <>
-                        <LoaderCircleIcon size={14} className="animate-spin" aria-hidden />
-                        Saving…
-                      </>
-                    ) : (
-                      "Save and pay later"
-                    )}
-                  </button>
+                  {savedLater ? (
+                    <div role="status" className="rounded-[14px] bg-ws-sunken px-4 py-3 text-center">
+                      <p className="inline-flex items-center gap-1.5 text-[13.5px] font-medium text-ws-primary">
+                        <CheckIcon size={14} className="shrink-0 text-credit" aria-hidden />
+                        Saved — we&apos;ll remind you by email.
+                      </p>
+                      <Link
+                        href={programHref}
+                        className="mt-1 block text-[13px] font-medium text-ws-muted underline-offset-4 transition-colors duration-[var(--ws-motion-fast)] hover:text-ws-primary hover:underline"
+                      >
+                        Back to the program
+                      </Link>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={saveForLater}
+                      disabled={savingLater || busy}
+                      className="flex h-11 w-full items-center justify-center gap-2 rounded-full text-[14px] font-medium text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-raised hover:text-ws-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40 disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-ws-muted"
+                    >
+                      {savingLater ? (
+                        <>
+                          <LoaderCircleIcon size={14} className="animate-spin" aria-hidden />
+                          Saving…
+                        </>
+                      ) : (
+                        "Save and pay later"
+                      )}
+                    </button>
+                  )}
                   {saveLaterError && (
                     <p role="alert" className="mt-1 text-center text-[12.5px] text-ws-danger">
                       {saveLaterError}
@@ -484,13 +584,15 @@ export function CheckoutView({
               )}
 
               {/* The promise under the button — only while there is a button to keep it. */}
-              {!payBlocked && (
+              {(byEspee ? !espee.open : !payBlocked) && (
                 <p className="mt-4 flex items-start gap-2 border-t border-ws-hairline pt-4 text-[12.5px] leading-relaxed text-ws-muted">
                   <LockKeyholeIcon size={14} className="mt-0.5 shrink-0" aria-hidden />
                   <span>
-                    {isPaid
-                      ? "Charged once, only when you press Pay. Your program opens the moment the wallet confirms."
-                      : "No payment needed. Your program opens as soon as you enrol."}
+                    {!isPaid
+                      ? "No payment needed. Your program opens as soon as you enrol."
+                      : byEspee
+                        ? "Your receipt is stored privately. Your program opens once an admin confirms the transfer — we'll email you either way."
+                        : "Charged once, only when you press Pay. Your program opens the moment the wallet confirms."}
                   </span>
                 </p>
               )}
@@ -589,7 +691,38 @@ export function CheckoutView({
                 </Link>
               </Disclosure>
 
-              {isPaid && (
+              {isPaid && byEspee && (
+                <Disclosure icon={ShieldCheckIcon} title="How payment works" summary="Transfer · receipt · confirmation">
+                  <ul className="space-y-4">
+                    <HowRow icon={ArrowRightLeftIcon} title="Send ESPEE to the Academy">
+                      Transfer exactly {espeeAmount(priceMinor)} ESPEE to the account shown in the payment card — 1 ESPEE
+                      is $1.
+                    </HowRow>
+                    <HowRow icon={ReceiptTextIcon} title="Upload your receipt">
+                      Add the transfer reference and a screenshot or PDF of the receipt. Only our payments team can see
+                      it.
+                    </HowRow>
+                    <HowRow icon={BadgeCheckIcon} title="Access follows the confirmation">
+                      An admin checks the transfer and opens the program in your dashboard. If something doesn&apos;t
+                      match, we email you why, and you can send a new proof.
+                    </HowRow>
+                  </ul>
+                  <p className="mt-5 flex items-center gap-2 text-[13px] text-ws-muted">
+                    <MailIcon size={14} className="shrink-0" aria-hidden />
+                    <span>
+                      Questions?{" "}
+                      <a
+                        href={`mailto:${BRAND.supportEmail}`}
+                        className="font-medium text-ws-primary underline-offset-4 hover:underline"
+                      >
+                        {BRAND.supportEmail}
+                      </a>
+                    </span>
+                  </p>
+                </Disclosure>
+              )}
+
+              {isPaid && !byEspee && (
                 <Disclosure icon={ShieldCheckIcon} title="How payment works" summary="One debit · access on confirmation">
                   <ul className="space-y-4">
                     <HowRow icon={WalletIcon} title="Paid from your WorldStreet wallet">
