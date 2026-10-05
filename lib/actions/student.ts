@@ -10,6 +10,7 @@ import {
   Lesson,
   WatchProgress,
   type ICoursePackage,
+  type CourseKind,
   type IPackageEntitlements,
   type LessonType,
   type PackageKey,
@@ -28,6 +29,7 @@ import {
 import { saveWithCertificateId } from "@/lib/certificate-id"
 import { isCountryCode } from "@/lib/countries"
 import { FACULTY_ROLES, isFacultyRole, safeWebUrl } from "@/lib/faculty"
+import { PROGRAM_KIND_FILTER, courseKindOf } from "@/lib/course-kind"
 
 // ============================================================================
 // TYPES
@@ -63,6 +65,31 @@ export type BrowseCourse = {
   rating: number | null
   /** First three "what you'll learn" lines, for the card's hover peek. Empty until the program has outcomes. */
   outcomes: string[]
+  /** School program, marketplace course or New Economy course (`courseKindOf`). */
+  kind: CourseKind
+  /**
+   * Who a marketplace course credits: the seller's name when an approved
+   * seller (not faculty) sells it. null credits the Academy's faculty —
+   * every program and New Economy course, and the marketplace courses the
+   * Academy itself owns (owner, 2026-10-05).
+   */
+  sellerName: string | null
+  /** First publication, ISO; null on legacy rows. The marketplace's "Newest" sort. */
+  publishedAt: string | null
+}
+
+/** Marketplace credit for a course's owner — see BrowseCourse.sellerName. */
+function sellerNameOf(
+  kind: CourseKind,
+  owner: { role?: string | null; firstName?: string | null; lastName?: string | null } | null
+): string | null {
+  if (kind !== "marketplace" || !owner || isFacultyRole(owner.role)) return null
+  return `${owner.firstName ?? ""} ${owner.lastName ?? ""}`.trim() || null
+}
+
+/** Which kinds of course a catalogue read lists. */
+function kindFilter(kind: CourseKind): Record<string, unknown> {
+  return kind === "program" ? { ...PROGRAM_KIND_FILTER } : { kind }
 }
 
 export type StudentEnrollment = {
@@ -174,11 +201,20 @@ export async function fetchBrowseCourses(options?: {
   school?: SchoolSlug
   /** Only this instructor's programs — "Courses taught" on /faculty/[username]. */
   instructorId?: string
+  /**
+   * Which half of the Academy: school programs (the default — every school,
+   * program and dashboard listing), the marketplace, or New Economy courses.
+   */
+  kind?: CourseKind
 }): Promise<BrowseCourse[]> {
   try {
     await connectDB()
-    
-    const query: Record<string, unknown> = { status: "published" }
+
+    // Programs unless the caller names another kind — and only a known kind:
+    // this is a server action, so the value may be anything.
+    const kind: CourseKind =
+      options?.kind === "marketplace" || options?.kind === "new-economy" ? options.kind : "program"
+    const query: Record<string, unknown> = { status: "published", ...kindFilter(kind) }
     
     // A server action receives raw JSON: these filters reach the query only as
     // plain strings, never as operator objects like {"$ne": null} — else ignored.
@@ -203,18 +239,20 @@ export async function fetchBrowseCourses(options?: {
     }
     
     const courses = await Course.find(query)
-      .populate("instructor", "firstName lastName avatarUrl")
+      .populate("instructor", "firstName lastName avatarUrl role")
       .sort({ enrolledCount: -1, createdAt: -1 })
       .lean()
-    
+
     return courses.map((course) => {
       const instructor = course.instructor as unknown as {
         _id: { toString(): string }
         firstName: string
         lastName: string
         avatarUrl: string
+        role: string
       }
-      
+      const courseKind = courseKindOf(course)
+
       return {
         id: course._id.toString(),
         title: course.title,
@@ -239,6 +277,9 @@ export async function fetchBrowseCourses(options?: {
         enrolledCount: course.enrolledCount || 0,
         rating: course.rating?.average || null,
         outcomes: (course.whatYouWillLearn ?? []).slice(0, 3),
+        kind: courseKind,
+        sellerName: sellerNameOf(courseKind, instructor),
+        publishedAt: course.publishedAt ? course.publishedAt.toISOString() : null,
       }
     })
   } catch (error) {
@@ -278,7 +319,12 @@ export async function fetchFreePreviewLessons(limit = 6): Promise<FreePreview[]>
     })
       .sort({ order: 1 })
       .limit(60)
-      .populate({ path: "course", match: { status: "published" }, select: "title slug school thumbnailUrl" })
+      // School programs only: the marketplace and New Economy have their own pages.
+      .populate({
+        path: "course",
+        match: { status: "published", ...PROGRAM_KIND_FILTER },
+        select: "title slug school thumbnailUrl",
+      })
       .select("title videoUrl videoDuration videoThumbnailUrl course")
       .lean()
 
@@ -526,7 +572,7 @@ async function findProgram(filter: { slug: string } | { _id: string }): Promise<
       : [
           {
             key: "standard",
-            name: "Full program",
+            name: courseKindOf(course) === "program" ? "Full program" : "Full course",
             tagline: "",
             price: course.pricing === "free" ? 0 : course.price ?? 0,
             listPrice: null,
@@ -562,6 +608,9 @@ async function findProgram(filter: { slug: string } | { _id: string }): Promise<
     enrolledCount: course.enrolledCount || 0,
     rating: course.rating?.average || null,
     outcomes: whatYouWillLearn.slice(0, 3),
+    kind: courseKindOf(course),
+    sellerName: sellerNameOf(courseKindOf(course), instructor),
+    publishedAt: course.publishedAt ? course.publishedAt.toISOString() : null,
     ratingCount: course.rating?.count || 0,
     whatYouWillLearn,
     requirements: course.requirements ?? [],
@@ -764,19 +813,22 @@ export async function fetchOtherCourses(excludeCourseId: string): Promise<Browse
     const courses = await Course.find({
       _id: { $ne: excludeCourseId },
       status: "published",
+      ...PROGRAM_KIND_FILTER,
     })
-      .populate("instructor", "firstName lastName avatarUrl")
+      .populate("instructor", "firstName lastName avatarUrl role")
       .limit(6)
       .lean()
-    
+
     return courses.map((course) => {
       const instructor = course.instructor as unknown as {
         _id: { toString(): string }
         firstName: string
         lastName: string
         avatarUrl: string
+        role: string
       }
-      
+      const courseKind = courseKindOf(course)
+            
       return {
         id: course._id.toString(),
         title: course.title,
@@ -801,6 +853,9 @@ export async function fetchOtherCourses(excludeCourseId: string): Promise<Browse
         enrolledCount: course.enrolledCount || 0,
         rating: course.rating?.average || null,
         outcomes: (course.whatYouWillLearn ?? []).slice(0, 3),
+        kind: courseKind,
+        sellerName: sellerNameOf(courseKind, instructor),
+        publishedAt: course.publishedAt ? course.publishedAt.toISOString() : null,
       }
     })
   } catch (error) {
@@ -1271,7 +1326,7 @@ export async function fetchInstructorProfile(instructorId: string): Promise<Inst
     
     // Compute real counts from DB
     const [courseCount, studentCount] = await Promise.all([
-      Course.countDocuments({ instructor: instructor._id, status: "published" }),
+      Course.countDocuments({ instructor: instructor._id, status: "published", ...PROGRAM_KIND_FILTER }),
       Enrollment.distinct("user", {
         course: { $in: await Course.find({ instructor: instructor._id }).distinct("_id") },
       }).then((ids) => ids.length),
@@ -1307,6 +1362,7 @@ export async function fetchInstructorPublicCourses(instructorId: string): Promis
     const courses = await Course.find({
       instructor: instructorId,
       status: "published",
+      ...PROGRAM_KIND_FILTER,
     })
       .select("title thumbnailUrl level pricing price totalLessons enrolledCount rating school slug")
       .sort({ createdAt: -1 })
@@ -1422,7 +1478,8 @@ type FacultyUserDoc = {
 async function publishedCourseCounts(): Promise<Map<string, number>> {
   const rows = await Course.aggregate<{ _id: mongoose.Types.ObjectId; count: number }>([
     // A published course with no instructor (a non-Mongoose writer) must not take the whole directory down.
-    { $match: { status: "published", instructor: { $type: "objectId" } } },
+    // Faculty teach school programs — a marketplace or New Economy course makes no one faculty.
+    { $match: { status: "published", instructor: { $type: "objectId" }, ...PROGRAM_KIND_FILTER } },
     { $group: { _id: "$instructor", count: { $sum: 1 } } },
   ])
   return new Map(rows.map((row) => [row._id.toString(), row.count]))
@@ -1483,7 +1540,7 @@ export async function fetchFacultyProfile(username: string): Promise<FacultyProf
       .lean()
     if (!user) return null
 
-    const courseCount = await Course.countDocuments({ instructor: user._id, status: "published" })
+    const courseCount = await Course.countDocuments({ instructor: user._id, status: "published", ...PROGRAM_KIND_FILTER })
     if (courseCount === 0) return null
 
     const profile = user.instructorProfile
@@ -1526,7 +1583,7 @@ export async function fetchFacultyUsername(userId: string): Promise<string | nul
       .select("username")
       .lean()
     if (!user) return null
-    const teaches = await Course.exists({ instructor: user._id, status: "published" })
+    const teaches = await Course.exists({ instructor: user._id, status: "published", ...PROGRAM_KIND_FILTER })
     return teaches ? user.username : null
   } catch (error) {
     console.error("Fetch faculty username error:", error)

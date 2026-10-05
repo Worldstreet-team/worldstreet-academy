@@ -74,11 +74,14 @@ const GOLD_CTA =
  * CTA's price rolls. All of it is instant under reduced motion.
  */
 export function PackageChooser({
+  noun = "program",
   programTitle,
   comingSoon,
   lessons,
   className,
 }: {
+  /** What the page sells: a school program, or a marketplace / New Economy course. */
+  noun?: "program" | "course"
   programTitle: string
   /** Published with a future availableAt: packages can be read, not bought yet. */
   comingSoon: boolean
@@ -89,7 +92,7 @@ export function PackageChooser({
   return (
     <section id="packages" aria-labelledby="packages-heading" className={cn(SECTION_SCROLL_MT, className)}>
       <h2 id="packages-heading" className={PROGRAM_H2}>
-        {multiTier ? "Choose your learning experience" : "Enrol in this program"}
+        {multiTier ? "Choose your learning experience" : `Enrol in this ${noun}`}
       </h2>
       {multiTier ? (
         <>
@@ -101,7 +104,7 @@ export function PackageChooser({
           <PackageCompare lessons={lessons} />
         </>
       ) : (
-        <SingleOffer comingSoon={comingSoon} lessons={lessons} />
+        <SingleOffer noun={noun} comingSoon={comingSoon} lessons={lessons} />
       )}
     </section>
   )
@@ -581,7 +584,15 @@ function OfferTerms({ pkg, comingSoon, className }: { pkg: PublicPackage; coming
  * ladder-less program lists only its services — its feature lines are the
  * program's "What you'll learn", already on the page.
  */
-function SingleOffer({ comingSoon, lessons }: { comingSoon: boolean; lessons: LessonAccess | null }) {
+function SingleOffer({
+  noun,
+  comingSoon,
+  lessons,
+}: {
+  noun: "program" | "course"
+  comingSoon: boolean
+  lessons: LessonAccess | null
+}) {
   const { packages, tierCount, selected: pkg } = usePackageSelection()
   const features = tierCount > 0 ? pkg.features.filter((line) => line.trim()) : []
   const lessonsText = lessonLine(lessons, pkg.key)
@@ -590,7 +601,7 @@ function SingleOffer({ comingSoon, lessons }: { comingSoon: boolean; lessons: Le
   const offer = (
     <>
       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ws-muted">
-        {tierCount > 0 ? pkg.name : "Full program"}
+        {tierCount > 0 ? pkg.name : `Full ${noun}`}
       </p>
       <p className="mt-3 font-display text-[52px] font-light leading-none tabular-nums tracking-[-0.03em] text-ws-primary">
         {packagePriceLabel(pkg.price)}

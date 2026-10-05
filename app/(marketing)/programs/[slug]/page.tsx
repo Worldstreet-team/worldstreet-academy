@@ -92,6 +92,11 @@ const STUCK_CHROME_PX = 112
  * content starts under it. Below lg it is one column: art, hero, the offer
  * inline, then the nav.
  *
+ * The same page is the course page for marketplace and New Economy courses
+ * (owner, 2026-10-05): the hero carries their badge and credit, they sell at
+ * one price, the live-cohort strip is a programs-only thing, and "related"
+ * draws from their own catalogue.
+ *
  * Every fact is real: lesson count, length and previews come from the
  * published lessons (not the stored counters), reviews and ratings from their
  * collections; anything at zero is left out rather than printed.
@@ -112,8 +117,9 @@ export default async function ProgramPage({
     user ? getLearnStart(user.id, program.id) : Promise.resolve(null),
     fetchProgramCurriculum(program.id),
     fetchProgramReviews(program.id, 1, 6),
-    fetchBrowseCourses(),
+    fetchBrowseCourses({ kind: program.kind }),
   ])
+  const isProgram = program.kind === "program"
   const signedIn = Boolean(user)
   const isEnrolled = enrollment?.isEnrolled ?? false
   const isPreEnrolled = enrollment?.status === "pre_enrolled"
@@ -184,7 +190,8 @@ export default async function ProgramPage({
   // show, else the catalogue — school siblings first — as "More programs".
   const others = catalogue.filter((c) => c.id !== program.id)
   const siblings = school ? others.filter((c) => c.school === school.slug) : []
-  const relatedFromSchool = siblings.length >= 2
+  // A marketplace "school" is a topic, not a school page to send people to.
+  const relatedFromSchool = isProgram && siblings.length >= 2
   const related: BrowseCourse[] = relatedFromSchool
     ? siblings.slice(0, 4)
     : [...siblings, ...others.filter((c) => c.school !== program.school || !school)].slice(0, 4)
@@ -295,7 +302,7 @@ export default async function ProgramPage({
                   // (owner 2026-10-03: "pay now to join"). Only on an open
                   // program — a coming-soon one has its own opening date.
                   <div>
-                    {access.kind === "open" && (
+                    {access.kind === "open" && isProgram && (
                       <CohortBanner
                         variant="strip"
                         note={
@@ -307,6 +314,7 @@ export default async function ProgramPage({
                       />
                     )}
                     <PackageChooser
+                      noun={isProgram ? "program" : "course"}
                       programTitle={program.title}
                       comingSoon={access.kind === "coming_soon"}
                       lessons={lessonAccess}
@@ -314,7 +322,18 @@ export default async function ProgramPage({
                   </div>
                 )}
                 {hasReviews && <ProgramReviews courseId={program.id} sectionId="reviews" initial={reviewsPage} />}
-                <RelatedPrograms programs={related} school={relatedFromSchool ? school : null} signedIn={signedIn} />
+                <RelatedPrograms
+                  programs={related}
+                  school={relatedFromSchool ? school : null}
+                  catalogue={
+                    program.kind === "marketplace"
+                      ? { heading: "More on the marketplace", href: "/marketplace", label: "Browse the marketplace" }
+                      : program.kind === "new-economy"
+                        ? { heading: "More free courses", href: "/new-economy", label: "All New Economy courses" }
+                        : undefined
+                  }
+                  signedIn={signedIn}
+                />
               </div>
               {/* The FAQ carries its own max-w-7xl gutter and vertical padding:
                   step out of this grid's gutter so the two line up, and let its

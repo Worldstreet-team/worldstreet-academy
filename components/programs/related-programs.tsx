@@ -15,27 +15,30 @@ import { PROGRAM_H2 } from "@/components/programs/section-title"
 export function RelatedPrograms({
   programs,
   school,
+  catalogue,
   signedIn,
 }: {
   programs: BrowseCourse[]
   /** Set when `programs` all come from this school. */
   school: School | null
+  /** The catalogue these come from when it isn't the programs' — the marketplace or New Economy. */
+  catalogue?: { heading: string; href: string; label: string }
   signedIn: boolean
 }) {
   if (programs.length === 0) return null
-  const href = school ? `/schools/${school.slug}` : "/programs"
+  const href = school ? `/schools/${school.slug}` : (catalogue?.href ?? "/programs")
 
   return (
     <section aria-labelledby="related-heading">
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <h2 id="related-heading" className={PROGRAM_H2}>
-          {school ? `More from ${school.short}` : "More programs"}
+          {school ? `More from ${school.short}` : (catalogue?.heading ?? "More programs")}
         </h2>
         <Link
           href={href}
           className="inline-flex items-center gap-1.5 rounded-sm text-[14px] font-semibold text-ws-primary underline decoration-ws-hairline underline-offset-4 transition-colors duration-[var(--ws-motion-fast)] hover:decoration-current focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40"
         >
-          {school ? "View the school" : "Browse all programs"}
+          {school ? "View the school" : (catalogue?.label ?? "Browse all programs")}
           <ArrowRightIcon size={15} aria-hidden />
         </Link>
       </div>
