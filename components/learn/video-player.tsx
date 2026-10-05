@@ -16,7 +16,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { CheckIcon, FastForwardIcon, LightbulbIcon, MaximizeIcon, MinimizeIcon, PauseIcon, PictureInPicture2Icon, PlayIcon, RewindIcon, SettingsIcon, Volume1Icon, Volume2Icon, VolumeXIcon } from "lucide-react"
+import { CheckIcon, FastForwardIcon, LightbulbIcon, MaximizeIcon, MinimizeIcon, PauseIcon, PlayIcon, RewindIcon, SettingsIcon, Volume1Icon, Volume2Icon, VolumeXIcon } from "lucide-react"
 import { RenderIcon } from "@/components/shared/render-icon"
 
 /* ------------------------------------------------------------------ */
@@ -401,21 +401,6 @@ export function VideoPlayer({
     }
   }, [])
 
-  /* ---- PiP ---- */
-  const togglePip = useCallback(async () => {
-    const video = videoRef.current
-    if (!video) return
-    try {
-      if (document.pictureInPictureElement) {
-        await document.exitPictureInPicture()
-      } else {
-        await video.requestPictureInPicture()
-      }
-    } catch {
-      // PiP not supported
-    }
-  }, [])
-
   /* ---- Lights Out ---- */
   const toggleLightsOut = useCallback(() => {
     setLightsOut((v) => {
@@ -539,9 +524,6 @@ export function VideoPlayer({
         case "f":
           toggleFullscreen()
           break
-        case "p":
-          togglePip()
-          break
         case "l":
           toggleLightsOut()
           break
@@ -562,7 +544,7 @@ export function VideoPlayer({
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
   }, [
-    togglePlay, skip, toggleMute, toggleFullscreen, togglePip,
+    togglePlay, skip, toggleMute, toggleFullscreen,
     toggleLightsOut, setVolumeLevel, volume, changePlaybackRate,
     playbackRate, flashOsd,
   ])
@@ -612,6 +594,13 @@ export function VideoPlayer({
         onSeeked={() => setIsBuffering(false)}
         preload="auto"
         playsInline
+        // Watch, don't download (owner, 2026-10-03): no native download item,
+        // no picture-in-picture, no right-click "Save video as". This deters
+        // casual saving; it can't stop screen capture or a determined user
+        // copying the media URL.
+        controlsList="nodownload"
+        disablePictureInPicture
+        onContextMenu={(e) => e.preventDefault()}
       />
 
       {/* ---- Double-tap seek indicators ---- */}
@@ -870,15 +859,6 @@ export function VideoPlayer({
               <LightbulbIcon  size={16} />
             </button>
 
-            {/* PiP — hidden on mobile */}
-            <button
-              onClick={togglePip}
-              className="hidden md:inline-flex text-white/70 hover:text-white transition-colors p-1"
-              title="Picture in Picture (P)"
-            >
-              <PictureInPicture2Icon  size={16} />
-            </button>
-
             {/* Fullscreen */}
             <button
               onClick={toggleFullscreen}
@@ -938,15 +918,6 @@ export function VideoPlayer({
                 </span>
                 <span className={cn("text-[10px] font-medium", lightsOut ? "text-primary" : "text-muted-foreground")}>
                   {lightsOut ? "On" : "Off"}
-                </span>
-              </button>
-              <button
-                onClick={() => { togglePip(); setShowMobileSettings(false) }}
-                className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-              >
-                <span className="flex items-center gap-2.5 text-sm">
-                  <PictureInPicture2Icon  size={15} />
-                  Picture in Picture
                 </span>
               </button>
             </div>

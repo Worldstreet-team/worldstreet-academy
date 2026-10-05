@@ -19,6 +19,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   BookOpen,
+  CalendarDays,
   ChartLine,
   ChevronDown,
   Gift,
@@ -114,6 +115,12 @@ const connectItems: NavItem[] = [
     href: "/instructor/meetings",
     icon: Users,
     match: (p) => p.startsWith("/instructor/meetings"),
+  },
+  {
+    title: "Calendar",
+    href: "/instructor/calendar",
+    icon: CalendarDays,
+    match: (p) => p.startsWith("/instructor/calendar"),
   },
 ]
 

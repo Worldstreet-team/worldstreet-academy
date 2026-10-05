@@ -66,6 +66,7 @@ import {
   ReturnToMeetingBanner,
 } from "@/components/meetings"
 import { LinkIcon, Minimize2Icon } from "lucide-react"
+import { Whiteboard } from "@/components/meetings/whiteboard"
 import type { ActiveTab, ChatMessage, Poll, PollVoter } from "@/components/meetings"
 import { useMyMeetings, useMeetingHistory, useInstructorMeetingCourses, queryKeys } from "@/lib/hooks/queries"
 import { MentorshipPanel } from "@/components/mentorship/mentorship-panel"
@@ -1606,6 +1607,14 @@ export default function InstructorMeetingsPage() {
                 </button>
               </>
             )}
+
+            {/* Whiteboard: the host's toggle + a panel over the stage (components/meetings/whiteboard.tsx). */}
+            <Whiteboard
+              key={activeMeeting.id}
+              meetingId={activeMeeting.id}
+              hostUserId={activeMeeting.hostId}
+              isHost={isHost ?? false}
+            />
 
             {activeSlide?.type === "screenshare" ? (
               <ScreenShareView

@@ -29,6 +29,7 @@ import {
   UserGroup02Icon,
   UserGroupIcon,
   Video01Icon,
+  VideoReplayIcon,
   Wallet01Icon,
 } from "@hugeicons/core-free-icons"
 import {
@@ -140,6 +141,12 @@ const connectItems: NavItem[] = [
     href: "/dashboard/meetings",
     icon: UserGroupIcon,
     match: (p) => p.startsWith("/dashboard/meetings"),
+  },
+  {
+    title: "Recordings",
+    href: "/dashboard/recordings",
+    icon: VideoReplayIcon,
+    match: (p) => p.startsWith("/dashboard/recordings"),
   },
 ]
 

@@ -10,6 +10,8 @@ import { emitEvent, emitEventToMany, type MeetingEventPayload } from "@/lib/call
 import { sendMeetingNotificationEmail, sendMeetingInviteEmail } from "@/lib/email"
 import { getCourseAccess } from "@/lib/course-access"
 import { entitlementsFor, includesMentorship } from "@/lib/entitlements"
+import { HOST_EARLY_START_MS } from "@/lib/class-schedule"
+import { announceClassLive } from "@/lib/class-live"
 
 // ── Helpers ──
 
@@ -23,9 +25,6 @@ async function initAction() {
 function backgroundSave(promise: Promise<unknown>) {
   promise.catch((err) => console.error("[Meeting] Background save failed:", err))
 }
-
-/** How early the host may start a scheduled course class (joinMeeting refuses before that). */
-const HOST_EARLY_START_MS = 15 * 60_000
 
 // ── Types ──
 
@@ -221,6 +220,12 @@ export async function joinMeeting(meetingId: string): Promise<{
         meeting.status = "active"
         meeting.startedAt = new Date()
         await meeting.save()
+        // A course class going live tells its students (bell + Ably + email).
+        // announceClassLive claims Meeting.liveNotifiedAt first, so a host
+        // rejoining never re-notifies, and it skips mentorship sessions.
+        if (meeting.courseId && !meeting.mentorshipSessionId) {
+          backgroundSave(announceClassLive(meeting._id.toString(), { email: true }))
+        }
       }
       return {
         success: true,
@@ -1858,7 +1863,10 @@ export async function createCourseMeeting(
 
     // Create the RTK room up front — for a scheduled class too, like interviews,
     // so the host's join at start time is instant (joinMeeting flips it live).
-    const rtkMeetingId = await createRTKMeeting(`Meeting: ${title}`)
+    // Every course class is recorded (owner, 2026-10-05): RealtimeKit starts
+    // recording when the first participant — the host — joins, and
+    // /api/cron/recordings copies the file to the private bucket.
+    const rtkMeetingId = await createRTKMeeting(`Meeting: ${title}`, { recordOnStart: true })
     const hostParticipant = await addParticipant(rtkMeetingId, {
       name: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
       customParticipantId: currentUser.id,
@@ -1945,6 +1953,11 @@ export async function createCourseMeeting(
         await Promise.allSettled(emailPromises)
       })()
     )
+    // A class that starts now is live already: bell + Ably for its students.
+    // The creation email above already says "Happening right now", so no second email.
+    if (!scheduledAt) {
+      backgroundSave(announceClassLive(meeting._id.toString(), { email: false }))
+    }
 
     return {
       success: true,

@@ -76,3 +76,4 @@ export {
   type ISellerApplication,
   type SellerApplicationStatus,
 } from "./seller-application"
+export { Recording, type IRecording, type RecordingStatus } from "./recording"

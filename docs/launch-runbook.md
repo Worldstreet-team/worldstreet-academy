@@ -83,7 +83,7 @@ Coolify → the academy application → Environment Variables. Names only here; 
 | `SITE_URL` | Yes | Runtime | `https://academy.worldstreetgold.com`, no trailing slash. `lib/app-url.ts` builds email links, canonical URLs, the sitemap, share-card URLs and certificate verify URLs from it. |
 | `NEXT_PUBLIC_APP_URL` | Optional | Runtime (server) | If set, it wins over `SITE_URL` — make it the same public origin. A localhost value is ignored in production. |
 | `NEXT_PUBLIC_COMMUNITY_URL` | Optional | **Build** | The dashboard's Community tile reads it in the browser, so Next bakes it in during the build: tick "Build Variable" and redeploy after any change. Unset → the tile is hidden. |
-| `CRON_SECRET` | Yes | Runtime | A long random value (`openssl rand -hex 32`). The three scheduled tasks (§5) send it as a bearer token. |
+| `CRON_SECRET` | Yes | Runtime | A long random value (`openssl rand -hex 32`). The four scheduled tasks (§5) send it as a bearer token. |
 
 Also confirm these existing names are present (don't change working values): `MONGODB_URI`, `CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `NEXT_PUBLIC_WALLET_FUNDING_URL`, `NEXT_PUBLIC_WALLET_WITHDRAW_URL`, `RESEND_API_KEY`, `EMAIL_FROM`, `ABLY_API_KEY`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_REALTIME_ORG_ID`, `CLOUDFLARE_REALTIME_API_KEY`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_RESOURCES_BUCKET_NAME` (that bucket must have no public access; assignment uploads and submission downloads fail closed without it — B6; students' browsers upload straight to it, so its CORS allows PUT with `Content-Type` from the academy origin (`https://academy.worldstreetgold.com`)), `R2_PUBLIC_URL`, `OPENAI_API_KEY`.
 
@@ -154,13 +154,14 @@ mongosh "$PROD_URI" --quiet --eval 'db.submissions.createIndex({ assignment: 1, 
 
 ## 5. Scheduled tasks (Coolify)
 
-All three routes under `app/api/cron/` are `POST`, require `Authorization: Bearer $CRON_SECRET`, and are idempotent.
+All four routes under `app/api/cron/` are `POST`, require `Authorization: Bearer $CRON_SECRET`, and are idempotent.
 
 | Task | Path | Cron | What it does |
 |---|---|---|---|
 | academy-course-live | `/api/cron/course-live` | `*/5 * * * *` | Emails and notifies pre-enrolled students when a scheduled course goes live; stamps `liveNotifiedAt`. Phase 3 recorded it as not yet scheduled in production. |
 | academy-reminders | `/api/cron/reminders` | `*/10 * * * *` | T-24h and T-1h reminders for scheduled classes (students whose package includes live classes), interviews and mentorship sessions (the host and the student, while the student still holds mentorship). Since Phase 9 it also sends pay-later nudge emails for open `EnrollmentIntent` rows (returns `nudged`) — no new scheduled task is needed for this. |
 | academy-earnings | `/api/cron/earnings` | `*/15 * * * *` | Clears matured instructor earnings to the wallet and applies refund clawbacks. |
+| academy-recordings | `/api/cron/recordings` | `0 * * * *` | Copies live-class recordings off RealtimeKit (which deletes them after 7 days) into the private resources bucket under `worldstreet-academy/recordings/<courseId>/<meetingId>/<recordingId>.mp4`, and marks each `Recording` row `stored`. Failed copies keep a reason and retry hourly until the 7-day window passes. At most 3 copies per run. Mentorship sessions are never recorded. |
 
 Coolify → academy app → Scheduled Tasks → Add, container = the academy app. The runner image (`node:22-alpine`) has no `curl`, so call the app from inside its own container with Node (swap the path for each task):
 
@@ -170,7 +171,7 @@ node -e 'fetch("http://127.0.0.1:3000/api/cron/course-live",{method:"POST",heade
 
 If reminders or earnings tasks already exist with a `curl` command, open their last run log: `curl: not found` means they have never run — replace them with the command above. If the in-container call returns anything but JSON, use `https://academy.worldstreetgold.com/api/cron/<name>` as the URL in the same command.
 
-**Check:** run each task once ("Run now", or wait one interval). Its log shows `200 {"ok":true,…}`. `401` → `CRON_SECRET` isn't in the container env; `503 {"ok":false,"error":"wallet_disabled"}` (earnings) → `WALLET_*` missing.
+**Check:** run each task once ("Run now", or wait one interval). Its log shows `200 {"ok":true,…}`. `401` → `CRON_SECRET` isn't in the container env; `503 {"ok":false,"error":"wallet_disabled"}` (earnings) → `WALLET_*` missing; `503 {"ok":false,"error":"private_bucket_missing"}` (recordings) → `R2_RESOURCES_BUCKET_NAME` missing (recordings never fall back to the public bucket); `503 … "realtime_disabled"` → `CLOUDFLARE_REALTIME_*` missing.
 
 ## 6. Production catalogue — `scripts/mastery-catalogue.mjs`
 
