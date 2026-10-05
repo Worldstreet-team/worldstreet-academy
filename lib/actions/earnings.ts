@@ -2,7 +2,7 @@
 
 import connectDB from "@/lib/db"
 import { Types } from "mongoose"
-import { Course, Enrollment, User, Order, PaymentEvent, Earning } from "@/lib/db/models"
+import { Course, Enrollment, User, Order, PaymentEvent, Earning, type IEarning } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth/actions"
 import {
   createWalletCredit,
@@ -41,11 +41,12 @@ export type InstructorEarnings = {
 }
 
 /**
- * Clear matured earnings for one instructor: sale rows credit their central
- * Worldstreet wallet balance (idempotent on creditReference — a rerun can
- * never double-pay), adjustment rows (post-clearing refund clawbacks) debit
- * it. Once credited, the money is ordinary Worldstreet balance and withdraws
- * through the existing dashboard flow, where KYC is enforced centrally.
+ * Clear matured earnings for one instructor: sale and referral rows credit
+ * their central Worldstreet wallet balance (idempotent on creditReference — a
+ * rerun can never double-pay), adjustment rows (post-clearing refund
+ * clawbacks) debit it. Once credited, the money is ordinary Worldstreet
+ * balance and withdraws through the existing dashboard flow, where KYC is
+ * enforced centrally.
  */
 async function clearMaturedEarnings(instructorId: string): Promise<void> {
   if (!walletEnabled()) return
@@ -65,7 +66,8 @@ async function clearMaturedEarnings(instructorId: string): Promise<void> {
         await createWalletCredit(earning.instructorAuthUserId, {
           amountMinor: earning.netMinor,
           reference: earning.creditReference,
-          description: `Academy earnings: ${courseTitle}`,
+          description:
+            earning.kind === "referral" ? `Academy referral commission: ${courseTitle}` : `Academy earnings: ${courseTitle}`,
           metadata: { earningId: earning._id.toString(), courseId: String(earning.course) },
         })
       } else {
@@ -157,11 +159,47 @@ export async function getMyInstructorEarnings(): Promise<InstructorEarnings | nu
 }
 
 /**
- * Refund a purchase (admin only). Re-credits the student's central wallet in
- * full, revokes course access, and claws the instructor's share back from the
- * earnings ledger — pending earnings are reversed outright; already-cleared
- * earnings get a negative adjustment that debits their wallet on the next
+ * Take a refunded purchase's earning back — a sale's share or a referral
+ * commission alike. Pending: reversed outright, it never reaches a wallet.
+ * Cleared: a negative adjustment that debits the earner's wallet on the next
  * clearing pass.
+ */
+async function clawBack(earning: IEarning, orderId: Types.ObjectId | null, reason: string): Promise<void> {
+  const label = earning.kind === "referral" ? "referral refunded" : "refund"
+  if (earning.status === "pending") {
+    earning.status = "reversed"
+    earning.note = `${label} before clearing: ${reason}`
+    await earning.save()
+  } else if (earning.status === "cleared") {
+    await Earning.create({
+      enrollment: earning.enrollment,
+      order: orderId,
+      course: earning.course,
+      instructor: earning.instructor,
+      instructorAuthUserId: earning.instructorAuthUserId,
+      student: earning.student,
+      kind: "adjustment",
+      grossMinor: -earning.grossMinor,
+      feeMinor: -earning.feeMinor,
+      netMinor: -earning.netMinor,
+      currency: earning.currency,
+      status: "pending",
+      availableAt: new Date(),
+      // Keyed on the earning being reversed, not the enrollment: a
+      // re-purchased-then-refunded course would collide on the latter.
+      creditReference: `academy_clawback_${earning._id.toString()}`,
+      chargeId: earning.chargeId,
+      note: `${label} after clearing: ${reason}`,
+    })
+  }
+}
+
+/**
+ * Refund a purchase (admin only). Re-credits the student's central wallet in
+ * full, revokes course access, and claws the instructor's share — and any
+ * referral commission the purchase paid — back from the earnings ledger:
+ * pending earnings are reversed outright; already-cleared earnings get a
+ * negative adjustment that debits their wallet on the next clearing pass.
  */
 export async function refundEnrollment(enrollmentId: string, reason: string) {
   try {
@@ -204,34 +242,17 @@ export async function refundEnrollment(enrollmentId: string, reason: string) {
     const earning = await Earning.findOne({ enrollment: enrollment._id, kind: "sale" }).sort({
       createdAt: -1,
     })
-    if (earning) {
-      if (earning.status === "pending") {
-        earning.status = "reversed"
-        earning.note = `refund before clearing: ${reason}`
-        await earning.save()
-      } else if (earning.status === "cleared") {
-        await Earning.create({
-          enrollment: enrollment._id,
-          order: order?._id ?? null,
-          course: earning.course,
-          instructor: earning.instructor,
-          instructorAuthUserId: earning.instructorAuthUserId,
-          student: earning.student,
-          kind: "adjustment",
-          grossMinor: -earning.grossMinor,
-          feeMinor: -earning.feeMinor,
-          netMinor: -earning.netMinor,
-          currency: earning.currency,
-          status: "pending",
-          availableAt: new Date(),
-          // Keyed on the earning being reversed, not the enrollment: a
-          // re-purchased-then-refunded course would collide on the latter.
-          creditReference: `academy_clawback_${earning._id.toString()}`,
-          chargeId: earning.chargeId,
-          note: `refund after clearing: ${reason}`,
-        })
-      }
-    }
+    if (earning) await clawBack(earning, order?._id ?? null, reason)
+
+    // The referral commission this purchase paid, if any, gets the same
+    // treatment. Matched on the refunded charge, so a commission from an
+    // earlier generation of this enrollment is never clawed back twice.
+    const commission = await Earning.findOne({
+      enrollment: enrollment._id,
+      kind: "referral",
+      chargeId: enrollment.transactionId,
+    })
+    if (commission) await clawBack(commission, order?._id ?? null, reason)
 
     await Course.findByIdAndUpdate(enrollment.course, { $inc: { enrolledCount: -1 } })
     const course = await Course.findById(enrollment.course).select("instructor")

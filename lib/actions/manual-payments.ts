@@ -23,6 +23,9 @@ import { courseAvailability } from "@/lib/types/course"
 import { PACKAGE_KEYS, packageFor, sellsPackages } from "@/lib/entitlements"
 import { notifyAdmins, notifyUser } from "@/lib/notify"
 import { appUrl } from "@/lib/app-url"
+import { courseKindOf } from "@/lib/course-kind"
+import { normalizeReferralCode } from "@/lib/referral-link"
+import { referralOwner, referrerFor, splitSale } from "@/lib/referrals"
 import {
   sendEnrollmentConfirmationEmail,
   sendEspeePaymentAdminEmail,
@@ -487,7 +490,9 @@ const ReferralInput = z.string().trim().min(1, "Tell us who invited you").max(80
 
 /**
  * Checkout's optional "Who invited you?" (owner meeting 2026-10-03). Free
- * text for now — referral codes and payouts come later. The first answer
+ * text — and when it is someone's referral code (owner, 2026-10-05), that
+ * person is linked too, so their code is credited with this learner's
+ * purchases. The learner's own code is refused, not saved. The first answer
  * wins: an account that already has one keeps it.
  */
 export async function saveReferral(
@@ -501,11 +506,17 @@ export async function saveReferral(
     const parsed = ReferralInput.safeParse(text)
     if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Check the name" }
 
+    const code = normalizeReferralCode(parsed.data)
+    const owner = code ? await referralOwner(code) : null
+    if (owner && owner.id === user.id) {
+      return { success: false, error: "That's your own code — enter the person who invited you" }
+    }
+    const at = new Date()
+    const referredBy =
+      owner && code ? { text: parsed.data, at, code, userId: owner.id } : { text: parsed.data, at }
+
     // `referredBy: null` also matches accounts created before the field existed.
-    const result = await User.updateOne(
-      { _id: user.id, referredBy: null },
-      { $set: { referredBy: { text: parsed.data, at: new Date() } } }
-    )
+    const result = await User.updateOne({ _id: user.id, referredBy: null }, { $set: { referredBy } })
     return { success: true, data: { saved: result.modifiedCount > 0 } }
   } catch (error) {
     console.error("Save referral error:", error)
@@ -721,7 +732,7 @@ export async function adminApproveEspeePayment(paymentId: string): Promise<Espee
     }
 
     const [course, learner, existing] = await Promise.all([
-      Course.findById(proof.course).select("title instructor packages").lean(),
+      Course.findById(proof.course).select("title instructor packages kind").lean(),
       User.findById(proof.user).select("email firstName lastName").lean(),
       Enrollment.findOne({ user: proof.user, course: proof.course }).select("status").lean(),
     ])
@@ -888,7 +899,25 @@ export async function adminApproveEspeePayment(paymentId: string): Promise<Espee
       console.error("[ESPEE] enrolled, but the order/proof link failed:", err)
     }
 
-    // No instructor Earning, and no totalEarnings (owner meeting 2026-10-03):
+    // Who made the sale, recorded as on a wallet order (owner, 2026-10-05) —
+    // from the learner's saved `referredBy` only: this request is the admin's,
+    // so its cookies say nothing about the learner. Record only: ESPEE pays no
+    // share and no referral commission (below). Never fails the approval.
+    try {
+      const split = splitSale({
+        kind: courseKindOf(course),
+        sellerId: course.instructor.toString(),
+        buyerId: learnerId,
+        referrer: await referrerFor(learnerId, null),
+      })
+      if (split.attribution) {
+        await Order.updateOne({ _id: order._id }, { $set: { attribution: split.attribution } })
+      }
+    } catch (err) {
+      console.error("[ESPEE] couldn't record who made the sale:", err)
+    }
+
+    // No instructor Earning, no referral Earning, and no totalEarnings (owner meeting 2026-10-03):
     // an ESPEE transfer never enters the wallet system, so there is no charge
     // to clear an instructor's share from. Only the student counts move, as in
     // purchaseCourse — pre-enrollment already counted this student.
