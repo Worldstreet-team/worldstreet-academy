@@ -178,3 +178,33 @@ The Academy now has two halves: **school programs** (live cohorts, three plans) 
 - **Splits** (`lib/db/models/earning.ts`): a seller keeps `MARKETPLACE_SHARE_OWN_LINK` (85%) on a sale through their own referral link and `MARKETPLACE_SHARE_ACADEMY` (50%) when the Academy makes the sale. Wired on the web by the referrals stream.
 - **`sellerapplications`** — web-only; Go may ignore it. `{ user, status: "submitted" | "approved" | "rejected", fullName, school, topic, experience, sampleUrl, pitch, agreedAt, reviewedBy, reviewedAt, reason }`, one `submitted` row per user (partial unique index). Approval mirrors into `users.sellerStatus`.
 - Any wholesale course write must carry `kind`, `review` and `communityUrl`, and any wholesale user write `sellerStatus` (write dotted paths or keep the fields).
+
+## 10. Points and the tutor application questions (owner meeting, 2026-10-03)
+
+Go needs no patch for either: nothing it reads changed.
+
+**`pointevents`** — new collection, **web-only**; Go may ignore it. Learning points with no cash value, one row per award. Totals are summed on read (no cached total anywhere, so nothing to keep in step).
+
+| Field | Type | Meaning |
+|---|---|---|
+| `user` | ObjectId | Who earned it. |
+| `course` | ObjectId \| `null` | The program it was earned in. |
+| `kind` | `"lesson_completed" \| "assignment_submitted" \| "assignment_graded" \| "exam_passed" \| "course_completed"` | What earned it. |
+| `points` | integer ≥ 0 | 10 a lesson, 20 an assignment handed in, grade ÷ 5 (rounded) when it's graded, 50 a passed final exam, 200 a completed program (`POINTS` in `lib/points.ts`). |
+| `key` | string, **unique** | Makes each award pay once: `lesson:<enrollmentId>:<lessonId>`, `assignment-submitted:<submissionId>`, `assignment-graded:<submissionId>`, `exam:<enrollmentId>:<examId>`, `course:<enrollmentId>`. |
+| `createdAt` | date | When it was awarded. |
+
+Indexes: `{ key: 1 }` unique, `{ user: 1, createdAt: -1 }`, `{ course: 1, user: 1 }`. Lessons a learner completes or programs they finish **through Go/mobile earn nothing** until Go writes the same rows; if it does, use the same keys so a web save of the same event stays a no-op (a duplicate key error means "already awarded").
+
+**`instructorapplications.answers`** gains six optional fields (additive; missing on applications submitted before them, so read every one as optional):
+
+| Field | Type | Meaning |
+|---|---|---|
+| `school` | string (SchoolSlug) | "Which school would you teach in?" |
+| `teachingTopic` | string ≤ 200 | "What exactly would you like to teach?" |
+| `passion` | `"yes" \| "somewhat"` | "Are you passionate about teaching it?" |
+| `passionReason` | string ≤ 200 | One line on why. |
+| `readyToCommit` | boolean | "Ready to commit to bringing learners to a place of real understanding?" — required at submit, so `true` whenever present. |
+| `extraDocumentUrl` | string \| `null` | An optional extra PDF, uploaded like `cvUrl`. |
+
+The web requires the first five on every new application. Any wholesale application write must keep them (write dotted paths or keep the fields).

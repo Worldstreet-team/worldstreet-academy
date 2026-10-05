@@ -44,7 +44,25 @@ export interface IApplicationAnswers {
   sampleVideoUrl: string | null
   /** Uploaded CV/credentials (R2 public URL). */
   cvUrl: string | null
+  /*
+   * Bason's questions (owner meeting, 2026-10-03). Additive and absent on
+   * applications submitted before them — readers must treat every one as optional.
+   */
+  /** "Which school would you teach in?" — a SchoolSlug (lib/schools.ts). */
+  school?: string
+  /** "What exactly would you like to teach?" */
+  teachingTopic?: string
+  /** "Are you passionate about teaching it?" */
+  passion?: ApplicationPassion
+  /** One line on why. */
+  passionReason?: string
+  /** "Ready to commit to bringing learners to a place of real understanding?" — required at submit, so always true when set. */
+  readyToCommit?: boolean
+  /** "Anything else you'd like to upload?" — an optional PDF (R2 public URL), uploaded like the CV. */
+  extraDocumentUrl?: string | null
 }
+
+export type ApplicationPassion = "yes" | "somewhat"
 
 export type RejectionReason =
   | "not_enough_experience"
@@ -134,6 +152,13 @@ const InstructorApplicationSchema = new Schema<IInstructorApplication>(
       website: { type: String, default: null },
       sampleVideoUrl: { type: String, default: null },
       cvUrl: { type: String, default: null },
+      // Bason's questions — no defaults, so older applications stay without them.
+      school: { type: String, maxlength: 60 },
+      teachingTopic: { type: String, maxlength: 200 },
+      passion: { type: String, enum: ["yes", "somewhat"] },
+      passionReason: { type: String, maxlength: 200 },
+      readyToCommit: { type: Boolean },
+      extraDocumentUrl: { type: String },
     },
     interviewMeetingId: { type: Schema.Types.ObjectId, ref: "Meeting", default: null },
     proposedSlots: [

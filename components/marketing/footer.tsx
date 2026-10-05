@@ -79,7 +79,7 @@ export function Footer({ showFaculty }: { showFaculty: boolean }) {
             <h4 className="text-sm font-semibold mb-3">Teach</h4>
             <ul className="space-y-2">
               <li>
-                <Link href="/instructor" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                <Link href="/teach" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                   Become an Instructor
                 </Link>
               </li>

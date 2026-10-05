@@ -47,6 +47,7 @@ export {
   ACTIVE_APPLICATION_STATUSES,
   type IInstructorApplication,
   type IApplicationAnswers,
+  type ApplicationPassion,
   type ApplicationStatus,
   type IProposedSlot,
   type IScorecard,
