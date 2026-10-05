@@ -15,6 +15,14 @@ import type { default as RTKClientInstance } from "@cloudflare/realtimekit"
 
 type RTKEventCallback = (...args: unknown[]) => void
 
+/**
+ * Where a listener attaches: "self" → client.self, "participants" →
+ * client.participants.joined (per-peer events), "broadcast" →
+ * client.participants itself (room-wide events such as `broadcastedMessage`,
+ * which the whiteboard uses).
+ */
+type RTKListenerTarget = "self" | "participants" | "broadcast"
+
 interface RTKClientManager {
   /** The current Dyte/RTK client instance */
   client: RTKClientInstance | null
@@ -35,10 +43,10 @@ interface RTKClientManager {
   destroy(): Promise<void>
 
   /** Register an event listener (persists across React re-renders) */
-  on(event: string, target: "self" | "participants", callback: RTKEventCallback): void
+  on(event: string, target: RTKListenerTarget, callback: RTKEventCallback): void
 
   /** Remove an event listener */
-  off(event: string, target: "self" | "participants", callback: RTKEventCallback): void
+  off(event: string, target: RTKListenerTarget, callback: RTKEventCallback): void
 
   /** Remove all event listeners */
   offAll(): void
@@ -54,7 +62,7 @@ let _isInitializing = false
 let _isJoining = false
 const _listeners: Array<{
   event: string
-  target: "self" | "participants"
+  target: RTKListenerTarget
   callback: RTKEventCallback
 }> = []
 
@@ -222,7 +230,7 @@ export const rtkClient: RTKClientManager = {
 
 function _attachListener(
   event: string,
-  target: "self" | "participants",
+  target: RTKListenerTarget,
   callback: RTKEventCallback
 ) {
   if (!_client) return
@@ -233,12 +241,14 @@ function _attachListener(
       event as Parameters<typeof _client.participants.joined.on>[0],
       callback as never
     )
+  } else if (target === "broadcast") {
+    _client.participants.on(event as Parameters<typeof _client.participants.on>[0], callback as never)
   }
 }
 
 function _detachListener(
   event: string,
-  target: "self" | "participants",
+  target: RTKListenerTarget,
   callback: RTKEventCallback
 ) {
   if (!_client) return
@@ -248,6 +258,11 @@ function _detachListener(
     } else if (target === "participants") {
       _client.participants.joined.removeListener(
         event as Parameters<typeof _client.participants.joined.removeListener>[0],
+        callback as never
+      )
+    } else if (target === "broadcast") {
+      _client.participants.removeListener(
+        event as Parameters<typeof _client.participants.removeListener>[0],
         callback as never
       )
     }
