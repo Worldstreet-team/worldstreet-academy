@@ -56,6 +56,28 @@ import {
  */
 
 const OBJECT_ID = /^[a-f0-9]{24}$/
+
+/**
+ * An approval claims the proof (`approved`) before it writes the Order and the
+ * Enrollment, and links the enrollment last. A proof still `approved` with no
+ * linked enrollment after this long was interrupted mid-approval (a restart or
+ * a timeout) and may be approved again; every step after the claim is
+ * idempotent. The wait keeps an approval that is merely slow from being
+ * re-entered.
+ */
+const STRANDED_AFTER_MS = 2 * 60 * 1000
+
+function isStrandedApproval(
+  p: { status: ManualPaymentStatus; enrollment?: unknown; reviewedAt?: Date | null },
+  now: number
+): boolean {
+  return (
+    p.status === "approved" &&
+    !p.enrollment &&
+    p.reviewedAt instanceof Date &&
+    now - p.reviewedAt.getTime() > STRANDED_AFTER_MS
+  )
+}
 const PAGE_SIZE = 20
 const PROOF_STATUSES = ["submitted", "approved", "rejected"] as const satisfies readonly ManualPaymentStatus[]
 
@@ -611,6 +633,8 @@ export type AdminEspeeDetail = AdminEspeeRow & {
   orderReference: string | null
   /** The learner's enrollment on this program right now, whatever its status. */
   enrollmentStatus: string | null
+  /** Approved, but the approval was interrupted before the program opened — approving again finishes it. */
+  stranded: boolean
   history: { status: string; at: string; note?: string; by?: string }[]
 }
 
@@ -656,6 +680,7 @@ export async function adminGetEspeePayment(paymentId: string): Promise<AdminEspe
       reviewedByName: reviewer ? fullName(reviewer, reviewer.email ?? "Admin") : "",
       orderReference: order?.reference ?? null,
       enrollmentStatus: enrollment?.status ?? null,
+      stranded: isStrandedApproval(p, Date.now()),
       history: (p.history ?? []).map((h) => ({
         status: h.status,
         at: new Date(h.at).toISOString(),
@@ -690,7 +715,10 @@ export async function adminApproveEspeePayment(paymentId: string): Promise<Espee
 
     const proof = await ManualPayment.findById(paymentId).lean()
     if (!proof) return { success: false, error: "Payment not found" }
-    if (proof.status !== "submitted") return { success: false, error: `This payment was already ${proof.status}` }
+    const resuming = isStrandedApproval(proof, Date.now())
+    if (proof.status !== "submitted" && !resuming) {
+      return { success: false, error: `This payment was already ${proof.status}` }
+    }
 
     const [course, learner, existing] = await Promise.all([
       Course.findById(proof.course).select("title instructor packages").lean(),
@@ -710,8 +738,12 @@ export async function adminApproveEspeePayment(paymentId: string): Promise<Espee
 
     const adminName = fullName(admin, admin.email)
     const now = new Date()
+    // A resumed approval re-claims on the reviewedAt it read, so two admins
+    // finishing the same stranded proof can't both run.
     const claimed = await ManualPayment.findOneAndUpdate(
-      { _id: proof._id, status: "submitted" },
+      resuming
+        ? { _id: proof._id, status: "approved", enrollment: null, reviewedAt: proof.reviewedAt }
+        : { _id: proof._id, status: "submitted" },
       {
         $set: {
           status: "approved",
@@ -725,9 +757,13 @@ export async function adminApproveEspeePayment(paymentId: string): Promise<Espee
             status: "approved",
             at: now,
             by: adminName,
-            note: alreadyIn
-              ? "The learner already had access, so the enrollment was left as it was. Refund the transfer outside the platform if it was a duplicate."
-              : "ESPEE transfer confirmed",
+            note: resuming
+              ? alreadyIn
+                ? "Approval finished — the learner's enrollment was already open"
+                : "Approval resumed after an interrupted attempt"
+              : alreadyIn
+                ? "The learner already had access, so the enrollment was left as it was. Refund the transfer outside the platform if it was a duplicate."
+                : "ESPEE transfer confirmed",
           },
         },
       },

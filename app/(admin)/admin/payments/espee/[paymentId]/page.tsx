@@ -172,7 +172,25 @@ export default function AdminEspeePaymentDetailPage() {
                       </Button>
                     </div>
                   )}
+                  {payment.stranded && (
+                    <Button
+                      size="sm"
+                      className="shrink-0"
+                      onClick={() => {
+                        setActionError(null)
+                        setDialog("approve")
+                      }}
+                    >
+                      Finish approval
+                    </Button>
+                  )}
                 </div>
+                {payment.stranded && (
+                  <p className="mt-3 rounded-lg border border-ws-hairline bg-ws-raised px-3 py-2.5 text-xs">
+                    This approval was interrupted before the program opened. Finish it to open the program and email the
+                    learner.
+                  </p>
+                )}
                 {isOpen && alreadyIn && (
                   <p className="mt-3 rounded-lg border border-ws-hairline bg-ws-raised px-3 py-2.5 text-xs">
                     This learner already has access to this program ({payment.enrollmentStatus}). Approving records the
