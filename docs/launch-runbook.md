@@ -41,7 +41,12 @@ From the 2026-10-03 meeting: three plans on every program, ESPEE proof-of-paymen
    - Approve it from `/admin/payments/espee`. `/dashboard` opens, and the learner gets the enrollment email with the sign-in line.
    - Then reject a second proof and check that the reason shows at checkout.
 6. **Sales export.** On `/admin/users`, use "Export interested learners".
-7. **Go team.** Point them at `docs/go-patches-phase-3.md` §7: ESPEE orders have no wallet charge.
+7. **Go team.** Point them at `docs/go-patches-phase-3.md` §7–§11: ESPEE orders have no wallet charge; referral earnings and seller shares (§8); course `kind` — Go must hide marketplace and New Economy courses wherever it lists programs (§9); recordings and the go-live notice (§10); points and the new application answers (§11).
+8. **Marketplace, referrals, teaching (2026-10-05, same release).**
+   - Recordings need the same `R2_RESOURCES_BUCKET_NAME` and the new hourly `academy-recordings` task (§5). RealtimeKit bills recording at about $0.01 per minute; only course classes record, never 1-on-1 mentorship.
+   - New Economy courses: `MONGODB_URI="$PROD_URI" node scripts/new-economy-catalogue.mjs --owner <admin email>` (dry run), then `--apply`. It creates one free DRAFT per WorldStreet product; add lessons and publish each from the admin course editor.
+   - Sellers apply at `/sell` → approve them at `/admin/sellers` → review each course at `/admin/courses?review=pending`. A seller keeps 85% through their own link (the "Your link" in their course list), 50% otherwise; referrers earn 10% of a referred person's first purchase. Both clear through the existing earnings task.
+   - Smoke test: open `/?ref=<your code>` from `/dashboard/referrals` in a private window, buy as a fresh account, and check `/dashboard/referrals` shows the pending 10%.
 
 **Rollback:** set `FACULTY_PUBLIC` in `lib/faculty.ts` back to `true` to show faculty again. Reverting the `feat/cohort-launch` merge restores the old gate and wallet-only checkout. Approved ESPEE enrollments stay valid, and their Orders carry `paymentMethod: "espee"`.
 
