@@ -4,6 +4,7 @@ import connectDB from "@/lib/db"
 import { Types } from "mongoose"
 import { Course, Enrollment, User, Order, PaymentEvent, Earning, type IEarning } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth/actions"
+import { getSellerStatus } from "@/lib/seller"
 import {
   createWalletCredit,
   createWalletCharge,
@@ -101,7 +102,9 @@ export async function getMyInstructorEarnings(): Promise<InstructorEarnings | nu
   try {
     await connectDB()
     const user = await getCurrentUser()
-    if (!user || (user.role !== "INSTRUCTOR" && user.role !== "ADMIN")) return null
+    if (!user) return null
+    // Faculty, and approved marketplace sellers (USERs who sell their own courses).
+    if (user.role !== "INSTRUCTOR" && user.role !== "ADMIN" && (await getSellerStatus(user.id)) !== "approved") return null
 
     await clearMaturedEarnings(user.id)
 
