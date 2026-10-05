@@ -13,6 +13,10 @@ import type { PackageKey } from "./course"
  *
  * Only a confirmed charge from the central Worldstreet wallet service moves an
  * order to `paid`; course access is granted on `enrolled` and never before.
+ * The one exception is an ESPEE order (paymentMethod "espee", owner meeting
+ * 2026-10-03): the money moved outside the wallet, so an admin's approval of
+ * the learner's proof (ManualPayment) is what moves it to `paid`, and it never
+ * carries a chargeId.
  */
 
 export type OrderStatus =
@@ -23,6 +27,9 @@ export type OrderStatus =
   | "failed"
   | "cancelled"
   | "refunded"
+
+/** How the money moved. Additive: orders written before ESPEE read as "wallet". */
+export type OrderPaymentMethod = "wallet" | "espee"
 
 export interface IOrderTransition {
   status: OrderStatus
@@ -43,6 +50,7 @@ export interface IOrder extends Document {
   /** Wallet charge id once the debit is confirmed. */
   chargeId: string | null
   packageKey: PackageKey | null
+  paymentMethod: OrderPaymentMethod
   failureCode: string | null
   history: IOrderTransition[]
   createdAt: Date
@@ -65,6 +73,7 @@ const OrderSchema = new Schema<IOrder>(
     },
     chargeId: { type: String, default: null },
     packageKey: { type: String, enum: [null, "basic", "standard", "executive"], default: null },
+    paymentMethod: { type: String, enum: ["wallet", "espee"], default: "wallet" },
     failureCode: { type: String, default: null },
     history: [
       {

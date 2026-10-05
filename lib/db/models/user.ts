@@ -25,6 +25,8 @@ export interface IUser extends Document {
   preferredLanguage: string | null
   /** ISO 3166-1 alpha-2 code (lib/countries.ts); null = not shown. Faculty pages now; testimonials reuse it in Phase 6. */
   country: string | null
+  /** Checkout's "Who invited you?" — free text, first answer wins (owner meeting 2026-10-03). Additive — Go ignores it. */
+  referredBy: { text: string; at: Date } | null
   // For instructors
   instructorProfile?: {
     headline: string | null
@@ -128,6 +130,16 @@ const UserSchema = new Schema<IUser>(
     },
     country: {
       type: String,
+      default: null,
+    },
+    referredBy: {
+      type: new Schema(
+        {
+          text: { type: String, required: true, trim: true, maxlength: 80 },
+          at: { type: Date, required: true },
+        },
+        { _id: false }
+      ),
       default: null,
     },
     instructorProfile: {

@@ -152,4 +152,23 @@ export function generateSubmissionKey(assignmentId: string, userId: string, orig
   return `${submissionKeyPrefix(assignmentId, userId)}${Date.now()}-${randomId}.${extension}`
 }
 
+/**
+ * The folder one learner's ESPEE payment proofs live in — submitEspeePayment
+ * only accepts keys inside it. Private bucket only, like submissions: callers
+ * refuse outright while hasPrivateResourceBucket() is false.
+ */
+export function paymentProofKeyPrefix(userId: string): string {
+  return `worldstreet-academy/payment-proofs/${userId}/`
+}
+
+/**
+ * Key for one payment proof: inside the learner's folder, unguessable. The
+ * extension comes from the validated content type (lib/espee.ts), not the
+ * file name, so the key alone says what the receipt is.
+ */
+export function generatePaymentProofKey(userId: string, extension: string): string {
+  const randomId = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10)
+  return `${paymentProofKeyPrefix(userId)}${Date.now()}-${randomId}.${extension.replace(/[^a-z0-9]/g, "")}`
+}
+
 export { r2Client }
