@@ -1853,6 +1853,10 @@ export async function createCourseMeeting(
       }
     }
 
+    // Faculty only — a marketplace seller owns courses too, but live classes
+    // (which email and notify every buyer) are a faculty tool.
+    if (currentUser.role !== "INSTRUCTOR" && currentUser.role !== "ADMIN") return { success: false, error: "Only faculty can run live classes" }
+
     // Verify instructor owns this course
     const course = await Course.findOne({
       _id: courseId,
@@ -2368,6 +2372,7 @@ export async function getInstructorCoursesForMeeting(): Promise<{
   try {
     const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
+    if (currentUser.role !== "INSTRUCTOR" && currentUser.role !== "ADMIN") return { success: true, courses: [] }
 
     const courses = await Course.find({
       instructor: new Types.ObjectId(currentUser.id),

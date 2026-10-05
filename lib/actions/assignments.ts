@@ -29,8 +29,13 @@ const MAX_SUBMISSION_FILES = 3
 
 type Viewer = { id: string; role: string }
 
-/** The course instructor or an admin — the authoring and grading gate. */
+/**
+ * The course instructor or an admin — the authoring and grading gate.
+ * Faculty only: a marketplace seller owns courses too, but assignments are a
+ * faculty tool.
+ */
 async function courseStaff(user: Viewer, courseId: string) {
+  if (user.role !== "INSTRUCTOR" && user.role !== "ADMIN") return null
   const course = await Course.findById(courseId).select("instructor title").lean()
   if (!course) return null
   if (course.instructor.toString() !== user.id && user.role !== "ADMIN") return null

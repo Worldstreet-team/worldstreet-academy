@@ -40,10 +40,15 @@ function shuffled<T>(arr: T[]): T[] {
   return a
 }
 
-/** Course owner or ADMIN — the instructor-side authz gate. */
+/**
+ * Course owner or ADMIN — the instructor-side authz gate. Faculty only: a
+ * marketplace seller owns courses too, but exams (which can gate
+ * certificates) are a faculty tool.
+ */
 async function requireCourseOwner(courseId: string) {
   const user = await initAction()
   if (!user) throw new Error("Not authenticated")
+  if (user.role !== "INSTRUCTOR" && user.role !== "ADMIN") throw new Error("Not your course")
   const course = await Course.findById(courseId).select("instructor title examRequired status")
   if (!course) throw new Error("Course not found")
   if (course.instructor.toString() !== user.id && user.role !== "ADMIN") {

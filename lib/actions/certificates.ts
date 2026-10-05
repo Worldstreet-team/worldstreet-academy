@@ -309,7 +309,9 @@ export async function fetchInstructorCertificateStats(): Promise<InstructorCerti
   try {
     await connectDB()
     const currentUser = await getCurrentUser()
-    if (!currentUser) return []
+    // Faculty only: a marketplace seller owns courses too, but certificates
+    // (and the buyers' emails they carry) are a faculty tool.
+    if (!currentUser || (currentUser.role !== "INSTRUCTOR" && currentUser.role !== "ADMIN")) return []
 
     // Get instructor's courses
     const courses = await Course.find({
@@ -359,7 +361,7 @@ export async function fetchCourseCertificates(
   try {
     await connectDB()
     const currentUser = await getCurrentUser()
-    if (!currentUser) return { courseTitle: "", certificates: [] }
+    if (!currentUser || (currentUser.role !== "INSTRUCTOR" && currentUser.role !== "ADMIN")) return { courseTitle: "", certificates: [] }
 
     // Verify the instructor owns the course
     const course = await Course.findOne({
