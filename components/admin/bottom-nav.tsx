@@ -9,6 +9,7 @@ import {
   Ellipsis,
   House,
   Inbox,
+  ReceiptText,
   Star,
   Users,
   Wallet,
@@ -51,12 +52,18 @@ const navItems: BottomNavItem[] = [
     title: "Payments",
     href: "/admin/payments",
     icon: Wallet,
-    match: (p: string) => p.startsWith("/admin/payments"),
+    match: (p: string) => p.startsWith("/admin/payments") && !p.startsWith("/admin/payments/espee"),
   },
 ]
 
-/** Courses, Reviews and Exams share the fifth slot behind a "More" menu. */
+/** ESPEE payments, Courses, Reviews and Exams share the fifth slot behind a "More" menu. */
 const moreItems: BottomNavItem[] = [
+  {
+    title: "ESPEE payments",
+    href: "/admin/payments/espee",
+    icon: ReceiptText,
+    match: (p: string) => p.startsWith("/admin/payments/espee"),
+  },
   {
     title: "Courses",
     href: "/admin/courses",

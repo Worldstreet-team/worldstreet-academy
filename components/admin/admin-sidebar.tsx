@@ -27,6 +27,7 @@ import {
   Inbox,
   LayoutDashboard,
   LogOut,
+  ReceiptText,
   Star,
   Users,
   Wallet,
@@ -72,7 +73,13 @@ const manageItems: NavItem[] = [
     title: "Payments",
     href: "/admin/payments",
     icon: Wallet,
-    match: (p) => p.startsWith("/admin/payments"),
+    match: (p) => p.startsWith("/admin/payments") && !p.startsWith("/admin/payments/espee"),
+  },
+  {
+    title: "ESPEE payments",
+    href: "/admin/payments/espee",
+    icon: ReceiptText,
+    match: (p) => p.startsWith("/admin/payments/espee"),
   },
   {
     title: "Courses",
