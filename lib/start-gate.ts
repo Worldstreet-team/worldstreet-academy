@@ -6,32 +6,36 @@ export const START_SCHOOL_COOKIE = "wsa_school"
 export type StartGateInput = {
   role: "USER" | "INSTRUCTOR" | "ADMIN"
   instructorStatus: "none" | "applied" | "interview" | "approved" | "rejected"
-  hasEnrollment: boolean
-  hasIntent: boolean
+  /** An active or completed enrollment — the only thing that opens the dashboard. */
+  hasAccess: boolean
   pathname: string
 }
 
 /**
- * Reachable without a school: the retired picker URL (now a redirect), the
- * till, the instructor door, and invite links.
+ * Reachable without paying: the retired picker URL (now a redirect), the
+ * till, the wallet (so a learner can top up to pay), the instructor door, and
+ * invite links.
  */
 const EXEMPT_PREFIXES = [
   "/dashboard/start",
   "/dashboard/checkout",
+  "/dashboard/wallet",
   "/dashboard/become-instructor",
   "/dashboard/meetings",
 ] as const
 
 /**
- * School first (owner, 2026-09-16; plan D15, 2026-09-18): a learner with no
- * enrollment and no saved school is sent to the schools before the dashboard
- * opens. Instructors, admins, applicants and anyone who already has either
- * are never sent.
+ * No dashboard without paying (owner meeting, 2026-10-03): a learner gets in
+ * only with an active or completed enrollment. A saved school
+ * (EnrollmentIntent) or a reservation no longer opens it — intents are still
+ * saved, for the pay-later reminders. Before that (owner, 2026-09-16; plan
+ * D15) any enrollment or saved school was enough. Instructors, admins and
+ * applicants are never sent.
  */
 export function needsSchoolChoice(input: StartGateInput): boolean {
   if (input.role !== "USER") return false
   if (input.instructorStatus !== "none") return false
-  if (input.hasEnrollment || input.hasIntent) return false
+  if (input.hasAccess) return false
   return !EXEMPT_PREFIXES.some((p) => input.pathname === p || input.pathname.startsWith(`${p}/`))
 }
 

@@ -36,9 +36,10 @@ export async function Navbar({ showFaculty }: { showFaculty: boolean }) {
   // for a guest it would just bounce through the login wall.
   const [user, published] = await Promise.all([getCurrentUser(), fetchBrowseCourses()])
   const isInstructor = user && (user.role === "INSTRUCTOR" || user.role === "ADMIN")
-  // A learner the school-first gate would bounce (no enrollment, nothing saved)
-  // gets "Choose a program" instead of a dashboard link that loops back to
-  // /schools. Fails open like the gate: unreadable state shows the dashboard.
+  // A learner the gate would bounce (no paid enrollment — owner meeting
+  // 2026-10-03) gets "Choose a program" instead of a dashboard link that loops
+  // back to /schools, or "Payment status" while an ESPEE proof of theirs is
+  // under review. Fails open like the gate: unreadable state shows the dashboard.
   const gate = user && user.role === "USER" ? await getStartGateState(user.id).catch(() => null) : null
   const gated = Boolean(
     user &&
@@ -111,7 +112,12 @@ export async function Navbar({ showFaculty }: { showFaculty: boolean }) {
 
         <ThemeToggle className="hidden h-10 w-10 border-transparent text-ws-muted hover:bg-ws-chip hover:text-ws-primary lg:flex" />
 
-        {user && gated ? (
+        {user && gated && gate?.hasOpenProof ? (
+          <Link href="/dashboard/checkout/pending" className={primaryClass}>
+            <span className="sm:hidden">Payment</span>
+            <span className="hidden sm:inline">Payment status</span>
+          </Link>
+        ) : user && gated ? (
           <Link href="/schools?start=1" className={primaryClass}>
             <span className="sm:hidden">Choose</span>
             <span className="hidden sm:inline">Choose a program</span>

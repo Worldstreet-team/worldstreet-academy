@@ -63,6 +63,7 @@ const labelMap: Record<string, string> = {
   applications: "Applications",
   users: "Users",
   payments: "Payments",
+  espee: "ESPEE",
   reviews: "Reviews",
   "become-instructor": "Become an Instructor",
   wallet: "Wallet",

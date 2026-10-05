@@ -5,6 +5,7 @@ import { ReceiptTextIcon } from "lucide-react"
 import { getCachedUser } from "@/lib/auth/cached"
 import { checkEnrollment } from "@/lib/actions/enrollments"
 import { getMyWalletBalance } from "@/lib/actions/wallet"
+import { getEspeeCheckoutState } from "@/lib/actions/manual-payments"
 import { fetchProgramById } from "@/lib/actions/student"
 import { fetchProgramCurriculum } from "@/lib/actions/program-page"
 import { PACKAGE_RANK } from "@/lib/entitlements"
@@ -29,7 +30,9 @@ type Search = { courseId?: string | string[]; package?: string | string[] }
  *   · a multi-package program without a valid `package` → the program page's
  *     package chooser, where the choice now lives (a single-price program
  *     needs no package);
- *   · otherwise the order, with the wallet balance already read.
+ *   · otherwise the order, with the wallet balance already read — and, when
+ *     ESPEE is on (owner meeting 2026-10-03), the ESPEE details and any proof
+ *     of the buyer's for this program that is already under review.
  */
 export default async function CheckoutPage({ searchParams }: { searchParams: Promise<Search> }) {
   const params = await searchParams
@@ -58,7 +61,11 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
       : (program.packages.find((p) => p.key === packageParam) ?? null)
   if (!selected) redirect(`/programs/${program.slug}#packages`)
 
-  const [wallet, curriculum] = await Promise.all([getMyWalletBalance(), fetchProgramCurriculum(program.id)])
+  const [wallet, curriculum, espee] = await Promise.all([
+    getMyWalletBalance(),
+    fetchProgramCurriculum(program.id),
+    getEspeeCheckoutState(program.id),
+  ])
 
   // A lesson's `tier` is set only when it sits above the program's cheapest
   // tier; the chosen package opens it when its rank reaches that tier.
@@ -76,6 +83,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
       wallet={wallet}
       facts={facts}
       reservedSeat={enrollment.status === "pre_enrolled"}
+      espee={espee}
     />
   )
 }

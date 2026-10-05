@@ -19,7 +19,7 @@ export { Meeting, type IMeeting, type IMeetingParticipant, type IMeetingInvite, 
 export { WatchProgress, type IWatchProgress } from "./watch-progress"
 export { Resource, type IResource, type ResourceKind } from "./resource"
 export { ResourceDownload, type IResourceDownload } from "./resource-download"
-export { Order, type IOrder, type OrderStatus } from "./order"
+export { Order, type IOrder, type OrderStatus, type OrderPaymentMethod } from "./order"
 export { PaymentEvent, type IPaymentEvent } from "./payment-event"
 export { Earning, type IEarning, type EarningStatus, type EarningKind, INSTRUCTOR_REVENUE_SHARE, EARNINGS_CLEARING_DAYS } from "./earning"
 export { Notification, type INotification, type NotificationType } from "./notification"
@@ -45,3 +45,10 @@ export {
   type EnrollmentIntentStatus,
   type EnrollmentIntentSource,
 } from "./enrollment-intent"
+export {
+  ManualPayment,
+  type IManualPayment,
+  type IManualPaymentTransition,
+  type ManualPaymentStatus,
+  type ManualPaymentMethod,
+} from "./manual-payment"

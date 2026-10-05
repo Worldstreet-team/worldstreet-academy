@@ -1,10 +1,10 @@
 import { CompassIcon } from "lucide-react"
 
 /**
- * Why a signed-in learner is looking at the schools: the school-first gate
- * sent them (`/schools?start=1`, `schoolsPathFor`). The page renders it only
- * for a learner the gate would still send — no enrollment, no saved program —
- * so it always tells the truth about what opens the dashboard.
+ * Why a signed-in learner is looking at the schools: the gate sent them
+ * (`/schools?start=1`, `schoolsPathFor`). The page renders it only for a
+ * learner the gate would still send — no paid enrollment (owner meeting
+ * 2026-10-03) — so it always tells the truth about what opens the dashboard.
  */
 export function GateNotice({ firstName }: { firstName: string }) {
   return (
@@ -20,7 +20,7 @@ export function GateNotice({ firstName }: { firstName: string }) {
           {firstName ? `Welcome, ${firstName}. ` : null}Choose a program to get started
         </p>
         <p className="mt-1 text-pretty text-[14px] leading-relaxed text-ws-muted">
-          Your dashboard opens once you enrol, or save a program to pay later.
+          Your dashboard opens once you enrol in a program.
         </p>
       </div>
     </div>

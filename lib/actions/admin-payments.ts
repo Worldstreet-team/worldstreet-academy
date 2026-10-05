@@ -240,7 +240,12 @@ export async function adminRunReconciliation(): Promise<{
     }
 
     const findings: ReconcileFinding[] = []
-    const orders = await Order.find({ status: { $in: ["paid", "enrolled", "refunded"] } })
+    // ESPEE orders never touch the wallet (no chargeId by design), so there is
+    // nothing to reconcile them against. Older orders have no paymentMethod.
+    const orders = await Order.find({
+      status: { $in: ["paid", "enrolled", "refunded"] },
+      paymentMethod: { $ne: "espee" },
+    })
       .sort({ createdAt: -1 })
       .limit(500)
       .lean()
