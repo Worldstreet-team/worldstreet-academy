@@ -147,3 +147,23 @@ Learners may pay by ESPEE transfer outside the wallet (1 ESPEE = $1); an admin a
 - **`users.referredBy`** — `{ text, at } | null`, checkout's "Who invited you?" (first answer wins). Any wholesale user write must keep it.
 - **`manualpayments`** — web-only; Go may ignore it. Receipts live only under `worldstreet-academy/payment-proofs/<userId>/` in the private resources bucket.
 - **Dashboard gate (web).** A learner reaches the web dashboard only with an `active` or `completed` enrollment; a saved school no longer opens it. Mobile may mirror this.
+
+## 8. The Academy Marketplace and New Economy (owner, 2026-10-03 / 10-05)
+
+The Academy now has two halves: **school programs** (live cohorts, three plans) and the **marketplace** (pre-recorded courses sold by approved sellers and by the Academy's faculty, each quality-reviewed before it is published). **New Economy** courses are free courses on how to use each WorldStreet product. All changes are additive; no `role` value was added.
+
+**Go must hide non-program kinds wherever it lists programs** — school pages, the program catalogue, search and recommendations, "courses taught" and faculty counts. Match programs with `kind: { $nin: ["marketplace", "new-economy"] }`, which also matches legacy rows that have no `kind`. A course's own page, enrollment, lessons and checkout work for every kind.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `courses.kind` | `"program" \| "marketplace" \| "new-economy"` | Missing on legacy rows = `"program"`. Indexed. |
+| `courses.review` | `{ status, submittedAt, reviewedAt, reviewedBy, note }` | The marketplace review. `status`: `"none" \| "pending" \| "approved" \| "changes_requested"` (default `"none"`); `reviewedBy` is a user ObjectId; `note` ≤ 2000 chars. A seller's course stays `draft` until an admin approves it; approval sets `status: "published"`, `publishedAt` (if unset) and publishes its lessons. |
+| `courses.communityUrl` | string \| `null` | The course's class community (WhatsApp, Telegram, Discord, Social…): http(s), ≤ 500 chars. |
+| `users.sellerStatus` | `"none" \| "applied" \| "approved" \| "rejected"` | Missing = `"none"`. `"approved"` lets a **USER** create and edit their own marketplace courses on the web. It is not a role and grants nothing else. |
+
+- **Single price.** Marketplace and New Economy courses carry no package ladder (`packages: []`) and sell at `price`/`pricing`. New Economy courses are always `pricing: "free"`, `price: 0`, `school: null`, `category: "New Economy"`.
+- **Who may publish.** Go must never publish a course whose owner is a seller (role `USER`) except as the admin review does: `review.status` `"approved"`. Faculty marketplace courses publish directly, as programs do.
+- **Credit.** A marketplace course owned by a `USER` shows the seller's name ("by Jane Doe"); one owned by INSTRUCTOR/ADMIN credits the Academy's faculty.
+- **Splits** (`lib/db/models/earning.ts`): a seller keeps `MARKETPLACE_SHARE_OWN_LINK` (85%) on a sale through their own referral link and `MARKETPLACE_SHARE_ACADEMY` (50%) when the Academy makes the sale. Wired on the web by the referrals stream.
+- **`sellerapplications`** — web-only; Go may ignore it. `{ user, status: "submitted" | "approved" | "rejected", fullName, school, topic, experience, sampleUrl, pitch, agreedAt, reviewedBy, reviewedAt, reason }`, one `submitted` row per user (partial unique index). Approval mirrors into `users.sellerStatus`.
+- Any wholesale course write must carry `kind`, `review` and `communityUrl`, and any wholesale user write `sellerStatus` (write dotted paths or keep the fields).
