@@ -105,6 +105,7 @@ export function CheckoutView({
   facts,
   reservedSeat,
   espee,
+  inviter,
 }: {
   program: ProgramDetail
   packageKey: PublicPackage["key"]
@@ -114,6 +115,8 @@ export function CheckoutView({
   reservedSeat: boolean
   /** "Pay with ESPEE": whether it's offered, our details, and the buyer's proof for this program. */
   espee: EspeeCheckoutState
+  /** "First L." of whoever this purchase is credited to (their link or the account's referral), or null. */
+  inviter: string | null
 }) {
   const router = useRouter()
   const queryClient = useQueryClient()
@@ -521,8 +524,14 @@ export function CheckoutView({
               {byEspee && <EspeePanel espee={espee} priceMinor={priceMinor} form={espeeForm} />}
 
               {/* Who referred this buyer (owner meeting 2026-10-03) — asked once:
-                  the first answer is kept. Codes and payouts come later. */}
-              {!espee.referredBy && phase !== "success" && !(byEspee && espee.open) && (
+                  the first answer is kept. When their link or a code they gave
+                  already names someone (owner, 2026-10-05), say who instead. */}
+              {inviter && phase !== "success" && (
+                <p className="mt-5 text-[13px] text-ws-muted">
+                  Invited by <span className="font-medium text-ws-primary">{inviter}</span>
+                </p>
+              )}
+              {!inviter && !espee.referredBy && phase !== "success" && !(byEspee && espee.open) && (
                 <div className="mt-5 space-y-1.5">
                   <Label htmlFor="checkout-invited-by">
                     Who invited you? <span className="font-normal text-ws-muted">· optional</span>
@@ -533,7 +542,7 @@ export function CheckoutView({
                     onChange={(e) => setInvitedBy(e.target.value)}
                     maxLength={80}
                     autoComplete="off"
-                    placeholder="Their name or username"
+                    placeholder="Their name or referral code"
                     disabled={busy}
                   />
                 </div>

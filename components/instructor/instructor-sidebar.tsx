@@ -21,6 +21,7 @@ import {
   BookOpen,
   ChartLine,
   ChevronDown,
+  Gift,
   House,
   LayoutDashboard,
   LogOut,
@@ -266,6 +267,15 @@ export function InstructorSidebar() {
                   title: "Student Dashboard",
                   href: "/dashboard",
                   icon: LayoutDashboard,
+                }}
+                active={false}
+              />
+              {/* Referrals live in the student shell; instructors share the same page. */}
+              <NavRow
+                item={{
+                  title: "Refer & earn",
+                  href: "/dashboard/referrals",
+                  icon: Gift,
                 }}
                 active={false}
               />

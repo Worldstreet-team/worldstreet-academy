@@ -17,6 +17,7 @@ import {
   DollarCircleIcon,
   EyeIcon,
   GameController01Icon,
+  GiftIcon,
   HelpCircleIcon,
   LinkSquare02Icon,
   Logout01Icon,
@@ -145,6 +146,12 @@ const connectItems: NavItem[] = [
 /** Low-frequency destinations. Reachable, but not competing for attention. */
 const accountItems: NavItem[] = [
   { title: "Wallet", href: "/dashboard/wallet", icon: Wallet01Icon, match: (p) => p.startsWith("/dashboard/wallet") },
+  {
+    title: "Refer & earn",
+    href: "/dashboard/referrals",
+    icon: GiftIcon,
+    match: (p) => p.startsWith("/dashboard/referrals"),
+  },
   {
     title: "Bookmarks",
     href: "/dashboard/bookmarks",
