@@ -1,5 +1,6 @@
 import { Navbar } from "@/components/marketing/navbar"
 import { Footer } from "@/components/marketing/footer"
+import { CohortBanner } from "@/components/marketing/cohort-banner"
 import { fetchFacultyCount } from "@/lib/actions/student"
 import { FACULTY_PUBLIC } from "@/lib/faculty"
 
@@ -16,6 +17,10 @@ export default async function MarketingLayout({
 
   return (
     <div className="flex min-h-svh flex-col">
+      {/* The live cohort's one-line countdown (owner 2026-10-03). It sits
+          above the sticky navbar and scrolls away, so the navbar still sticks
+          at the top and every sticky offset under it holds. */}
+      <CohortBanner variant="bar" />
       <Navbar showFaculty={showFaculty} />
       {/* The navbar is sticky and opaque, so pages simply start below it. */}
       <main className="flex-1">{children}</main>
