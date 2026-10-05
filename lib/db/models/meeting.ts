@@ -34,6 +34,12 @@ export interface IMeeting extends Document {
   mentorshipSessionId?: Types.ObjectId
   /** Scheduled-meeting reminder ledger (cron marks what it already sent). */
   reminders?: { h24SentAt?: Date | null; h1SentAt?: Date | null }
+  /**
+   * Course classes: when "<course> is live now" went to the class's students.
+   * Claimed with a filtered update before sending, so a host rejoining never
+   * re-notifies. Null/missing = not announced yet.
+   */
+  liveNotifiedAt?: Date | null
   courseThumbnailUrl?: string
   /** Email invites sent for this meeting */
   invites: IMeetingInvite[]
@@ -88,6 +94,7 @@ const MeetingSchema = new Schema<IMeeting>(
       h24SentAt: { type: Date, default: null },
       h1SentAt: { type: Date, default: null },
     },
+    liveNotifiedAt: { type: Date, default: null },
     courseThumbnailUrl: { type: String },
     invites: [MeetingInviteSchema],
     settings: {
