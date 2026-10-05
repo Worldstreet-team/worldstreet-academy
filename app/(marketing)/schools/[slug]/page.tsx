@@ -9,7 +9,9 @@ import { packagePriceLabel, programPriceLabel } from "@/lib/program-price"
 import { appUrl } from "@/lib/app-url"
 import { BRAND } from "@/lib/brand"
 import { FACULTY_PUBLIC } from "@/lib/faculty"
+import { cohortIsUpcoming } from "@/lib/cohort"
 import { Faq } from "@/components/marketing/faq"
+import { CohortBanner } from "@/components/marketing/cohort-banner"
 import { PreviewProvider } from "@/components/programs/preview-player"
 import { SectionNav, type SectionLink } from "@/components/programs/section-nav"
 import { plural } from "@/components/programs/format"
@@ -66,7 +68,8 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
  *   hero          the school's render, full bleed; name, promise, one gold
  *                 action, and a strip of real facts
  *   section nav   sticky under the navbar, one link per section that renders
- *   programs      image-led cards (1 = feature, 2 = pair, 3+ = grid)
+ *   programs      image-led cards (1 = feature, 2 = pair, 3+ = grid), with
+ *                 the live cohort strip between the heading and the cards
  *   compare       2+ programs, side by side
  *   learn         the programs' own outcomes, de-duplicated and attributed
  *   path          2+ levels, beginner → advanced
@@ -188,7 +191,23 @@ export default async function SchoolPage({ params }: Params) {
             </div>
           </div>
 
-          <SchoolPrograms school={school} programs={programs} />
+          <SchoolPrograms
+            school={school}
+            programs={programs}
+            cohort={
+              // Checked here too: the slot's wrapper must go with the strip.
+              cohortIsUpcoming() ? (
+                <CohortBanner
+                  variant="strip"
+                  note={
+                    only
+                      ? "Open the program, choose your package and pay now to join the live cohort."
+                      : "Choose your program below, then your package, and pay now to join the live cohort."
+                  }
+                />
+              ) : null
+            }
+          />
           <SchoolCompare programs={programs} schoolName={school.name} />
           <SchoolTopics programs={programs} />
           <SchoolPath programs={programs} />

@@ -30,6 +30,7 @@ import { PreviewProvider, type ProgramPreview } from "@/components/programs/prev
 import { ProgramStickyBar } from "@/components/programs/program-sticky-bar"
 import { PROGRAM_H2, SECTION_SCROLL_MT } from "@/components/programs/section-title"
 import { Faq } from "@/components/marketing/faq"
+import { CohortBanner } from "@/components/marketing/cohort-banner"
 import type { ProgramAccess } from "@/components/programs/access"
 
 // Per-visitor: enrollment state and the coming-soon/live cutover both change
@@ -290,11 +291,27 @@ export default async function ProgramPage({
             <div className="col-[1/-1] row-start-4 min-w-0 pt-20 lg:pt-24">
               <div className="space-y-20 lg:space-y-24">
                 {showLadder && (
-                  <PackageChooser
-                    programTitle={program.title}
-                    comingSoon={access.kind === "coming_soon"}
-                    lessons={lessonAccess}
-                  />
+                  // The live cohort sits right above the choice it asks for
+                  // (owner 2026-10-03: "pay now to join"). Only on an open
+                  // program — a coming-soon one has its own opening date.
+                  <div>
+                    {access.kind === "open" && (
+                      <CohortBanner
+                        variant="strip"
+                        note={
+                          multiTier
+                            ? "Choose your package below and pay now to take your seat in the live cohort."
+                            : "Pay now to take your seat in the live cohort."
+                        }
+                        className="mb-10"
+                      />
+                    )}
+                    <PackageChooser
+                      programTitle={program.title}
+                      comingSoon={access.kind === "coming_soon"}
+                      lessons={lessonAccess}
+                    />
+                  </div>
                 )}
                 {hasReviews && <ProgramReviews courseId={program.id} sectionId="reviews" initial={reviewsPage} />}
                 <RelatedPrograms programs={related} school={relatedFromSchool ? school : null} signedIn={signedIn} />

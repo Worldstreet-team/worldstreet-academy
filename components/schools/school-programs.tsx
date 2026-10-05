@@ -22,8 +22,20 @@ import { opensLabel, sizeLine, type SchoolProgram } from "@/components/schools/m
  *
  * With no programs yet the section says so plainly and points somewhere
  * useful, instead of leaving a dashed hole.
+ *
+ * `cohort` (the live cohort strip) sits between the heading and the cards,
+ * beside the choice it asks for; it is left out when there is nothing to
+ * choose.
  */
-export function SchoolPrograms({ school, programs }: { school: School; programs: SchoolProgram[] }) {
+export function SchoolPrograms({
+  school,
+  programs,
+  cohort,
+}: {
+  school: School
+  programs: SchoolProgram[]
+  cohort?: React.ReactNode
+}) {
   const count = programs.length
 
   return (
@@ -44,6 +56,8 @@ export function SchoolPrograms({ school, programs }: { school: School; programs:
           ) : undefined
         }
       />
+
+      {count > 0 && cohort && <div className="mt-8">{cohort}</div>}
 
       {count === 0 ? (
         <EmptyPrograms school={school} />

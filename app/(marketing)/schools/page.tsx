@@ -5,10 +5,12 @@ import { getStartGateState } from "@/lib/start-gate-state"
 import { needsSchoolChoice } from "@/lib/start-gate"
 import { appUrl } from "@/lib/app-url"
 import { FACULTY_PUBLIC } from "@/lib/faculty"
+import { cohortIsUpcoming } from "@/lib/cohort"
 import { SchoolsIndex } from "@/components/schools-index/schools-index"
 import { GateNotice } from "@/components/schools-index/gate-notice"
 import { FreeLessons } from "@/components/schools-index/free-lessons"
 import { BrowseAll } from "@/components/schools-index/browse-all"
+import { CohortBanner } from "@/components/marketing/cohort-banner"
 import { LEVEL_ORDER, buildSchoolsIndex, type LevelFilter } from "@/components/schools-index/model"
 
 export const metadata: Metadata = {
@@ -90,6 +92,15 @@ export default async function SchoolsPage({ searchParams }: Search) {
         initialQuery={q}
         initialLevel={data.levels.length > 1 ? level : "all"}
         notice={welcome ? <GateNotice firstName={welcome.firstName} /> : null}
+        cohort={
+          // Checked here too: the slot's wrapper must go with the strip.
+          cohortIsUpcoming() ? (
+            <CohortBanner
+              variant="strip"
+              note="Choose your school below, then your program and package, and pay now to join."
+            />
+          ) : null
+        }
       />
 
       <div className="mx-auto mt-28 max-w-7xl space-y-24 px-6 md:mt-40 md:space-y-32">
