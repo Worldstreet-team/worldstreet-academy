@@ -71,3 +71,4 @@ export {
   type ManualPaymentStatus,
   type ManualPaymentMethod,
 } from "./manual-payment"
+export { Recording, type IRecording, type RecordingStatus } from "./recording"

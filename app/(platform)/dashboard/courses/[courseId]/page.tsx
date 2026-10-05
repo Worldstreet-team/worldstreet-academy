@@ -23,6 +23,7 @@ import { LessonPreviewAccordion } from "@/components/courses/lesson-preview-acco
 import { AboutInstructor } from "@/components/courses/about-instructor"
 import { BookmarkButton } from "@/components/courses/bookmark-button"
 import { CourseResources } from "@/components/learn/course-resources"
+import { RecordingsList } from "@/components/recordings/recordings-list"
 import { CourseExamCard } from "@/components/courses/course-exam-card"
 import { CourseOutcomes } from "@/components/courses/course-outcomes"
 import { CourseReviews } from "@/components/courses/course-reviews"
@@ -389,6 +390,9 @@ export default async function CourseDetailPage({
             {/* Included materials — locked until enrolled, but visible so buyers
                 can see what the course comes with. */}
             <CourseResources courseId={course.id} />
+
+            {/* Recordings of past live classes — only when the package includes live classes (checked server-side). */}
+            {(isEnrolled || isStaff) && <RecordingsList courseId={course.id} />}
 
             {/* About Instructor */}
             <AboutInstructor

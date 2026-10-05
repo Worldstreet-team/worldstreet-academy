@@ -1,5 +1,6 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
+import type { Readable } from "node:stream"
 
 // R2 Client configuration
 const r2Client = new S3Client({
@@ -169,6 +170,41 @@ export function paymentProofKeyPrefix(userId: string): string {
 export function generatePaymentProofKey(userId: string, extension: string): string {
   const randomId = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10)
   return `${paymentProofKeyPrefix(userId)}${Date.now()}-${randomId}.${extension.replace(/[^a-z0-9]/g, "")}`
+}
+
+/**
+ * Where a class recording lives — PRIVATE bucket only. Built from server-side
+ * ids (never a browser value) and `rtkRecordingId`, so a retried copy writes
+ * the same object.
+ */
+export function recordingKey(courseId: string, meetingId: string, rtkRecordingId: string): string {
+  const safe = (v: string) => v.replace(/[^a-zA-Z0-9-]/g, "")
+  return `worldstreet-academy/recordings/${safe(courseId)}/${safe(meetingId)}/${safe(rtkRecordingId)}.mp4`
+}
+
+/**
+ * Stream a body of known length into the PRIVATE resources bucket with one
+ * PutObject (no buffering in memory). R2 caps a single PUT at ~5 GB. Throws
+ * when the private bucket isn't configured — callers must fail closed, never
+ * fall back to the public bucket.
+ */
+export async function putPrivateObjectStream(
+  key: string,
+  body: Readable,
+  contentLength: number,
+  contentType: string
+): Promise<void> {
+  const bucket = process.env.R2_RESOURCES_BUCKET_NAME
+  if (!bucket) throw new Error("R2_RESOURCES_BUCKET_NAME is not set")
+  await r2Client.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: body,
+      ContentLength: contentLength,
+      ContentType: contentType,
+    })
+  )
 }
 
 export { r2Client }
