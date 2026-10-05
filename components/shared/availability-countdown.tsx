@@ -12,9 +12,9 @@ import * as React from "react"
  */
 import { useRouter } from "next/navigation"
 
-type Parts = { days: number; hours: number; minutes: number; seconds: number }
+export type Parts = { days: number; hours: number; minutes: number; seconds: number }
 
-function partsUntil(target: number, now: number): Parts | null {
+export function partsUntil(target: number, now: number): Parts | null {
   const diff = target - now
   if (diff <= 0) return null
   return {
