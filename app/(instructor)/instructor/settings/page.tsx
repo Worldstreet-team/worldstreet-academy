@@ -3,6 +3,8 @@ import { PageHeader } from "@/components/shared/page-header"
 import { getMySignature } from "@/lib/actions/signature"
 import { getMyInstructorEarnings } from "@/lib/actions/earnings"
 import { getCurrentUser } from "@/lib/auth"
+import { MARKETPLACE_SHARE_ACADEMY, MARKETPLACE_SHARE_OWN_LINK } from "@/lib/db/models"
+import { sellerSplitNote } from "@/lib/marketplace"
 import { InstructorProfileClient } from "./instructor-profile-client"
 
 export default async function InstructorSettingsPage() {
@@ -11,6 +13,8 @@ export default async function InstructorSettingsPage() {
     getCurrentUser(),
     getMyInstructorEarnings(),
   ])
+  // An approved marketplace seller (no faculty role) earns on the marketplace split.
+  const seller = currentUser?.role === "USER"
 
   return (
     <>
@@ -18,8 +22,8 @@ export default async function InstructorSettingsPage() {
       <div className="flex-1 px-4 sm:px-6 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-8 md:px-8 md:pb-12 lg:px-12">
         <div className="mx-auto w-full max-w-2xl space-y-8">
           <PageHeader
-            title="Instructor Settings"
-            subline="Update your instructor profile and preferences."
+            title={seller ? "Settings" : "Instructor Settings"}
+            subline={seller ? "Your seller profile and earnings." : "Update your instructor profile and preferences."}
           />
 
           <InstructorProfileClient
@@ -44,7 +48,10 @@ export default async function InstructorSettingsPage() {
               </div>
             </div>
             <p className="mt-4 border-t border-ws-hairline pt-4 text-[11px] leading-relaxed text-ws-muted">
-              You keep an 85% share of every sale. Earnings clear into your central Worldstreet
+              {seller
+                ? `${sellerSplitNote(MARKETPLACE_SHARE_OWN_LINK, MARKETPLACE_SHARE_ACADEMY)} `
+                : "You keep an 85% share of every sale. "}
+              Earnings clear into your central Worldstreet
               wallet balance {earnings?.clearingDays ?? 7} days after each sale (refund
               protection). Withdrawals — and the identity verification they require — happen on
               the Worldstreet dashboard, not in the Academy.

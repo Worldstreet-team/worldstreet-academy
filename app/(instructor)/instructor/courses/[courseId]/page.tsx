@@ -11,6 +11,8 @@ import { ArrowLeft, ClipboardCheck, FileQuestion, Pencil } from "lucide-react"
 import { fetchCourseForEdit } from "@/lib/actions/instructor"
 import { ResourceManager } from "@/components/instructor/resource-manager"
 import { DeleteCourseButton } from "@/components/instructor/delete-course-dialog"
+import { getCachedUser } from "@/lib/auth/cached"
+import { COURSE_KIND_LABEL } from "@/lib/course-kind"
 
 export default async function InstructorCourseInfoPage({
   params,
@@ -18,9 +20,11 @@ export default async function InstructorCourseInfoPage({
   params: Promise<{ courseId: string }>
 }) {
   const { courseId } = await params
-  const data = await fetchCourseForEdit(courseId)
+  const [data, viewer] = await Promise.all([fetchCourseForEdit(courseId), getCachedUser()])
 
   if (!data) notFound()
+  // Approved marketplace sellers (no faculty role) get no exam or assignment tools.
+  const seller = viewer?.role === "USER"
 
   const { course, lessons } = data
 
@@ -230,6 +234,22 @@ export default async function InstructorCourseInfoPage({
                       <span className="font-medium text-ws-primary">{course.category}</span>
                     </div>
                   )}
+                  <div className="flex justify-between">
+                    <span className="text-ws-muted">Type</span>
+                    <span className="font-medium text-ws-primary">{COURSE_KIND_LABEL[course.kind]}</span>
+                  </div>
+                  {course.review.status !== "none" && (
+                    <div className="flex justify-between">
+                      <span className="text-ws-muted">Review</span>
+                      <span className="font-medium text-ws-primary">
+                        {course.review.status === "pending"
+                          ? "In review"
+                          : course.review.status === "changes_requested"
+                            ? "Changes requested"
+                            : "Approved"}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="h-px bg-ws-hairline" />
@@ -243,22 +263,26 @@ export default async function InstructorCourseInfoPage({
                     <Pencil size={16} strokeWidth={2} />
                     Edit Course
                   </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    render={<Link href={`/instructor/courses/${course.id}/exam`} />}
-                  >
-                    <FileQuestion size={16} strokeWidth={2} />
-                    Exam (CBT)
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    render={<Link href={`/instructor/courses/${course.id}/assignments`} />}
-                  >
-                    <ClipboardCheck size={16} strokeWidth={2} />
-                    Assignments
-                  </Button>
+                  {!seller && (
+                    <>
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        render={<Link href={`/instructor/courses/${course.id}/exam`} />}
+                      >
+                        <FileQuestion size={16} strokeWidth={2} />
+                        Exam (CBT)
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        render={<Link href={`/instructor/courses/${course.id}/assignments`} />}
+                      >
+                        <ClipboardCheck size={16} strokeWidth={2} />
+                        Assignments
+                      </Button>
+                    </>
+                  )}
                   {/* Type-to-confirm dialog; the deleteCourse action is unchanged */}
                   <DeleteCourseButton courseId={course.id} courseTitle={course.title} />
                 </div>

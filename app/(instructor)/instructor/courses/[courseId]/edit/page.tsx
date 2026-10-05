@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation"
 import { fetchCourseForEdit } from "@/lib/actions/instructor"
 import { CourseEditor } from "@/components/instructor/course-editor"
+import { MARKETPLACE_SHARE_ACADEMY, MARKETPLACE_SHARE_OWN_LINK } from "@/lib/db/models"
+import { sellerSplitNote } from "@/lib/marketplace"
 
 export default async function EditCoursePage({
   params,
@@ -30,6 +32,10 @@ export default async function EditCoursePage({
     availableAt: data.course.availableAt,
     preEnrollEnabled: data.course.preEnrollEnabled,
     packages: data.course.packages,
+    kind: data.course.kind,
+    communityUrl: data.course.communityUrl,
+    review: data.course.review,
+    share: data.course.share,
   }
 
   const lessons = data.lessons.map((l) => ({
@@ -47,5 +53,11 @@ export default async function EditCoursePage({
     minPackageKey: l.minPackageKey,
   }))
 
-  return <CourseEditor course={course} existingLessons={lessons} />
+  return (
+    <CourseEditor
+      course={course}
+      existingLessons={lessons}
+      splitNote={sellerSplitNote(MARKETPLACE_SHARE_OWN_LINK, MARKETPLACE_SHARE_ACADEMY)}
+    />
+  )
 }

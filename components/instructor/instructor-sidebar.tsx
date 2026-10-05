@@ -26,6 +26,8 @@ import {
   LogOut,
   MessageCircle,
   Plus,
+  Settings,
+  Store,
   Trophy,
   User,
   Users,
@@ -45,6 +47,10 @@ import { BrandLockup } from "@/components/shared/brand-lockup"
  * active row a `bg/chip` pill with a gold icon. The four cross-app
  * WorldStreet links collapse behind one disclosure so they stop competing
  * with teaching navigation.
+ *
+ * An approved marketplace seller (`seller`, owner 2026-10-05) sees only the
+ * course tools they may use — My Courses, Add Course, Profile, Settings —
+ * and the marketplace instead of the faculty-only connect rows.
  */
 
 type NavItem = {
@@ -107,6 +113,19 @@ const connectItems: NavItem[] = [
     href: "/instructor/meetings",
     icon: Users,
     match: (p) => p.startsWith("/instructor/meetings"),
+  },
+]
+
+/** A seller's whole rail: their courses, and where earnings and profile live. */
+const sellerItems: NavItem[] = [
+  teachItems[2],
+  teachItems[3],
+  teachItems[1],
+  {
+    title: "Settings",
+    href: "/instructor/settings",
+    icon: Settings,
+    match: (p) => p === "/instructor/settings",
   },
 ]
 
@@ -175,7 +194,7 @@ function NavRow({
   )
 }
 
-export function InstructorSidebar() {
+export function InstructorSidebar({ seller = false }: { seller?: boolean }) {
   const pathname = usePathname()
   const router = useRouter()
   const user = useUser()
@@ -189,15 +208,15 @@ export function InstructorSidebar() {
 
   const liveCount = activeMeetings.length + invites.length
 
+  const railItems = seller ? sellerItems : teachItems
+
   // Prefetch all navigation routes on mount for faster transitions
   React.useEffect(() => {
-    const routes = [
-      ...teachItems.map((i) => i.href),
-      ...connectItems.map((i) => i.href),
-      "/dashboard",
-    ]
+    const routes = seller
+      ? sellerItems.map((i) => i.href)
+      : [...teachItems.map((i) => i.href), ...connectItems.map((i) => i.href), "/dashboard"]
     routes.forEach((r) => router.prefetch(r))
-  }, [router])
+  }, [router, seller])
 
   return (
     <Sidebar collapsible="icon">
@@ -222,7 +241,7 @@ export function InstructorSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {teachItems.map((item) => (
+              {railItems.map((item) => (
                 <NavRow key={item.title} item={item} active={isActive(item, pathname)} />
               ))}
             </SidebarMenu>
@@ -231,42 +250,44 @@ export function InstructorSidebar() {
 
         <SidebarSeparator />
 
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {connectItems.map((item) => (
-                <NavRow
-                  key={item.title}
-                  item={item}
-                  active={isActive(item, pathname)}
-                  badge={
-                    item.title === "Messages" ? (
-                      hasOngoingCall ? (
-                        <NavBadge tone="live">On call</NavBadge>
-                      ) : unreadCount > 0 ? (
-                        <NavBadge tone="brand">{unreadCount > 99 ? "99+" : unreadCount}</NavBadge>
+        {!seller && (
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {connectItems.map((item) => (
+                  <NavRow
+                    key={item.title}
+                    item={item}
+                    active={isActive(item, pathname)}
+                    badge={
+                      item.title === "Messages" ? (
+                        hasOngoingCall ? (
+                          <NavBadge tone="live">On call</NavBadge>
+                        ) : unreadCount > 0 ? (
+                          <NavBadge tone="brand">{unreadCount > 99 ? "99+" : unreadCount}</NavBadge>
+                        ) : undefined
+                      ) : item.title === "Meetings" && liveCount > 0 ? (
+                        <NavBadge tone="live">{liveCount} live</NavBadge>
                       ) : undefined
-                    ) : item.title === "Meetings" && liveCount > 0 ? (
-                      <NavBadge tone="live">{liveCount} live</NavBadge>
-                    ) : undefined
-                  }
-                />
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+                    }
+                  />
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
-        <SidebarSeparator />
+        {!seller && <SidebarSeparator />}
 
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
               <NavRow
-                item={{
-                  title: "Student Dashboard",
-                  href: "/dashboard",
-                  icon: LayoutDashboard,
-                }}
+                item={
+                  seller
+                    ? { title: "Marketplace", href: "/marketplace", icon: Store }
+                    : { title: "Student Dashboard", href: "/dashboard", icon: LayoutDashboard }
+                }
                 active={false}
               />
             </SidebarMenu>

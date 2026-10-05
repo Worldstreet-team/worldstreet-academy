@@ -9,6 +9,8 @@ import {
   House,
   Plus,
   Settings,
+  Store,
+  User,
   type LucideIcon,
 } from "lucide-react"
 
@@ -49,11 +51,33 @@ const navItems: BottomNavItem[] = [
   },
 ]
 
-export function InstructorBottomNav() {
+/**
+ * An approved marketplace seller's bar (owner 2026-10-05): their courses and
+ * profile, Add Course in the middle, then settings (earnings) and the
+ * marketplace — no faculty-only Overview or Analytics.
+ */
+const sellerNavItems: BottomNavItem[] = [
+  navItems[1],
+  {
+    title: "Profile",
+    href: "/instructor/profile",
+    icon: User,
+    match: (p: string) => p === "/instructor/profile",
+  },
+  navItems[3],
+  {
+    title: "Marketplace",
+    href: "/marketplace",
+    icon: Store,
+  },
+]
+
+export function InstructorBottomNav({ seller = false }: { seller?: boolean }) {
   const pathname = usePathname()
 
-  const left = navItems.slice(0, 2)
-  const right = navItems.slice(2)
+  const items = seller ? sellerNavItems : navItems
+  const left = items.slice(0, 2)
+  const right = items.slice(2)
 
   const renderItem = (item: BottomNavItem) => {
     const active = item.match?.(pathname) ?? pathname === item.href
