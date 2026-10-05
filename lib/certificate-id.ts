@@ -3,6 +3,7 @@ import type { Types } from "mongoose"
 import { BRAND } from "@/lib/brand"
 import { Course, Enrollment, type IEnrollment } from "@/lib/db/models"
 import { entitlementsFor } from "@/lib/entitlements"
+import { POINTS, awardPoints, pointKey } from "@/lib/points"
 
 /**
  * Certificate IDs (spec §13). One home for the rules: how an ID is generated,
@@ -114,12 +115,23 @@ export async function ensureCertificateId(
  * Drop-in for `enrollment.save()` on the completion paths (completeLesson,
  * gradeAttempt's exam pass, markCourseComplete). Saves — a failed save still
  * throws — then stamps the certificate ID via `ensureCertificateId`, random when
- * this save is the transition into "completed", which never throws.
+ * this save is the transition into "completed", which never throws. That
+ * transition also earns the program-completion points (lib/points.ts), fire
+ * and forget, once per enrollment.
  */
 export async function saveWithCertificateId(enrollment: IEnrollment): Promise<void> {
   // Read before save() clears the modified state: an unchanged status means the
   // enrollment was already completed before this call.
   const firstCompletion = enrollment.isModified("status")
   await enrollment.save()
+  if (firstCompletion && enrollment.status === "completed") {
+    void awardPoints({
+      userId: enrollment.user,
+      courseId: enrollment.course,
+      kind: "course_completed",
+      points: POINTS.course_completed,
+      key: pointKey.courseCompleted(enrollment._id.toString()),
+    })
+  }
   await ensureCertificateId(enrollment, firstCompletion)
 }

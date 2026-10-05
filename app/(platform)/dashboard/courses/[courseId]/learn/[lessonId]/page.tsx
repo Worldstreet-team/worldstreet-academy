@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
-import { ArrowLeft, InfoIcon } from "lucide-react"
+import { ArrowLeft, InfoIcon, UsersIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
@@ -10,7 +10,7 @@ import { updateLastAccessed } from "@/lib/actions/enrollments"
 import { getCourseRatingSummary, getUserReview } from "@/lib/actions/reviews"
 import { getCourseWatchProgress } from "@/lib/actions/watch-progress"
 import { getCurrentUser } from "@/lib/auth"
-import { getCourseAccess, getLearnStart, openPublishedLessonIds } from "@/lib/course-access"
+import { classCommunityUrl, getCourseAccess, getLearnStart, openPublishedLessonIds } from "@/lib/course-access"
 import { CourseExamCard } from "@/components/courses/course-exam-card"
 import { MarkCompleteButton } from "@/components/learn/mark-complete-button"
 import { MessageInstructorButton } from "@/app/(platform)/dashboard/instructor/[instructorId]/message-instructor-button"
@@ -62,12 +62,14 @@ export default async function LessonPage({
   const prevLesson = currentIndex > 0 ? lessons[currentIndex - 1] : null
   const nextLesson = currentIndex < lessons.length - 1 ? lessons[currentIndex + 1] : null
 
-  const [otherCourses, completedLessonIds, ratingSummary, userReview, watchProgress] = await Promise.all([
+  const [otherCourses, completedLessonIds, ratingSummary, userReview, watchProgress, communityUrl] = await Promise.all([
     fetchOtherCourses(courseId),
     getCompletedLessons(courseId),
     getCourseRatingSummary(courseId),
     currentUser ? getUserReview(currentUser.id, courseId) : Promise.resolve(null),
     getCourseWatchProgress(courseId),
+    // The class community is a private group: learners only, never staff previewing.
+    classCommunityUrl(access),
   ])
 
   // Build a map of lessonId -> watch percent
@@ -129,6 +131,24 @@ export default async function LessonPage({
             <InfoIcon className="h-4 w-4" aria-hidden />
             <span className="hidden sm:inline">Overview</span>
           </Button>
+          {communityUrl && (
+            <Button
+              variant="ghost"
+              size="sm"
+              render={
+                <a
+                  href={communityUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Your class community (opens in a new tab)"
+                />
+              }
+              className="gap-1.5 text-xs md:text-sm text-ws-muted hover:text-ws-primary"
+            >
+              <UsersIcon className="h-4 w-4" aria-hidden />
+              <span className="hidden sm:inline">Community</span>
+            </Button>
+          )}
           <span className="text-[10px] md:text-xs text-ws-muted tabular-nums">
             {currentIndex + 1}/{lessons.length} · {courseProgressPercent}%
           </span>

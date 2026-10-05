@@ -27,6 +27,7 @@ import {
   openPublishedLessonIdsFromRows,
 } from "@/lib/course-access"
 import { saveWithCertificateId } from "@/lib/certificate-id"
+import { POINTS, awardPoints, pointKey } from "@/lib/points"
 import { isCountryCode } from "@/lib/countries"
 import { FACULTY_ROLES, isFacultyRole, safeWebUrl } from "@/lib/faculty"
 import { PROGRAM_KIND_FILTER, courseKindOf } from "@/lib/course-kind"
@@ -139,6 +140,8 @@ export type StudentEnrollment = {
   resumeLesson: ResumeLesson | null
   /** The package's open lessons in course order, true where completed — the hero's per-lesson track. */
   lessonTrack: boolean[]
+  /** The class community link (`Course.communityUrl`) — only on an access-granting enrollment; it's a private group. */
+  communityUrl: string | null
 }
 
 export type ResumeLesson = {
@@ -879,7 +882,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
     const enrollments = await Enrollment.find({ user: user._id })
       .populate({
         path: "course",
-        select: "slug title thumbnailUrl instructor totalLessons availableAt status packages examRequired school",
+        select: "slug title thumbnailUrl instructor totalLessons availableAt status packages examRequired school communityUrl",
         populate: {
           path: "instructor",
           select: "firstName lastName avatarUrl instructorProfile.headline",
@@ -898,6 +901,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
       availableAt?: Date | null
       packages?: ICoursePackage[] | null
       examRequired?: boolean
+      communityUrl?: string | null
       instructor: {
         _id: { toString(): string }
         firstName: string
@@ -1013,6 +1017,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
             }
           : null,
         lessonTrack: openInOrder.map((l) => completedIds.has(l._id.toString())),
+        communityUrl: access ? safeWebUrl(course.communityUrl) : null,
       }
     })
   } catch (error) {
@@ -1176,7 +1181,10 @@ export async function markLessonComplete(
     const locked = await lockedLessonIds(access)
     if (locked.has(lessonId)) return { success: false, error: "This lesson isn't included in your package" }
 
-    if (!enrollment.completedLessons.some((id: { toString(): string }) => id.toString() === lessonId)) {
+    const newlyCompleted = !enrollment.completedLessons.some(
+      (id: { toString(): string }) => id.toString() === lessonId
+    )
+    if (newlyCompleted) {
       enrollment.completedLessons.push(new mongoose.Types.ObjectId(lessonId))
     }
 
@@ -1187,6 +1195,17 @@ export async function markLessonComplete(
     enrollment.lastAccessedAt = new Date()
 
     await enrollment.save()
+
+    // Points for a published lesson this package opens, once per enrollment and lesson.
+    if (newlyCompleted && open.has(lessonId)) {
+      void awardPoints({
+        userId: user._id,
+        courseId,
+        kind: "lesson_completed",
+        points: POINTS.lesson_completed,
+        key: pointKey.lesson(enrollment._id.toString(), lessonId),
+      })
+    }
 
     return { success: true }
   } catch (error) {

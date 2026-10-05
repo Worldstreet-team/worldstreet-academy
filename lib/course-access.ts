@@ -11,6 +11,7 @@ import {
   type PackageKey,
 } from "@/lib/db/models"
 import { canAccessLesson, entitlementsFor } from "@/lib/entitlements"
+import { safeWebUrl } from "@/lib/faculty"
 
 /**
  * Package-aware access for one student on one course — the single lookup the
@@ -217,6 +218,19 @@ export async function getLearnStart(userId: string, courseId: string): Promise<L
   const lessonId = resumed ? lastId : lessons.map((lesson) => lesson._id.toString()).find((id) => open.has(id))
   if (!lessonId) return null
   return { lessonId, href: `/dashboard/courses/${courseId}/learn/${lessonId}`, resumed }
+}
+
+/**
+ * The class community link (`Course.communityUrl`, set in the course editor)
+ * for a learner whose enrollment grants access — pass their `getCourseAccess`.
+ * It is a private group: a visitor, a reservation, a refund or staff
+ * previewing (all null access) never get it.
+ */
+export async function classCommunityUrl(access: CourseAccess | null): Promise<string | null> {
+  if (!access) return null
+  await connectDB()
+  const course = await Course.findById(access.course.id).select("communityUrl").lean()
+  return safeWebUrl(course?.communityUrl)
 }
 
 /** True only when the user is enrolled on the lesson's course and their package can't open it. */

@@ -12,6 +12,7 @@ import {
   Bookmark02Icon,
   Brain01Icon,
   Certificate01Icon,
+  ChampionIcon,
   ChartUpIcon,
   DashboardSquare01Icon,
   DollarCircleIcon,
@@ -109,6 +110,7 @@ const learnItems: NavItem[] = [
     icon: Certificate01Icon,
     match: (p) => p === "/dashboard/certificates" || p.includes("/certificate"),
   },
+  { title: "Points", href: "/dashboard/points", icon: ChampionIcon, match: (p) => p === "/dashboard/points" },
 ]
 
 /** Executive-package mentees only (`isMentorEnrollment`). */

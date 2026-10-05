@@ -7,6 +7,7 @@ import {
   BookOpen01Icon,
   Calendar03Icon,
   Certificate01Icon,
+  ChampionIcon,
   CustomerSupportIcon,
   HelpCircleIcon,
   LinkSquare02Icon,
@@ -30,6 +31,7 @@ import {
 import type { StudentEnrollment } from "@/lib/actions/student"
 import { BRAND } from "@/lib/brand"
 import {
+  type ClassCommunity,
   enrollmentStatusLabel,
   formatClassWhen,
   formatShortDate,
@@ -44,7 +46,7 @@ import {
   type InstructorRow,
   type ProgramTab,
 } from "@/lib/dashboard-home"
-import { useMyCertificates, useUpcomingClasses } from "@/lib/hooks/queries"
+import { useMyCertificates, useMyPoints, useUpcomingClasses } from "@/lib/hooks/queries"
 import { cn } from "@/lib/utils"
 
 /*
@@ -60,6 +62,7 @@ const CertificateGlyph = glyph(Certificate01Icon)
 const HelpGlyph = glyph(HelpCircleIcon)
 const SupportGlyph = glyph(CustomerSupportIcon)
 const CommunityGlyph = glyph(UserGroupIcon)
+const PointsGlyph = glyph(ChampionIcon)
 
 /* ── My programs ──────────────────────────────────────────────────────── */
 
@@ -275,6 +278,50 @@ export function CertificatesTile({ now }: { now: number }) {
   )
 }
 
+/* ── Points ───────────────────────────────────────────────────────────── */
+
+/**
+ * The student's learning points (owner, 2026-10-03): the total, and what the
+ * last seven days added. No cash value. The leaderboard and how points are
+ * earned live on /dashboard/points.
+ */
+export function PointsTile() {
+  const { data, isLoading } = useMyPoints()
+  return (
+    <CardShell>
+      <CardHeader title="Points" subtitle="Earned as you learn" />
+      {isLoading ? (
+        <SkeletonRows rows={1} label="Loading points" />
+      ) : !data ? (
+        <TileEmpty icon={PointsGlyph} title="Your points didn't load" description="Refresh the page to try again." />
+      ) : (
+        <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2 px-4 pb-4 pt-1">
+          <span className="flex flex-col gap-1">
+            <span className="font-display text-[34px] font-light leading-none tabular-nums tracking-[-0.02em]">
+              {data.total.toLocaleString("en-US")}
+            </span>
+            <span className="text-[12.5px] text-muted-foreground">
+              {data.total === 0 ? "Finish a lesson to earn your first points" : "points in total"}
+            </span>
+          </span>
+          <span
+            className={cn(
+              "shrink-0 rounded-full px-2.5 py-1 text-[12px] font-semibold tabular-nums",
+              data.thisWeek > 0 ? "bg-credit-chip text-credit" : "bg-foreground/[0.06] text-muted-foreground"
+            )}
+          >
+            +{data.thisWeek.toLocaleString("en-US")} this week
+          </span>
+        </div>
+      )}
+      <Link href="/dashboard/points" className={TILE_FOOT_LINK}>
+        Leaderboard &amp; activity
+        <Chevron />
+      </Link>
+    </CardShell>
+  )
+}
+
 /* ── Instructors / mentor ─────────────────────────────────────────────── */
 
 /** One row per instructor; Message only where a package includes Q&A. */
@@ -349,13 +396,28 @@ const COMMUNITY_URL = process.env.NEXT_PUBLIC_COMMUNITY_URL?.trim() || null
 /**
  * Always present, so the grid always has a closing tile. "Priority support"
  * only for a package bought with it. At full page width its rows sit side by
- * side instead of stretching one row across the screen.
+ * side instead of stretching one row across the screen. Community: one row per
+ * enrolled program's class community (owner, 2026-10-03); the general
+ * community link only when none of the student's programs has one.
  */
-export function SupportTile({ priority }: { priority: boolean }) {
+export function SupportTile({ priority, communities }: { priority: boolean; communities: ClassCommunity[] }) {
+  const communityRows =
+    communities.length > 0
+      ? communities.map((c) => ({ key: c.url, href: c.url, title: "Class community", subtitle: c.courseTitle }))
+      : COMMUNITY_URL
+        ? [
+            {
+              key: "general",
+              href: COMMUNITY_URL,
+              title: "Community",
+              subtitle: `Connect with other ${BRAND.wordmark} learners`,
+            },
+          ]
+        : []
   return (
     <CardShell className="@container">
       <CardHeader
-        title={COMMUNITY_URL ? "Help & community" : "Support"}
+        title={communityRows.length > 0 ? "Help & community" : "Support"}
         subtitle="Answers, and real people when you need them"
         badge={
           priority ? (
@@ -383,19 +445,19 @@ export function SupportTile({ priority }: { priority: boolean }) {
             </span>
           </span>
         </a>
-        {COMMUNITY_URL && (
-          <a href={COMMUNITY_URL} target="_blank" rel="noopener noreferrer" className={TILE_ROW}>
+        {communityRows.map((row) => (
+          <a key={row.key} href={row.href} target="_blank" rel="noopener noreferrer" className={TILE_ROW}>
             <RowChip icon={CommunityGlyph} />
             <span className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-[14px] font-medium">Community</span>
-              <span className="truncate text-[12.5px] text-muted-foreground">
-                Connect with other {BRAND.wordmark} learners
+              <span className="truncate text-[14px] font-medium">{row.title}</span>
+              <span className="truncate text-[12.5px] text-muted-foreground" title={row.subtitle}>
+                {row.subtitle}
               </span>
             </span>
             <HugeiconsIcon icon={LinkSquare02Icon} className="h-4 w-4 shrink-0 text-muted-foreground/70" aria-hidden />
             <span className="sr-only">(opens in a new tab)</span>
           </a>
-        )}
+        ))}
       </div>
     </CardShell>
   )
