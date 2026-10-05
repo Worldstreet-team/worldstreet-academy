@@ -30,7 +30,7 @@ import { appUrl } from "@/lib/app-url"
 import { referralPath } from "@/lib/referral-link"
 import { ensureReferralCode } from "@/lib/referrals"
 import { sellerSplitNote } from "@/lib/marketplace"
-import { requestCourseReview } from "@/lib/course-review"
+import { requestCourseReview, requestLiveCourseReview } from "@/lib/course-review"
 
 const PackageSchema = z
   .object({
@@ -734,6 +734,20 @@ export async function updateCourse(
       return { success: false, error: null, fieldErrors: { lessons: "Add at least one lesson before submitting for review" } }
     }
     const pricingFields = coursePricing(kind, pricing, price, packages)
+    // A seller's live course: content edits go back to review (below), and the
+    // price can't change at all — a course must not pass review at one price
+    // and sell at another.
+    const liveSellerEdit = seller && existingCourse.status === "published" && status === "published"
+    if (
+      liveSellerEdit &&
+      (pricingFields.pricing !== existingCourse.pricing || pricingFields.price !== existingCourse.price)
+    ) {
+      return {
+        success: false,
+        error: "A live course's price can't change. Take it back to draft and submit it for review to change the price.",
+        fieldErrors: {},
+      }
+    }
 
     // Update course
     await Course.findByIdAndUpdate(courseId, {
@@ -821,6 +835,8 @@ export async function updateCourse(
 
     if (submitting) {
       await requestCourseReview(courseId, sellerOf(instructor))
+    } else if (liveSellerEdit) {
+      await requestLiveCourseReview(courseId, sellerOf(instructor))
     }
 
     revalidatePath("/instructor/courses")
