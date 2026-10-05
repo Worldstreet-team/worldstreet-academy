@@ -87,6 +87,9 @@
  *   already holding the clean slug aborts the whole run
  *   (`ABORT: slug <x> exists on "<title>" — title drift?`) rather than
  *   silently creating a second copy.
+ * - URLS: a MATCH keeps its existing slug (2026-10-05: production slugs
+ *   like `forex-trading-mastery-j7g0ta` are already shared, and an old slug
+ *   has no redirect). `--rename-slugs` restores the clean-slug rewrite.
  *
  *   node scripts/mastery-catalogue.mjs --apply --allow-price-change
  * ---------------------------------------------------------------------
@@ -98,6 +101,7 @@ config()
 
 const APPLY = process.argv.includes("--apply")
 const ALLOW_PRICE_CHANGE = process.argv.includes("--allow-price-change")
+const RENAME_SLUGS = process.argv.includes("--rename-slugs")
 
 if (!process.env.MONGODB_URI) {
   console.error("MONGODB_URI is not set — refusing to run.")
@@ -479,7 +483,11 @@ for (const program of PROGRAMS) {
       setDoc.whatYouWillLearn = program.spec.whatYouWillLearn
     }
 
-    const slugResult = await resolveSlug(program.title, existing._id)
+    // A live program keeps its URL: /programs/<slug> links are already shared
+    // and indexed, and nothing redirects an old slug. --rename-slugs opts in.
+    const slugResult = RENAME_SLUGS
+      ? await resolveSlug(program.title, existing._id)
+      : { slug: null, warning: null }
     if (slugResult.slug) setDoc.slug = slugResult.slug
 
     plans.push({
