@@ -15,7 +15,7 @@ import {
   Row,
   Column,
 } from "@react-email/components"
-import { APP_URL } from "@/lib/app-url"
+import { APP_URL, appUrl } from "@/lib/app-url"
 import { BRAND } from "@/lib/brand"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
@@ -911,6 +911,7 @@ export async function sendMeetingInviteEmail(
 
 
 export type EnrollmentEmailData = {
+  /** The learner's account email — also printed as the address they sign in with. */
   to: string
   firstName: string
   courseTitle: string
@@ -937,6 +938,7 @@ function formatLaunch(iso: string): string {
 
 function EnrollmentConfirmationEmail({ data }: { data: EnrollmentEmailData }) {
   const courseUrl = `${APP_URL}/dashboard/courses/${data.courseId}`
+  const dashboardUrl = appUrl("/dashboard")
   return (
     <Html style={base}>
       <Head />
@@ -975,6 +977,13 @@ function EnrollmentConfirmationEmail({ data }: { data: EnrollmentEmailData }) {
                 </Text>
               </>
             )}
+
+            {/* Sign-in details (owner meeting 2026-10-03). Never a password:
+                the account is the WorldStreet account they signed up with. */}
+            <Text style={{ ...sub, marginTop: "12px" }}>
+              Sign in at <Link href={dashboardUrl}>{dashboardUrl}</Link> with <strong>{data.to}</strong> to open
+              your dashboard.
+            </Text>
 
             <Section style={{ marginTop: "28px" }}>
               <Button href={courseUrl} style={cta}>
@@ -1171,6 +1180,188 @@ export async function sendFinishEnrollingEmail(data: FinishEnrollingEmailData) {
     return { success: true }
   } catch (err) {
     console.error("[Email] Finish enrolling error:", err)
+    return { success: false, error: "Failed to send email" }
+  }
+}
+
+/* ─── Pay with ESPEE (owner meeting, 2026-10-03) ─── */
+
+/** One message, one button — the learner-facing ESPEE notices. */
+function PaymentNoticeEmail({
+  preview,
+  title,
+  children,
+  ctaLabel,
+  ctaUrl,
+}: {
+  preview: string
+  title: string
+  children: React.ReactNode
+  ctaLabel: string
+  ctaUrl: string
+}) {
+  return (
+    <Html style={base}>
+      <Head />
+      <Preview>{preview}</Preview>
+      <Body style={body}>
+        <Container style={card}>
+          <Section style={contentPad}>
+            <Text style={heading}>{title}</Text>
+            {children}
+            <Section style={{ marginTop: "28px" }}>
+              <Button href={ctaUrl} style={cta}>
+                {ctaLabel}
+              </Button>
+            </Section>
+            <Hr style={{ borderColor: "#E9E7E5", margin: "24px 0 16px" }} />
+            <Link href={ctaUrl} style={linkSmall}>
+              {ctaUrl}
+            </Link>
+          </Section>
+        </Container>
+        <Section style={footer}>
+          <Text style={footerText}>{BRAND.name}</Text>
+        </Section>
+      </Body>
+    </Html>
+  )
+}
+
+/** New ESPEE proof to review — one per admin. */
+export async function sendEspeePaymentAdminEmail(
+  to: string,
+  data: {
+    learnerName: string
+    learnerAvatarUrl?: string
+    courseTitle: string
+    packageName: string | null
+    amountLabel: string
+    transferReference: string
+    reviewUrl: string
+  }
+) {
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to,
+      subject: `New ESPEE payment to review — ${data.learnerName}`,
+      react: React.createElement(SimplePipelineEmail, {
+        preview: `${data.learnerName} sent ${data.amountLabel}`,
+        title: "New ESPEE payment to review",
+        bodyText: `${data.learnerName} sent ${data.amountLabel} for ${data.courseTitle}${
+          data.packageName ? ` — ${data.packageName}` : ""
+        }. Transfer reference: ${data.transferReference}. Check the receipt, then approve or reject it.`,
+        ctaLabel: "Review payment",
+        ctaUrl: data.reviewUrl,
+        avatarUrl: data.learnerAvatarUrl,
+        avatarName: data.learnerName,
+      }),
+    })
+    if (error) return { success: false, error: error.message }
+    return { success: true }
+  } catch (err) {
+    console.error("[Email] ESPEE admin alert error:", err)
+    return { success: false, error: "Failed to send email" }
+  }
+}
+
+export type EspeeLearnerEmailData = {
+  to: string
+  firstName: string
+  courseTitle: string
+  packageName: string | null
+  amountLabel: string
+}
+
+/** "We received your proof — your dashboard opens once it's confirmed." */
+export async function sendEspeeProofReceivedEmail(data: EspeeLearnerEmailData) {
+  if (!data.to) return { success: false, error: "No recipient" }
+  const statusUrl = appUrl("/dashboard/checkout/pending")
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: data.to,
+      subject: `We received your payment proof: ${data.courseTitle}`,
+      react: (
+        <PaymentNoticeEmail
+          preview={`Your ${data.amountLabel} transfer is being checked`}
+          title="We received your proof"
+          ctaLabel="View payment status"
+          ctaUrl={statusUrl}
+        >
+          <Text style={sub}>
+            {data.firstName ? `Thanks, ${data.firstName}. We` : "Thanks. We"} received your proof of{" "}
+            <strong>{data.amountLabel}</strong> for <strong>{data.courseTitle}</strong>
+            {data.packageName ? ` — ${data.packageName}` : ""}.
+          </Text>
+          <Text style={sub}>
+            Our team checks every transfer by hand. Your dashboard opens once it&apos;s confirmed, and we&apos;ll
+            email you the moment it is.
+          </Text>
+        </PaymentNoticeEmail>
+      ),
+    })
+    if (error) {
+      console.error("[Email] ESPEE proof received failed:", error)
+      return { success: false, error: error.message }
+    }
+    return { success: true }
+  } catch (err) {
+    console.error("[Email] ESPEE proof received error:", err)
+    return { success: false, error: "Failed to send email" }
+  }
+}
+
+/** "We couldn't confirm your payment", with the admin's reason and a way back to checkout. */
+export async function sendEspeePaymentRejectedEmail(
+  data: EspeeLearnerEmailData & { reason: string; checkoutUrl: string }
+) {
+  if (!data.to) return { success: false, error: "No recipient" }
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: data.to,
+      subject: `Payment not confirmed: ${data.courseTitle}`,
+      react: (
+        <PaymentNoticeEmail
+          preview={`We couldn't confirm your ${data.amountLabel} transfer`}
+          title="Payment not confirmed"
+          ctaLabel="Try again"
+          ctaUrl={data.checkoutUrl}
+        >
+          <Text style={sub}>
+            {data.firstName ? `${data.firstName}, we` : "We"} couldn&apos;t confirm your ESPEE payment of{" "}
+            <strong>{data.amountLabel}</strong> for <strong>{data.courseTitle}</strong>
+            {data.packageName ? ` — ${data.packageName}` : ""}.
+          </Text>
+          <Text
+            style={{
+              ...sub,
+              margin: "16px 0 0",
+              padding: "12px 14px",
+              backgroundColor: "#F5F4F3",
+              borderRadius: "10px",
+              color: "#292524",
+              textAlign: "left" as const,
+            }}
+          >
+            {data.reason}
+          </Text>
+          <Text style={{ ...muted, marginTop: "12px" }}>
+            Nothing has been opened yet. You can send a new proof from checkout, or write to{" "}
+            {BRAND.supportEmail} if you think this is a mistake.
+          </Text>
+        </PaymentNoticeEmail>
+      ),
+    })
+    if (error) {
+      console.error("[Email] ESPEE rejection failed:", error)
+      return { success: false, error: error.message }
+    }
+    return { success: true }
+  } catch (err) {
+    console.error("[Email] ESPEE rejection error:", err)
     return { success: false, error: "Failed to send email" }
   }
 }
