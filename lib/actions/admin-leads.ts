@@ -1,7 +1,7 @@
 "use server"
 
 import connectDB from "@/lib/db"
-import { Bookmark, Course, Enrollment, EnrollmentIntent, Order, User } from "@/lib/db/models"
+import { Bookmark, Course, Enrollment, EnrollmentIntent, ManualPayment, Order, User } from "@/lib/db/models"
 import { requireAdmin } from "@/lib/auth/admin"
 import { countryName } from "@/lib/countries"
 import { SCHOOL_BY_SLUG, type SchoolSlug } from "@/lib/schools"
@@ -18,7 +18,8 @@ export interface LeadCounts {
  * Population: users with role USER, an email, and NO Enrollment in status
  * `active` or `completed`. Interest signals (batched with `$in`): a saved
  * school (EnrollmentIntent), a wishlist bookmark, a `pre_enrolled` enrollment,
- * and an Order in pending / payment_requested / failed / cancelled. Users with
+ * an Order in pending / payment_requested / failed / cancelled, and an ESPEE
+ * payment proof under review or rejected. Users with
  * no signal are kept as "Signed up only". Sorted by last activity, newest first.
  *
  * Phone numbers are not stored by the Academy: the User model has no phone
@@ -37,11 +38,11 @@ export async function exportInterestedLearnersCsv(): Promise<
       email: { $exists: true, $nin: [null, ""] },
       _id: { $nin: paidIds },
     })
-      .select("firstName lastName email country createdAt")
+      .select("firstName lastName email country createdAt referredBy")
       .lean()
 
     const ids = users.map((u) => u._id)
-    const [intents, bookmarks, preEnrolled, orders] = await Promise.all([
+    const [intents, bookmarks, preEnrolled, orders, proofs] = await Promise.all([
       EnrollmentIntent.find({ user: { $in: ids } })
         .select("user school course packageKey savedAt")
         .lean(),
@@ -55,10 +56,13 @@ export async function exportInterestedLearnersCsv(): Promise<
       })
         .select("user course packageKey failureCode createdAt")
         .lean(),
+      ManualPayment.find({ user: { $in: ids }, status: { $in: ["submitted", "rejected"] } })
+        .select("user course packageKey status createdAt")
+        .lean(),
     ])
 
     const courseIds = new Set<string>()
-    for (const r of [...intents, ...bookmarks, ...preEnrolled, ...orders]) {
+    for (const r of [...intents, ...bookmarks, ...preEnrolled, ...orders, ...proofs]) {
       if (r.course) courseIds.add(r.course.toString())
     }
     const courses = await Course.find({ _id: { $in: [...courseIds] } })
@@ -119,6 +123,11 @@ export async function exportInterestedLearnersCsv(): Promise<
       })
     }
 
+    for (const m of proofs) {
+      const label = m.status === "submitted" ? "ESPEE proof under review" : "ESPEE proof rejected"
+      note(m.user, label, m.createdAt, { course: m.course, plan: m.packageKey })
+    }
+
     const schoolName = (slug: string) => SCHOOL_BY_SLUG[slug as SchoolSlug]?.name ?? slug
     const ORDER = ["Saved a school", "Wishlist", "Pre-enrolled"]
     const rank = (l: string) => {
@@ -131,7 +140,12 @@ export async function exportInterestedLearnersCsv(): Promise<
       .sort((a, b) => b.lead.last - a.lead.last)
 
     let withSignal = 0
-    const quote = (v: string | number | null) => `"${String(v ?? "").replace(/"/g, '""')}"`
+    // Names and referral answers are typed by learners: a leading = + - @
+    // would run as a formula when sales opens the file in a spreadsheet.
+    const quote = (v: string | number | null) => {
+      const text = String(v ?? "")
+      return `"${(/^[=+\-@]/.test(text) ? `'${text}` : text).replace(/"/g, '""')}"`
+    }
     const header = [
       "First name",
       "Last name",
@@ -142,6 +156,7 @@ export async function exportInterestedLearnersCsv(): Promise<
       "School(s)",
       "Program(s)",
       "Plan",
+      "Referred by",
       "Last activity",
     ]
     const lines = rows.map(({ u, lead }) => {
@@ -160,6 +175,7 @@ export async function exportInterestedLearnersCsv(): Promise<
         [...lead.schools].map(schoolName).join("; "),
         [...lead.programs].join("; "),
         lead.plan?.key ?? "",
+        u.referredBy?.text ?? "",
         new Date(lead.last).toISOString().slice(0, 10),
       ]
         .map(quote)
