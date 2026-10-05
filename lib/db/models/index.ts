@@ -21,7 +21,14 @@ export { Meeting, type IMeeting, type IMeetingParticipant, type IMeetingInvite, 
 export { WatchProgress, type IWatchProgress } from "./watch-progress"
 export { Resource, type IResource, type ResourceKind } from "./resource"
 export { ResourceDownload, type IResourceDownload } from "./resource-download"
-export { Order, type IOrder, type OrderStatus, type OrderPaymentMethod } from "./order"
+export {
+  Order,
+  type IOrder,
+  type OrderStatus,
+  type OrderPaymentMethod,
+  type IOrderAttribution,
+  type OrderAttributionKind,
+} from "./order"
 export { PaymentEvent, type IPaymentEvent } from "./payment-event"
 export {
   Earning,

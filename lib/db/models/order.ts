@@ -31,6 +31,22 @@ export type OrderStatus =
 /** How the money moved. Additive: orders written before ESPEE read as "wallet". */
 export type OrderPaymentMethod = "wallet" | "espee"
 
+/**
+ * Who made the sale (owner, 2026-10-05), decided in lib/referrals.ts:
+ *   seller_link  a marketplace course bought through its seller's own code
+ *   referral     any other code, owned by someone other than the buyer
+ * Null (or missing, on older orders) is an Academy sale with no code.
+ */
+export type OrderAttributionKind = "seller_link" | "referral"
+
+export interface IOrderAttribution {
+  /** The referral code, as stored on its owner. */
+  code: string
+  /** The code's owner. */
+  userId: Types.ObjectId
+  kind: OrderAttributionKind
+}
+
 export interface IOrderTransition {
   status: OrderStatus
   at: Date
@@ -51,6 +67,8 @@ export interface IOrder extends Document {
   chargeId: string | null
   packageKey: PackageKey | null
   paymentMethod: OrderPaymentMethod
+  /** Additive: null = an Academy sale with no code. */
+  attribution: IOrderAttribution | null
   failureCode: string | null
   history: IOrderTransition[]
   createdAt: Date
@@ -74,6 +92,17 @@ const OrderSchema = new Schema<IOrder>(
     chargeId: { type: String, default: null },
     packageKey: { type: String, enum: [null, "basic", "standard", "executive"], default: null },
     paymentMethod: { type: String, enum: ["wallet", "espee"], default: "wallet" },
+    attribution: {
+      type: new Schema(
+        {
+          code: { type: String, required: true },
+          userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+          kind: { type: String, enum: ["seller_link", "referral"], required: true },
+        },
+        { _id: false }
+      ),
+      default: null,
+    },
     failureCode: { type: String, default: null },
     history: [
       {
