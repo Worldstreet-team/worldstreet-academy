@@ -8,6 +8,7 @@ import { getCurrentUser } from "@/lib/auth/actions"
 import { notifyUser, notifyUsers } from "@/lib/notify"
 import { getCourseAccess } from "@/lib/course-access"
 import { entitlementsFor } from "@/lib/entitlements"
+import { POINTS, awardPoints, gradePoints, pointKey } from "@/lib/points"
 import {
   generatePresignedDownloadUrl,
   generatePresignedUploadUrl,
@@ -287,6 +288,15 @@ export async function gradeSubmission(input: {
     if (graded.matchedCount === 0) {
       return { success: false, error: "The student resubmitted — review the new version" }
     }
+
+    // The grade's points, once per submission: a re-grade keeps the first award.
+    void awardPoints({
+      userId: submission.user,
+      courseId: submission.course,
+      kind: "assignment_graded",
+      points: gradePoints(parsed.data.grade),
+      key: pointKey.assignmentGraded(submission._id.toString()),
+    })
 
     const assignment = await Assignment.findById(submission.assignment).select("title").lean()
     const assignmentId = submission.assignment.toString()
@@ -574,8 +584,9 @@ export async function submitAssignment(input: {
         },
         { upsert: true, new: true, runValidators: true }
       )
+    let saved: Awaited<ReturnType<typeof write>>
     try {
-      await write()
+      saved = await write()
     } catch (error) {
       if (!isDuplicateKey(error)) throw error
       // The filter's status clause turns off MongoDB's own duplicate-key upsert retry, so the
@@ -583,11 +594,22 @@ export async function submitAssignment(input: {
       const current = await Submission.findOne({ assignment: gate.assignment._id, user: user.id }).select("status").lean()
       if (current?.status === "graded") return { success: false, error: "This assignment has already been graded" }
       try {
-        await write()
+        saved = await write()
       } catch (retryError) {
         if (isDuplicateKey(retryError)) return { success: false, error: "This assignment has already been graded" }
         throw retryError
       }
+    }
+
+    // Handing it in earns points once per submission row; resubmitting doesn't pay again.
+    if (saved) {
+      void awardPoints({
+        userId: user.id,
+        courseId: gate.assignment.course,
+        kind: "assignment_submitted",
+        points: POINTS.assignment_submitted,
+        key: pointKey.assignmentSubmitted(saved._id.toString()),
+      })
     }
 
     void notifyUser(gate.access.course.instructorId, {

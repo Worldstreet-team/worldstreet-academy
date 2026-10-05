@@ -47,6 +47,7 @@ export {
   ACTIVE_APPLICATION_STATUSES,
   type IInstructorApplication,
   type IApplicationAnswers,
+  type ApplicationPassion,
   type ApplicationStatus,
   type IProposedSlot,
   type IScorecard,
@@ -77,3 +78,4 @@ export {
   type SellerApplicationStatus,
 } from "./seller-application"
 export { Recording, type IRecording, type RecordingStatus } from "./recording"
+export { PointEvent, type IPointEvent, type PointEventKind } from "./point-event"

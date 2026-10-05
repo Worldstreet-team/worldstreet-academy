@@ -24,6 +24,7 @@ import { sendEnrollmentConfirmationEmail } from "@/lib/email"
 import { notifyAdmins, notifyUser } from "@/lib/notify"
 import { getCourseAccess, isLessonLockedFor, lockedLessonIds } from "@/lib/course-access"
 import { saveWithCertificateId } from "@/lib/certificate-id"
+import { POINTS, awardPoints, pointKey } from "@/lib/points"
 import { PACKAGE_KEYS, packageFor, sellsPackages } from "@/lib/entitlements"
 import { courseKindOf } from "@/lib/course-kind"
 import {
@@ -578,6 +579,11 @@ export async function completeLesson(
   try {
     await connectDB()
 
+    // The learner's id comes from the caller: only the signed-in learner may
+    // complete their own lessons (and earn their points).
+    const current = await getCurrentUser()
+    if (!current || current.id !== userId) return { success: false, error: "Not authenticated" }
+
     const enrollment = await Enrollment.findOne({
       user: userId,
       course: courseId,
@@ -598,8 +604,9 @@ export async function completeLesson(
     const lessonObjectId = new Types.ObjectId(lessonId)
     const lessonIdStr = lessonObjectId.toString()
     const completedIds = enrollment.completedLessons.map((id: Types.ObjectId) => id.toString())
+    const newlyCompleted = !completedIds.includes(lessonIdStr)
 
-    if (!completedIds.includes(lessonIdStr)) {
+    if (newlyCompleted) {
       enrollment.completedLessons.push(lessonObjectId)
     }
 
@@ -629,6 +636,17 @@ export async function completeLesson(
 
     // A completion and its certificate ID (when the package certifies) land together.
     await saveWithCertificateId(enrollment)
+
+    // Points for a lesson this package opens, once per enrollment and lesson.
+    if (newlyCompleted && open.has(lessonIdStr)) {
+      void awardPoints({
+        userId,
+        courseId,
+        kind: "lesson_completed",
+        points: POINTS.lesson_completed,
+        key: pointKey.lesson(enrollment._id.toString(), lessonIdStr),
+      })
+    }
 
     revalidatePath(`/courses/${courseId}/learn/${lessonId}`)
     revalidatePath("/dashboard/my-courses")

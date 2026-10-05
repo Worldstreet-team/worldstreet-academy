@@ -14,6 +14,7 @@ import {
   CertificatesTile,
   InstructorsTile,
   MyProgramsTile,
+  PointsTile,
   SupportTile,
   UpcomingClassesTile,
 } from "@/components/dashboard/home-tiles"
@@ -23,6 +24,7 @@ import { useUser } from "@/components/providers/user-provider"
 import { CardShell, EmptyState, Eyebrow, Rise } from "@/components/ui/system"
 import {
   assessmentCounts,
+  classCommunities,
   hasPrioritySupport,
   includesAny,
   instructorRows,
@@ -153,6 +155,7 @@ export default function DashboardPage() {
     // card; it takes a narrow slot until there is a list to fill the wide one.
     tiles.push({ key: "assignments", prefer: assessments.length > 2 ? "wide" : "narrow", node: <AssignmentsTile /> })
   }
+  tiles.push({ key: "points", prefer: "narrow", node: <PointsTile /> })
   if (showClasses) tiles.push({ key: "classes", prefer: "narrow", node: <UpcomingClassesTile now={now} /> })
   if (instructors.length > 0) {
     tiles.push({ key: "instructors", prefer: "narrow", node: <InstructorsTile rows={instructors} /> })
@@ -160,7 +163,11 @@ export default function DashboardPage() {
   if (showCertificates && certificates.length > 0) {
     tiles.push({ key: "certificates", prefer: "narrow", node: <CertificatesTile now={now} /> })
   }
-  tiles.push({ key: "support", prefer: "narrow", node: <SupportTile priority={hasPrioritySupport(enrollments)} /> })
+  tiles.push({
+    key: "support",
+    prefer: "narrow",
+    node: <SupportTile priority={hasPrioritySupport(enrollments)} communities={classCommunities(enrollments)} />,
+  })
 
   // Programs the student already has would only repeat the list above.
   const recommended = notEnrolled(browseCourses, enrollments).slice(0, 3)

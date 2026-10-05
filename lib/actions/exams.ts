@@ -23,6 +23,7 @@ import { getCurrentUser } from "@/lib/auth/actions"
 import { notifyUser } from "@/lib/notify"
 import { PACKAGE_LABEL, canAccessLesson, effectiveLessonTier, entitlementsFor, lowestPackageWith } from "@/lib/entitlements"
 import { saveWithCertificateId } from "@/lib/certificate-id"
+import { POINTS, awardPoints, pointKey } from "@/lib/points"
 
 /* ═══════════════════ helpers ═══════════════════ */
 
@@ -741,6 +742,16 @@ async function gradeAttempt(attempt: HydratedDocument<import("@/lib/db/models").
     }
     // A pass that completes the course also issues its certificate ID.
     await saveWithCertificateId(enrollment)
+    // A passed final exam earns its points once per enrollment and exam (retakes don't).
+    if (passed) {
+      void awardPoints({
+        userId: attempt.user,
+        courseId: exam.course,
+        kind: "exam_passed",
+        points: POINTS.exam_passed,
+        key: pointKey.examPassed(enrollment._id.toString(), exam._id.toString()),
+      })
+    }
   }
 
   return { passed, scorePercent, pointsEarned, pointsTotal, showResults: exam.settings.showResults }

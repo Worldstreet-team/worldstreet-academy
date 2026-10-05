@@ -186,3 +186,33 @@ Go needs no patch. All additive:
 - **`meetings.liveNotifiedAt`** — date or `null` (missing = `null`). Set on a course class when its "<course> is live now" notice goes to the class's students (when the host starts a scheduled class, or when a class is created to start now). The web claims it with a filtered update before sending, so a host rejoining never re-notifies. If Go ever starts a class, it should claim the same field before notifying, or leave it alone. Any wholesale meeting write must keep it.
 - **Course-class RealtimeKit rooms are created with `record_on_start: true`.** Mentorship rooms, interviews and ad-hoc meetings are not. If Go creates class rooms, it should pass the same flag, or those classes won't be recorded.
 - **`recordings`** — new web-only collection; Go may ignore it. One row per RealtimeKit recording of a course class: `meeting`, `course`, `host` (ObjectIds), `rtkRecordingId` (unique), `rtkStatus`, `status` (`"pending" | "stored" | "failed"`), `storageKey` (private resources bucket only, `worldstreet-academy/recordings/<courseId>/<meetingId>/<rtkRecordingId>.mp4`), `durationSeconds`, `sizeBytes`, `recordedAt`, `title`, `hidden`, `failureReason`, `attempts`, `copyStartedAt`, `storedAt`. Written by `/api/cron/recordings`. Playback is a 10-minute signed GET minted after the web re-checks that the viewer's package includes live classes (or that they are course staff). If mobile ever plays recordings, it must go through the same check and never expose `storageKey` or a public URL.
+
+## 11. Points and the tutor application questions (owner meeting, 2026-10-03)
+
+Go needs no patch for either: nothing it reads changed.
+
+**`pointevents`** — new collection, **web-only**; Go may ignore it. Learning points with no cash value, one row per award. Totals are summed on read (no cached total anywhere, so nothing to keep in step).
+
+| Field | Type | Meaning |
+|---|---|---|
+| `user` | ObjectId | Who earned it. |
+| `course` | ObjectId \| `null` | The program it was earned in. |
+| `kind` | `"lesson_completed" \| "assignment_submitted" \| "assignment_graded" \| "exam_passed" \| "course_completed"` | What earned it. |
+| `points` | integer ≥ 0 | 10 a lesson, 20 an assignment handed in, grade ÷ 5 (rounded) when it's graded, 50 a passed final exam, 200 a completed program (`POINTS` in `lib/points.ts`). |
+| `key` | string, **unique** | Makes each award pay once: `lesson:<enrollmentId>:<lessonId>`, `assignment-submitted:<submissionId>`, `assignment-graded:<submissionId>`, `exam:<enrollmentId>:<examId>`, `course:<enrollmentId>`. |
+| `createdAt` | date | When it was awarded. |
+
+Indexes: `{ key: 1 }` unique, `{ user: 1, createdAt: -1 }`, `{ course: 1, user: 1 }`. Lessons a learner completes or programs they finish **through Go/mobile earn nothing** until Go writes the same rows; if it does, use the same keys so a web save of the same event stays a no-op (a duplicate key error means "already awarded").
+
+**`instructorapplications.answers`** gains six optional fields (additive; missing on applications submitted before them, so read every one as optional):
+
+| Field | Type | Meaning |
+|---|---|---|
+| `school` | string (SchoolSlug) | "Which school would you teach in?" |
+| `teachingTopic` | string ≤ 200 | "What exactly would you like to teach?" |
+| `passion` | `"yes" \| "somewhat"` | "Are you passionate about teaching it?" |
+| `passionReason` | string ≤ 200 | One line on why. |
+| `readyToCommit` | boolean | "Ready to commit to bringing learners to a place of real understanding?" — required at submit, so `true` whenever present. |
+| `extraDocumentUrl` | string \| `null` | An optional extra PDF, uploaded like `cvUrl`. |
+
+The web requires the first five on every new application. Any wholesale application write must keep them (write dotted paths or keep the fields).

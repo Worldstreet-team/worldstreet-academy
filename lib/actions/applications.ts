@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { Types, type HydratedDocument } from "mongoose"
+import { z } from "zod/v4"
 import connectDB from "@/lib/db"
 import {
   InstructorApplication,
@@ -24,9 +25,10 @@ import {
   sendUnderReviewEmail,
   sendSlotsProposedEmail,
 } from "@/lib/email"
-import type { IScorecard, RejectionReason } from "@/lib/db/models"
+import type { ApplicationPassion, IApplicationAnswers, IScorecard, RejectionReason } from "@/lib/db/models"
 import { APP_URL } from "@/lib/app-url"
 import { BRAND } from "@/lib/brand"
+import { SCHOOL_SLUGS, isSchoolSlug, type SchoolSlug } from "@/lib/schools"
 
 const PAGE_SIZE = 20
 
@@ -44,8 +46,48 @@ export type ApplicationAnswersInput = {
   website?: string
   sampleVideoUrl?: string
   cvUrl?: string
+  /*
+   * Bason's questions (owner meeting, 2026-10-03) — required at submit,
+   * optional here because applications from before them don't have them.
+   */
+  school?: SchoolSlug
+  teachingTopic?: string
+  passion?: ApplicationPassion
+  passionReason?: string
+  readyToCommit?: boolean
+  /** Optional additional PDF, uploaded like the CV. */
+  extraDocumentUrl?: string
   /** Terms-of-teaching acceptance — required at submit, recorded with a timestamp. */
   termsAccepted?: boolean
+}
+
+/** Bason's questions, validated at submit (the form's own constraints, mirrored). */
+const TeachingAnswers = z.object({
+  school: z.enum(SCHOOL_SLUGS, { error: "Choose the school you'd teach in" }),
+  teachingTopic: z
+    .string({ error: "Tell us what exactly you'd like to teach" })
+    .trim()
+    .min(10, "Tell us what exactly you'd like to teach (at least 10 characters)")
+    .max(200, "Keep what you'd teach under 200 characters"),
+  passion: z.enum(["yes", "somewhat"], { error: "Tell us whether you're passionate about teaching it" }),
+  passionReason: z
+    .string({ error: "Add a line on why you're passionate about it" })
+    .trim()
+    .min(10, "Add a line on why (at least 10 characters)")
+    .max(200, "Keep why to one line (200 characters)"),
+  readyToCommit: z.literal(true, { error: "Confirm you're ready to bring learners to real understanding" }),
+})
+
+/** Bason's answers as the applicant and admin views read them — absent on older applications. */
+function teachingAnswersView(answers: IApplicationAnswers) {
+  return {
+    school: isSchoolSlug(answers.school) ? answers.school : undefined,
+    teachingTopic: answers.teachingTopic || undefined,
+    passion: answers.passion ?? undefined,
+    passionReason: answers.passionReason || undefined,
+    readyToCommit: answers.readyToCommit ?? undefined,
+    extraDocumentUrl: answers.extraDocumentUrl ?? undefined,
+  }
 }
 
 /** Days a rejected applicant must wait before re-applying. */
@@ -106,6 +148,16 @@ export async function submitInstructorApplication(input: ApplicationAnswersInput
       return { success: false, error: "Tell us more about your experience (at least 50 characters)" }
     if (motivation.length < 50)
       return { success: false, error: "Tell us more about your motivation (at least 50 characters)" }
+    const teaching = TeachingAnswers.safeParse({
+      school: input.school,
+      teachingTopic: input.teachingTopic,
+      passion: input.passion,
+      passionReason: input.passionReason,
+      readyToCommit: input.readyToCommit,
+    })
+    if (!teaching.success) {
+      return { success: false, error: teaching.error.issues[0]?.message ?? "Answer every question to continue" }
+    }
     if (!input.termsAccepted) {
       return { success: false, error: "Please accept the instructor terms to continue" }
     }
@@ -157,6 +209,8 @@ export async function submitInstructorApplication(input: ApplicationAnswersInput
         website: sanitizeUrl(input.website),
         sampleVideoUrl: sanitizeUrl(input.sampleVideoUrl),
         cvUrl: sanitizeUrl(input.cvUrl),
+        ...teaching.data,
+        extraDocumentUrl: sanitizeUrl(input.extraDocumentUrl),
       },
       termsAcceptedAt: new Date(),
       history: [
@@ -252,6 +306,7 @@ export async function getMyInstructorApplication(): Promise<MyApplication | null
         website: app.answers.website ?? undefined,
         sampleVideoUrl: app.answers.sampleVideoUrl ?? undefined,
         cvUrl: app.answers.cvUrl ?? undefined,
+        ...teachingAnswersView(app.answers),
       },
       decisionNote: app.decisionNote ?? "",
       history: (app.history ?? []).map((h) => ({
@@ -501,6 +556,7 @@ export async function adminGetApplication(applicationId: string): Promise<AdminA
         website: a.answers.website ?? undefined,
         sampleVideoUrl: a.answers.sampleVideoUrl ?? undefined,
         cvUrl: a.answers.cvUrl ?? undefined,
+        ...teachingAnswersView(a.answers),
       },
       reviewerNotes: (a.reviewerNotes ?? [])
         .map((n) => ({ byName: n.byName, note: n.note, at: new Date(n.at).toISOString() }))

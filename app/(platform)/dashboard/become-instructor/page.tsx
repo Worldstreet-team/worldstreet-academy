@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Dialog,
   DialogContent,
@@ -37,6 +38,8 @@ import {
 import { getVideoUploadUrl, getDocumentUploadUrl } from "@/lib/actions/upload"
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import { BRAND } from "@/lib/brand"
+import { SCHOOLS, type SchoolSlug } from "@/lib/schools"
+import type { ApplicationPassion } from "@/lib/db/models"
 
 /* v2 surfaces: 20px cards on the card fill — no outline in dark, hairline in
    light — and a 44/40px control height shared by fields and their buttons. */
@@ -168,6 +171,11 @@ function UploadField({
 }
 
 const EXPERIENCE_OPTIONS = ["<1", "1-3", "3-5", "5+"]
+const PASSION_OPTIONS: { value: ApplicationPassion; label: string }[] = [
+  { value: "yes", label: "Yes" },
+  { value: "somewhat", label: "Somewhat" },
+]
+const SCHOOL_ITEMS = SCHOOLS.map((s) => ({ value: s.slug, label: s.name }))
 
 /* ── Status tracker ── */
 
@@ -243,6 +251,8 @@ function ApplicationForm({ onSubmitted }: { onSubmitted: () => void }) {
     expertise: React.useId(),
     experience: React.useId(),
     motivation: React.useId(),
+    teachingTopic: React.useId(),
+    passionReason: React.useId(),
     portfolio: React.useId(),
     linkedin: React.useId(),
     twitter: React.useId(),
@@ -263,6 +273,12 @@ function ApplicationForm({ onSubmitted }: { onSubmitted: () => void }) {
   const [website, setWebsite] = React.useState("")
   const [sampleVideoUrl, setSampleVideoUrl] = React.useState("")
   const [cvUrl, setCvUrl] = React.useState("")
+  const [school, setSchool] = React.useState<SchoolSlug | "">("")
+  const [teachingTopic, setTeachingTopic] = React.useState("")
+  const [passion, setPassion] = React.useState<ApplicationPassion | "">("")
+  const [passionReason, setPassionReason] = React.useState("")
+  const [readyToCommit, setReadyToCommit] = React.useState(false)
+  const [extraDocumentUrl, setExtraDocumentUrl] = React.useState("")
   const [termsAccepted, setTermsAccepted] = React.useState(false)
 
   const submit = useMutation({
@@ -295,13 +311,23 @@ function ApplicationForm({ onSubmitted }: { onSubmitted: () => void }) {
           ? "Add at least one area of expertise"
           : !experienceYears
             ? "Pick your years of experience"
-            : null
+            : !school
+              ? "Choose the school you'd teach in"
+              : teachingTopic.trim().length < 10
+                ? "Say what you'd teach in at least 10 characters"
+                : null
       : step === 1
         ? experience.trim().length < 50
           ? "Experience needs at least 50 characters"
           : motivation.trim().length < 50
             ? "Motivation needs at least 50 characters"
-            : null
+            : !passion
+              ? "Tell us if you're passionate about it"
+              : passionReason.trim().length < 10
+                ? "Add a line on why (at least 10 characters)"
+                : !readyToCommit
+                  ? "Confirm you're ready to commit"
+                  : null
         : !termsAccepted
           ? "Accept the instructor terms to submit"
           : null
@@ -431,6 +457,41 @@ function ApplicationForm({ onSubmitted }: { onSubmitted: () => void }) {
                 })}
               </div>
             </FormField>
+
+            <FormField label="Which school would you teach in?" required>
+              <Select
+                items={SCHOOL_ITEMS}
+                value={school || null}
+                onValueChange={(v) => setSchool((v ?? "") as SchoolSlug | "")}
+              >
+                <SelectTrigger className="w-full" aria-label="Which school would you teach in?">
+                  <SelectValue placeholder="Choose a school" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SCHOOLS.map((s) => (
+                    <SelectItem key={s.slug} value={s.slug}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
+
+            <FormField
+              label="What exactly would you like to teach?"
+              htmlFor={ids.teachingTopic}
+              required
+              hint="The subject, the level and who it's for. At least 10 characters."
+              count={`${teachingTopic.trim().length} / 200`}
+            >
+              <Input
+                id={ids.teachingTopic}
+                value={teachingTopic}
+                onChange={(e) => setTeachingTopic(e.target.value)}
+                placeholder='e.g. "Forex price action for complete beginners"'
+                maxLength={200}
+              />
+            </FormField>
           </>
         )}
 
@@ -469,6 +530,58 @@ function ApplicationForm({ onSubmitted }: { onSubmitted: () => void }) {
                 maxLength={2000}
               />
             </FormField>
+
+            <FormField label="Are you passionate about teaching it?" required>
+              <div role="radiogroup" aria-label="Are you passionate about teaching it?" className="flex flex-wrap gap-2.5">
+                {PASSION_OPTIONS.map((opt) => {
+                  const selected = passion === opt.value
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => setPassion(opt.value)}
+                      className={`h-10 min-w-24 rounded-full border px-4 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 ${
+                        selected
+                          ? "border-foreground bg-foreground text-background"
+                          : "border-border text-muted-foreground hover:bg-accent hover:text-foreground"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </FormField>
+
+            <FormField
+              label="Why? One line is enough"
+              htmlFor={ids.passionReason}
+              required
+              count={`${passionReason.trim().length} / 200`}
+            >
+              <Input
+                id={ids.passionReason}
+                value={passionReason}
+                onChange={(e) => setPassionReason(e.target.value)}
+                placeholder="What keeps you coming back to this subject?"
+                maxLength={200}
+              />
+            </FormField>
+
+            <label className="flex cursor-pointer items-start gap-3 rounded-[14px] border border-border p-4 transition-colors hover:bg-accent/40">
+              <input
+                type="checkbox"
+                checked={readyToCommit}
+                onChange={(e) => setReadyToCommit(e.target.checked)}
+                className="mt-0.5 size-4 shrink-0 accent-primary"
+              />
+              <span className="text-[13px] leading-relaxed text-muted-foreground">
+                I&apos;m ready to commit to bringing my learners to a place of real understanding: staying with
+                them until the subject makes sense, not just until the material is covered.
+              </span>
+            </label>
           </>
         )}
 
@@ -490,6 +603,14 @@ function ApplicationForm({ onSubmitted }: { onSubmitted: () => void }) {
               value={cvUrl}
               onChange={setCvUrl}
               placeholder="Paste a link or upload a PDF"
+            />
+            <UploadField
+              label="Anything else you'd like to upload? (PDF, optional)"
+              accept="application/pdf"
+              kind="document"
+              value={extraDocumentUrl}
+              onChange={setExtraDocumentUrl}
+              placeholder="Certificates, a course outline, a track record…"
             />
             <div className="grid gap-x-5 gap-y-6 sm:grid-cols-2">
               <FormField label="Portfolio / work URL" htmlFor={ids.portfolio}>
@@ -593,6 +714,12 @@ function ApplicationForm({ onSubmitted }: { onSubmitted: () => void }) {
                   website: website || undefined,
                   sampleVideoUrl: sampleVideoUrl || undefined,
                   cvUrl: cvUrl || undefined,
+                  school: school || undefined,
+                  teachingTopic,
+                  passion: passion || undefined,
+                  passionReason,
+                  readyToCommit,
+                  extraDocumentUrl: extraDocumentUrl || undefined,
                   termsAccepted,
                 })
               }
@@ -664,7 +791,10 @@ export default function BecomeInstructorPage() {
           </h1>
           <p className="mx-auto max-w-md text-[15px] leading-relaxed text-muted-foreground">
             Teach crypto, trading and blockchain to thousands of WorldStreet students — and earn 85% of every
-            sale.
+            sale.{" "}
+            <Link href="/teach" className="font-medium text-foreground underline underline-offset-4">
+              How teaching here works
+            </Link>
           </p>
         </header>
 

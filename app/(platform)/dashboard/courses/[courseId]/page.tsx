@@ -15,7 +15,7 @@ import {
   fetchProgramSlug,
 } from "@/lib/actions/student"
 import { checkEnrollment } from "@/lib/actions/enrollments"
-import { getCourseAccess, getLearnStart } from "@/lib/course-access"
+import { classCommunityUrl, getCourseAccess, getLearnStart } from "@/lib/course-access"
 import { CourseSchedulingCta } from "@/components/shared/course-scheduling-cta"
 import { courseAvailability } from "@/lib/types/course"
 import { getCurrentUser } from "@/lib/auth"
@@ -28,7 +28,14 @@ import { CourseExamCard } from "@/components/courses/course-exam-card"
 import { CourseOutcomes } from "@/components/courses/course-outcomes"
 import { CourseReviews } from "@/components/courses/course-reviews"
 import { CourseCarousel } from "@/components/learn/course-carousel"
-import { ChevronLeftIcon, GraduationCapIcon, HourglassIcon, StarIcon } from "lucide-react"
+import {
+  ChevronLeftIcon,
+  ExternalLinkIcon,
+  GraduationCapIcon,
+  HourglassIcon,
+  StarIcon,
+  UsersIcon,
+} from "lucide-react"
 import { programRail, programStats } from "@/lib/program-rail"
 import { PackageLadder } from "@/components/programs/package-ladder"
 import type { ProgramAccess } from "@/components/programs/access"
@@ -85,6 +92,8 @@ export default async function CourseDetailPage({
 
   // Q&A follows the package; visitors without an enrollment keep today's behaviour.
   const courseAccess = currentUser ? await getCourseAccess(currentUser.id, courseId) : null
+  // The class community is a private group: only an access-granting enrollment sees its link.
+  const communityUrl = await classCommunityUrl(courseAccess)
 
   const isComingSoon =
     courseAvailability({ status: "published", availableAt: course.availableAt }) === "coming_soon"
@@ -277,6 +286,39 @@ export default async function CourseDetailPage({
                       the first one is live. Until then, this page is your program&apos;s home.
                     </p>
                   </div>
+                </section>
+              )}
+
+              {communityUrl && (
+                <section
+                  aria-labelledby="community-heading"
+                  className="flex flex-col gap-4 rounded-[20px] border border-ws-hairline bg-ws-surface p-5 sm:flex-row sm:items-center md:p-6 dark:border-transparent"
+                >
+                  <span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-[9px] bg-ws-brand/10 text-ws-gold">
+                    <UsersIcon size={18} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <h2
+                      id="community-heading"
+                      className="font-display text-lg font-semibold tracking-[-0.01em] text-ws-primary"
+                    >
+                      Join your class community
+                    </h2>
+                    <p className="mt-1 text-sm leading-relaxed text-ws-muted">
+                      Meet the learners in your program, ask questions between classes and hear from your instructor
+                      first.
+                    </p>
+                  </div>
+                  <a
+                    href={communityUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full border border-ws-hairline px-5 text-sm font-semibold text-ws-primary transition-colors hover:bg-ws-raised"
+                  >
+                    Join community
+                    <ExternalLinkIcon size={14} aria-hidden />
+                    <span className="sr-only">(opens in a new tab)</span>
+                  </a>
                 </section>
               )}
 

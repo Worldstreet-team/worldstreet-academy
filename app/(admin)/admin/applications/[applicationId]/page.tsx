@@ -31,6 +31,7 @@ import {
   adminSaveScorecard,
 } from "@/lib/actions/applications"
 import type { RejectionReason } from "@/lib/db/models"
+import { SCHOOL_BY_SLUG } from "@/lib/schools"
 
 const REJECTION_REASONS: { value: RejectionReason; label: string }[] = [
   { value: "not_enough_experience", label: "Not enough experience" },
@@ -403,6 +404,19 @@ export default function AdminApplicationDetailPage() {
                         )}
                       </div>
                     </div>
+                    {(app.answers.school || app.answers.teachingTopic) && (
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
+                          Would teach
+                        </p>
+                        {app.answers.school && (
+                          <p className="text-sm font-medium">{SCHOOL_BY_SLUG[app.answers.school].name}</p>
+                        )}
+                        {app.answers.teachingTopic && (
+                          <p className="text-sm whitespace-pre-wrap leading-relaxed">{app.answers.teachingTopic}</p>
+                        )}
+                      </div>
+                    )}
                     <div>
                       <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
                         Experience
@@ -419,10 +433,32 @@ export default function AdminApplicationDetailPage() {
                         {app.answers.motivation}
                       </p>
                     </div>
+                    {app.answers.passion && (
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
+                          Passionate about teaching it
+                        </p>
+                        <p className="text-sm">
+                          <span className="font-medium">{app.answers.passion === "yes" ? "Yes" : "Somewhat"}</span>
+                          {app.answers.passionReason && (
+                            <span className="text-muted-foreground"> · {app.answers.passionReason}</span>
+                          )}
+                        </p>
+                      </div>
+                    )}
+                    {app.answers.readyToCommit !== undefined && (
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
+                          Ready to bring learners to real understanding
+                        </p>
+                        <p className="text-sm">{app.answers.readyToCommit ? "Confirmed" : "Not confirmed"}</p>
+                      </div>
+                    )}
                     <div className="space-y-1.5 pt-1 border-t border-ws-hairline">
                       <LinkRow label="Portfolio" href={app.answers.portfolioUrl} />
                       <LinkRow label="Sample video" href={app.answers.sampleVideoUrl} />
                       <LinkRow label="CV / credentials" href={app.answers.cvUrl} />
+                      <LinkRow label="Additional document" href={app.answers.extraDocumentUrl} />
                       <LinkRow label="LinkedIn" href={app.answers.linkedin} />
                       <LinkRow label="Twitter / X" href={app.answers.twitter} />
                       <LinkRow label="Website" href={app.answers.website} />
