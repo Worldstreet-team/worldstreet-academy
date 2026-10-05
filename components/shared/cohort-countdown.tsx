@@ -15,15 +15,21 @@ const pad = (n: number) => String(n).padStart(2, "0")
  * the first client render agree.
  *
  * blocks  = labelled Days/Hours/Minutes/Seconds tiles (banners)
- * compact = "12d 04h 31m" inline text (chips, package cards)
+ * compact = "12d 04h 31m 09s" inline text (chips, package cards)
+ *
+ * `prefix` ("Offer ends in ") belongs to the countdown, so it disappears with
+ * it — a caller never strands a label in front of nothing.
  */
 export function CohortCountdown({
   variant = "compact",
+  prefix = null,
   endedLabel = null,
   className,
   blockClassName,
 }: {
   variant?: "blocks" | "compact"
+  /** compact only: text printed before the time, e.g. "Offer ends in ". */
+  prefix?: string | null
   endedLabel?: string | null
   className?: string
   /** blocks only: classes for each tile, so a banner can restyle them. */
@@ -45,6 +51,7 @@ export function CohortCountdown({
   if (variant === "compact") {
     return (
       <span className={cn("tabular-nums", className)} role="timer" aria-label="Time until the live cohort begins">
+        {prefix}
         {parts.days > 0 ? `${parts.days}d ` : ""}
         {pad(parts.hours)}h {pad(parts.minutes)}m {pad(parts.seconds)}s
       </span>
