@@ -79,3 +79,29 @@ export function CohortCountdown({
     </div>
   )
 }
+
+/** setTimeout's ceiling (~24.8 days); a later start is caught on the next visit. */
+const MAX_TIMEOUT_MS = 2_147_483_647
+
+/**
+ * Shows its children only until the cohort begins. Server copy on a cached
+ * marketing page would otherwise outlive the date ("begins Monday 19 October"
+ * with its timer gone), so the browser removes it at the instant, and on any
+ * load after it.
+ */
+export function WhileCohortUpcoming({ children }: { children: React.ReactNode }) {
+  const [ended, setEnded] = React.useState(false)
+
+  React.useEffect(() => {
+    const left = new Date(COHORT_STARTS_AT_ISO).getTime() - Date.now()
+    if (left <= 0) {
+      setEnded(true)
+      return
+    }
+    if (left > MAX_TIMEOUT_MS) return
+    const t = setTimeout(() => setEnded(true), left)
+    return () => clearTimeout(t)
+  }, [])
+
+  return ended ? null : children
+}

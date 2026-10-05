@@ -4,7 +4,7 @@ import { COHORT_DATE_LABEL, COHORT_DATE_SHORT, cohortIsUpcoming } from "@/lib/co
 import { PACKAGE_LABEL } from "@/lib/entitlements"
 import { cn } from "@/lib/utils"
 import { CardShell, Eyebrow } from "@/components/ui/system"
-import { CohortCountdown } from "@/components/shared/cohort-countdown"
+import { CohortCountdown, WhileCohortUpcoming } from "@/components/shared/cohort-countdown"
 import { GOLD_CTA } from "@/components/schools/cta"
 
 type Props =
@@ -21,7 +21,8 @@ type Props =
  * "Live cohort begins on the 19th" — the owner's countdown and call to action
  * (meeting 2026-10-03: join the upcoming cohort, choose your school, choose
  * your program, pay now to join). The date and countdown come from
- * lib/cohort.ts; every variant renders nothing once the cohort has begun.
+ * lib/cohort.ts; every variant renders nothing once the cohort has begun —
+ * on the server, and in the browser for a page cached from before it.
  *
  *   bar    one line above the navbar on every marketing page, the whole bar a
  *          link to /schools; its copy shortens on small screens so it stays
@@ -37,9 +38,17 @@ type Props =
  */
 export function CohortBanner(props: Props) {
   if (!cohortIsUpcoming()) return null
-  if (props.variant === "bar") return <CohortBar />
-  if (props.variant === "band") return <CohortBand className={props.className} />
-  return <CohortStrip note={props.note} className={props.className} />
+  return (
+    <WhileCohortUpcoming>
+      {props.variant === "bar" ? (
+        <CohortBar />
+      ) : props.variant === "band" ? (
+        <CohortBand className={props.className} />
+      ) : (
+        <CohortStrip note={props.note} className={props.className} />
+      )}
+    </WhileCohortUpcoming>
+  )
 }
 
 /** The "live" signal: a small static red dot (no pulse — no ambient loops). */
