@@ -39,10 +39,11 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useUser } from "@/components/providers/user-provider"
 import type { Lesson, CourseLevel, CoursePricing, CourseStatus } from "@/lib/types"
-import { CheckIcon, ChevronDownIcon, ChevronLeftIcon, EyeIcon, FileIcon, PlusIcon, SquarePenIcon, Trash2Icon, VideoIcon } from "lucide-react"
+import { CheckIcon, ChevronDownIcon, ChevronLeftIcon, CopyIcon, EyeIcon, FileIcon, PlusIcon, SendIcon, SquarePenIcon, Trash2Icon, VideoIcon } from "lucide-react"
 import { RenderIcon } from "@/components/shared/render-icon"
 import { SCHOOLS, type SchoolSlug } from "@/lib/schools"
-import type { ICoursePackage, PackageKey } from "@/lib/db/models"
+import type { CourseKind, CourseReviewStatus, ICoursePackage, PackageKey } from "@/lib/db/models"
+import { COURSE_KIND_LABEL } from "@/lib/course-kind"
 import { PACKAGE_KEYS, PACKAGE_LABEL } from "@/lib/entitlements"
 import { isoToLocalInput, localInputToIso } from "@/lib/datetime-local"
 import {
@@ -69,6 +70,96 @@ type EditableCourse = {
   availableAt?: string | null
   preEnrollEnabled?: boolean
   packages?: ICoursePackage[]
+  /** Missing = a school program (legacy rows). */
+  kind?: CourseKind
+  communityUrl?: string | null
+  /** The marketplace quality review (sellers' courses). */
+  review?: { status: CourseReviewStatus; submittedAt: string | null; reviewedAt: string | null; note: string | null }
+  /** The seller's own link to this live marketplace course. */
+  share?: { url: string; note: string } | null
+}
+
+const KIND_ITEMS = (["program", "marketplace", "new-economy"] as const).map((value) => ({
+  value,
+  label: COURSE_KIND_LABEL[value],
+}))
+
+function formatDay(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", { dateStyle: "medium" })
+}
+
+/** "Your link" with a copy button — sales through it pay the seller the larger share. */
+function ShareLink({ url, note }: { url: string; note: string }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <div className="space-y-1.5 rounded-md border p-3">
+      <Label htmlFor="ed-share">Your link</Label>
+      <div className="flex gap-2">
+        <Input id="ed-share" value={url} readOnly onFocus={(e) => e.currentTarget.select()} className="text-xs" />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-9 shrink-0"
+          onClick={() => {
+            void navigator.clipboard?.writeText(url).then(() => {
+              setCopied(true)
+              setTimeout(() => setCopied(false), 1600)
+            })
+          }}
+        >
+          {copied ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
+          {copied ? "Copied" : "Copy"}
+        </Button>
+      </div>
+      <p className="text-[10px] text-muted-foreground">{note}</p>
+    </div>
+  )
+}
+
+/** Where a seller's marketplace course stands in review, and what the reviewer said. */
+function ReviewState({
+  review,
+  status,
+  seller,
+}: {
+  review: NonNullable<EditableCourse["review"]>
+  status: CourseStatus
+  seller: boolean
+}) {
+  if (review.status === "pending") {
+    return (
+      <p className="rounded-md border p-3 text-[11px] text-muted-foreground">
+        <span className="font-semibold text-foreground">In review</span>
+        {review.submittedAt ? ` since ${formatDay(review.submittedAt)}` : ""}. An admin checks it against the quality
+        standards — {seller ? "we'll email you the decision." : "approve or request changes from Courses → Review queue."}
+      </p>
+    )
+  }
+  if (review.status === "changes_requested") {
+    return (
+      <div className="space-y-1 rounded-md border border-ws-warning/40 p-3 text-[11px]">
+        <p className="font-semibold text-foreground">Changes requested</p>
+        {review.note && <p className="whitespace-pre-line text-muted-foreground">{review.note}</p>}
+        {seller && <p className="text-muted-foreground">Make the changes, then choose Save &amp; submit for review.</p>}
+      </div>
+    )
+  }
+  if (review.status === "approved") {
+    return (
+      <p className="rounded-md border p-3 text-[11px] text-muted-foreground">
+        <span className="font-semibold text-foreground">Approved</span>
+        {review.reviewedAt ? ` ${formatDay(review.reviewedAt)}` : ""}
+        {status === "published" ? " · live on the marketplace. Your edits go live as you save." : "."}
+      </p>
+    )
+  }
+  return seller ? (
+    <p className="rounded-md border p-3 text-[11px] text-muted-foreground">
+      When it&apos;s ready, choose <span className="font-semibold text-foreground">Save &amp; submit for review</span>. An
+      admin checks every marketplace course before it goes live.
+    </p>
+  ) : null
 }
 
 /* ─── Duration helpers (stored in seconds) ─── */
@@ -150,14 +241,20 @@ export function CourseEditor({
   existingLessons = [],
   adminMode = false,
   returnTo = "/instructor/courses",
+  splitNote,
 }: {
   course?: EditableCourse
   existingLessons?: Lesson[]
   /** Admin portal context: full status set, admin back-link. */
   adminMode?: boolean
   returnTo?: string
+  /** The marketplace split, shown under a marketplace course's price (lib/marketplace.ts sellerSplitNote). */
+  splitNote?: string
 }) {
   const user = useUser()
+  // Only approved marketplace sellers reach the editor without a faculty role
+  // (the instructor layout's gate). The server enforces their rules again.
+  const sellerMode = user.role === "USER"
   const isEdit = !!course
   const action = isEdit ? updateCourse : createCourse
   const [state, formAction, isPending] = useActionState(action, initialFormState)
@@ -178,12 +275,20 @@ export function CourseEditor({
   const [packages, setPackages] = useState<EditorPackage[]>(
     (course?.packages ?? []).map(toEditorPackage)
   )
+  const [kind, setKind] = useState<CourseKind>(course?.kind ?? (sellerMode ? "marketplace" : "program"))
+  const [communityUrl, setCommunityUrl] = useState(course?.communityUrl ?? "")
+  const [submitForReview, setSubmitForReview] = useState(false)
+  const review = course?.review ?? { status: "none" as const, submittedAt: null, reviewedAt: null, note: null }
+  // Marketplace and New Economy courses sell at one price (owner, 2026-10-05):
+  // only a school program has a package ladder, and New Economy is free.
+  const ladderActive = kind === "program"
   // With a ladder, the course's scalar pricing is the cheapest enabled
   // tier (the server derives the same in updateCourse/createCourse); the
   // hidden fields mirror that so the server's price check keeps passing.
-  const derivedPrice = ladderPrice(packages)
-  const effectivePricing = derivedPrice === null ? pricing : derivedPrice > 0 ? "paid" : "free"
-  const effectivePrice = derivedPrice === null ? price : String(derivedPrice)
+  const derivedPrice = ladderActive ? ladderPrice(packages) : null
+  const effectivePricing =
+    kind === "new-economy" ? "free" : derivedPrice === null ? pricing : derivedPrice > 0 ? "paid" : "free"
+  const effectivePrice = kind === "new-economy" ? "0" : derivedPrice === null ? price : String(derivedPrice)
   const [previewError, setPreviewError] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
 
@@ -231,7 +336,7 @@ export function CourseEditor({
     }))
   )
   // Tiers this course sells, in ladder order — the only valid lesson tiers.
-  const soldTiers = PACKAGE_KEYS.filter((k) => packages.some((p) => p.enabled && p.key === k))
+  const soldTiers = ladderActive ? PACKAGE_KEYS.filter((k) => packages.some((p) => p.enabled && p.key === k)) : []
   const tierItems = [
     { value: "everyone", label: "Everyone" },
     ...soldTiers.map((k) => ({ value: k, label: `${PACKAGE_LABEL[k]} and up` })),
@@ -281,6 +386,11 @@ export function CourseEditor({
           <Badge variant="secondary" className="text-[10px] capitalize">
             {status}
           </Badge>
+          {review.status === "pending" && (
+            <Badge variant="outline" className="text-[10px]">
+              In review
+            </Badge>
+          )}
           <form action={formAction} data-editor-form>
             {isEdit && (
               <input type="hidden" name="courseId" value={course.id} />
@@ -299,6 +409,9 @@ export function CourseEditor({
             <input type="hidden" name="availableAt" value={localInputToIso(availableAtLocal)} />
             <input type="hidden" name="preEnrollEnabled" value={preEnrollEnabled ? "true" : "false"} />
             <input type="hidden" name="returnTo" value={returnTo} />
+            <input type="hidden" name="kind" value={kind} />
+            <input type="hidden" name="communityUrl" value={communityUrl} />
+            <input type="hidden" name="submitForReview" value={submitForReview ? "true" : "false"} />
             <input
               type="hidden"
               name="lessons"
@@ -313,10 +426,28 @@ export function CourseEditor({
                 <ChevronDownIcon  size={14} />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" sideOffset={4}>
+                {/* A seller never publishes: an admin does, on approval. A
+                    live course keeps its status as they save; anything else is
+                    a draft until it is submitted for review. */}
+                {sellerMode && status === "published" && (
+                  <DropdownMenuItem
+                    className="text-sm gap-2"
+                    onClick={() => {
+                      setSubmitForReview(false)
+                      requestAnimationFrame(() => {
+                        document.querySelector<HTMLFormElement>("[data-editor-form]")?.requestSubmit()
+                      })
+                    }}
+                  >
+                    <CheckIcon size={14} />
+                    Save changes
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   className="text-sm gap-2"
                   onClick={() => {
                     setStatus("draft")
+                    setSubmitForReview(false)
                     requestAnimationFrame(() => {
                       const form = document.querySelector<HTMLFormElement>(
                         "[data-editor-form]"
@@ -326,23 +457,40 @@ export function CourseEditor({
                   }}
                 >
                   <SquarePenIcon  size={14} />
-                  Save as Draft
+                  {sellerMode && status === "published" ? "Unpublish (save as draft)" : "Save as Draft"}
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="text-sm gap-2"
-                  onClick={() => {
-                    setStatus("published")
-                    requestAnimationFrame(() => {
-                      const form = document.querySelector<HTMLFormElement>(
-                        "[data-editor-form]"
-                      )
-                      form?.requestSubmit()
-                    })
-                  }}
-                >
-                  <CheckIcon  size={14} />
-                  Save &amp; Publish
-                </DropdownMenuItem>
+                {sellerMode && status !== "published" && review.status !== "pending" && (
+                  <DropdownMenuItem
+                    className="text-sm gap-2"
+                    onClick={() => {
+                      setStatus("draft")
+                      setSubmitForReview(true)
+                      requestAnimationFrame(() => {
+                        document.querySelector<HTMLFormElement>("[data-editor-form]")?.requestSubmit()
+                      })
+                    }}
+                  >
+                    <SendIcon size={14} />
+                    Save &amp; submit for review
+                  </DropdownMenuItem>
+                )}
+                {!sellerMode && (
+                  <DropdownMenuItem
+                    className="text-sm gap-2"
+                    onClick={() => {
+                      setStatus("published")
+                      requestAnimationFrame(() => {
+                        const form = document.querySelector<HTMLFormElement>(
+                          "[data-editor-form]"
+                        )
+                        form?.requestSubmit()
+                      })
+                    }}
+                  >
+                    <CheckIcon  size={14} />
+                    Save &amp; Publish
+                  </DropdownMenuItem>
+                )}
                 {/* Suspend/close are admin verbs — the server enforces this
                     too; hiding them here just keeps the instructor menu honest. */}
                 {adminMode &&
@@ -382,6 +530,43 @@ export function CourseEditor({
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_1fr_340px] overflow-hidden">
         {/* ───────── LEFT: Course Details ───────── */}
         <div className="overflow-auto border-r p-5 space-y-4">
+          {kind === "marketplace" && (review.status !== "none" || sellerMode) && (
+            <ReviewState review={review} status={status} seller={sellerMode} />
+          )}
+          {course?.share && <ShareLink url={course.share.url} note={course.share.note} />}
+
+          <SectionDivider label="Course Type" />
+
+          {sellerMode ? (
+            <p className="rounded-md border p-3 text-[11px] text-muted-foreground">
+              <span className="font-semibold text-foreground">{COURSE_KIND_LABEL.marketplace}</span> — a pre-recorded
+              course on the Academy Marketplace, reviewed before it is published.
+            </p>
+          ) : (
+            <div className="space-y-1.5">
+              <Label>Course type</Label>
+              <Select items={KIND_ITEMS} value={kind} onValueChange={(v) => setKind((v ?? "program") as CourseKind)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {KIND_ITEMS.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[10px] text-muted-foreground">
+                {kind === "program"
+                  ? "A school program: live cohorts and packages, listed in its school."
+                  : kind === "marketplace"
+                    ? "A pre-recorded course on the marketplace, at one price. Faculty courses publish directly."
+                    : "A free course on how to use a WorldStreet product, listed on New Economy."}
+              </p>
+            </div>
+          )}
+
           <SectionDivider label="Basic Information" />
 
           <div className="space-y-1.5">
@@ -460,6 +645,30 @@ export function CourseEditor({
             </div>
           </div>
 
+          <SectionDivider label="Community" />
+
+          <div className="space-y-1.5">
+            <Label htmlFor="ed-community">
+              Community link{" "}
+              <span className="text-[10px] font-normal text-muted-foreground">(optional)</span>
+            </Label>
+            <Input
+              id="ed-community"
+              type="url"
+              inputMode="url"
+              placeholder="https://chat.whatsapp.com/…"
+              value={communityUrl}
+              maxLength={500}
+              onChange={(e) => setCommunityUrl(e.target.value)}
+            />
+            <p className="text-[10px] text-muted-foreground">
+              Where this course&apos;s learners meet — WhatsApp, Telegram, Discord or WorldStreet Social.
+            </p>
+            {state.fieldErrors.communityUrl && (
+              <p className="text-xs text-destructive">{state.fieldErrors.communityUrl}</p>
+            )}
+          </div>
+
           <SectionDivider label="Thumbnail" />
 
           <MediaUpload
@@ -492,45 +701,49 @@ export function CourseEditor({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
-              <Label>School</Label>
-              <Select
-                defaultValue={school}
-                onValueChange={(v) => setSchool((v ?? "") as SchoolSlug | "")}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Choose a school" />
-                </SelectTrigger>
-                <SelectContent>
-                  {SCHOOLS.map((s) => (
-                    <SelectItem value={s.slug} key={s.slug}>{s.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {state.fieldErrors.school && (
-                <p className="text-xs text-destructive">{state.fieldErrors.school}</p>
-              )}
-            </div>
-            <div className="space-y-1.5 col-span-2">
-              <Label>Status</Label>
-              <Select
-                defaultValue={status}
-                onValueChange={(v) =>
-                  setStatus((v ?? "draft") as typeof status)
-                }
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="published">Published</SelectItem>
-                  {adminMode && <SelectItem value="suspended">Suspended</SelectItem>}
-                  {adminMode && <SelectItem value="closed">Closed</SelectItem>}
-                  <SelectItem value="archived">Archived</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {kind !== "new-economy" && (
+              <div className="space-y-1.5">
+                <Label>{kind === "marketplace" ? "Topic (school)" : "School"}</Label>
+                <Select
+                  defaultValue={school}
+                  onValueChange={(v) => setSchool((v ?? "") as SchoolSlug | "")}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Choose a school" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SCHOOLS.map((s) => (
+                      <SelectItem value={s.slug} key={s.slug}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {state.fieldErrors.school && (
+                  <p className="text-xs text-destructive">{state.fieldErrors.school}</p>
+                )}
+              </div>
+            )}
+            {!sellerMode && (
+              <div className="space-y-1.5 col-span-2">
+                <Label>Status</Label>
+                <Select
+                  defaultValue={status}
+                  onValueChange={(v) =>
+                    setStatus((v ?? "draft") as typeof status)
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="published">Published</SelectItem>
+                    {adminMode && <SelectItem value="suspended">Suspended</SelectItem>}
+                    {adminMode && <SelectItem value="closed">Closed</SelectItem>}
+                    <SelectItem value="archived">Archived</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           <SectionDivider label="Availability" />
@@ -575,8 +788,19 @@ export function CourseEditor({
 
           <SectionDivider label="Packages" />
 
-          <PackageEditor value={packages} onChange={setPackages} error={state.fieldErrors.packages} />
-          {orphanedTierLessons > 0 && (
+          {ladderActive ? (
+            <PackageEditor value={packages} onChange={setPackages} error={state.fieldErrors.packages} />
+          ) : (
+            <p className="rounded-md border p-3 text-[11px] text-muted-foreground">
+              {kind === "marketplace" ? "Marketplace" : "New Economy"} courses sell at one price — no packages.
+              {packages.length > 0 && (
+                <span className="mt-1 block text-ws-warning">
+                  Saving removes this course&apos;s {packages.length === 1 ? "package" : `${packages.length} packages`}.
+                </span>
+              )}
+            </p>
+          )}
+          {ladderActive && orphanedTierLessons > 0 && (
             <p className="text-[11px] text-ws-warning">
               {orphanedTierLessons === 1 ? "1 lesson requires" : `${orphanedTierLessons} lessons require`} a package
               this course no longer sells. Saving opens {orphanedTierLessons === 1 ? "it" : "them"} to every enrolment.
@@ -585,7 +809,11 @@ export function CourseEditor({
 
           <SectionDivider label="Pricing" />
 
-          {derivedPrice !== null ? (
+          {kind === "new-economy" ? (
+            <p className="rounded-md border p-3 text-[11px] text-muted-foreground">
+              New Economy courses are always free.
+            </p>
+          ) : derivedPrice !== null ? (
             <p className="rounded-md border p-3 text-[11px] text-muted-foreground">
               Set by packages: this course sells {derivedPrice > 0 ? `from $${derivedPrice}` : "free"} — the
               cheapest enabled tier. Disable every tier to price the course directly.
@@ -626,7 +854,7 @@ export function CourseEditor({
                   />
                 </div>
                 <p className="text-[10px] text-muted-foreground">
-                  Platform takes 15% commission
+                  {kind === "marketplace" && splitNote ? splitNote : "Platform takes 15% commission"}
                 </p>
               </div>
             )}

@@ -18,6 +18,8 @@ import { Testimonials, FinaleCta } from "@/components/marketing/reviews-finale"
 import { Faq } from "@/components/marketing/faq"
 import { StickySchoolBar } from "@/components/marketing/sticky-school-bar"
 import { FreePreviewRail } from "@/components/marketing/free-preview-rail"
+import { InstitutionBand } from "@/components/marketing/institution-band"
+import { CourseTeaser } from "@/components/marketing/course-teaser"
 import { ScrollProgress } from "@/components/marketing/motion/scroll-progress"
 
 // A new account starts at the schools (Homepage → School → Program), never at the hub.
@@ -37,11 +39,14 @@ function futureDrops(published: BrowseCourse[]): BrowseCourse[] {
 
 /**
  * The Academy landing at `/` — clean editorial composition, in order: hero,
- * the live cohort band (hidden once the cohort has begun), the band of
+ * the live cohort band (hidden once the cohort has begun), "Who we are"
+ * (the owner's own framing, 2026-10-03), the band of
  * words, the Schools grid, the About statement, the Why pillars, the
  * How-it-works timeline, the catalogue
- * card grid (the ONLY section allowed to show course thumbnails), the
+ * card grid (the one program section with course thumbnails), the
  * "Watch a free lesson" rail (real free previews only; hidden at zero), the
+ * marketplace and New Economy teasers (up to four cards each — the
+ * Academy's other half, owner 2026-10-05; each hidden at zero), the
  * Faculty teaser (hidden when there is no faculty, and while FACULTY_PUBLIC
  * is off), Upcoming drops (hidden
  * when nothing is scheduled), testimonials (real reviews), the FAQ, and the
@@ -56,12 +61,14 @@ function futureDrops(published: BrowseCourse[]): BrowseCourse[] {
  * LandingReview fields plus the true "70% default" pass-mark line.
  */
 export async function Landing() {
-  const [user, courses, reviews, faculty, previews] = await Promise.all([
+  const [user, courses, reviews, faculty, previews, marketplace, newEconomy] = await Promise.all([
     getCurrentUser().catch(() => null),
     fetchBrowseCourses(),
     fetchLandingReviews(9),
     FACULTY_PUBLIC ? fetchFaculty() : Promise.resolve([]),
     fetchFreePreviewLessons(),
+    fetchBrowseCourses({ kind: "marketplace" }),
+    fetchBrowseCourses({ kind: "new-economy" }),
   ])
 
   const signedIn = Boolean(user)
@@ -95,6 +102,9 @@ export async function Landing() {
       {/* Live cohort — the date, the countdown and "Choose your school" (owner 2026-10-03); gone once it begins */}
       <CohortBanner variant="band" className="pt-14 md:pt-20" />
 
+      {/* Who we are — the owner's framing: point A to point B, our systems, our experts */}
+      <InstitutionBand />
+
       {/* The band of words — the eight schools' vocabulary */}
       <WordsMarquee />
 
@@ -115,6 +125,30 @@ export async function Landing() {
 
       {/* Watch a free lesson — real free previews only; hides at zero */}
       <FreePreviewRail previews={previews} />
+
+      {/* The marketplace — up to four pre-recorded courses; hides at zero */}
+      <CourseTeaser
+        id="marketplace"
+        label="Marketplace"
+        title="Learn on your schedule"
+        body="Pre-recorded courses from practitioners, each reviewed by our team before it goes live."
+        href="/marketplace"
+        linkLabel="Browse the marketplace"
+        courses={marketplace}
+        signedIn={signedIn}
+      />
+
+      {/* New Economy — free courses on WorldStreet's products; hides at zero */}
+      <CourseTeaser
+        id="new-economy"
+        label="New Economy · Free"
+        title="Free courses on the new economy"
+        body="How to use each WorldStreet product, step by step. Free, at your own pace."
+        href="/new-economy"
+        linkLabel="All free courses"
+        courses={newEconomy}
+        signedIn={signedIn}
+      />
 
       {/* Faculty — up to four instructors and View faculty; hides at zero (spec §10) and while FACULTY_PUBLIC is off */}
       {FACULTY_PUBLIC && <FacultyTeaser faculty={faculty} />}

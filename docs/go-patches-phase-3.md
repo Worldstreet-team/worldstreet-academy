@@ -158,3 +158,23 @@ Every student and tutor has a referral code; a marketplace course's seller keeps
 - **`earnings.kind: "referral"`** — a new value on an existing field. One row per referred person, ever: 10% of their **first** paid enrollment (`grossMinor` = the sale, `netMinor` = the commission, `feeMinor` = the rest), credited to the referrer (`instructor`, `instructorAuthUserId` — the referrer may be a plain `USER`) after the usual 7-day clearing, with `creditReference: "academy_ref_<buyer user _id>"` (unique, so a second commission for the same person cannot be written). A refund reverses it or writes an `"adjustment"` clawback, exactly like a sale row. Anything in Go that reads `earnings` must accept the new kind; anything that counts `kind: "sale"` rows as sales should keep excluding it.
 - **Seller share on `kind: "sale"` rows** — no longer always 85%: a marketplace course's seller keeps 85% through their own link and 50% otherwise; school programs keep 85%. The row's own `feeMinor`/`netMinor` are the truth; never recompute them from `INSTRUCTOR_REVENUE_SHARE`.
 - **If Go ever sells a course**, it must apply the same rules (the truth table on `splitSale` in `lib/referrals.ts`) or write `attribution: null` with the program share; it must never pay a referral commission itself.
+
+## 9. The Academy Marketplace and New Economy (owner, 2026-10-03 / 10-05)
+
+The Academy now has two halves: **school programs** (live cohorts, three plans) and the **marketplace** (pre-recorded courses sold by approved sellers and by the Academy's faculty, each quality-reviewed before it is published). **New Economy** courses are free courses on how to use each WorldStreet product. All changes are additive; no `role` value was added.
+
+**Go must hide non-program kinds wherever it lists programs** — school pages, the program catalogue, search and recommendations, "courses taught" and faculty counts. Match programs with `kind: { $nin: ["marketplace", "new-economy"] }`, which also matches legacy rows that have no `kind`. A course's own page, enrollment, lessons and checkout work for every kind.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `courses.kind` | `"program" \| "marketplace" \| "new-economy"` | Missing on legacy rows = `"program"`. Indexed. |
+| `courses.review` | `{ status, submittedAt, reviewedAt, reviewedBy, note }` | The marketplace review. `status`: `"none" \| "pending" \| "approved" \| "changes_requested"` (default `"none"`); `reviewedBy` is a user ObjectId; `note` ≤ 2000 chars. A seller's course stays `draft` until an admin approves it; approval sets `status: "published"`, `publishedAt` (if unset) and publishes its lessons. |
+| `courses.communityUrl` | string \| `null` | The course's class community (WhatsApp, Telegram, Discord, Social…): http(s), ≤ 500 chars. |
+| `users.sellerStatus` | `"none" \| "applied" \| "approved" \| "rejected"` | Missing = `"none"`. `"approved"` lets a **USER** create and edit their own marketplace courses on the web. It is not a role and grants nothing else. |
+
+- **Single price.** Marketplace and New Economy courses carry no package ladder (`packages: []`) and sell at `price`/`pricing`. New Economy courses are always `pricing: "free"`, `price: 0`, `school: null`, `category: "New Economy"`.
+- **Who may publish.** Go must never publish a course whose owner is a seller (role `USER`) except as the admin review does: `review.status` `"approved"`. Faculty marketplace courses publish directly, as programs do.
+- **Credit.** A marketplace course owned by a `USER` shows the seller's name ("by Jane Doe"); one owned by INSTRUCTOR/ADMIN credits the Academy's faculty.
+- **Splits** (`lib/db/models/earning.ts`): a seller keeps `MARKETPLACE_SHARE_OWN_LINK` (85%) on a sale through their own referral link and `MARKETPLACE_SHARE_ACADEMY` (50%) when the Academy makes the sale. Wired on the web by the referrals stream.
+- **`sellerapplications`** — web-only; Go may ignore it. `{ user, status: "submitted" | "approved" | "rejected", fullName, school, topic, experience, sampleUrl, pitch, agreedAt, reviewedBy, reviewedAt, reason }`, one `submitted` row per user (partial unique index). Approval mirrors into `users.sellerStatus`.
+- Any wholesale course write must carry `kind`, `review` and `communityUrl`, and any wholesale user write `sellerStatus` (write dotted paths or keep the fields).

@@ -1,7 +1,9 @@
 "use client"
 
 import * as React from "react"
+import { Suspense } from "react"
 import Image from "next/image"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Topbar } from "@/components/platform/topbar"
 import { Button } from "@/components/ui/button"
@@ -25,10 +27,12 @@ import {
 import Link from "next/link"
 import { MoreHorizontal } from "lucide-react"
 import { PageHeader } from "@/components/shared/page-header"
+import { Textarea } from "@/components/ui/textarea"
 import {
   adminListCourses,
   adminSetCourseStatus,
 } from "@/lib/actions/admin-courses"
+import { adminApproveCourseReview, adminRequestCourseChanges } from "@/lib/actions/admin-course-review"
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import {
   formatDate,
@@ -41,8 +45,29 @@ import { courseAvailability } from "@/lib/types/course"
 import type { CourseStatus } from "@/lib/types/course"
 import { BookOpenIcon, PlusIcon, StarIcon } from "lucide-react"
 
+const KIND_LABEL = { marketplace: "Marketplace", "new-economy": "New Economy" } as const
+
+/**
+ * The catalogue, and (owner 2026-10-05) the marketplace review queue at
+ * `?review=pending`: sellers' courses waiting on a quality review — approve
+ * to publish, or request changes with a note.
+ */
 export default function AdminCoursesPage() {
+  // useSearchParams needs a Suspense boundary in the app router.
+  return (
+    <Suspense fallback={null}>
+      <AdminCoursesInner />
+    </Suspense>
+  )
+}
+
+function AdminCoursesInner() {
   const queryClient = useQueryClient()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const review = searchParams.get("review") === "pending" ? "pending" : "all"
+  const [changesTarget, setChangesTarget] = React.useState<{ id: string; title: string } | null>(null)
+  const [changesNote, setChangesNote] = React.useState("")
   const [status, setStatus] = React.useState("all")
   const [search, setSearch] = React.useState("")
   const [debouncedSearch, setDebouncedSearch] = React.useState("")
@@ -55,7 +80,10 @@ export default function AdminCoursesPage() {
     return () => clearTimeout(t)
   }, [search])
 
-  const filters = { status, search: debouncedSearch || undefined, page }
+  const filters =
+    review === "pending"
+      ? { status: "all", search: debouncedSearch || undefined, page, review }
+      : { status, search: debouncedSearch || undefined, page }
 
   const { data, isLoading } = useQuery({
     queryKey: queryKeys.adminCourses(filters),
@@ -72,20 +100,64 @@ export default function AdminCoursesPage() {
     },
   })
 
+  const approveReview = useMutation({
+    mutationFn: (courseId: string) => adminApproveCourseReview(courseId),
+    onSuccess: (res) => {
+      setActionError(res.success ? null : res.error)
+      queryClient.invalidateQueries({ queryKey: ["admin", "courses"] })
+    },
+  })
+
+  const requestChanges = useMutation({
+    mutationFn: ({ courseId, note }: { courseId: string; note: string }) => adminRequestCourseChanges(courseId, note),
+    onSuccess: (res) => {
+      if (!res.success) {
+        setActionError(res.error)
+        return
+      }
+      setActionError(null)
+      setChangesTarget(null)
+      setChangesNote("")
+      queryClient.invalidateQueries({ queryKey: ["admin", "courses"] })
+    },
+  })
+
   return (
     <>
       <Topbar variant="admin" />
       <div className="flex-1 px-4 sm:px-6 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-8 md:px-8 md:pb-12 lg:px-12">
         <div className="mx-auto w-full max-w-7xl space-y-8">
         <PageHeader
-          title="Courses"
-          subline={data ? `${data.total.toLocaleString()} courses` : "Create and manage the catalogue."}
+          title={review === "pending" ? "Review queue" : "Courses"}
+          subline={
+            review === "pending"
+              ? "Marketplace courses from sellers, oldest first. Approve to publish, or request changes."
+              : data
+                ? `${data.total.toLocaleString()} courses`
+                : "Create and manage the catalogue."
+          }
           action={
             <Button size="sm" render={<Link href="/admin/courses/new" />}>
               <PlusIcon size={14} />
               New course
             </Button>
           }
+        />
+
+        <FilterChips
+          value={review}
+          onChange={(v) => {
+            setPage(1)
+            router.replace(v === "pending" ? "/admin/courses?review=pending" : "/admin/courses")
+          }}
+          options={[
+            { value: "all", label: "All courses" },
+            {
+              value: "pending",
+              label: "Review queue",
+              ...(review === "pending" && data ? { count: data.total } : {}),
+            },
+          ]}
         />
 
         <div className="flex items-center gap-3 flex-wrap">
@@ -98,21 +170,23 @@ export default function AdminCoursesPage() {
             placeholder="Search titles…"
             className="max-w-xs h-10 text-sm"
           />
-          <FilterChips
-            value={status}
-            onChange={(v) => {
-              setStatus(v)
-              setPage(1)
-            }}
-            options={[
-              { value: "all", label: "All" },
-              { value: "published", label: "Published" },
-              { value: "draft", label: "Drafts" },
-              { value: "suspended", label: "Suspended" },
-              { value: "closed", label: "Closed" },
-              { value: "archived", label: "Archived" },
-            ]}
-          />
+          {review !== "pending" && (
+            <FilterChips
+              value={status}
+              onChange={(v) => {
+                setStatus(v)
+                setPage(1)
+              }}
+              options={[
+                { value: "all", label: "All" },
+                { value: "published", label: "Published" },
+                { value: "draft", label: "Drafts" },
+                { value: "suspended", label: "Suspended" },
+                { value: "closed", label: "Closed" },
+                { value: "archived", label: "Archived" },
+              ]}
+            />
+          )}
         </div>
 
         {actionError && <p className="text-xs text-ws-danger">{actionError}</p>}
@@ -126,8 +200,10 @@ export default function AdminCoursesPage() {
         ) : !data || data.courses.length === 0 ? (
           <EmptyState
             icon={BookOpenIcon}
-            title="No courses"
-            description="No courses match this filter."
+            title={review === "pending" ? "Nothing to review" : "No courses"}
+            description={
+              review === "pending" ? "No marketplace course is waiting on a review." : "No courses match this filter."
+            }
           />
         ) : (
           <>
@@ -165,6 +241,14 @@ export default function AdminCoursesPage() {
                           worth surfacing here since the raw status won't show it. */}
                       {courseAvailability({ status: c.status as CourseStatus, availableAt: c.availableAt }) ===
                         "coming_soon" && <StatusBadge status="coming_soon" />}
+                      {c.kind !== "program" && (
+                        <span className="inline-flex shrink-0 items-center rounded-full bg-ws-chip px-2 py-0.5 text-[10px] font-medium text-ws-primary">
+                          {KIND_LABEL[c.kind]}
+                        </span>
+                      )}
+                      {c.reviewStatus !== "none" && (
+                        <StatusBadge status={c.reviewStatus === "pending" ? "in_review" : c.reviewStatus} />
+                      )}
                     </div>
                     <p className="text-xs text-muted-foreground truncate">
                       {c.instructorName} · {c.totalLessons} lessons ·{" "}
@@ -182,8 +266,36 @@ export default function AdminCoursesPage() {
                       {c.pricing === "free" ? "Free" : `$${c.price ?? 0}`} · created{" "}
                       {formatDate(c.createdAt)}
                       {c.availableAt ? ` · available ${formatDateTime(c.availableAt)}` : ""}
+                      {c.sellerOwned ? " · seller" : ""}
+                      {c.reviewStatus === "pending" && c.reviewSubmittedAt
+                        ? ` · submitted ${formatDateTime(c.reviewSubmittedAt)}`
+                        : ""}
                     </p>
+                    {c.reviewStatus === "changes_requested" && c.reviewNote && (
+                      <p className="mt-0.5 line-clamp-1 text-[11px] text-ws-muted">Changes requested: {c.reviewNote}</p>
+                    )}
                   </div>
+                  {c.reviewStatus === "pending" && (
+                    <div className="hidden shrink-0 items-center gap-2 sm:flex">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setChangesNote("")
+                          setChangesTarget({ id: c.id, title: c.title })
+                        }}
+                      >
+                        Request changes
+                      </Button>
+                      <Button
+                        size="sm"
+                        disabled={approveReview.isPending}
+                        onClick={() => approveReview.mutate(c.id)}
+                      >
+                        {approveReview.isPending && approveReview.variables === c.id ? "Publishing…" : "Approve & publish"}
+                      </Button>
+                    </div>
+                  )}
                   <DropdownMenu>
                     <DropdownMenuTrigger
                       render={
@@ -199,6 +311,21 @@ export default function AdminCoursesPage() {
                       <DropdownMenuItem render={<Link href={`/admin/enrollments?course=${c.id}`} />}>
                         View enrollments
                       </DropdownMenuItem>
+                      {c.reviewStatus === "pending" && (
+                        <DropdownMenuItem onClick={() => approveReview.mutate(c.id)}>
+                          Approve &amp; publish
+                        </DropdownMenuItem>
+                      )}
+                      {c.reviewStatus === "pending" && (
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setChangesNote("")
+                            setChangesTarget({ id: c.id, title: c.title })
+                          }}
+                        >
+                          Request changes…
+                        </DropdownMenuItem>
+                      )}
                       {c.status !== "published" && (
                         <DropdownMenuItem
                           onClick={() =>
@@ -262,6 +389,41 @@ export default function AdminCoursesPage() {
         )}
         </div>
       </div>
+
+      {/* Request changes — the note goes to the seller by email and in the app. */}
+      <Dialog open={!!changesTarget} onOpenChange={(open) => !open && setChangesTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Request changes to “{changesTarget?.title}”?</DialogTitle>
+            <DialogDescription>
+              The course stays a draft. The seller gets your note by email and in the app, makes the changes and
+              submits it again.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={changesNote}
+            onChange={(e) => setChangesNote(e.target.value)}
+            placeholder="e.g. Lesson 3's audio is too quiet, and lesson 5 repeats lesson 4."
+            className="min-h-28"
+            maxLength={2000}
+            aria-label="What to change"
+          />
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setChangesTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              disabled={requestChanges.isPending || changesNote.trim().length < 5}
+              onClick={() => {
+                if (changesTarget) requestChanges.mutate({ courseId: changesTarget.id, note: changesNote })
+              }}
+            >
+              {requestChanges.isPending ? "Sending…" : "Send to the seller"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Archive confirm — archiving pulls a course out of the catalog, so it
           gets the same explicit confirmation as role changes and refunds. */}

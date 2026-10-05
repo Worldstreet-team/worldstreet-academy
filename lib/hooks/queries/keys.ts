@@ -58,7 +58,7 @@ export const queryKeys = {
   adminOrderDetail: (orderId: string) => ["admin", "order", orderId] as const,
   adminEarnings: (filters?: { status?: string; page?: number }) =>
     filters ? (["admin", "earnings", filters] as const) : (["admin", "earnings"] as const),
-  adminCourses: (filters?: { status?: string; search?: string; page?: number }) =>
+  adminCourses: (filters?: { status?: string; search?: string; page?: number; review?: string }) =>
     filters ? (["admin", "courses", filters] as const) : (["admin", "courses"] as const),
   adminEnrollments: (filters?: {
     course?: string
@@ -77,5 +77,7 @@ export const queryKeys = {
   adminEspeePayments: (filters?: { status?: string; page?: number }) =>
     filters ? (["admin", "espee-payments", filters] as const) : (["admin", "espee-payments"] as const),
   adminEspeePaymentDetail: (id: string) => ["admin", "espee-payment", id] as const,
+  adminSellerApplications: (filters?: { status?: string; page?: number }) =>
+    filters ? (["admin", "seller-applications", filters] as const) : (["admin", "seller-applications"] as const),
   adminFacultyProfile: (userId: string) => ["admin", "faculty-profile", userId] as const,
 } as const

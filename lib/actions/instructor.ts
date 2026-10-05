@@ -5,13 +5,32 @@ import { redirect } from "next/navigation"
 import type mongoose from "mongoose"
 import { z } from "zod/v4"
 import connectDB from "@/lib/db"
-import { Enrollment, Course, Lesson, User, ICourse, type ICoursePackage, type PackageKey } from "@/lib/db/models"
+import {
+  Enrollment,
+  Course,
+  Lesson,
+  User,
+  ICourse,
+  MARKETPLACE_SHARE_ACADEMY,
+  MARKETPLACE_SHARE_OWN_LINK,
+  type CourseKind,
+  type CourseReviewStatus,
+  type ICoursePackage,
+  type PackageKey,
+} from "@/lib/db/models"
 import { notifyUsers } from "@/lib/notify"
 import { uploadThumbnail, deleteFromCloudinary } from "@/lib/cloudinary"
 import type { CourseLevel, CoursePricing, CourseStatus } from "@/lib/types"
 import { getCurrentUser } from "@/lib/auth"
 import { SCHOOL_BY_SLUG, isSchoolSlug, type SchoolSlug } from "@/lib/schools"
 import { canAccessLesson, PACKAGE_LABEL, isPackageKey, pricingFromPackages } from "@/lib/entitlements"
+import { courseKindOf } from "@/lib/course-kind"
+import { safeWebUrl } from "@/lib/faculty"
+import { appUrl } from "@/lib/app-url"
+import { referralPath } from "@/lib/referral-link"
+import { ensureReferralCode } from "@/lib/referrals"
+import { sellerSplitNote } from "@/lib/marketplace"
+import { requestCourseReview } from "@/lib/course-review"
 
 const PackageSchema = z
   .object({
@@ -117,9 +136,21 @@ export type CourseFormState = {
   fieldErrors: Record<string, string>
 }
 
+/**
+ * A seller's own link to a published marketplace course: the course page with
+ * their referral code (owner, 2026-10-05). Sales through it pay the seller the
+ * larger share; `note` says so.
+ */
+export type SellerShareLink = { url: string; note: string }
+
 // ---- Types for instructor courses ----
 export type InstructorCourseItem = {
   id: string
+  slug: string
+  kind: CourseKind
+  reviewStatus: CourseReviewStatus
+  /** The seller's own link — published marketplace courses of an approved seller only. */
+  share: SellerShareLink | null
   title: string
   thumbnailUrl: string | null
   status: string
@@ -144,15 +175,17 @@ function generateSlug(title: string): string {
 }
 
 // ---- Get authenticated instructor (role-gated since the application flow shipped) ----
+/**
+ * Faculty (INSTRUCTOR/ADMIN), or an approved marketplace seller — a USER
+ * whose `sellerStatus` is "approved" (owner, 2026-10-05; never a role
+ * change). Sellers are confined by `courseScope` to their own marketplace
+ * courses and by the status rules in createCourse/updateCourse.
+ */
 async function getAuthenticatedInstructor() {
   const authUser = await getCurrentUser()
 
   if (!authUser) {
     throw new Error("Not authenticated")
-  }
-
-  if (authUser.role !== "INSTRUCTOR" && authUser.role !== "ADMIN") {
-    throw new Error("Instructor access required — apply at /dashboard/become-instructor")
   }
 
   await connectDB()
@@ -162,15 +195,95 @@ async function getAuthenticatedInstructor() {
     throw new Error("User not found in database")
   }
 
+  if (instructor.role !== "INSTRUCTOR" && instructor.role !== "ADMIN" && instructor.sellerStatus !== "approved") {
+    throw new Error("Instructor access required — apply at /dashboard/become-instructor")
+  }
+
   return instructor
+}
+
+/** An approved seller without a faculty role (getAuthenticatedInstructor admitted them as a seller). */
+function isSellerOnly(user: { role?: string }): boolean {
+  return user.role !== "INSTRUCTOR" && user.role !== "ADMIN"
 }
 
 /**
  * Which courses this user may touch. ADMINs manage the whole catalogue (the
- * admin portal reuses these actions); instructors only their own courses.
+ * admin portal reuses these actions); instructors only their own courses;
+ * sellers only their own marketplace courses.
  */
 function courseScope(user: { role?: string; _id: unknown }): mongoose.QueryFilter<ICourse> {
-  return user.role === "ADMIN" ? {} : ({ instructor: user._id } as mongoose.QueryFilter<ICourse>)
+  if (user.role === "ADMIN") return {}
+  if (isSellerOnly(user)) return { instructor: user._id, kind: "marketplace" } as mongoose.QueryFilter<ICourse>
+  return { instructor: user._id } as mongoose.QueryFilter<ICourse>
+}
+
+/**
+ * The editor's marketplace fields. `kind` is honoured for faculty only —
+ * sellers always write "marketplace". `communityUrl` is the class community
+ * (WhatsApp, Telegram, Discord…): http(s), ≤ 500 characters, "" clears it.
+ */
+const CourseExtrasSchema = z.object({
+  kind: z.enum(["program", "marketplace", "new-economy"]).nullable(),
+  communityUrl: z
+    .string()
+    .trim()
+    .max(500, "Community link must be 500 characters or less")
+    .transform((v) => v || null)
+    .refine((v) => v === null || safeWebUrl(v) !== null, "Community link must be a full http(s):// address")
+    .nullable(),
+  submitForReview: z.boolean(),
+})
+
+function parseExtras(
+  formData: FormData,
+  fieldErrors: Record<string, string>
+): { kind: CourseKind | null; communityUrl: string | null; submitForReview: boolean } {
+  const kind = formData.get("kind")
+  const communityUrl = formData.get("communityUrl")
+  const result = CourseExtrasSchema.safeParse({
+    kind: typeof kind === "string" && kind !== "" ? kind : null,
+    communityUrl: typeof communityUrl === "string" ? communityUrl : null,
+    submitForReview: formData.get("submitForReview") === "true",
+  })
+  if (!result.success) {
+    const issue = result.error.issues[0]
+    fieldErrors[issue?.path[0] === "kind" ? "kind" : "communityUrl"] = issue?.message ?? "Invalid course settings"
+    return { kind: null, communityUrl: null, submitForReview: false }
+  }
+  return { ...result.data, communityUrl: result.data.communityUrl ?? null }
+}
+
+/** How many lessons the editor sent (the review gate needs at least one). */
+function lessonCount(raw: string | null): number | null {
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed.length : null
+  } catch {
+    return null
+  }
+}
+
+/** New Economy courses sit outside the schools. */
+const NEW_ECONOMY_CATEGORY = "New Economy"
+
+/** A seller's link to one course, with their referral code. */
+function shareLink(slug: string, code: string): SellerShareLink {
+  return {
+    url: appUrl(referralPath(`/programs/${slug}`, code)),
+    note: sellerSplitNote(MARKETPLACE_SHARE_OWN_LINK, MARKETPLACE_SHARE_ACADEMY),
+  }
+}
+
+/** The seller's code, minted on first use; null if minting fails (the link is a convenience, never a blocker). */
+async function sellerCode(userId: string): Promise<string | null> {
+  try {
+    return await ensureReferralCode(userId)
+  } catch (error) {
+    console.error("Seller referral code error:", error)
+    return null
+  }
 }
 
 /** Statuses a non-admin may write. Suspend/close/archive are admin verbs. */
@@ -213,9 +326,18 @@ export async function fetchInstructorCourses(): Promise<InstructorCourseItem[]> 
     const courses = await Course.find({ instructor: instructor._id })
       .sort({ createdAt: -1 })
       .lean()
-    
+
+    // A seller's live marketplace courses each get their own link.
+    const sellable = (c: (typeof courses)[number]) => courseKindOf(c) === "marketplace" && c.status === "published"
+    const code =
+      isSellerOnly(instructor) && courses.some(sellable) ? await sellerCode(instructor._id.toString()) : null
+
     return courses.map((course) => ({
       id: course._id.toString(),
+      slug: course.slug,
+      kind: courseKindOf(course),
+      reviewStatus: course.review?.status ?? "none",
+      share: code && sellable(course) ? shareLink(course.slug, code) : null,
       title: course.title,
       thumbnailUrl: course.thumbnailUrl,
       status: course.status,
@@ -250,10 +372,28 @@ export async function fetchCourseForEdit(courseId: string) {
     const lessons = await Lesson.find({ course: courseId })
       .sort({ order: 1 })
       .lean()
-    
+
+    const kind = courseKindOf(course)
+    // "Your link" — only the seller's own live marketplace course.
+    const ownLive =
+      isSellerOnly(instructor) &&
+      kind === "marketplace" &&
+      course.status === "published" &&
+      course.instructor.toString() === instructor._id.toString()
+    const code = ownLive ? await sellerCode(instructor._id.toString()) : null
+
     return {
       course: {
         id: course._id.toString(),
+        kind,
+        communityUrl: course.communityUrl ?? null,
+        review: {
+          status: (course.review?.status ?? "none") as CourseReviewStatus,
+          submittedAt: course.review?.submittedAt ? course.review.submittedAt.toISOString() : null,
+          reviewedAt: course.review?.reviewedAt ? course.review.reviewedAt.toISOString() : null,
+          note: course.review?.note ?? null,
+        },
+        share: code ? shareLink(course.slug, code) : null,
         title: course.title,
         description: course.description,
         shortDescription: course.shortDescription ?? "",
@@ -309,6 +449,45 @@ export async function fetchCourseForEdit(courseId: string) {
   }
 }
 
+/**
+ * Price fields for a save. A school program prices from its packages when
+ * they are sent (the cheapest enabled tier). Marketplace and New Economy
+ * courses sell at ONE price (owner, 2026-10-05), so they carry no ladder —
+ * and a New Economy course is always free.
+ */
+function coursePricing(
+  kind: CourseKind,
+  pricing: CoursePricing,
+  price: string,
+  packages: ICoursePackage[] | null
+): { pricing: CoursePricing; price: number; packages?: ICoursePackage[] } {
+  if (kind === "new-economy") return { pricing: "free", price: 0, packages: [] }
+  const scalar = { pricing, price: pricing === "paid" ? parseFloat(price) : 0 }
+  if (kind === "marketplace") return { ...scalar, packages: [] }
+  const override = packages ? pricingFromPackages(packages) : null
+  return {
+    ...scalar,
+    ...(packages ? { packages } : {}),
+    ...(override ? { pricing: override.pricing, price: override.price } : {}),
+  }
+}
+
+/** School and category: the school's for programs and marketplace topics; none for New Economy. */
+function courseHome(kind: CourseKind, school: string): { school: SchoolSlug | null; category: string } {
+  if (kind === "new-economy") return { school: null, category: NEW_ECONOMY_CATEGORY }
+  const slug = school as SchoolSlug
+  return { school: slug, category: SCHOOL_BY_SLUG[slug].short }
+}
+
+/** How the review queue names a seller. */
+function sellerOf(user: { _id: { toString(): string }; firstName?: string | null; lastName?: string | null; avatarUrl?: string | null }) {
+  return {
+    id: user._id.toString(),
+    name: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "A seller",
+    avatarUrl: user.avatarUrl ?? null,
+  }
+}
+
 // ---- Create Course ----
 export async function createCourse(
   _prevState: CourseFormState,
@@ -331,6 +510,8 @@ export async function createCourse(
   // Validate
   const fieldErrors: Record<string, string> = {}
   const packages = parsePackages(formData, fieldErrors)
+  const extras = parseExtras(formData, fieldErrors)
+  const sentLessons = lessonCount(lessonsJson)
 
   if (!title || title.trim().length < 3) {
     fieldErrors.title = "Title must be at least 3 characters"
@@ -341,8 +522,12 @@ export async function createCourse(
   if (!level) {
     fieldErrors.level = "Please select a level"
   }
-  if (!isSchoolSlug(school)) {
+  // New Economy courses sit outside the schools; every other kind needs one.
+  if (!isSchoolSlug(school) && extras.kind !== "new-economy") {
     fieldErrors.school = "Choose a school"
+  }
+  if (extras.submitForReview && !sentLessons) {
+    fieldErrors.lessons = "Add at least one lesson before submitting for review"
   }
   if (pricing === "paid" && (!price || parseFloat(price) <= 0)) {
     fieldErrors.price = "Please enter a valid price"
@@ -363,12 +548,22 @@ export async function createCourse(
     const instructor = await getAuthenticatedInstructor()
 
     const requestedStatus = status || "draft"
-    if (instructor.role !== "ADMIN" && !INSTRUCTOR_STATUSES.includes(requestedStatus)) {
+    const seller = isSellerOnly(instructor)
+    if (seller) {
+      // A seller's course goes live only through review (owner, 2026-10-05).
+      if (requestedStatus !== "draft") {
+        return { success: false, error: "Save your course as a draft, then submit it for review", fieldErrors: {} }
+      }
+    } else if (instructor.role !== "ADMIN" && !INSTRUCTOR_STATUSES.includes(requestedStatus)) {
       return { success: false, error: "Only admins can set that course status", fieldErrors: {} }
     }
 
-    // Packages (when sent) are the source of truth for pricing — cheapest enabled tier.
-    const pricingOverride = packages ? pricingFromPackages(packages) : null
+    // Sellers only ever sell on the marketplace; faculty choose (default: a school program).
+    const kind: CourseKind = seller ? "marketplace" : (extras.kind ?? "program")
+    if (kind !== "new-economy" && !isSchoolSlug(school)) {
+      return { success: false, error: null, fieldErrors: { school: "Choose a school" } }
+    }
+    const pricingFields = coursePricing(kind, pricing, price, packages)
 
     // Create the course
     const course = await Course.create({
@@ -379,17 +574,15 @@ export async function createCourse(
       thumbnailUrl: thumbnailUrl || null,
       instructor: instructor._id,
       level,
-      pricing,
-      price: pricing === "paid" ? parseFloat(price) : 0,
       status: requestedStatus,
-      school,
-      category: SCHOOL_BY_SLUG[school].short,
+      ...courseHome(kind, school),
+      kind,
+      communityUrl: extras.communityUrl,
       whatYouWillLearn,
       availableAt: availableAt === "invalid" ? null : availableAt,
       preEnrollEnabled,
       publishedAt: requestedStatus === "published" ? new Date() : null,
-      ...(packages ? { packages } : {}),
-      ...(pricingOverride ? { pricing: pricingOverride.pricing, price: pricingOverride.price } : {}),
+      ...pricingFields,
     })
     
     // Create lessons if provided
@@ -398,7 +591,7 @@ export async function createCourse(
         const lessons = JSON.parse(lessonsJson)
         console.log("[Create Course] Parsed lessons:", lessons)
         if (Array.isArray(lessons) && lessons.length > 0) {
-          const sold = soldTierKeys(packages)
+          const sold = soldTierKeys(pricingFields.packages ?? null)
           await Lesson.insertMany(
             lessons.map((l: { title: string; description?: string; type?: string; thumbnailUrl?: string; videoUrl?: string; content?: string; duration?: string; isFree?: boolean; minPackageKey?: string | null }, idx: number) => ({
               course: course._id,
@@ -435,10 +628,16 @@ export async function createCourse(
       console.log("[Create Course] No lessons JSON provided")
     }
     
-    // Update instructor course count
-    await User.findByIdAndUpdate(instructor._id, {
-      $inc: { "instructorProfile.totalCourses": 1 },
-    })
+    // Update instructor course count (faculty only — a seller has no instructor profile)
+    if (!seller) {
+      await User.findByIdAndUpdate(instructor._id, {
+        $inc: { "instructorProfile.totalCourses": 1 },
+      })
+    }
+
+    if (seller && extras.submitForReview) {
+      await requestCourseReview(course._id.toString(), sellerOf(instructor))
+    }
 
     revalidatePath("/instructor/courses")
     revalidatePath("/admin/courses")
@@ -472,6 +671,8 @@ export async function updateCourse(
 
   const fieldErrors: Record<string, string> = {}
   const packages = parsePackages(formData, fieldErrors)
+  const extras = parseExtras(formData, fieldErrors)
+  const sentLessons = lessonCount(lessonsJson)
 
   if (!title || title.trim().length < 3) {
     fieldErrors.title = "Title must be at least 3 characters"
@@ -479,9 +680,7 @@ export async function updateCourse(
   if (!description || description.trim().length < 10) {
     fieldErrors.description = "Description must be at least 10 characters"
   }
-  if (!isSchoolSlug(school)) {
-    fieldErrors.school = "Choose a school"
-  }
+  // The school is checked once the kind is known (New Economy has none).
   if (pricing === "paid" && (!price || parseFloat(price) <= 0)) {
     fieldErrors.price = "Please enter a valid price"
   }
@@ -510,7 +709,15 @@ export async function updateCourse(
       return { success: false, error: "Course not found", fieldErrors: {} }
     }
 
-    if (
+    const seller = isSellerOnly(instructor)
+    if (seller) {
+      // A seller never publishes (an admin does, on approval). They may keep
+      // the status they have — so an approved, published course stays live
+      // while they edit it — or take a live course back to draft.
+      if (status !== existingCourse.status && !(status === "draft" && existingCourse.status === "published")) {
+        return { success: false, error: "An admin publishes marketplace courses — submit yours for review", fieldErrors: {} }
+      }
+    } else if (
       instructor.role !== "ADMIN" &&
       status !== existingCourse.status &&
       !INSTRUCTOR_STATUSES.includes(status)
@@ -518,8 +725,15 @@ export async function updateCourse(
       return { success: false, error: "Only admins can set that course status", fieldErrors: {} }
     }
 
-    // Packages (when sent) are the source of truth for pricing — cheapest enabled tier.
-    const pricingOverride = packages ? pricingFromPackages(packages) : null
+    const kind: CourseKind = seller ? "marketplace" : (extras.kind ?? courseKindOf(existingCourse))
+    if (kind !== "new-economy" && !isSchoolSlug(school)) {
+      return { success: false, error: null, fieldErrors: { school: "Choose a school" } }
+    }
+    const submitting = seller && extras.submitForReview && status !== "published"
+    if (submitting && (sentLessons ?? existingCourse.totalLessons ?? 0) === 0) {
+      return { success: false, error: null, fieldErrors: { lessons: "Add at least one lesson before submitting for review" } }
+    }
+    const pricingFields = coursePricing(kind, pricing, price, packages)
 
     // Update course
     await Course.findByIdAndUpdate(courseId, {
@@ -528,11 +742,11 @@ export async function updateCourse(
       shortDescription: shortDescription.trim() || null,
       thumbnailUrl: thumbnailUrl || null,
       level,
-      pricing,
-      price: pricing === "paid" ? parseFloat(price) : 0,
       status,
-      school,
-      category: SCHOOL_BY_SLUG[school].short,
+      ...courseHome(kind, school),
+      kind,
+      // A form without the field (an older editor tab) leaves the link alone.
+      ...(formData.has("communityUrl") ? { communityUrl: extras.communityUrl } : {}),
       whatYouWillLearn,
       availableAt: availableAt === "invalid" ? existingCourse.availableAt : availableAt,
       preEnrollEnabled,
@@ -540,8 +754,7 @@ export async function updateCourse(
       ...(status === "published" && !existingCourse.publishedAt
         ? { publishedAt: new Date() }
         : {}),
-      ...(packages ? { packages } : {}),
-      ...(pricingOverride ? { pricing: pricingOverride.pricing, price: pricingOverride.price } : {}),
+      ...pricingFields,
     })
     
     // Update lessons if provided
@@ -561,7 +774,7 @@ export async function updateCourse(
           await Lesson.deleteMany({ course: courseId })
           
           if (lessons.length > 0) {
-            const sold = soldTierKeys(packages ?? existingCourse.packages)
+            const sold = soldTierKeys(pricingFields.packages ?? existingCourse.packages)
             const created = await Lesson.insertMany(
               lessons.map((l: { tempId?: string; title: string; description?: string; type?: string; thumbnailUrl?: string; videoUrl?: string; content?: string; duration?: string; isFree?: boolean; minPackageKey?: string | null }, idx: number) => ({
                 course: courseId,
@@ -593,7 +806,7 @@ export async function updateCourse(
           })
 
           if (freshLessons.length > 0) {
-            void announceLessons(courseId, title, packages ?? existingCourse.packages, freshLessons)
+            void announceLessons(courseId, title, pricingFields.packages ?? existingCourse.packages, freshLessons)
           }
         } else {
           console.log("[Update Course] Lessons is not an array")
@@ -604,6 +817,10 @@ export async function updateCourse(
       }
     } else {
       console.log("[Update Course] No lessons JSON provided")
+    }
+
+    if (submitting) {
+      await requestCourseReview(courseId, sellerOf(instructor))
     }
 
     revalidatePath("/instructor/courses")
@@ -698,10 +915,12 @@ export async function deleteCourse(formData: FormData): Promise<void> {
     // Delete course
     await course.deleteOne()
     
-    // Update instructor course count
-    await User.findByIdAndUpdate(instructor._id, {
-      $inc: { "instructorProfile.totalCourses": -1 },
-    })
+    // Update instructor course count (faculty only — a seller has no instructor profile)
+    if (!isSellerOnly(instructor)) {
+      await User.findByIdAndUpdate(instructor._id, {
+        $inc: { "instructorProfile.totalCourses": -1 },
+      })
+    }
 
     revalidatePath("/instructor/courses")
     revalidatePath("/admin/courses")

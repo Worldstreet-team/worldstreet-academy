@@ -4,6 +4,7 @@ import mongoose from "mongoose"
 import connectDB from "@/lib/db"
 import { Course, Review } from "@/lib/db/models"
 import { isSchoolSlug } from "@/lib/schools"
+import { PROGRAM_KIND_FILTER } from "@/lib/course-kind"
 import { countryName } from "@/lib/countries"
 import { maskedName } from "@/lib/masked-name"
 import type { CourseRatingSummary } from "@/lib/actions/reviews"
@@ -48,7 +49,10 @@ export async function fetchSchoolReviews(slug: string, limit = 6): Promise<Schoo
     const size = Number.isInteger(limit) ? Math.min(Math.max(limit, 1), MAX_REVIEWS) : 6
 
     await connectDB()
-    const courses = await Course.find({ school: slug, status: "published" }).select("title slug rating").lean()
+    // The school speaks for its programs: marketplace courses filed under it are not part of its record.
+    const courses = await Course.find({ school: slug, status: "published", ...PROGRAM_KIND_FILTER })
+      .select("title slug rating")
+      .lean()
     if (courses.length === 0) return EMPTY
 
     let count = 0

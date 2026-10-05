@@ -28,6 +28,11 @@ import { formatLength, initialsOf, plural } from "@/components/programs/format"
  * site (FACULTY_PUBLIC), "who teaches it" is the Academy's faculty under the
  * gold wsa-mark, never a person.
  *
+ * A marketplace course (owner, 2026-10-05) says so: a "Marketplace" badge,
+ * the marketplace in the breadcrumb, and — when an approved seller sells it —
+ * the seller's name instead of the faculty line. The Academy's own
+ * marketplace and New Economy courses keep the faculty credit.
+ *
  * Every fact renders ONLY when it is real. A catalogue program with no
  * lessons, no rating and no enrollments yet (most of them, before launch)
  * must not be given invented numbers to look busier — each line collapses
@@ -49,6 +54,19 @@ export function ProgramHero({
 }) {
   const school = program.school ? SCHOOL_BY_SLUG[program.school] : null
   const rated = program.ratingCount > 0 && program.rating !== null
+  // Where the course sits: a school (programs), the marketplace (its topic
+  // filter for the school chip), or the New Economy catalogue.
+  const home =
+    program.kind === "marketplace"
+      ? { href: "/marketplace", label: "Marketplace", schoolHref: (slug: string) => `/marketplace?school=${slug}` }
+      : program.kind === "new-economy"
+        ? { href: "/new-economy", label: "New Economy", schoolHref: null }
+        : {
+            href: school ? "/schools" : "/programs",
+            label: school ? "All schools" : "All programs",
+            schoolHref: (slug: string) => `/schools/${slug}`,
+          }
+  const badge = program.kind === "marketplace" ? "Marketplace" : program.kind === "new-economy" ? "New Economy · Free" : null
   const profileHref = program.instructorUsername
     ? facultyHref(program.instructorUsername)
     : signedIn
@@ -70,18 +88,18 @@ export function ProgramHero({
       <nav aria-label="Breadcrumb">
         <ol className="flex flex-wrap items-center gap-x-2 gap-y-2 text-[13px] font-medium text-ws-muted">
           <li>
-            <Link href={school ? "/schools" : "/programs"} className={crumb}>
-              {school ? "All schools" : "All programs"}
+            <Link href={home.href} className={crumb}>
+              {home.label}
             </Link>
           </li>
-          {school && (
+          {school && home.schoolHref && (
             <>
               <li aria-hidden className="text-ws-subtle">
                 <ChevronRightIcon size={14} />
               </li>
               <li>
                 <Link
-                  href={`/schools/${school.slug}`}
+                  href={home.schoolHref(school.slug)}
                   className="inline-flex items-center gap-2 rounded-full bg-ws-surface py-1 pl-1 pr-3 text-ws-primary ring-1 ring-ws-hairline transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40 dark:ring-transparent"
                 >
                   <span className="flex size-6 items-center justify-center rounded-full bg-ws-raised text-ws-primary">
@@ -95,8 +113,15 @@ export function ProgramHero({
         </ol>
       </nav>
 
+      {badge && (
+        <p className="mt-6">
+          <span className="inline-flex items-center rounded-full bg-ws-chip px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-ws-primary">
+            {badge}
+          </span>
+        </p>
+      )}
       <h1
-        className="mt-6 max-w-[20ch] text-balance font-display font-semibold leading-[1.04] tracking-[-0.025em] text-ws-primary"
+        className={`${badge ? "mt-4" : "mt-6"} max-w-[20ch] text-balance font-display font-semibold leading-[1.04] tracking-[-0.025em] text-ws-primary`}
         style={{ fontSize: "clamp(2.125rem, 4.4vw, 3.5rem)" }}
       >
         {program.title}
@@ -136,7 +161,19 @@ export function ProgramHero({
         </div>
       )}
 
-      {FACULTY_PUBLIC ? (
+      {program.sellerName ? (
+        <div className="mt-6 flex items-center gap-3 text-[14px]">
+          <Avatar className="size-9 shrink-0">
+            {program.instructorAvatarUrl && <AvatarImage src={program.instructorAvatarUrl} alt="" />}
+            <AvatarFallback className="bg-ws-raised text-[12px] font-semibold text-ws-primary">
+              {initialsOf(program.sellerName)}
+            </AvatarFallback>
+          </Avatar>
+          <p className="min-w-0 text-ws-muted">
+            By <span className="font-semibold text-ws-primary">{program.sellerName}</span>
+          </p>
+        </div>
+      ) : FACULTY_PUBLIC ? (
         <div className="mt-6 flex items-center gap-3 text-[14px]">
           <Avatar className="size-9 shrink-0">
             {program.instructorAvatarUrl && <AvatarImage src={program.instructorAvatarUrl} alt="" />}

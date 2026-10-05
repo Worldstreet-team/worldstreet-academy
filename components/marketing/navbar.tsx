@@ -10,6 +10,8 @@ import { fetchBrowseCourses } from "@/lib/actions/student"
 import { countProgramsBySchool } from "@/lib/schools"
 import { needsSchoolChoice } from "@/lib/start-gate"
 import { getStartGateState } from "@/lib/start-gate-state"
+import { getSellerStatus } from "@/lib/seller"
+import { SELLER_HOME } from "@/lib/marketplace"
 import { BRAND } from "@/lib/brand"
 import { BrandLockup } from "@/components/shared/brand-lockup"
 import { cn } from "@/lib/utils"
@@ -36,6 +38,8 @@ export async function Navbar({ showFaculty }: { showFaculty: boolean }) {
   // for a guest it would just bounce through the login wall.
   const [user, published] = await Promise.all([getCurrentUser(), fetchBrowseCourses()])
   const isInstructor = user && (user.role === "INSTRUCTOR" || user.role === "ADMIN")
+  // An approved marketplace seller's way back to their courses (owner, 2026-10-05).
+  const isSeller = Boolean(user && user.role === "USER" && (await getSellerStatus(user.id)) === "approved")
   // A learner the gate would bounce (no paid enrollment — owner meeting
   // 2026-10-03) gets "Choose a program" instead of a dashboard link that loops
   // back to /schools, or "Payment status" while an ESPEE proof of theirs is
@@ -56,10 +60,13 @@ export async function Navbar({ showFaculty }: { showFaculty: boolean }) {
   const sheetLinks: MarketingNavLink[] = [
     { href: "/schools", label: "All schools" },
     { href: "/programs", label: "All programs" },
+    { href: "/marketplace", label: "Marketplace" },
+    { href: "/new-economy", label: "New Economy — free" },
     ...(showFaculty ? [{ href: "/faculty", label: "Faculty" }] : []),
     { href: "/#how-it-works", label: "How it works" },
     ...(user && !gated ? [{ href: "/dashboard", label: "My Learning" }] : []),
     ...(isInstructor ? [{ href: "/instructor", label: "Instructor Dashboard" }] : []),
+    ...(isSeller ? [{ href: SELLER_HOME, label: "Seller area" }] : []),
   ]
   const sheetActions: MarketingNavLink[] = user
     ? []
@@ -82,13 +89,17 @@ export async function Navbar({ showFaculty }: { showFaculty: boolean }) {
       <NavSearch className="hidden min-w-0 max-w-md flex-1 md:block" />
 
       <div className="flex shrink-0 items-center gap-1 sm:gap-1.5 md:ml-auto">
-        {/* Text links from lg. Measured at 1024: with Faculty too the search
-            drops under ~200px, so Faculty — and a signed-in user's two extra
-            links — wait for xl (Faculty for 2xl beside both of them). Below
-            lg they are all in the sheet. */}
+        {/* Text links from lg: Programs and the Marketplace (the Academy's
+            two halves, owner 2026-10-03). Measured at 1024: with Faculty too
+            the search drops under ~200px, so Faculty — and a signed-in user's
+            two extra links — wait for xl (Faculty for 2xl beside both of
+            them). Below lg they are all in the sheet, with New Economy. */}
         <nav aria-label="Site" className="hidden items-center lg:flex">
           <Link href="/programs" className={barLinkClass}>
             Programs
+          </Link>
+          <Link href="/marketplace" className={barLinkClass}>
+            Marketplace
           </Link>
           {showFaculty && (
             <Link
@@ -106,6 +117,11 @@ export async function Navbar({ showFaculty }: { showFaculty: boolean }) {
           {isInstructor && (
             <Link href="/instructor" className={cn(barLinkClass, "hidden xl:inline-flex")}>
               Instructor Dashboard
+            </Link>
+          )}
+          {isSeller && (
+            <Link href={SELLER_HOME} className={cn(barLinkClass, "hidden xl:inline-flex")}>
+              Seller area
             </Link>
           )}
         </nav>

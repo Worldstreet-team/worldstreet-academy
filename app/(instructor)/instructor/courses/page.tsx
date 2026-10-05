@@ -10,7 +10,8 @@ import { ArtCourses, ArtSearch } from "@/components/shared/illustrations"
 import { InstructorCourseCard } from "@/components/instructor/instructor-course-card"
 import { CourseCardSkeleton } from "@/components/platform/course-card"
 import { useInstructorCourses } from "@/lib/hooks/queries"
-import { Plus, Search } from "lucide-react"
+import { useUser } from "@/components/providers/user-provider"
+import { Link2, Plus, Search } from "lucide-react"
 
 type StatusFilter = "all" | "published" | "draft" | "archived"
 
@@ -18,6 +19,10 @@ export default function InstructorCoursesPage() {
   const [courseSearch, setCourseSearch] = React.useState("")
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("all")
   const { data: courses = [], isLoading } = useInstructorCourses()
+  // Only approved marketplace sellers reach the instructor area without a faculty role.
+  const seller = useUser().role === "USER"
+  // The split, once for the page — every live marketplace course of a seller carries its own link.
+  const shareNote = courses.find((c) => c.share)?.share?.note ?? null
 
   const totalStudents = courses.reduce((s, c) => s + c.enrolledCount, 0)
   const publishedCount = courses.filter((c) => c.status === "published").length
@@ -59,6 +64,18 @@ export default function InstructorCoursesPage() {
               </Button>
             }
           />
+
+          {shareNote && (
+            <div className="flex items-start gap-3 rounded-lg border border-ws-hairline bg-ws-surface p-4">
+              <Link2 size={18} strokeWidth={2} className="mt-0.5 shrink-0 text-ws-muted" />
+              <div className="space-y-0.5 text-[13px]">
+                <p className="font-semibold text-ws-primary">Share your own link</p>
+                <p className="text-ws-muted">
+                  Each live course below has a link with your code — copy it and send it to your audience. {shareNote}
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Search + status filter chips */}
           <div className="space-y-3">
@@ -110,7 +127,11 @@ export default function InstructorCoursesPage() {
             <EmptyState
               art={<ArtCourses />}
               title="No courses yet"
-              description="Create your first course to start teaching on the Academy."
+              description={
+                seller
+                  ? "Create your first marketplace course, add your lessons and submit it for review."
+                  : "Create your first course to start teaching on the Academy."
+              }
               actionLabel="Create Your First Course"
               actionHref="/instructor/courses/new"
             />

@@ -45,6 +45,16 @@ export function Footer({ showFaculty }: { showFaculty: boolean }) {
                   Programs
                 </Link>
               </li>
+              <li>
+                <Link href="/marketplace" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  Marketplace
+                </Link>
+              </li>
+              <li>
+                <Link href="/new-economy" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  New Economy — free
+                </Link>
+              </li>
               {/* Only when faculty exists (spec §10) — never a link to an empty page */}
               {showFaculty && (
                 <li>
@@ -76,6 +86,11 @@ export function Footer({ showFaculty }: { showFaculty: boolean }) {
               <li>
                 <Link href="/instructor/courses/new" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                   Create a Course
+                </Link>
+              </li>
+              <li>
+                <Link href="/sell" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  Sell your course
                 </Link>
               </li>
             </ul>

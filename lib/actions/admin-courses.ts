@@ -3,9 +3,10 @@
 import { revalidatePath } from "next/cache"
 import { z } from "zod/v4"
 import connectDB from "@/lib/db"
-import { Course, Review, User } from "@/lib/db/models"
+import { Course, Review, User, type CourseKind, type CourseReviewStatus } from "@/lib/db/models"
 import { requireAdmin } from "@/lib/auth/admin"
 import { notifyUser } from "@/lib/notify"
+import { courseKindOf } from "@/lib/course-kind"
 
 const PAGE_SIZE = 20
 
@@ -31,12 +32,21 @@ export type AdminCourseRow = {
   publishedAt: string | null
   availableAt: string | null
   preEnrollEnabled: boolean
+  kind: CourseKind
+  /** The marketplace quality review; "none" for programs and faculty courses. */
+  reviewStatus: CourseReviewStatus
+  reviewSubmittedAt: string | null
+  reviewNote: string | null
+  /** Sold by an approved seller (role USER), not by faculty. */
+  sellerOwned: boolean
 }
 
 export async function adminListCourses(filters?: {
   status?: string
   search?: string
   page?: number
+  /** "pending" — the marketplace review queue (/admin/courses?review=pending). */
+  review?: string
 }): Promise<{ courses: AdminCourseRow[]; total: number; page: number; pageCount: number }> {
   const empty = { courses: [], total: 0, page: 1, pageCount: 1 }
   try {
@@ -45,17 +55,20 @@ export async function adminListCourses(filters?: {
 
     const page = Math.max(1, filters?.page ?? 1)
     const query: Record<string, unknown> = {}
-    if (filters?.status && filters.status !== "all") query.status = filters.status
+    // Only literal strings reach the query — a server action may be sent anything.
+    if (typeof filters?.status === "string" && filters.status !== "all") query.status = filters.status
+    if (filters?.review === "pending") query["review.status"] = "pending"
     if (filters?.search?.trim()) {
       query.title = new RegExp(escapeRegex(filters.search.trim()), "i")
     }
 
     const [rows, total] = await Promise.all([
       Course.find(query)
-        .sort({ createdAt: -1 })
+        // The review queue is first come, first served.
+        .sort(filters?.review === "pending" ? { "review.submittedAt": 1 } : { createdAt: -1 })
         .skip((page - 1) * PAGE_SIZE)
         .limit(PAGE_SIZE)
-        .populate("instructor", "firstName lastName")
+        .populate("instructor", "firstName lastName role")
         .lean(),
       Course.countDocuments(query),
     ])
@@ -66,6 +79,7 @@ export async function adminListCourses(filters?: {
           _id?: { toString(): string }
           firstName?: string
           lastName?: string
+          role?: string
         } | null
         return {
           id: c._id.toString(),
@@ -87,6 +101,11 @@ export async function adminListCourses(filters?: {
           publishedAt: c.publishedAt ? new Date(c.publishedAt).toISOString() : null,
           availableAt: c.availableAt ? new Date(c.availableAt).toISOString() : null,
           preEnrollEnabled: c.preEnrollEnabled ?? true,
+          kind: courseKindOf(c),
+          reviewStatus: c.review?.status ?? "none",
+          reviewSubmittedAt: c.review?.submittedAt ? new Date(c.review.submittedAt).toISOString() : null,
+          reviewNote: c.review?.note ?? null,
+          sellerOwned: instructor?.role === "USER",
         }
       }),
       total,

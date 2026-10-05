@@ -61,7 +61,10 @@ export function dropDateLabel(availableAt: string): string {
  * The art carries the school's label; on hover the first three outcomes
  * slide up over it (hidden when the program has none). The footer names the
  * instructor — or, while people are hidden from the public site
- * (FACULTY_PUBLIC), credits the Academy's faculty under the gold wsa-mark.
+ * (FACULTY_PUBLIC), credits the Academy's faculty under the gold wsa-mark. A
+ * marketplace course sold by an approved seller always names the seller
+ * ("by Jane Doe", owner 2026-10-05): sellers are not faculty, and the credit
+ * is what they sell on.
  */
 export function MarketingCourseCard({
   course,
@@ -174,7 +177,15 @@ export function MarketingCourseCard({
           <div className="mt-auto flex min-h-[calc(0.75rem+1.25rem)] items-center justify-between gap-2 border-t border-ws-hairline pt-3">
             {/* No lesson/duration counts: brand-new programs read "0 lessons"
                 and that is worse than saying nothing. */}
-            {FACULTY_PUBLIC ? (
+            {course.sellerName ? (
+              <span className="flex min-w-0 items-center gap-2">
+                <Avatar className="h-5 w-5 shrink-0">
+                  {course.instructorAvatarUrl && <AvatarImage src={course.instructorAvatarUrl} alt="" />}
+                  <AvatarFallback className="text-[9px]">{initials(course.sellerName)}</AvatarFallback>
+                </Avatar>
+                <span className="truncate text-[12px] text-ws-muted">by {course.sellerName}</span>
+              </span>
+            ) : FACULTY_PUBLIC ? (
               <span className="flex min-w-0 items-center gap-2">
                 <Avatar className="h-5 w-5 shrink-0">
                   {course.instructorAvatarUrl && <AvatarImage src={course.instructorAvatarUrl} alt="" />}
