@@ -445,6 +445,10 @@ export type PublicPackage = {
   name: string
   tagline: string
   price: number
+  /** Pre-discount price, whole USD — display only; struck through when above `price`. */
+  listPrice: number | null
+  /** "9 weeks" — how long the package runs; null when not stated. */
+  duration: string | null
   features: string[]
   highlight: boolean
   ctaLabel: string | null
@@ -512,6 +516,8 @@ async function findProgram(filter: { slug: string } | { _id: string }): Promise<
           name: p.name,
           tagline: p.tagline ?? "",
           price: p.price,
+          listPrice: p.listPrice ?? null,
+          duration: p.duration ?? null,
           features: p.features ?? [],
           highlight: Boolean(p.highlight),
           ctaLabel: p.ctaLabel ?? null,
@@ -523,6 +529,8 @@ async function findProgram(filter: { slug: string } | { _id: string }): Promise<
             name: "Full program",
             tagline: "",
             price: course.pricing === "free" ? 0 : course.price ?? 0,
+            listPrice: null,
+            duration: null,
             features: whatYouWillLearn,
             highlight: false,
             ctaLabel: null,

@@ -13,20 +13,40 @@ import { getCurrentUser } from "@/lib/auth"
 import { SCHOOL_BY_SLUG, isSchoolSlug, type SchoolSlug } from "@/lib/schools"
 import { canAccessLesson, PACKAGE_LABEL, isPackageKey, pricingFromPackages } from "@/lib/entitlements"
 
-const PackageSchema = z.object({
-  key: z.enum(["basic", "standard", "executive"]),
-  name: z.string().trim().min(2, "Name must be at least 2 characters").max(60, "Name must be 60 characters or less"),
-  tagline: z.string().trim().max(120).default(""),
-  price: z.number({ error: "Enter a price in whole dollars" }).int("Price must be whole dollars").min(0, "Price can't be negative").max(100000, "Price can't exceed $100,000"),
-  features: z.array(z.string().trim().min(1).max(160)).max(20).default([]),
-  highlight: z.boolean().default(false),
-  ctaLabel: z.string().trim().max(40).nullable().default(null),
-  enabled: z.boolean().default(true),
-  entitlements: z.object({
-    liveClasses: z.boolean(), instructorQa: z.boolean(), assignments: z.boolean(),
-    certificate: z.boolean(), mentorship: z.boolean(), prioritySupport: z.boolean(),
-  }),
-})
+const PackageSchema = z
+  .object({
+    key: z.enum(["basic", "standard", "executive"]),
+    name: z.string().trim().min(2, "Name must be at least 2 characters").max(60, "Name must be 60 characters or less"),
+    tagline: z.string().trim().max(120).default(""),
+    price: z.number({ error: "Enter a price in whole dollars" }).int("Price must be whole dollars").min(0, "Price can't be negative").max(100000, "Price can't exceed $100,000"),
+    // The pre-discount price, shown struck through. Display only: checkout charges `price`.
+    listPrice: z
+      .number({ error: "Enter the original price in whole dollars" })
+      .int("Original price must be whole dollars")
+      .min(0, "Original price can't be negative")
+      .max(1_000_000, "Original price can't exceed $1,000,000")
+      .nullable()
+      .default(null),
+    duration: z
+      .string()
+      .trim()
+      .max(40, "Duration must be 40 characters or less")
+      .nullable()
+      .default(null)
+      .transform((v) => (v === "" ? null : v)),
+    features: z.array(z.string().trim().min(1).max(160)).max(20).default([]),
+    highlight: z.boolean().default(false),
+    ctaLabel: z.string().trim().max(40).nullable().default(null),
+    enabled: z.boolean().default(true),
+    entitlements: z.object({
+      liveClasses: z.boolean(), instructorQa: z.boolean(), assignments: z.boolean(),
+      certificate: z.boolean(), mentorship: z.boolean(), prioritySupport: z.boolean(),
+    }),
+  })
+  .refine((p) => p.listPrice === null || p.listPrice > p.price, {
+    message: "Original price must be higher than the price",
+    path: ["listPrice"],
+  })
 const PackagesSchema = z
   .array(PackageSchema)
   .max(3)
@@ -253,6 +273,8 @@ export async function fetchCourseForEdit(courseId: string) {
             name: p.name,
             tagline: p.tagline ?? "",
             price: p.price,
+            listPrice: p.listPrice ?? null,
+            duration: p.duration ?? null,
             features: p.features ?? [],
             highlight: Boolean(p.highlight),
             ctaLabel: p.ctaLabel ?? null,
