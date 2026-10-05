@@ -43,7 +43,8 @@ import { queryKeys } from "@/lib/hooks/queries/keys"
 import { formatDate, StatusBadge, FilterChips, Pagination } from "@/components/admin/shared"
 import { useUser } from "@/components/providers/user-provider"
 import { FacultyProfileDialog } from "@/components/admin/faculty-profile-dialog"
-import { UserRoundPenIcon, UsersIcon } from "lucide-react"
+import { DownloadIcon, UserRoundPenIcon, UsersIcon } from "lucide-react"
+import { exportInterestedLearnersCsv, type LeadCounts } from "@/lib/actions/admin-leads"
 
 type RoleFilter = "all" | "USER" | "INSTRUCTOR" | "ADMIN"
 type Role = "USER" | "INSTRUCTOR" | "ADMIN"
@@ -59,6 +60,31 @@ export default function AdminUsersPage() {
   const [pendingRole, setPendingRole] = React.useState<Role | null>(null)
   const [actionError, setActionError] = React.useState<string | null>(null)
   const [facultyUserId, setFacultyUserId] = React.useState<string | null>(null)
+  const [exporting, setExporting] = React.useState(false)
+  const [leadCounts, setLeadCounts] = React.useState<LeadCounts | null>(null)
+  const [exportError, setExportError] = React.useState<string | null>(null)
+
+  async function exportLeads() {
+    setExporting(true)
+    setExportError(null)
+    try {
+      const res = await exportInterestedLearnersCsv()
+      if (!res.success) {
+        setExportError(res.error)
+        return
+      }
+      const blob = new Blob([res.data.csv], { type: "text/csv;charset=utf-8" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `interested-learners-${new Date().toISOString().slice(0, 10)}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+      setLeadCounts(res.data.counts)
+    } finally {
+      setExporting(false)
+    }
+  }
 
   React.useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 350)
@@ -109,7 +135,22 @@ export default function AdminUsersPage() {
         <PageHeader
           title="Users"
           subline={data ? `${data.total.toLocaleString()} accounts` : "Search and manage accounts."}
+          action={
+            <Button size="sm" variant="outline" onClick={exportLeads} disabled={exporting}>
+              <DownloadIcon size={14} />
+              {exporting ? "Exporting…" : "Export interested learners"}
+            </Button>
+          }
         />
+
+        {exportError && <p className="text-xs text-destructive">{exportError}</p>}
+        {leadCounts && (
+          <p className="text-xs text-muted-foreground">
+            Exported {leadCounts.total.toLocaleString()} interested learners ·{" "}
+            {leadCounts.withSignal.toLocaleString()} with a signal ·{" "}
+            {leadCounts.signedUpOnly.toLocaleString()} signed up only
+          </p>
+        )}
 
         <div className="flex items-center gap-3 flex-wrap">
           <Input
