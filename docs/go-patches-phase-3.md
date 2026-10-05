@@ -16,6 +16,7 @@ Source of truth for the rules: `lib/entitlements.ts` and `lib/course-access.ts` 
 | `courses.packages[]` | `key` | `"basic" \| "standard" \| "executive"` | Tier id, unique per course. |
 | | `name`, `tagline`, `features[]`, `highlight`, `ctaLabel` | strings / bool | Display only. |
 | | `price` | integer, **whole USD** (same unit as `Course.price`) | Package price. |
+| | `listPrice`, `duration` | integer whole USD \| `null`; string \| `null` | Additive, display only (2026-10-03): the pre-discount price the web shows struck through, and how long the package runs ("9 weeks"). Go may ignore both; what is charged is still `price`. Missing on older rows = `null`. |
 | | `enabled` | bool | Whether the tier is on sale. |
 | | `entitlements` | `{ liveClasses, instructorQa, assignments, certificate, mentorship, prioritySupport }` booleans | What the tier includes. A missing flag means `false`. |
 | `courses` | `price` / `pricing` | unchanged | Kept equal to the **cheapest enabled** package (`pricing: "free"` only when that cheapest tier is $0). |
