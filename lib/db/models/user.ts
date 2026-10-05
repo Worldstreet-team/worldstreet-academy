@@ -1,6 +1,8 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose"
 
 export type InstructorStatus = "none" | "applied" | "interview" | "approved" | "rejected"
+/** Marketplace seller pipeline (owner, 2026-10-05: approved sellers only). Sellers are not faculty — no role change. */
+export type SellerStatus = "none" | "applied" | "approved" | "rejected"
 
 export interface IUser extends Document {
   _id: Types.ObjectId
@@ -25,8 +27,16 @@ export interface IUser extends Document {
   preferredLanguage: string | null
   /** ISO 3166-1 alpha-2 code (lib/countries.ts); null = not shown. Faculty pages now; testimonials reuse it in Phase 6. */
   country: string | null
-  /** Checkout's "Who invited you?" — free text, first answer wins (owner meeting 2026-10-03). Additive — Go ignores it. */
-  referredBy: { text: string; at: Date } | null
+  /**
+   * Who invited this learner — first answer wins (owner meeting 2026-10-03).
+   * `text` is what they typed or the code they arrived with; `code`/`userId`
+   * are set when it matched someone's referral code. Additive — Go ignores it.
+   */
+  referredBy: { text: string; at: Date; code?: string | null; userId?: Types.ObjectId | null } | null
+  /** This person's own referral code (students and tutors alike), minted on first use. Unique when set. */
+  referralCode: string | null
+  /** Marketplace seller pipeline; "approved" opens the seller area. */
+  sellerStatus: SellerStatus
   // For instructors
   instructorProfile?: {
     headline: string | null
@@ -137,10 +147,18 @@ const UserSchema = new Schema<IUser>(
         {
           text: { type: String, required: true, trim: true, maxlength: 80 },
           at: { type: Date, required: true },
+          code: { type: String, default: null },
+          userId: { type: Schema.Types.ObjectId, ref: "User", default: null },
         },
         { _id: false }
       ),
       default: null,
+    },
+    referralCode: { type: String, default: null, trim: true, uppercase: true },
+    sellerStatus: {
+      type: String,
+      enum: ["none", "applied", "approved", "rejected"],
+      default: "none",
     },
     instructorProfile: {
       headline: { type: String, default: null },
@@ -167,6 +185,12 @@ const UserSchema = new Schema<IUser>(
 // Alternate Clerk identities are resolved on every authenticated request
 // (see lib/auth/sync.ts) — keep that lookup indexed. Sparse: most users have none.
 UserSchema.index({ linkedAuthIds: 1 }, { sparse: true })
+// One owner per referral code; most users have none until they open their referrals page.
+UserSchema.index(
+  { referralCode: 1 },
+  { unique: true, partialFilterExpression: { referralCode: { $type: "string" } }, name: "referralCode_unique" }
+)
+UserSchema.index({ "referredBy.userId": 1 }, { sparse: true })
 
 // Virtual for full name
 UserSchema.virtual("fullName").get(function () {

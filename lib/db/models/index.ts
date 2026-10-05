@@ -1,4 +1,4 @@
-export { User, type IUser, type InstructorStatus } from "./user"
+export { User, type IUser, type InstructorStatus, type SellerStatus } from "./user"
 export {
   Course,
   type ICourse,
@@ -8,6 +8,8 @@ export {
   type PackageKey,
   type IPackageEntitlements,
   type ICoursePackage,
+  type CourseKind,
+  type CourseReviewStatus,
 } from "./course"
 export { Lesson, type ILesson, type LessonType } from "./lesson"
 export { Enrollment, type IEnrollment, type EnrollmentStatus } from "./enrollment"
@@ -21,7 +23,17 @@ export { Resource, type IResource, type ResourceKind } from "./resource"
 export { ResourceDownload, type IResourceDownload } from "./resource-download"
 export { Order, type IOrder, type OrderStatus, type OrderPaymentMethod } from "./order"
 export { PaymentEvent, type IPaymentEvent } from "./payment-event"
-export { Earning, type IEarning, type EarningStatus, type EarningKind, INSTRUCTOR_REVENUE_SHARE, EARNINGS_CLEARING_DAYS } from "./earning"
+export {
+  Earning,
+  type IEarning,
+  type EarningStatus,
+  type EarningKind,
+  INSTRUCTOR_REVENUE_SHARE,
+  EARNINGS_CLEARING_DAYS,
+  MARKETPLACE_SHARE_OWN_LINK,
+  MARKETPLACE_SHARE_ACADEMY,
+  REFERRAL_COMMISSION_RATE,
+} from "./earning"
 export { Notification, type INotification, type NotificationType } from "./notification"
 export {
   InstructorApplication,

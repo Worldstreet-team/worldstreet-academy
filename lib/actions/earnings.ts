@@ -19,7 +19,7 @@ const WITHDRAW_URL = process.env.NEXT_PUBLIC_WALLET_WITHDRAW_URL || "/dashboard/
 export type EarningRow = {
   id: string
   courseTitle: string
-  kind: "sale" | "adjustment"
+  kind: "sale" | "adjustment" | "referral"
   grossMinor: number
   feeMinor: number
   netMinor: number

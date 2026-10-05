@@ -13,9 +13,21 @@ import mongoose, { Schema, Document, Model, Types } from "mongoose"
  */
 
 export type EarningStatus = "pending" | "cleared" | "reversed"
-export type EarningKind = "sale" | "adjustment"
+export type EarningKind = "sale" | "adjustment" | "referral"
 
 export const INSTRUCTOR_REVENUE_SHARE = 0.85 // 85% instructor / 15% platform
+/**
+ * Marketplace seller shares (owner, 2026-10-05): the seller keeps 85% when the
+ * buyer came through the seller's own link, 50% when the Academy made the sale.
+ */
+export const MARKETPLACE_SHARE_OWN_LINK = 0.85
+export const MARKETPLACE_SHARE_ACADEMY = 0.5
+/**
+ * Referral commission (owner, 2026-10-05): 10% of the referred person's FIRST
+ * paid enrollment, paid from the Academy's share as a "referral" earning that
+ * clears like a sale. Never on a self-referral.
+ */
+export const REFERRAL_COMMISSION_RATE = 0.1
 export const EARNINGS_CLEARING_DAYS = 7
 
 export interface IEarning extends Document {
@@ -51,7 +63,7 @@ const EarningSchema = new Schema<IEarning>(
     instructor: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     instructorAuthUserId: { type: String, required: true },
     student: { type: Schema.Types.ObjectId, ref: "User", default: null },
-    kind: { type: String, enum: ["sale", "adjustment"], default: "sale" },
+    kind: { type: String, enum: ["sale", "adjustment", "referral"], default: "sale" },
     grossMinor: { type: Number, required: true },
     feeMinor: { type: Number, required: true },
     netMinor: { type: Number, required: true },

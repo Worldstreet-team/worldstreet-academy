@@ -15,6 +15,21 @@ export type CourseStatus = "draft" | "published" | "suspended" | "closed" | "arc
 
 export type PackageKey = "basic" | "standard" | "executive"
 
+/**
+ * What kind of course this is (owner meeting 2026-10-03). Legacy rows have no
+ * field and read as "program" — always go through `courseKindOf`
+ * (lib/course-kind.ts).
+ *  - program      a school program: live cohorts, Basic/Standard/Executive
+ *  - marketplace  a pre-recorded course sold on the Academy marketplace, by an
+ *                 approved seller or by the Academy's own faculty
+ *  - new-economy  a free course on how to use a WorldStreet product
+ */
+export type CourseKind = "program" | "marketplace" | "new-economy"
+
+/** A marketplace course's quality review before it may be published (approved sellers only). */
+export type CourseReviewStatus = "none" | "pending" | "approved" | "changes_requested"
+
+
 /** What a package unlocks beyond the lessons themselves (spec §6 ladder). */
 export interface IPackageEntitlements {
   liveClasses: boolean
@@ -105,6 +120,18 @@ export interface ICourse extends Document {
   /** When true, passing the course exam gates completion + certificate (enforced web + Go). */
   examRequired: boolean
   packages: ICoursePackage[]
+  /** See CourseKind; missing on legacy rows (= "program"). */
+  kind: CourseKind
+  /** Marketplace quality review. Status stays "draft" until an admin approves. */
+  review: {
+    status: CourseReviewStatus
+    submittedAt: Date | null
+    reviewedAt: Date | null
+    reviewedBy: Types.ObjectId | null
+    note: string | null
+  }
+  /** The class community for this course (WhatsApp, Telegram, Discord, Social…); null = none. */
+  communityUrl: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -245,6 +272,20 @@ const CourseSchema = new Schema<ICourse>(
       ],
       default: [],
     },
+    kind: {
+      type: String,
+      enum: ["program", "marketplace", "new-economy"],
+      default: "program",
+      index: true,
+    },
+    review: {
+      status: { type: String, enum: ["none", "pending", "approved", "changes_requested"], default: "none" },
+      submittedAt: { type: Date, default: null },
+      reviewedAt: { type: Date, default: null },
+      reviewedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+      note: { type: String, default: null, maxlength: 2000 },
+    },
+    communityUrl: { type: String, default: null, trim: true, maxlength: 500 },
     publishedAt: {
       type: Date,
       default: null,
