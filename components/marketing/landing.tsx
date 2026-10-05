@@ -1,6 +1,7 @@
 import { fetchBrowseCourses, fetchFaculty, fetchFreePreviewLessons, type BrowseCourse } from "@/lib/actions/student"
 import { fetchLandingReviews } from "@/lib/actions/reviews"
 import { getCurrentUser } from "@/lib/auth/actions"
+import { FACULTY_PUBLIC } from "@/lib/faculty"
 import { registerUrl } from "@/lib/auth/login-url"
 import { cheapestBySchool, countProgramsBySchool } from "@/lib/schools"
 import { HeroWall } from "@/components/marketing/hero-wall"
@@ -39,7 +40,8 @@ function futureDrops(published: BrowseCourse[]): BrowseCourse[] {
  * the How-it-works timeline, the catalogue
  * card grid (the ONLY section allowed to show course thumbnails), the
  * "Watch a free lesson" rail (real free previews only; hidden at zero), the
- * Faculty teaser (hidden when there is no faculty), Upcoming drops (hidden
+ * Faculty teaser (hidden when there is no faculty, and while FACULTY_PUBLIC
+ * is off), Upcoming drops (hidden
  * when nothing is scheduled), testimonials (real reviews), the FAQ, and the
  * finale CTA — plus a sticky school bar, fixed to the viewport, that follows
  * the visitor once the hero has scrolled out of view, and a gold reading-
@@ -56,7 +58,7 @@ export async function Landing() {
     getCurrentUser().catch(() => null),
     fetchBrowseCourses(),
     fetchLandingReviews(9),
-    fetchFaculty(),
+    FACULTY_PUBLIC ? fetchFaculty() : Promise.resolve([]),
     fetchFreePreviewLessons(),
   ])
 
@@ -109,8 +111,8 @@ export async function Landing() {
       {/* Watch a free lesson — real free previews only; hides at zero */}
       <FreePreviewRail previews={previews} />
 
-      {/* Faculty — up to four instructors and View faculty; hides at zero (spec §10) */}
-      <FacultyTeaser faculty={faculty} />
+      {/* Faculty — up to four instructors and View faculty; hides at zero (spec §10) and while FACULTY_PUBLIC is off */}
+      {FACULTY_PUBLIC && <FacultyTeaser faculty={faculty} />}
 
       {/* Upcoming drops (renders only when something is scheduled) */}
       {drops.length > 0 && <UpcomingDrops drops={drops} />}

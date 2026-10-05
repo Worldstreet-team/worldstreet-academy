@@ -1,6 +1,7 @@
 import type { BrowseCourse } from "@/lib/actions/student"
 import { SCHOOLS, type SchoolSlug } from "@/lib/schools"
 import { schoolCover } from "@/lib/school-art"
+import { FACULTY_PUBLIC } from "@/lib/faculty"
 
 /**
  * The `/schools` index as plain data: built once on the server from the live
@@ -32,7 +33,7 @@ export type IndexProgram = {
   packages: number
   /** "Opens Oct 3" for a program scheduled in the future; null once it is open. */
   opens: string | null
-  /** Lower-cased search words: title, blurb, outcomes, level, instructor. */
+  /** Lower-cased search words: title, blurb, outcomes, level, instructor (while FACULTY_PUBLIC). */
   terms: string[]
 }
 
@@ -99,7 +100,8 @@ function toProgram(course: BrowseCourse, now: number): IndexProgram {
         course.shortDescription ?? "",
         ...course.outcomes,
         LEVEL_LABEL[course.level] ?? "",
-        course.instructorName,
+        // Never a name the page doesn't show (FACULTY_PUBLIC, owner 2026-10-03).
+        FACULTY_PUBLIC ? course.instructorName : "",
       ].join(" ")
     ),
   }

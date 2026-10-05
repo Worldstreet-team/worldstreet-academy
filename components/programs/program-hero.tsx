@@ -11,8 +11,9 @@ import {
 } from "lucide-react"
 import type { ProgramDetail } from "@/lib/actions/student"
 import { SCHOOL_BY_SLUG } from "@/lib/schools"
-import { facultyHref } from "@/lib/faculty"
+import { ACADEMY_FACULTY, FACULTY_PUBLIC, facultyHref } from "@/lib/faculty"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { AcademyMark } from "@/components/shared/academy-mark"
 import { SchoolIcon } from "@/components/shared/school-icon"
 import { AvailabilityCountdown } from "@/components/shared/availability-countdown"
 import type { ProgramAccess } from "@/components/programs/access"
@@ -23,7 +24,9 @@ import { formatLength, initialsOf, plural } from "@/components/programs/format"
 /**
  * The hero band's text column: where the program sits (breadcrumb + school),
  * what it is (title, subtitle), what others made of it (rating, learners),
- * who teaches it, and what it holds.
+ * who teaches it, and what it holds. While people are hidden from the public
+ * site (FACULTY_PUBLIC), "who teaches it" is the Academy's faculty under the
+ * gold wsa-mark, never a person.
  *
  * Every fact renders ONLY when it is real. A catalogue program with no
  * lessons, no rating and no enrollments yet (most of them, before launch)
@@ -133,30 +136,39 @@ export function ProgramHero({
         </div>
       )}
 
-      <div className="mt-6 flex items-center gap-3 text-[14px]">
-        <Avatar className="size-9 shrink-0">
-          {program.instructorAvatarUrl && <AvatarImage src={program.instructorAvatarUrl} alt="" />}
-          <AvatarFallback className="bg-ws-raised text-[12px] font-semibold text-ws-primary">
-            {initialsOf(program.instructorName)}
-          </AvatarFallback>
-        </Avatar>
-        <p className="min-w-0 text-ws-muted">
-          Taught by{" "}
-          {profileHref ? (
-            <Link
-              href={profileHref}
-              className="rounded-sm font-semibold text-ws-primary underline decoration-ws-hairline underline-offset-4 transition-colors duration-[var(--ws-motion-fast)] hover:decoration-current focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40"
-            >
-              {program.instructorName}
-            </Link>
-          ) : (
-            <span className="font-semibold text-ws-primary">{program.instructorName}</span>
-          )}
-          {program.instructorHeadline && (
-            <span className="hidden sm:inline"> · {program.instructorHeadline}</span>
-          )}
-        </p>
-      </div>
+      {FACULTY_PUBLIC ? (
+        <div className="mt-6 flex items-center gap-3 text-[14px]">
+          <Avatar className="size-9 shrink-0">
+            {program.instructorAvatarUrl && <AvatarImage src={program.instructorAvatarUrl} alt="" />}
+            <AvatarFallback className="bg-ws-raised text-[12px] font-semibold text-ws-primary">
+              {initialsOf(program.instructorName)}
+            </AvatarFallback>
+          </Avatar>
+          <p className="min-w-0 text-ws-muted">
+            Taught by{" "}
+            {profileHref ? (
+              <Link
+                href={profileHref}
+                className="rounded-sm font-semibold text-ws-primary underline decoration-ws-hairline underline-offset-4 transition-colors duration-[var(--ws-motion-fast)] hover:decoration-current focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40"
+              >
+                {program.instructorName}
+              </Link>
+            ) : (
+              <span className="font-semibold text-ws-primary">{program.instructorName}</span>
+            )}
+            {program.instructorHeadline && (
+              <span className="hidden sm:inline"> · {program.instructorHeadline}</span>
+            )}
+          </p>
+        </div>
+      ) : (
+        <div className="mt-6 flex items-center gap-3 text-[14px]">
+          <AcademyMark size={36} />
+          <p className="min-w-0 text-ws-muted">
+            Taught by <span className="font-semibold text-ws-primary">{ACADEMY_FACULTY}</span>
+          </p>
+        </div>
+      )}
 
       <ul className="mt-7 flex flex-wrap gap-x-6 gap-y-3 border-t border-ws-hairline pt-6 text-[14px] text-ws-muted">
         {meta.map(({ icon: Icon, label, capitalize }) => (

@@ -1,5 +1,24 @@
 import { z } from "zod/v4"
+import { BRAND } from "@/lib/brand"
 import { isCountryCode } from "@/lib/countries"
+
+/**
+ * Whether people (instructors' names, photos and profiles) appear on the
+ * public, signed-out-reachable site. Owner meeting, 2026-10-03: visitors were
+ * confused by named tutors ("Taught by …"), so the public site credits the
+ * Academy's faculty as a whole until this is switched back on. UI only —
+ * nothing is deleted. While false: /faculty and /faculty/[username] 404, the
+ * sitemap, navbar, mobile menu and footer drop Faculty, the landing teaser,
+ * school faculty section and program instructor section are not rendered, and
+ * every "Taught by <person>" reads ACADEMY_FACULTY with the gold wsa-mark.
+ * Certificates (/verify) and the signed-in apps keep the real instructor.
+ */
+export const FACULTY_PUBLIC: boolean = false
+
+/** Who teaches, on public pages while FACULTY_PUBLIC is off. */
+export const ACADEMY_FACULTY = `${BRAND.name} faculty`
+/** The same credit where a card has no room for the full name. */
+export const ACADEMY_FACULTY_SHORT = `${BRAND.eyebrow} faculty`
 
 /**
  * Faculty (spec §10): the rules both profile editors share. Pure and

@@ -3,8 +3,10 @@ import { ChevronRightIcon, StarIcon } from "lucide-react"
 import { SCHOOLS, type School } from "@/lib/schools"
 import type { CourseRatingSummary } from "@/lib/actions/reviews"
 import { packagePriceLabel } from "@/lib/program-price"
+import { ACADEMY_FACULTY, FACULTY_PUBLIC } from "@/lib/faculty"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { AcademyMark } from "@/components/shared/academy-mark"
 import { SchoolIcon } from "@/components/shared/school-icon"
 import { initialsOf } from "@/components/programs/format"
 import { SchoolHeroArt } from "@/components/schools/school-hero-art"
@@ -26,7 +28,9 @@ const rise = (step: number) => ({ "--rise-delay": `${step * 60}ms` }) as React.C
  *
  * The facts are real or absent: programs, level range, the cheapest price,
  * free lessons, who teaches, learners and the combined rating each render
- * only when there is something true and non-zero to say.
+ * only when there is something true and non-zero to say. While people are
+ * hidden from the public site (FACULTY_PUBLIC), who teaches is the Academy's
+ * faculty under the gold wsa-mark.
  */
 export function SchoolHero({
   school,
@@ -191,7 +195,7 @@ function HeroFacts({
     onArt && "lg:text-white"
   )
 
-  const facts: Array<{ key: string; label: string; value: React.ReactNode }> = [
+  const facts: Array<{ key: string; label: string; value: React.ReactNode; className?: string }> = [
     { key: "programs", label: "Programs", value: <span className="tabular-nums">{programs.length}</span> },
     {
       key: "levels",
@@ -216,23 +220,36 @@ function HeroFacts({
     ...(freeLessons > 0
       ? [{ key: "free", label: "Free lessons", value: <span className="tabular-nums">{freeLessons}</span> }]
       : []),
-    instructors.length === 1
+    !FACULTY_PUBLIC
       ? {
           key: "faculty",
           label: "Taught by",
+          // The credit is long: on the phone and sm grids it takes a whole row.
+          className: "col-span-2",
           value: (
             <>
-              <Avatar className="size-6 shrink-0">
-                {instructors[0].avatarUrl && <AvatarImage src={instructors[0].avatarUrl} alt="" />}
-                <AvatarFallback className="bg-ws-raised text-[10px] font-semibold text-ws-primary">
-                  {initialsOf(instructors[0].name)}
-                </AvatarFallback>
-              </Avatar>
-              <span className="min-w-0 truncate">{instructors[0].name}</span>
+              <AcademyMark size={24} />
+              <span className="min-w-0">{ACADEMY_FACULTY}</span>
             </>
           ),
         }
-      : { key: "faculty", label: "Instructors", value: <span className="tabular-nums">{instructors.length}</span> },
+      : instructors.length === 1
+        ? {
+            key: "faculty",
+            label: "Taught by",
+            value: (
+              <>
+                <Avatar className="size-6 shrink-0">
+                  {instructors[0].avatarUrl && <AvatarImage src={instructors[0].avatarUrl} alt="" />}
+                  <AvatarFallback className="bg-ws-raised text-[10px] font-semibold text-ws-primary">
+                    {initialsOf(instructors[0].name)}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="min-w-0 truncate">{instructors[0].name}</span>
+              </>
+            ),
+          }
+        : { key: "faculty", label: "Instructors", value: <span className="tabular-nums">{instructors.length}</span> },
     ...(learners > 0
       ? [{ key: "learners", label: "Learners", value: <span className="tabular-nums">{learners.toLocaleString("en-US")}</span> }]
       : []),
@@ -272,7 +289,7 @@ function HeroFacts({
         )}
       >
         {facts.map((fact) => (
-          <div key={fact.key} className={cn("min-w-0", onArt && "lg:border-l lg:border-white/12 lg:px-7")}>
+          <div key={fact.key} className={cn("min-w-0", fact.className, onArt && "lg:border-l lg:border-white/12 lg:px-7")}>
             <dt className={label}>{fact.label}</dt>
             <dd className={value}>{fact.value}</dd>
           </div>

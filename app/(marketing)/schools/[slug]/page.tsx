@@ -8,6 +8,7 @@ import { fetchSchoolReviews } from "@/lib/actions/school-page"
 import { packagePriceLabel, programPriceLabel } from "@/lib/program-price"
 import { appUrl } from "@/lib/app-url"
 import { BRAND } from "@/lib/brand"
+import { FACULTY_PUBLIC } from "@/lib/faculty"
 import { Faq } from "@/components/marketing/faq"
 import { PreviewProvider } from "@/components/programs/preview-player"
 import { SectionNav, type SectionLink } from "@/components/programs/section-nav"
@@ -70,7 +71,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
  *   learn         the programs' own outcomes, de-duplicated and attributed
  *   path          2+ levels, beginner → advanced
  *   free lessons  the shared preview player; hidden when none
- *   faculty       hidden when none
+ *   faculty       hidden when none, and while FACULTY_PUBLIC is off
  *   reviews       combined rating + the best written reviews; hidden when none
  *   FAQ · other schools · closing band · phone bar
  *
@@ -86,7 +87,7 @@ export default async function SchoolPage({ params }: Params) {
 
   const [catalogue, faculty, reviews] = await Promise.all([
     fetchBrowseCourses(),
-    fetchFaculty(),
+    FACULTY_PUBLIC ? fetchFaculty() : Promise.resolve([]),
     fetchSchoolReviews(school.slug, 6),
   ])
   const loaded = await Promise.all(

@@ -5,6 +5,7 @@ import { fetchBrowseCourses, fetchProgramBySlug, type BrowseCourse } from "@/lib
 import { fetchProgramCurriculum, fetchProgramReviews } from "@/lib/actions/program-page"
 import { appUrl } from "@/lib/app-url"
 import { BRAND } from "@/lib/brand"
+import { FACULTY_PUBLIC } from "@/lib/faculty"
 import { checkEnrollment } from "@/lib/actions/enrollments"
 import { getCachedUser } from "@/lib/auth/cached"
 import { getLearnStart } from "@/lib/course-access"
@@ -191,7 +192,7 @@ export default async function ProgramPage({
   const links: SectionLink[] = [
     { id: "overview", label: "Overview" },
     curriculum.length > 0 ? { id: "curriculum", label: "Curriculum" } : null,
-    { id: "instructor", label: "Instructor" },
+    FACULTY_PUBLIC ? { id: "instructor", label: "Instructor" } : null,
     showLadder ? { id: "packages", label: multiTier ? "Packages" : "Pricing" } : null,
     hasReviews ? { id: "reviews", label: "Reviews" } : null,
     { id: "faq", label: "FAQ" },
@@ -269,18 +270,21 @@ export default async function ProgramPage({
                   </div>
                 </section>
               )}
-              <ProgramInstructor
-                sectionId="instructor"
-                id={program.instructorId}
-                username={program.instructorUsername}
-                name={program.instructorName}
-                avatarUrl={program.instructorAvatarUrl}
-                headline={program.instructorHeadline}
-                bio={program.instructorBio}
-                totalStudents={program.instructorTotalStudents}
-                programCount={programCount}
-                signedIn={signedIn}
-              />
+              {/* No person on the public site while FACULTY_PUBLIC is off (owner 2026-10-03). */}
+              {FACULTY_PUBLIC && (
+                <ProgramInstructor
+                  sectionId="instructor"
+                  id={program.instructorId}
+                  username={program.instructorUsername}
+                  name={program.instructorName}
+                  avatarUrl={program.instructorAvatarUrl}
+                  headline={program.instructorHeadline}
+                  bio={program.instructorBio}
+                  totalStudents={program.instructorTotalStudents}
+                  programCount={programCount}
+                  signedIn={signedIn}
+                />
+              )}
             </div>
 
             <div className="col-[1/-1] row-start-4 min-w-0 pt-20 lg:pt-24">

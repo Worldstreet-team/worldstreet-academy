@@ -5,6 +5,7 @@ import { ArrowRightIcon, SearchIcon } from "lucide-react"
 import { SCHOOLS, SCHOOL_BY_SLUG, countProgramsBySchool, type School, type SchoolSlug } from "@/lib/schools"
 import { schoolCover } from "@/lib/school-art"
 import { BRAND } from "@/lib/brand"
+import { FACULTY_PUBLIC } from "@/lib/faculty"
 import { appUrl } from "@/lib/app-url"
 import { fetchBrowseCourses, type BrowseCourse } from "@/lib/actions/student"
 import { getCachedUser } from "@/lib/auth/cached"
@@ -24,10 +25,12 @@ export const revalidate = 0
  * The navbar's "Search programs" (`?q=`): every word must appear somewhere in
  * the program's title, its school's name or short label, or its instructor's
  * name — case-insensitive, so "trading forex" finds "Forex Trading Mastery".
+ * Not the instructor while people are hidden from the public site
+ * (FACULTY_PUBLIC): a search must not find a program by a name it never shows.
  */
 function matchesQuery(course: BrowseCourse, words: string[]): boolean {
   const school = course.school ? SCHOOL_BY_SLUG[course.school] : null
-  const haystack = [course.title, school?.name, school?.short, course.instructorName]
+  const haystack = [course.title, school?.name, school?.short, FACULTY_PUBLIC ? course.instructorName : null]
     .filter(Boolean)
     .join(" ")
     .toLowerCase()
@@ -136,7 +139,7 @@ export default async function ProgramsPage({
           </span>
           <p className="mt-4 font-display text-lg font-semibold text-ws-primary">No programs match “{query}”</p>
           <p className="mx-auto mt-2 max-w-md text-[14px] leading-relaxed text-ws-muted">
-            Try a program, a school or an instructor&rsquo;s name.
+            {FACULTY_PUBLIC ? <>Try a program, a school or an instructor&rsquo;s name.</> : "Try a program or a school."}
           </p>
           <Link
             href="/programs"

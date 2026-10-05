@@ -4,6 +4,7 @@ import { getCachedUser } from "@/lib/auth/cached"
 import { getStartGateState } from "@/lib/start-gate-state"
 import { needsSchoolChoice } from "@/lib/start-gate"
 import { appUrl } from "@/lib/app-url"
+import { FACULTY_PUBLIC } from "@/lib/faculty"
 import { SchoolsIndex } from "@/components/schools-index/schools-index"
 import { GateNotice } from "@/components/schools-index/gate-notice"
 import { FreeLessons } from "@/components/schools-index/free-lessons"
@@ -63,7 +64,8 @@ export default async function SchoolsPage({ searchParams }: Search) {
   const [courses, previews, facultyCount, welcome] = await Promise.all([
     fetchBrowseCourses(),
     fetchFreePreviewLessons(9),
-    fetchFacultyCount(),
+    // No faculty count or link while people are hidden from the public site (owner 2026-10-03).
+    FACULTY_PUBLIC ? fetchFacultyCount() : Promise.resolve(0),
     start ? gateWelcome().catch(() => null) : Promise.resolve(null),
   ])
 
