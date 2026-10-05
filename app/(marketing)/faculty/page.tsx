@@ -1,8 +1,10 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import { notFound } from "next/navigation"
 import { fetchFaculty } from "@/lib/actions/student"
 import { appUrl } from "@/lib/app-url"
 import { BRAND } from "@/lib/brand"
+import { FACULTY_PUBLIC } from "@/lib/faculty"
 import { FacultyCard } from "@/components/faculty/faculty-card"
 
 /** Spec §10 intro, verbatim (brand casing per D1). */
@@ -20,9 +22,11 @@ export const revalidate = 0
 /**
  * `/faculty` — spec §10 as a page: the heading and intro, then every faculty
  * member (role INSTRUCTOR or ADMIN with at least one published program),
- * featured first.
+ * featured first. Not found while faculty is hidden from the public site
+ * (FACULTY_PUBLIC, owner meeting 2026-10-03).
  */
 export default async function FacultyPage() {
+  if (!FACULTY_PUBLIC) notFound()
   const faculty = await fetchFaculty()
 
   return (

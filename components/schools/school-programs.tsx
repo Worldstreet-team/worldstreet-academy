@@ -3,8 +3,10 @@ import Image from "next/image"
 import { ArrowRightIcon, CalendarClockIcon, StarIcon } from "lucide-react"
 import type { School } from "@/lib/schools"
 import { PACKAGE_LABEL } from "@/lib/entitlements"
+import { ACADEMY_FACULTY, FACULTY_PUBLIC } from "@/lib/faculty"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { AcademyMark } from "@/components/shared/academy-mark"
 import { levelChipStyle } from "@/components/shared/level-badge"
 import { SchoolIcon } from "@/components/shared/school-icon"
 import { initialsOf, plural } from "@/components/programs/format"
@@ -20,8 +22,20 @@ import { opensLabel, sizeLine, type SchoolProgram } from "@/components/schools/m
  *
  * With no programs yet the section says so plainly and points somewhere
  * useful, instead of leaving a dashed hole.
+ *
+ * `cohort` (the live cohort strip) sits between the heading and the cards,
+ * beside the choice it asks for; it is left out when there is nothing to
+ * choose.
  */
-export function SchoolPrograms({ school, programs }: { school: School; programs: SchoolProgram[] }) {
+export function SchoolPrograms({
+  school,
+  programs,
+  cohort,
+}: {
+  school: School
+  programs: SchoolProgram[]
+  cohort?: React.ReactNode
+}) {
   const count = programs.length
 
   return (
@@ -42,6 +56,8 @@ export function SchoolPrograms({ school, programs }: { school: School; programs:
           ) : undefined
         }
       />
+
+      {count > 0 && cohort && <div className="mt-8">{cohort}</div>}
 
       {count === 0 ? (
         <EmptyPrograms school={school} />
@@ -183,15 +199,22 @@ function ProgramCard({ item, variant }: { item: SchoolProgram; variant: "feature
         )}
 
         <div className="mt-auto pt-7">
-          <p className="flex min-w-0 items-center gap-2 text-[13.5px]">
-            <Avatar className="size-6 shrink-0">
-              {program.instructorAvatarUrl && <AvatarImage src={program.instructorAvatarUrl} alt="" />}
-              <AvatarFallback className="bg-ws-raised text-[10px] font-semibold text-ws-primary">
-                {initialsOf(program.instructorName)}
-              </AvatarFallback>
-            </Avatar>
-            <span className="truncate text-ws-primary">{program.instructorName}</span>
-          </p>
+          {FACULTY_PUBLIC ? (
+            <p className="flex min-w-0 items-center gap-2 text-[13.5px]">
+              <Avatar className="size-6 shrink-0">
+                {program.instructorAvatarUrl && <AvatarImage src={program.instructorAvatarUrl} alt="" />}
+                <AvatarFallback className="bg-ws-raised text-[10px] font-semibold text-ws-primary">
+                  {initialsOf(program.instructorName)}
+                </AvatarFallback>
+              </Avatar>
+              <span className="truncate text-ws-primary">{program.instructorName}</span>
+            </p>
+          ) : (
+            <p className="flex min-w-0 items-center gap-2 text-[13.5px]">
+              <AcademyMark size={24} />
+              <span className="truncate text-ws-primary">{ACADEMY_FACULTY}</span>
+            </p>
+          )}
           {/* One run of text, so a wrap never strands a separator at the start of a line. */}
           {(rated || size.length > 0) && (
             <p className="mt-2.5 text-[13.5px] leading-relaxed tabular-nums text-ws-muted">

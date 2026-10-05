@@ -50,6 +50,7 @@ export function SchoolsIndex({
   initialQuery,
   initialLevel,
   notice,
+  cohort,
 }: {
   data: SchoolsIndexData
   stats: IndexStats
@@ -57,6 +58,8 @@ export function SchoolsIndex({
   initialLevel: LevelFilter
   /** The school-first gate's welcome, when it applies (server-rendered). */
   notice?: React.ReactNode
+  /** The live cohort strip (server-rendered; null once the cohort has begun), between the header and the schools. */
+  cohort?: React.ReactNode
 }) {
   const ok = useMotionOK()
   const [query, setQuery] = React.useState(initialQuery)
@@ -270,6 +273,8 @@ export function SchoolsIndex({
           </div>
         </div>
       </section>
+
+      {cohort && <div className="mx-auto max-w-7xl px-6 pb-14 md:pb-20">{cohort}</div>}
 
       <IndexBar
         show={barShown}

@@ -3,6 +3,7 @@ import type { ProgramCurriculumLesson } from "@/lib/actions/program-page"
 import type { PackageKey } from "@/lib/db/models"
 import { courseAvailability } from "@/lib/types/course"
 import { PACKAGE_LABEL } from "@/lib/entitlements"
+import { FACULTY_PUBLIC } from "@/lib/faculty"
 import { programPriceLabel } from "@/lib/program-price"
 import { programIncludes, type IncludedItem, type ProgramFacts } from "@/components/programs/purchase-panel"
 import type { ProgramPreview } from "@/components/programs/preview-player"
@@ -237,16 +238,21 @@ export function compareGroups(programs: SchoolProgram[]): CompareGroup[] {
           : null
       ),
     },
-    {
-      label: "Instructor",
-      cells: programs.map(({ program }) => ({ kind: "text", text: program.instructorName })),
-    },
+    // No person on the public site while FACULTY_PUBLIC is off (owner 2026-10-03).
+    ...(FACULTY_PUBLIC
+      ? [
+          {
+            label: "Instructor",
+            cells: programs.map(({ program }): CompareCell => ({ kind: "text", text: program.instructorName })),
+          },
+        ]
+      : []),
   ]
   const kept = (rows: CompareRow[]) => rows.filter((row) => row.cells.some((cell) => cell !== null))
   return [
     { title: "At a glance", rows: kept(basics) },
     { title: "What’s inside today", rows: kept(inside) },
     { title: "Which package adds each service", rows: kept(services) },
-    { title: "Learners and faculty", rows: kept(people) },
+    { title: FACULTY_PUBLIC ? "Learners and faculty" : "What learners say", rows: kept(people) },
   ].filter((group) => group.rows.length > 0)
 }

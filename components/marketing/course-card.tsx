@@ -10,7 +10,9 @@ import { WishlistButton, autoBookmark } from "@/components/marketing/wishlist-bu
 import type { BrowseCourse } from "@/lib/actions/student"
 import { programPriceLabel } from "@/lib/program-price"
 import { SCHOOL_BY_SLUG } from "@/lib/schools"
+import { ACADEMY_FACULTY_SHORT, FACULTY_PUBLIC } from "@/lib/faculty"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { AcademyMark } from "@/components/shared/academy-mark"
 
 export function formatDuration(totalMinutes: number): string {
   if (!totalMinutes || totalMinutes <= 0) return ""
@@ -58,7 +60,8 @@ export function dropDateLabel(availableAt: string): string {
  *
  * The art carries the school's label; on hover the first three outcomes
  * slide up over it (hidden when the program has none). The footer names the
- * instructor.
+ * instructor — or, while people are hidden from the public site
+ * (FACULTY_PUBLIC), credits the Academy's faculty under the gold wsa-mark.
  */
 export function MarketingCourseCard({
   course,
@@ -171,13 +174,20 @@ export function MarketingCourseCard({
           <div className="mt-auto flex min-h-[calc(0.75rem+1.25rem)] items-center justify-between gap-2 border-t border-ws-hairline pt-3">
             {/* No lesson/duration counts: brand-new programs read "0 lessons"
                 and that is worse than saying nothing. */}
-            <span className="flex min-w-0 items-center gap-2">
-              <Avatar className="h-5 w-5 shrink-0">
-                {course.instructorAvatarUrl && <AvatarImage src={course.instructorAvatarUrl} alt="" />}
-                <AvatarFallback className="text-[9px]">{initials(course.instructorName)}</AvatarFallback>
-              </Avatar>
-              <span className="truncate text-[12px] text-ws-muted">{course.instructorName}</span>
-            </span>
+            {FACULTY_PUBLIC ? (
+              <span className="flex min-w-0 items-center gap-2">
+                <Avatar className="h-5 w-5 shrink-0">
+                  {course.instructorAvatarUrl && <AvatarImage src={course.instructorAvatarUrl} alt="" />}
+                  <AvatarFallback className="text-[9px]">{initials(course.instructorName)}</AvatarFallback>
+                </Avatar>
+                <span className="truncate text-[12px] text-ws-muted">{course.instructorName}</span>
+              </span>
+            ) : (
+              <span className="flex min-w-0 items-center gap-2">
+                <AcademyMark size={20} />
+                <span className="truncate text-[12px] text-ws-muted">{ACADEMY_FACULTY_SHORT}</span>
+              </span>
+            )}
             <span className="flex items-center gap-2">
               {course.tierCount > 1 && (
                 <span className="text-[11px] tabular-nums text-ws-subtle">{course.tierCount} packages</span>

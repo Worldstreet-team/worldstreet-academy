@@ -9,7 +9,7 @@ import { fetchBrowseCourses, fetchFacultyProfile } from "@/lib/actions/student"
 import { appUrl } from "@/lib/app-url"
 import { BRAND } from "@/lib/brand"
 import { countryName } from "@/lib/countries"
-import { facultyHref, facultyInitials } from "@/lib/faculty"
+import { FACULTY_PUBLIC, facultyHref, facultyInitials } from "@/lib/faculty"
 
 // Profile edits, role changes and publishing all change this page.
 export const revalidate = 0
@@ -20,6 +20,7 @@ type Params = { params: Promise<{ username: string }> }
 const getProfile = cache((username: string) => fetchFacultyProfile(username))
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
+  if (!FACULTY_PUBLIC) return {}
   const { username } = await params
   const profile = await getProfile(username)
   if (!profile) return {}
@@ -36,9 +37,11 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
  * spec §10 fields: photo, name, area of specialization, short biography,
  * professional experience, courses taught and credentials/achievements — plus
  * headline, country, expertise and links. Unknown usernames, students and
- * instructors without a published program 404.
+ * instructors without a published program 404 — and every profile does while
+ * faculty is hidden from the public site (FACULTY_PUBLIC, owner 2026-10-03).
  */
 export default async function FacultyProfilePage({ params }: Params) {
+  if (!FACULTY_PUBLIC) notFound()
   const { username } = await params
   const profile = await getProfile(username)
   if (!profile) notFound()

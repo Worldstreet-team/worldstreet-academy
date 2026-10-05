@@ -1,9 +1,11 @@
 import { fetchBrowseCourses, fetchFaculty, fetchFreePreviewLessons, type BrowseCourse } from "@/lib/actions/student"
 import { fetchLandingReviews } from "@/lib/actions/reviews"
 import { getCurrentUser } from "@/lib/auth/actions"
+import { FACULTY_PUBLIC } from "@/lib/faculty"
 import { registerUrl } from "@/lib/auth/login-url"
 import { cheapestBySchool, countProgramsBySchool } from "@/lib/schools"
 import { HeroWall } from "@/components/marketing/hero-wall"
+import { CohortBanner } from "@/components/marketing/cohort-banner"
 import { HowItWorks } from "@/components/marketing/how-it-works"
 import { WordsMarquee } from "@/components/marketing/words-marquee"
 import { AboutBand } from "@/components/marketing/about-band"
@@ -35,11 +37,13 @@ function futureDrops(published: BrowseCourse[]): BrowseCourse[] {
 
 /**
  * The Academy landing at `/` — clean editorial composition, in order: hero,
- * the band of words, the Schools grid, the About statement, the Why pillars,
- * the How-it-works timeline, the catalogue
+ * the live cohort band (hidden once the cohort has begun), the band of
+ * words, the Schools grid, the About statement, the Why pillars, the
+ * How-it-works timeline, the catalogue
  * card grid (the ONLY section allowed to show course thumbnails), the
  * "Watch a free lesson" rail (real free previews only; hidden at zero), the
- * Faculty teaser (hidden when there is no faculty), Upcoming drops (hidden
+ * Faculty teaser (hidden when there is no faculty, and while FACULTY_PUBLIC
+ * is off), Upcoming drops (hidden
  * when nothing is scheduled), testimonials (real reviews), the FAQ, and the
  * finale CTA — plus a sticky school bar, fixed to the viewport, that follows
  * the visitor once the hero has scrolled out of view, and a gold reading-
@@ -56,7 +60,7 @@ export async function Landing() {
     getCurrentUser().catch(() => null),
     fetchBrowseCourses(),
     fetchLandingReviews(9),
-    fetchFaculty(),
+    FACULTY_PUBLIC ? fetchFaculty() : Promise.resolve([]),
     fetchFreePreviewLessons(),
   ])
 
@@ -88,6 +92,9 @@ export async function Landing() {
       {/* Hero — the still claim over a slideshow of students, the school picker and its CTAs (spec §1) */}
       <HeroWall counts={schoolCounts} cheapest={schoolFrom} signedIn={signedIn} registerUrl={REGISTER_URL} />
 
+      {/* Live cohort — the date, the countdown and "Choose your school" (owner 2026-10-03); gone once it begins */}
+      <CohortBanner variant="band" className="pt-14 md:pt-20" />
+
       {/* The band of words — the eight schools' vocabulary */}
       <WordsMarquee />
 
@@ -109,8 +116,8 @@ export async function Landing() {
       {/* Watch a free lesson — real free previews only; hides at zero */}
       <FreePreviewRail previews={previews} />
 
-      {/* Faculty — up to four instructors and View faculty; hides at zero (spec §10) */}
-      <FacultyTeaser faculty={faculty} />
+      {/* Faculty — up to four instructors and View faculty; hides at zero (spec §10) and while FACULTY_PUBLIC is off */}
+      {FACULTY_PUBLIC && <FacultyTeaser faculty={faculty} />}
 
       {/* Upcoming drops (renders only when something is scheduled) */}
       {drops.length > 0 && <UpcomingDrops drops={drops} />}
