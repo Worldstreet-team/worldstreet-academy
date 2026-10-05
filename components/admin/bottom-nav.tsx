@@ -11,6 +11,7 @@ import {
   Inbox,
   ReceiptText,
   Star,
+  Store,
   Users,
   Wallet,
   type LucideIcon,
@@ -56,7 +57,7 @@ const navItems: BottomNavItem[] = [
   },
 ]
 
-/** ESPEE payments, Courses, Reviews and Exams share the fifth slot behind a "More" menu. */
+/** ESPEE payments, Courses, Sellers, Reviews and Exams share the fifth slot behind a "More" menu. */
 const moreItems: BottomNavItem[] = [
   {
     title: "ESPEE payments",
@@ -69,6 +70,12 @@ const moreItems: BottomNavItem[] = [
     href: "/admin/courses",
     icon: BookOpen,
     match: (p: string) => p.startsWith("/admin/courses"),
+  },
+  {
+    title: "Sellers",
+    href: "/admin/sellers",
+    icon: Store,
+    match: (p: string) => p.startsWith("/admin/sellers"),
   },
   {
     title: "Reviews",

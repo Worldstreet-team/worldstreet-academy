@@ -1365,3 +1365,151 @@ export async function sendEspeePaymentRejectedEmail(
     return { success: false, error: "Failed to send email" }
   }
 }
+
+/* ─── Academy Marketplace (owner, 2026-10-05) ─── */
+
+/** The quoted reason or note in a decision email — the same panel the ESPEE rejection uses. */
+function NoteBox({ text }: { text: string }) {
+  return (
+    <Text
+      style={{
+        ...sub,
+        margin: "16px 0 0",
+        padding: "12px 14px",
+        backgroundColor: "#F5F4F3",
+        borderRadius: "10px",
+        color: "#292524",
+        textAlign: "left" as const,
+      }}
+    >
+      {text}
+    </Text>
+  )
+}
+
+/** New seller application — one per admin (follows sendNewApplicationAdminEmail). */
+export async function sendNewSellerApplicationAdminEmail(
+  to: string,
+  data: { applicantName: string; applicantAvatarUrl?: string; topic: string; schoolName: string; reviewUrl: string }
+) {
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to,
+      subject: `New seller application — ${data.applicantName}`,
+      react: React.createElement(SimplePipelineEmail, {
+        preview: `${data.applicantName} applied to sell on the marketplace`,
+        title: "New seller application",
+        bodyText: `${data.applicantName} wants to sell a course on the marketplace: “${data.topic}” (${data.schoolName}).`,
+        ctaLabel: "Review application",
+        ctaUrl: data.reviewUrl,
+        avatarUrl: data.applicantAvatarUrl,
+        avatarName: data.applicantName,
+      }),
+    })
+    if (error) return { success: false, error: error.message }
+    return { success: true }
+  } catch (err) {
+    console.error("[Email] Admin new-seller error:", err)
+    return { success: false, error: "Failed to send email" }
+  }
+}
+
+/** The seller application's outcome: approved (open the seller area) or rejected (with the reason). */
+export async function sendSellerDecisionEmail(data: {
+  to: string
+  firstName: string
+  approved: boolean
+  reason: string | null
+  /** Approved: the seller area. Rejected: the application page. */
+  ctaUrl: string
+}) {
+  if (!data.to) return { success: false, error: "No recipient" }
+  const who = data.firstName ? `${data.firstName}, ` : ""
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: data.to,
+      subject: data.approved ? "You're approved to sell on the marketplace" : "Your seller application",
+      react: React.createElement(SimplePipelineEmail, {
+        preview: data.approved ? "Create your first marketplace course" : "About your seller application",
+        title: data.approved ? "You're approved to sell" : "Application not approved",
+        bodyText: data.approved
+          ? `${who}welcome to the ${BRAND.name} marketplace. Create your course, add your lessons and submit it for review — we publish it once it meets the quality standards.`
+          : `${who}thank you for applying to sell on the ${BRAND.name} marketplace. We can't approve your application yet.`,
+        ctaLabel: data.approved ? "Create your course" : "View your application",
+        ctaUrl: data.ctaUrl,
+        extra: !data.approved && data.reason ? React.createElement(NoteBox, { text: data.reason }) : undefined,
+      }),
+    })
+    if (error) return { success: false, error: error.message }
+    return { success: true }
+  } catch (err) {
+    console.error("[Email] Seller decision error:", err)
+    return { success: false, error: "Failed to send email" }
+  }
+}
+
+/** A seller submitted a marketplace course for review — one per admin. */
+export async function sendCourseReviewAdminEmail(
+  to: string,
+  data: { sellerName: string; sellerAvatarUrl?: string; courseTitle: string; reviewUrl: string }
+) {
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to,
+      subject: `Course to review — ${data.courseTitle}`,
+      react: React.createElement(SimplePipelineEmail, {
+        preview: `${data.sellerName} submitted a course for review`,
+        title: "A marketplace course is waiting for review",
+        bodyText: `${data.sellerName} submitted “${data.courseTitle}”. Check it against the quality standards, then approve it or request changes.`,
+        ctaLabel: "Open the review queue",
+        ctaUrl: data.reviewUrl,
+        avatarUrl: data.sellerAvatarUrl,
+        avatarName: data.sellerName,
+      }),
+    })
+    if (error) return { success: false, error: error.message }
+    return { success: true }
+  } catch (err) {
+    console.error("[Email] Course review admin error:", err)
+    return { success: false, error: "Failed to send email" }
+  }
+}
+
+/** The review's outcome for the seller: published, or changes requested with the reviewer's note. */
+export async function sendCourseReviewDecisionEmail(data: {
+  to: string
+  firstName: string
+  courseTitle: string
+  approved: boolean
+  note: string | null
+  /** Approved: the live course page. Changes requested: the editor. */
+  ctaUrl: string
+}) {
+  if (!data.to) return { success: false, error: "No recipient" }
+  const who = data.firstName ? `${data.firstName}, ` : ""
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: data.to,
+      subject: data.approved ? `Published: ${data.courseTitle}` : `Changes requested: ${data.courseTitle}`,
+      react: React.createElement(SimplePipelineEmail, {
+        preview: data.approved ? "Your course is live on the marketplace" : "A few changes before we can publish",
+        title: data.approved ? "Your course is live" : "Changes requested",
+        bodyText: data.approved
+          ? `${who}“${data.courseTitle}” passed review and is now on the marketplace. Share your own link from the seller area — sales through it earn you the larger share.`
+          : `${who}“${data.courseTitle}” needs a few changes before we can publish it. Make them in the editor and submit it again.`,
+        ctaLabel: data.approved ? "View your course" : "Edit your course",
+        ctaUrl: data.ctaUrl,
+        extra: data.note ? React.createElement(NoteBox, { text: data.note }) : undefined,
+      }),
+    })
+    if (error) return { success: false, error: error.message }
+    return { success: true }
+  } catch (err) {
+    console.error("[Email] Course review decision error:", err)
+    return { success: false, error: "Failed to send email" }
+  }
+}

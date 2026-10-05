@@ -29,6 +29,7 @@ import {
   LogOut,
   ReceiptText,
   Star,
+  Store,
   Users,
   Wallet,
   type LucideIcon,
@@ -86,6 +87,12 @@ const manageItems: NavItem[] = [
     href: "/admin/courses",
     icon: BookOpen,
     match: (p) => p.startsWith("/admin/courses"),
+  },
+  {
+    title: "Sellers",
+    href: "/admin/sellers",
+    icon: Store,
+    match: (p) => p.startsWith("/admin/sellers"),
   },
   {
     title: "Enrollments",
