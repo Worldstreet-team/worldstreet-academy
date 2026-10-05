@@ -136,3 +136,13 @@ Go needs no patch: nothing it reads changed. Optional for mobile: `GET` the call
 | `packageKey` | `null \| "basic" \| "standard" \| "executive"` | The saved tier, if one was picked. |
 | `status` | `"open" \| "converted" \| "dismissed"` | `open` until the learner enrolls (`converted`) or dismisses it. |
 | `savedAt` | date | When the intent was last saved. |
+
+## 7. Pay with ESPEE (owner meeting, 2026-10-03)
+
+Learners may pay by ESPEE transfer outside the wallet (1 ESPEE = $1); an admin approves their uploaded receipt on the web. All additive:
+
+- **`orders.paymentMethod`** — `"wallet" | "espee"`, default `"wallet"` (a missing field means wallet). An ESPEE order is written straight to `paid` → `enrolled` with `chargeId: null` and reference `academy_espee_<manualPaymentId>`. Any Go reconciliation, refund or "paid without a charge" check must skip or refuse `paymentMethod: "espee"`: there is no wallet charge to look up or refund.
+- **ESPEE enrollments** — ordinary `active` rows with `pricePaid > 0`, `transactionId: null` and `legacyUnpaid: false`. They are paid, not legacy: don't flag or revoke them. No `earnings` row is written for them (the money never enters the wallet).
+- **`users.referredBy`** — `{ text, at } | null`, checkout's "Who invited you?" (first answer wins). Any wholesale user write must keep it.
+- **`manualpayments`** — web-only; Go may ignore it. Receipts live only under `worldstreet-academy/payment-proofs/<userId>/` in the private resources bucket.
+- **Dashboard gate (web).** A learner reaches the web dashboard only with an `active` or `completed` enrollment; a saved school no longer opens it. Mobile may mirror this.
