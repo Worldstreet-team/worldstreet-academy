@@ -57,7 +57,10 @@ const enrollments = db.collection("enrollments")
 
 const problems = []
 const healed = []
-const paidOrders = await orders.find({ status: { $in: ["paid", "enrolled", "refunded"] } }).toArray()
+// ESPEE orders never touch the wallet (no chargeId by design) — nothing to reconcile.
+const paidOrders = await orders
+  .find({ status: { $in: ["paid", "enrolled", "refunded"] }, paymentMethod: { $ne: "espee" } })
+  .toArray()
 
 console.log(`Reconciling ${paidOrders.length} order(s) against the wallet service...`)
 for (const order of paidOrders) {
