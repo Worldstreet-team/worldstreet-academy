@@ -57,7 +57,7 @@ import { useNow } from "@/lib/hooks/use-now"
  * there is no ambient motion.
  */
 
-/** Section heading outside a card: Poppins 20, with a quiet "See all". Gold on this page belongs to the hero's CTA. */
+/** Section heading outside a card: Manrope 20, with a quiet "See all". Gold on this page belongs to the hero's CTA. */
 function SectionHeading({
   id,
   title,

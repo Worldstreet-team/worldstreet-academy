@@ -8,7 +8,7 @@ import { CardShell, Skel, SkeletonRows } from "@/components/ui/system"
 
 export type Glyph = React.ComponentType<{ className?: string }>
 
-/** A Hugeicons glyph as the kit's `icon` prop — components/ui/system.tsx takes a component. Call at module scope. */
+/** A design-system glyph as the kit's `icon` prop — components/ui/system.tsx takes a component. Call at module scope. */
 export function glyph(icon: IconComponent): Glyph {
   function IconGlyph({ className }: { className?: string }) {
     return <Glyph icon={icon} className={className} aria-hidden />

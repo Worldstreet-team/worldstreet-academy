@@ -24,7 +24,7 @@ export function Footer({ showFaculty }: { showFaculty: boolean }) {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
           <div className="col-span-2 md:col-span-1">
             {/* Unified ecosystem lockup (05-screens): gold wsa-mark 26px +
-                "WorldStreet" Poppins SemiBold 15 + gold app eyebrow. */}
+                "WorldStreet" Manrope SemiBold 15 + gold app eyebrow. */}
             <Link href="/" className="flex items-center gap-2 mb-4">
               <BrandLockup alt="" />
             </Link>

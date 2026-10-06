@@ -14,7 +14,7 @@ type BrandLockupProps = {
 
 /**
  * Unified ecosystem lockup (design-system 05-screens): gold wsa-mark 26px +
- * "WorldStreet" Poppins SemiBold 15 + gold uppercase app eyebrow. One
+ * "WorldStreet" Manrope SemiBold 15 + gold uppercase app eyebrow. One
  * implementation for the marketing navbar/footer and all three sidebars.
  */
 export function BrandLockup({ eyebrow = BRAND.eyebrow, alt = "", truncate = false, className }: BrandLockupProps) {

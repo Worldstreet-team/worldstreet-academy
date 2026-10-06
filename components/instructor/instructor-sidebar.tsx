@@ -29,7 +29,7 @@ import { BrandLockup } from "@/components/shared/brand-lockup"
 
 /**
  * Instructor sidebar — same 260px rail recipe as the student AppSidebar
- * (components/platform/app-sidebar.tsx): 40px rows, 20px Lucide glyphs,
+ * (components/platform/app-sidebar.tsx): 40px rows, 20px duotone glyphs,
  * active row a `bg/chip` pill with a gold icon. The four cross-app
  * WorldStreet links collapse behind one disclosure so they stop competing
  * with teaching navigation.
@@ -222,7 +222,7 @@ export function InstructorSidebar({ seller = false }: { seller?: boolean }) {
               className="rounded-md transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-chip"
             >
               {/* Unified ecosystem lockup (05-screens): gold wsa-mark 26px +
-                  "WorldStreet" Poppins SemiBold 15 + gold app eyebrow. */}
+                  "WorldStreet" Manrope SemiBold 15 + gold app eyebrow. */}
               <BrandLockup truncate />
             </SidebarMenuButton>
           </SidebarMenuItem>

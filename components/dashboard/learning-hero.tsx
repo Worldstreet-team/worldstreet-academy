@@ -38,7 +38,7 @@ import { cn } from "@/lib/utils"
  * The top of the student home: the greeting row and the learning hero — the
  * Academy's analogue of the hub's balance hero (design-system 05, wallet-hero
  * pattern). The hero's figure is the program's progress, set as the house
- * Balance: Poppins Light, large, tabular.
+ * Balance: Manrope Light, large, tabular.
  */
 
 function greetingFor(hour: number): string {

@@ -28,7 +28,7 @@ import { BrandLockup } from "@/components/shared/brand-lockup"
 
 /**
  * Admin rail — mirrors the platform sidebar recipe (app-sidebar.tsx): 40px
- * pill rows, 20px Lucide glyphs, `bg/chip` active pill with a gold icon.
+ * pill rows, 20px duotone glyphs, `bg/chip` active pill with a gold icon.
  */
 
 type NavItem = {
@@ -153,7 +153,7 @@ export function AdminSidebar() {
               className="rounded-md transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-chip"
             >
               {/* Unified ecosystem lockup (05-screens): gold wsa-mark 26px +
-                  "WorldStreet" Poppins SemiBold 15 + gold app eyebrow. */}
+                  "WorldStreet" Manrope SemiBold 15 + gold app eyebrow. */}
               <BrandLockup truncate eyebrow="Admin" alt={BRAND.name} />
             </SidebarMenuButton>
           </SidebarMenuItem>

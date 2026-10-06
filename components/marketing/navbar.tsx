@@ -80,7 +80,7 @@ export async function Navbar({ showFaculty }: { showFaculty: boolean }) {
     // Sign in · the gold CTA. A solid stone bar — see NavbarShell.
     <NavbarShell>
       {/* Unified ecosystem lockup (05-screens): gold wsa-mark 26px +
-          "WorldStreet" Poppins SemiBold 15 + gold app eyebrow. */}
+          "WorldStreet" Manrope SemiBold 15 + gold app eyebrow. */}
       <Link href="/" className="mr-auto flex shrink-0 items-center gap-2 md:mr-1">
         <BrandLockup alt={BRAND.name} />
       </Link>

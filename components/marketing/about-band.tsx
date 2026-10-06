@@ -28,7 +28,7 @@ const WORD_SPAN = 0.14
 
 /**
  * ABOUT (spec §2) — typographic. The purpose statement is set as one wide
- * paragraph in the house hero register: Poppins Light 300, large, the weight
+ * paragraph in the house hero register: Manrope Light 300, large, the weight
  * the wallet hero gives its balance, borrowed here for words. Under it the
  * interest → opportunity arc, then the remaining spec paragraphs in two body
  * columns. "Welcome to…" is the small title beside the label — the statement

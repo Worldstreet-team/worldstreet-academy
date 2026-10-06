@@ -23,7 +23,7 @@
   /* Certificate-only script face — a sanctioned print-artifact exception;
      nothing else in the DS uses a cursive (or any mono) family. */
   --font-cursive: var(--font-cursive);
-  /* Display/brand voice per the WorldStreet design system (Poppins). */
+  /* Display/brand voice per the WorldStreet design system (Manrope). */
   --font-display: var(--font-display);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
