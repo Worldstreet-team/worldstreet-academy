@@ -174,6 +174,8 @@ export function ChangeText({ value, className }: { value: number; className?: st
 export type SegmentedOption<T extends string> = {
   key: T
   label: string
+  /** A small trailing marker after the label — a live dot, "in 2d". Keep it short. */
+  badge?: React.ReactNode
   icon?: React.ComponentType<{ className?: string }>
   /** The tab leads somewhere that is not open yet. It stays VISIBLE — the
    *  feature is coming and people have already found it — but it cannot be
@@ -313,6 +315,7 @@ export function Segmented<T extends string>({
           >
             {Icon && <Icon className={cn(md ? "h-4 w-4" : "h-3.5 w-3.5", active && !off && "text-primary")} />}
             {opt.label}
+            {opt.badge}
           </button>
         )
       })}
