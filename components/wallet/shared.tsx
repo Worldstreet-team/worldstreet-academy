@@ -16,7 +16,7 @@ export function fmtMoney(minor: number, currency: "USD" | "NGN"): string {
 }
 
 /**
- * design-system/02 ₦ glyph rule: the Latin subsets of Poppins and Public Sans
+ * design-system/02 ₦ glyph rule: the Latin subset of Manrope
  * carry no ₦, so a naira figure slots Noto Sans (loaded in app/layout.tsx)
  * between the brand face and the rest of the stack — only the missing glyph
  * falls through. The `--font-naira-*` stacks are built in the root layout, not

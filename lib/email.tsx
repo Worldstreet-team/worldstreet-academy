@@ -62,7 +62,7 @@ export type MeetingEmailData = {
    success #047857. Keep these in sync with the token file. */
 
 const base = {
-  fontFamily: "'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+  fontFamily: "'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
 }
 
 const body: React.CSSProperties = {
@@ -86,7 +86,7 @@ const contentPad: React.CSSProperties = {
 }
 
 const heading: React.CSSProperties = {
-  fontFamily: "'Poppins', 'Public Sans', -apple-system, 'Segoe UI', Roboto, sans-serif",
+  fontFamily: "'Manrope', -apple-system, 'Segoe UI', Roboto, sans-serif",
   fontSize: "20px",
   fontWeight: 600,
   color: "#292524",

@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils"
 
 /**
- * The standard page header used across all portals: Poppins display title,
+ * The standard page header used across all portals: Manrope display title,
  * muted subline, optional right-aligned action. Matches the restyled student
  * pages (dashboard, wallet, my-courses) so every surface leads with the same
  * typographic voice.
