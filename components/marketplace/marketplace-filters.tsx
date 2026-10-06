@@ -1,8 +1,9 @@
 "use client"
+import { ChevronDownIcon, SearchIcon } from "@/components/icons"
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { ChevronDownIcon, SearchIcon } from "lucide-react"
+
 import {
   MARKETPLACE_SORTS,
   marketplaceHref,

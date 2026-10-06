@@ -1,16 +1,11 @@
 "use client"
+import { Glyph, BookOpen01Icon, Bookmark02Icon, DashboardSquare01Icon, Mic01Icon, UserIcon } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  BookOpen01Icon,
-  Bookmark02Icon,
-  DashboardSquare01Icon,
-  Mic01Icon,
-  UserIcon,
-} from "@hugeicons/core-free-icons"
+
+
 import { cn } from "@/lib/utils"
 
 type BottomNavItem = {
@@ -103,7 +98,7 @@ export function PlatformBottomNav() {
             : "text-muted-foreground hover:text-foreground",
         )}
       >
-        <HugeiconsIcon icon={item.icon} className={cn("size-5 shrink-0", active && "text-primary")} />
+        <Glyph icon={item.icon} className={cn("size-5 shrink-0", active && "text-primary")} />
         <span className="max-w-full truncate text-[10px] font-semibold leading-none">{item.title}</span>
       </Link>
     )
@@ -129,7 +124,7 @@ export function PlatformBottomNav() {
             className="flex shrink-0 items-center justify-center rounded-full px-1 outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           >
             <span className="flex size-11 items-center justify-center rounded-full bg-primary/[0.14] text-primary ring-1 ring-primary/25">
-              <HugeiconsIcon icon={Mic01Icon} className="size-5" />
+              <Glyph icon={Mic01Icon} className="size-5" />
             </span>
           </button>
         )}

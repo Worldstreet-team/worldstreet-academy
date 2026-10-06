@@ -1,5 +1,6 @@
+import { ArrowRightIcon, CompassIcon } from "@/components/icons"
 import Link from "next/link"
-import { ArrowRightIcon, CompassIcon } from "lucide-react"
+
 import { SCHOOLS, type School, type SchoolSlug } from "@/lib/schools"
 import { cn } from "@/lib/utils"
 import { plural } from "@/components/programs/format"

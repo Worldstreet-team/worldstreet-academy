@@ -1,7 +1,8 @@
 "use client"
+import { EraserIcon, EyeOffIcon, PenLineIcon, PresentationIcon, Trash2Icon, XIcon } from "@/components/icons"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { EraserIcon, EyeOffIcon, PenLineIcon, PresentationIcon, Trash2Icon, XIcon } from "lucide-react"
+
 import { rtkClient } from "@/lib/rtk-client"
 import { cn } from "@/lib/utils"
 

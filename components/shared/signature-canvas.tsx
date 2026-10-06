@@ -1,4 +1,5 @@
 "use client"
+import { CheckIcon, EraserIcon, PencilLineIcon, Trash2Icon, UploadIcon, XIcon } from "@/components/icons"
 
 import {
   useRef,
@@ -11,7 +12,7 @@ import { Button } from "@/components/ui/button"
 import { saveSignature } from "@/lib/actions/signature"
 import { getImageUploadUrl } from "@/lib/actions/upload"
 import { cn } from "@/lib/utils"
-import { CheckIcon, EraserIcon, PencilLineIcon, Trash2Icon, UploadIcon, XIcon } from "lucide-react"
+
 
 type Tool = "pen" | "eraser"
 type PenSize = 2 | 3 | 5

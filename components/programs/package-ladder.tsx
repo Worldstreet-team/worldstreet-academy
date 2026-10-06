@@ -1,5 +1,6 @@
+import { CheckIcon, MinusIcon, StarIcon } from "@/components/icons"
 import Link from "next/link"
-import { CheckIcon, MinusIcon, StarIcon } from "lucide-react"
+
 import { cn } from "@/lib/utils"
 import type { PublicPackage } from "@/lib/actions/student"
 import { PACKAGE_LABEL } from "@/lib/entitlements"

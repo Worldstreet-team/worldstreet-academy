@@ -1,9 +1,9 @@
 "use client"
+import { PencilIcon } from "@/components/icons"
 
 import { useRef, useState, useEffect } from "react"
 import { motion } from "motion/react"
 import { useVivid } from "@/lib/vivid/provider"
-import { PencilIcon } from "lucide-react"
 
 export function SignatureCanvasUI() {
   const vivid = useVivid()

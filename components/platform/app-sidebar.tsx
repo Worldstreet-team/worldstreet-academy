@@ -1,38 +1,12 @@
 "use client"
+import { Glyph, ArrowDown01Icon, ArrowRight01Icon, BookOpen01Icon, Bookmark02Icon, Brain01Icon, Certificate01Icon, ChampionIcon, ChartUpIcon, DashboardSquare01Icon, DollarCircleIcon, EyeIcon, GameController01Icon, GiftIcon, HelpCircleIcon, LinkSquare02Icon, Logout01Icon, MentoringIcon, Message01Icon, Store01Icon, Task01Icon, TeachingIcon, UserGroup02Icon, UserGroupIcon, Video01Icon, VideoReplayIcon, Wallet01Icon } from "@/components/icons"
 
 import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  ArrowDown01Icon,
-  ArrowRight01Icon,
-  BookOpen01Icon,
-  Bookmark02Icon,
-  Brain01Icon,
-  Certificate01Icon,
-  ChampionIcon,
-  ChartUpIcon,
-  DashboardSquare01Icon,
-  DollarCircleIcon,
-  EyeIcon,
-  GameController01Icon,
-  GiftIcon,
-  HelpCircleIcon,
-  LinkSquare02Icon,
-  Logout01Icon,
-  MentoringIcon,
-  Message01Icon,
-  Store01Icon,
-  Task01Icon,
-  TeachingIcon,
-  UserGroup02Icon,
-  UserGroupIcon,
-  Video01Icon,
-  VideoReplayIcon,
-  Wallet01Icon,
-} from "@hugeicons/core-free-icons"
+
+
 import {
   Sidebar,
   SidebarContent,
@@ -273,7 +247,7 @@ function NavRow({
         {/* No chip, no edge tick: the row is a pill, and the icon alone goes
             gold to say "you are here" — the only gold on the rail besides badges. */}
         <span className="relative flex size-[18px] shrink-0 items-center justify-center">
-          <HugeiconsIcon
+          <Glyph
             icon={item.icon}
             className={cn(
               "transition-colors duration-[var(--ws-motion-fast)]",
@@ -324,10 +298,10 @@ function AppRow({ app, collapsed, isMobile }: { app: WorldStreetApp; collapsed: 
           "hover:bg-foreground/[0.04] hover:text-foreground active:bg-foreground/[0.06] active:text-foreground",
         )}
       >
-        <HugeiconsIcon icon={app.icon} className="text-muted-foreground/80" />
+        <Glyph icon={app.icon} className="text-muted-foreground/80" />
         <span className={cn("flex-1 truncate", collapsed && "sr-only")}>{app.title}</span>
         {!collapsed && (
-          <HugeiconsIcon icon={LinkSquare02Icon} aria-hidden className="size-3! shrink-0 text-muted-foreground/40" />
+          <Glyph icon={LinkSquare02Icon} aria-hidden className="size-3! shrink-0 text-muted-foreground/40" />
         )}
         <span className="sr-only">(opens in a new tab)</span>
       </SidebarMenuButton>
@@ -399,7 +373,7 @@ function NavGroup({
           )}
         >
           <span className="flex-1 text-left">{label}</span>
-          <HugeiconsIcon
+          <Glyph
             icon={ArrowDown01Icon}
             aria-hidden
             className={cn(
@@ -582,7 +556,7 @@ export function AppSidebar() {
                 Share what you know and earn from your courses.
               </span>
             </span>
-            <HugeiconsIcon
+            <Glyph
               icon={ArrowRight01Icon}
               aria-hidden
               className="size-4 shrink-0 text-muted-foreground transition-colors duration-[var(--ws-motion-fast)] group-hover/teach:text-foreground"
@@ -632,7 +606,7 @@ export function AppSidebar() {
                   aria-label="Log out"
                   className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors duration-[var(--ws-motion-fast)] hover:bg-foreground/[0.06] hover:text-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring"
                 >
-                  <HugeiconsIcon icon={Logout01Icon} className="size-[18px]" />
+                  <Glyph icon={Logout01Icon} className="size-[18px]" />
                 </button>
               )}
             </LogoutConfirmDialog>

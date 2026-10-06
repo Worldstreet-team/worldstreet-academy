@@ -1,5 +1,6 @@
+import { ArrowRightIcon } from "@/components/icons"
 import Link from "next/link"
-import { ArrowRightIcon } from "lucide-react"
+
 import { programPriceLabel } from "@/lib/program-price"
 import { cn } from "@/lib/utils"
 import { SCHOOL_SECTION, SectionHead } from "@/components/schools/section-head"

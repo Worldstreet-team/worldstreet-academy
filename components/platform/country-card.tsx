@@ -1,7 +1,7 @@
 "use client"
+import { CheckIcon } from "@/components/icons"
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react"
-import { CheckIcon } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"

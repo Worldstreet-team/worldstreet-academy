@@ -1,10 +1,9 @@
 "use client"
+import { Glyph, ArrowRight01Icon, Notification03Icon } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { ArrowRight01Icon, Notification03Icon } from "@hugeicons/core-free-icons"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent } from "@/components/ui/dropdown-menu"
@@ -113,7 +112,7 @@ function BellPanel({
         ) : rows.length === 0 ? (
           <div className="flex flex-col items-center px-6 py-10 text-center">
             <span className="flex size-11 items-center justify-center rounded-full bg-primary/[0.12] text-primary">
-              <HugeiconsIcon icon={Notification03Icon} className="size-5" />
+              <Glyph icon={Notification03Icon} className="size-5" />
             </span>
             <p className="mt-3 text-[14px] font-semibold text-foreground">
               {tab === "courses" ? "No course updates yet" : "Nothing else to report"}
@@ -139,7 +138,7 @@ function BellPanel({
         className="flex h-11 shrink-0 items-center justify-center gap-1.5 border-t border-border text-[13px] font-medium text-foreground transition-colors hover:bg-accent/40 focus-visible:bg-accent/40 focus-visible:outline-none"
       >
         See all notifications
-        <HugeiconsIcon icon={ArrowRight01Icon} className="size-3.5" />
+        <Glyph icon={ArrowRight01Icon} className="size-3.5" />
       </Link>
     </div>
   )
@@ -191,7 +190,7 @@ export function NotificationBell() {
       aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
     >
       {/* Same glyph set and 18px size as the rest of the top bar's targets. */}
-      <HugeiconsIcon icon={Notification03Icon} className="size-[18px]" />
+      <Glyph icon={Notification03Icon} className="size-[18px]" />
       {unreadCount > 0 && (
         <span className="absolute top-0.5 right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold tabular-nums text-primary-foreground ring-2 ring-background">
           {unreadCount > 99 ? "99+" : unreadCount}

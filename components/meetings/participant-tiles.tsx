@@ -1,10 +1,11 @@
 "use client"
+import { HandIcon, MicOffIcon, ScreenShareIcon } from "@/components/icons"
 
 import { useRef, useEffect } from "react"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { rtkClient } from "@/lib/rtk-client"
-import { HandIcon, MicOffIcon, ScreenShareIcon } from "lucide-react"
+
 
 const REACTIONS = [
   { id: "👏", emoji: "👏", label: "Clap" },

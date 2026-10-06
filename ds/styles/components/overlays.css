@@ -1,0 +1,51 @@
+/* VENDORED from worldstreet/design-system by scripts/vendor.mjs. Don't edit: change the design system and re-run it. */
+/* ---- Overlays [ext] — opaque elevated surfaces, no backdrop blur -------- */
+.cx-modal { border: 0; padding: 0; background: transparent; color: var(--cx-text); max-width: min(480px, calc(100vw - 32px)); width: 100%; overflow: visible; }
+.cx-modal::backdrop { background: var(--cx-overlay); }
+.cx-modal[open] { animation: cx-pop var(--cx-dur) var(--cx-ease); }
+.cx-modal > .cx-card { background: var(--cx-elevated); box-shadow: var(--cx-shadow-xl); padding: 28px; gap: 16px; }
+.cx-modal > .cx-card::before { display: none; }
+.cx-modal-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px; flex-wrap: wrap; }
+/* Drawer / bottom sheet — same <dialog>, docked right (desktop) / bottom (mobile) */
+.cx-drawer { position: fixed; inset: 0 0 0 auto; margin: 0; height: 100dvh; max-height: 100dvh; width: min(420px, 100vw); max-width: 100vw; border: 0; padding: 0;
+  background: var(--cx-elevated); color: var(--cx-text); box-shadow: var(--cx-shadow-xl); }
+.cx-drawer::backdrop { background: var(--cx-overlay); }
+.cx-drawer[open] { animation: cx-slide-in var(--cx-dur) var(--cx-ease); display: flex; flex-direction: column; }
+.cx-drawer-head { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid var(--cx-hairline); }
+.cx-drawer-body { flex: 1; overflow-y: auto; padding: 24px; display: grid; gap: 20px; align-content: start; }
+.cx-drawer-foot { padding: 16px 24px calc(16px + env(safe-area-inset-bottom)); border-top: 1px solid var(--cx-hairline); display: flex; gap: 12px; }
+.cx-drawer-foot .cx-btn { flex: 1; }
+@media (max-width: 767px) {
+  .cx-drawer { inset: auto 0 0 0; width: 100vw; height: auto; max-height: 88dvh; border-radius: var(--cx-r-card) var(--cx-r-card) 0 0; }
+  .cx-drawer[open] { animation-name: cx-sheet-in; }
+  .cx-drawer-head { padding-top: 28px; }
+  .cx-drawer-head::before { content: ""; position: absolute; left: 50%; top: 10px; width: 40px; height: 4px; margin-left: -20px; border-radius: 999px; background: var(--cx-surface-3); }
+}
+.cx-toast { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-radius: var(--cx-r-md); background: var(--cx-elevated);
+  box-shadow: var(--cx-shadow-lg); font-size: 15px; max-width: 380px; color: var(--cx-text); }
+.cx-toast .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--cx-gain); }
+.cx-toast--loss .dot { background: var(--cx-loss); }
+.cx-toast--warning .dot { background: var(--cx-warning); }
+.cx-toast .cx-btn { margin-left: auto; }
+.cx-toast-stack { position: fixed; right: 24px; bottom: 24px; display: grid; gap: 10px; z-index: var(--cx-z-toast); }
+.cx-toast-stack .cx-toast { animation: cx-rise var(--cx-dur) var(--cx-ease); }
+@media (max-width: 767px) { .cx-toast-stack { left: 16px; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); } .cx-toast { max-width: none; } }
+.cx-tip { position: relative; display: inline-flex; }
+.cx-tip::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translate(-50%, 4px); z-index: var(--cx-z-tooltip);
+  white-space: nowrap; padding: 6px 10px; border-radius: var(--cx-r-sm); background: var(--cx-elevated); box-shadow: var(--cx-shadow-md);
+  font-size: 13px; color: var(--cx-text); opacity: 0; pointer-events: none; transition: opacity var(--cx-dur-fast), transform var(--cx-dur-fast); }
+.cx-tip:hover::after, .cx-tip:focus-within::after { opacity: 1; transform: translate(-50%, 0); }
+.cx-popover { width: 300px; max-width: calc(100vw - 32px); padding: 18px; border-radius: var(--cx-r-md); background: var(--cx-elevated); box-shadow: var(--cx-shadow-lg); color: var(--cx-text); border: 0; }
+.cx-menu { min-width: 200px; padding: 6px; border-radius: var(--cx-r-md); background: var(--cx-elevated); box-shadow: var(--cx-shadow-lg); color: var(--cx-text); border: 0; }
+.cx-menu button, .cx-menu a { display: flex; width: 100%; align-items: center; gap: 10px; height: 38px; padding: 0 12px; border: 0; border-radius: 10px;
+  background: none; color: var(--cx-text); font: 400 15px var(--cx-font); cursor: pointer; text-align: left; text-decoration: none; }
+.cx-menu button:hover, .cx-menu a:hover, .cx-menu button:focus-visible { background: var(--cx-surface-2); box-shadow: none; }
+.cx-menu svg { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.7; }
+.cx-menu .kbd { margin-left: auto; font-size: 12px; color: var(--cx-text-muted); }
+.cx-menu .danger { color: var(--cx-loss); }
+.cx-menu hr { border: 0; height: 1px; background: var(--cx-hairline); margin: 6px 0; }
+/* Native popovers: anchor to the invoking button where CSS anchor positioning exists
+   (implicit anchor from popovertarget); older browsers fall back to centred. */
+@supports (position-area: bottom) {
+  .cx-popover[popover], .cx-menu[popover] { margin: 8px 0 0; inset: auto; position-area: bottom span-right; position-try-fallbacks: flip-block, flip-inline; }
+}

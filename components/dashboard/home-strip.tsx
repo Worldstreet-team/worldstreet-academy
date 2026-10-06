@@ -1,17 +1,8 @@
 "use client"
+import { Glyph, Award01Icon, BookOpen01Icon, Calendar03Icon, Certificate01Icon, PlayCircleIcon, Task01Icon, Tick02Icon, type IconComponent } from "@/components/icons"
 
 import type * as React from "react"
 import Link from "next/link"
-import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react"
-import {
-  Award01Icon,
-  BookOpen01Icon,
-  Calendar03Icon,
-  Certificate01Icon,
-  PlayCircleIcon,
-  Task01Icon,
-  Tick02Icon,
-} from "@hugeicons/core-free-icons"
 import { Countdown } from "@/components/shared/countdown"
 import { Skel } from "@/components/ui/system"
 import type { ClassBoardEntry } from "@/lib/actions/class-board"
@@ -52,7 +43,7 @@ function StatCell({
   href,
   quiet = false,
 }: {
-  icon: IconSvgElement
+  icon: IconComponent
   value: React.ReactNode
   label: string
   href?: string
@@ -61,7 +52,7 @@ function StatCell({
   const inner = (
     <span className="flex min-w-0 items-center gap-3">
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-foreground/[0.05]">
-        <HugeiconsIcon icon={icon} className="h-4 w-4 text-muted-foreground" aria-hidden />
+        <Glyph icon={icon} className="h-4 w-4 text-muted-foreground" aria-hidden />
       </span>
       <span className="flex min-w-0 flex-col">
         <span

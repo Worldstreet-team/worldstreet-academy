@@ -1,4 +1,5 @@
 "use client"
+import { CircleCheckBigIcon } from "@/components/icons"
 
 import Link from "next/link"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
@@ -8,7 +9,7 @@ import {
   getInstructorOnboarding,
   acceptInstructorAgreement,
 } from "@/lib/actions/instructor-onboarding"
-import { CircleCheckBigIcon } from "lucide-react"
+
 
 function Item({
   done,

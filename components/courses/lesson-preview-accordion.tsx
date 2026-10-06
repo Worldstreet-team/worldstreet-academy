@@ -1,4 +1,5 @@
 "use client"
+import { ChevronDownIcon, LockIcon, PlayIcon, TypeIcon, VideoIcon } from "@/components/icons"
 
 import { useState } from "react"
 import Image from "next/image"
@@ -9,7 +10,7 @@ import {
 } from "@/components/ui/collapsible"
 import type { PublicCourseLesson } from "@/lib/actions/student"
 import { PreviewVideoPlayer } from "./preview-video-player"
-import { ChevronDownIcon, LockIcon, PlayIcon, TypeIcon, VideoIcon } from "lucide-react"
+
 import { RenderIcon } from "@/components/shared/render-icon"
 
 interface LessonPreviewAccordionProps {
@@ -110,7 +111,7 @@ export function LessonPreviewAccordion({
                     )}
                   </div>
                 ) : (
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm bg-ws-raised text-sm font-medium tabular-nums text-ws-muted">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ws-raised text-sm font-medium tabular-nums text-ws-muted">
                     {index + 1}
                   </span>
                 )}
@@ -169,7 +170,7 @@ export function LessonPreviewAccordion({
                     )}
                   </div>
                 ) : (
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm bg-ws-raised text-sm font-medium tabular-nums text-ws-muted">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ws-raised text-sm font-medium tabular-nums text-ws-muted">
                     {index + 1}
                   </span>
                 )}

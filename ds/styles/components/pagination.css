@@ -1,0 +1,14 @@
+/* VENDORED from worldstreet/design-system by scripts/vendor.mjs. Don't edit: change the design system and re-run it. */
+/* ---- Breadcrumbs, pagination [ext] -------------------------------------- */
+.cx-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 14px; color: var(--cx-text-muted); list-style: none; padding: 0; margin: 0; }
+.cx-crumbs a { color: var(--cx-text-muted); text-decoration: none; border-radius: 4px; }
+.cx-crumbs a:hover { color: var(--cx-text); }
+.cx-crumbs li + li::before { content: "/"; margin-right: 6px; opacity: .5; }
+.cx-crumbs [aria-current="page"] { color: var(--cx-text); }
+.cx-pager { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.cx-pager > a, .cx-pager > button, .cx-pager > span { display: inline-grid; place-items: center; min-width: 44px; height: 44px; padding: 0 10px; border-radius: var(--cx-r-pill);
+  border: 0; background: none; color: var(--cx-text-2); font: 400 15px var(--cx-font); font-variant-numeric: tabular-nums; text-decoration: none; cursor: pointer; }
+.cx-pager > a:hover, .cx-pager > button:hover { background: var(--cx-surface-2); color: var(--cx-text); }
+.cx-pager [aria-current="page"] { background: var(--cx-surface-3); color: var(--cx-text); }
+.cx-pager [aria-disabled="true"] { color: var(--cx-text-disabled); pointer-events: none; }
+.cx-pager > span { cursor: default; color: var(--cx-text-muted); }

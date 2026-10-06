@@ -1,4 +1,5 @@
 "use client"
+import { BellIcon, BluetoothIcon, CircleHelpIcon, CodeIcon, CreditCardIcon, DownloadIcon, EllipsisIcon, EllipsisVerticalIcon, EyeIcon, FileIcon, FolderIcon, FolderOpenIcon, KeyboardIcon, LanguagesIcon, LayoutDashboardIcon, LogOutIcon, MailIcon, MonitorIcon, MoonIcon, PaletteIcon, PlusIcon, SaveIcon, SearchIcon, SettingsIcon, ShieldIcon, SunIcon, UserIcon } from "@/components/icons"
 
 import * as React from "react"
 
@@ -64,7 +65,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { BellIcon, BluetoothIcon, CircleHelpIcon, CodeIcon, CreditCardIcon, DownloadIcon, EllipsisIcon, EllipsisVerticalIcon, EyeIcon, FileIcon, FolderIcon, FolderOpenIcon, KeyboardIcon, LanguagesIcon, LayoutDashboardIcon, LogOutIcon, MailIcon, MonitorIcon, MoonIcon, PaletteIcon, PlusIcon, SaveIcon, SearchIcon, SettingsIcon, ShieldIcon, SunIcon, UserIcon } from "lucide-react"
+
 import { Textarea } from "@/components/ui/textarea"
 
 export function ComponentExample() {

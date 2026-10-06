@@ -1,9 +1,10 @@
+import { ChevronRightIcon, EllipsisIcon } from "@/components/icons"
 import * as React from "react"
 import { mergeProps } from "@base-ui/react/merge-props"
 import { useRender } from "@base-ui/react/use-render"
 
 import { cn } from "@/lib/utils"
-import { ChevronRightIcon, EllipsisIcon } from "lucide-react"
+
 
 function Breadcrumb({ className, ...props }: React.ComponentProps<"nav">) {
   return (

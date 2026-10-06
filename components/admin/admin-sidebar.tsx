@@ -1,4 +1,5 @@
 "use client"
+import { BookOpen, ClipboardCheck, GraduationCap, House, Inbox, LayoutDashboard, LogOut, ReceiptText, Star, Store, Users, Wallet, type IconComponent } from "@/components/icons"
 
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
@@ -19,21 +20,7 @@ import {
 } from "@/components/ui/sidebar"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ThemeToggle } from "@/components/theme-toggle"
-import {
-  BookOpen,
-  ClipboardCheck,
-  GraduationCap,
-  House,
-  Inbox,
-  LayoutDashboard,
-  LogOut,
-  ReceiptText,
-  Star,
-  Store,
-  Users,
-  Wallet,
-  type LucideIcon,
-} from "lucide-react"
+
 import { useUser } from "@/components/providers/user-provider"
 import { LogoutConfirmDialog } from "@/components/shared/logout-confirm-dialog"
 import { BRAND } from "@/lib/brand"
@@ -47,7 +34,7 @@ import { BrandLockup } from "@/components/shared/brand-lockup"
 type NavItem = {
   title: string
   href: string
-  icon: LucideIcon
+  icon: IconComponent
   match?: (pathname: string) => boolean
 }
 

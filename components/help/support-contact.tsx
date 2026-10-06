@@ -1,15 +1,16 @@
 "use client"
+import { Glyph, ArrowRight01Icon, Mail01Icon, Message01Icon } from "@/components/icons"
 
-import { HugeiconsIcon } from "@hugeicons/react"
-import { ArrowRight01Icon, Mail01Icon, Message01Icon } from "@hugeicons/core-free-icons"
+
+
 import { CardHeader, CardShell, ListRow } from "@/components/ui/system"
 import { BRAND } from "@/lib/brand"
 import { hasPrioritySupport } from "@/lib/dashboard-home"
 import { useEnrollments } from "@/lib/hooks/queries"
 
-const MailGlyph = ({ className }: { className?: string }) => <HugeiconsIcon icon={Mail01Icon} className={className} />
-const MessageGlyph = ({ className }: { className?: string }) => <HugeiconsIcon icon={Message01Icon} className={className} />
-const chevron = <HugeiconsIcon icon={ArrowRight01Icon} aria-hidden className="h-4 w-4 shrink-0 text-muted-foreground" />
+const MailGlyph = ({ className }: { className?: string }) => <Glyph icon={Mail01Icon} className={className} />
+const MessageGlyph = ({ className }: { className?: string }) => <Glyph icon={Message01Icon} className={className} />
+const chevron = <Glyph icon={ArrowRight01Icon} aria-hidden className="h-4 w-4 shrink-0 text-muted-foreground" />
 
 /**
  * Contact support. Priority support (spec §12) is derived on the client

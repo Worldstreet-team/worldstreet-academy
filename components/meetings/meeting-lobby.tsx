@@ -1,4 +1,5 @@
 "use client"
+import { CalendarDaysIcon, ChevronDownIcon, ChevronRightIcon, ClockIcon, LoaderCircleIcon, Trash2Icon, UsersIcon, VideoIcon, XIcon } from "@/components/icons"
 
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
@@ -19,7 +20,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { endMeeting, type MeetingWithDetails, type MeetingHistoryEntry } from "@/lib/actions/meetings"
 import { useInvalidateMeetings } from "@/lib/hooks/queries"
-import { CalendarDaysIcon, ChevronDownIcon, ChevronRightIcon, ClockIcon, LoaderCircleIcon, Trash2Icon, UsersIcon, VideoIcon, XIcon } from "lucide-react"
+
 
 /* ── Utility formatters ── */
 

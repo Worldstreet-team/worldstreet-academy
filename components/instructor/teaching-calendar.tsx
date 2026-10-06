@@ -1,9 +1,10 @@
 "use client"
+import { ChevronLeftIcon, ChevronRightIcon, PlayIcon } from "@/components/icons"
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
-import { ChevronLeftIcon, ChevronRightIcon, PlayIcon } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
 import { getTeachingCalendar, type CalendarEntry } from "@/lib/actions/teaching-calendar"
 import { HOST_EARLY_START_MS, hostMayStart } from "@/lib/class-schedule"

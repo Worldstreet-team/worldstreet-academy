@@ -1,9 +1,10 @@
 "use client"
+import { CheckIcon, CropIcon, DropletsIcon, InfinityIcon, RotateCwIcon, SunIcon, Undo2Icon, XIcon } from "@/components/icons"
 
 import { useState, useRef, useEffect, useMemo } from "react"
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
-import { CheckIcon, CropIcon, DropletsIcon, InfinityIcon, RotateCwIcon, SunIcon, Undo2Icon, XIcon } from "lucide-react"
+
 import { RenderIcon } from "@/components/shared/render-icon"
 
 type MediaEditorProps = {

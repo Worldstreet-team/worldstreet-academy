@@ -1,5 +1,6 @@
+import { ArrowRightIcon } from "@/components/icons"
 import Link from "next/link"
-import { ArrowRightIcon } from "lucide-react"
+
 import type { BrowseCourse } from "@/lib/actions/student"
 import type { School } from "@/lib/schools"
 import { MarketingCourseCard } from "@/components/marketing/course-card"

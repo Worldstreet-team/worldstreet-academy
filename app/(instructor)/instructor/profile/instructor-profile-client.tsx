@@ -1,4 +1,5 @@
 "use client"
+import { CameraIcon, CheckIcon } from "@/components/icons"
 
 import { useRef, useState, useTransition, type ReactNode } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,7 +12,7 @@ import { updateAvatar, updateProfile } from "@/lib/actions/profile"
 import { getImageUploadUrl } from "@/lib/actions/upload"
 import { cn } from "@/lib/utils"
 import type { LocalUser } from "@/lib/auth/sync"
-import { CameraIcon, CheckIcon } from "lucide-react"
+
 
 export function InstructorProfileClient({
   user,

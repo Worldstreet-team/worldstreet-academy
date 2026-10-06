@@ -1,4 +1,5 @@
 "use client"
+import { MicIcon, MicOffIcon, PhoneOffIcon, VideoIcon } from "@/components/icons"
 
 import {
   createContext,
@@ -11,7 +12,7 @@ import {
 } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { MicIcon, MicOffIcon, PhoneOffIcon, VideoIcon } from "lucide-react"
+
 import { RenderIcon } from "@/components/shared/render-icon"
 
 /* ═══════════════════════════════════════════════════════

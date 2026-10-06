@@ -1,9 +1,10 @@
 "use client"
+import { PlayIcon } from "@/components/icons"
 
 import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { PlayIcon } from "lucide-react"
+
 import type { FreePreview } from "@/lib/actions/student"
 import { SCHOOL_BY_SLUG } from "@/lib/schools"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"

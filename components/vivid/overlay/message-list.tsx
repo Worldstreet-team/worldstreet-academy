@@ -1,8 +1,9 @@
 "use client"
+import { UserIcon } from "@/components/icons"
 
 import Image from "next/image"
 import { motion } from "motion/react"
-import { UserIcon } from "lucide-react"
+
 
 export interface ConvoItem {
   conversationId?: string

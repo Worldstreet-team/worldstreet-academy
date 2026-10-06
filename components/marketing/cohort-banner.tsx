@@ -1,5 +1,5 @@
+import { ArrowRightIcon } from "@/components/icons"
 import Link from "next/link"
-import { ArrowRightIcon } from "lucide-react"
 import { COHORT_DATE_LABEL, COHORT_DATE_SHORT, cohortIsUpcoming } from "@/lib/cohort"
 import { PACKAGE_LABEL } from "@/lib/entitlements"
 import { cn } from "@/lib/utils"

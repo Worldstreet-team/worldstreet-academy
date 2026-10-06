@@ -1,17 +1,11 @@
 "use client"
+import { Glyph, ArrowLeft01Icon, ArrowRight01Icon, Cancel01Icon, CheckmarkCircle02Icon, Mortarboard01Icon, Upload04Icon } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  ArrowLeft01Icon,
-  ArrowRight01Icon,
-  Cancel01Icon,
-  CheckmarkCircle02Icon,
-  Mortarboard01Icon,
-  Upload04Icon,
-} from "@hugeicons/core-free-icons"
+
+
 import { Topbar } from "@/components/platform/topbar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -162,7 +156,7 @@ function UploadField({
           disabled={uploading}
           onClick={() => inputRef.current?.click()}
         >
-          <HugeiconsIcon icon={Upload04Icon} className="size-4" />
+          <Glyph icon={Upload04Icon} className="size-4" />
           {uploading ? "Uploading…" : "Upload"}
         </Button>
       </div>
@@ -218,7 +212,7 @@ function StatusTracker({ status }: { status: string }) {
                     : "bg-surface-sunken text-muted-foreground"
               }`}
             >
-              {i < current ? <HugeiconsIcon icon={CheckmarkCircle02Icon} className="size-4" /> : i + 1}
+              {i < current ? <Glyph icon={CheckmarkCircle02Icon} className="size-4" /> : i + 1}
             </span>
             <span
               className={`whitespace-nowrap text-[12px] ${
@@ -344,7 +338,7 @@ function ApplicationForm({ onSubmitted }: { onSubmitted: () => void }) {
                   i <= step ? "bg-primary text-primary-foreground" : "bg-surface-sunken text-muted-foreground"
                 }`}
               >
-                {i < step ? <HugeiconsIcon icon={CheckmarkCircle02Icon} className="size-3.5" /> : i + 1}
+                {i < step ? <Glyph icon={CheckmarkCircle02Icon} className="size-3.5" /> : i + 1}
               </span>
               <span
                 className={`hidden text-[13px] md:inline ${
@@ -426,7 +420,7 @@ function ApplicationForm({ onSubmitted }: { onSubmitted: () => void }) {
                         aria-label={`Remove ${tag}`}
                         className="flex size-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-foreground/10 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
-                        <HugeiconsIcon icon={Cancel01Icon} className="size-3" />
+                        <Glyph icon={Cancel01Icon} className="size-3" />
                       </button>
                     </li>
                   ))}
@@ -679,7 +673,7 @@ function ApplicationForm({ onSubmitted }: { onSubmitted: () => void }) {
           disabled={step === 0 || submit.isPending}
           onClick={() => setStep((s) => Math.max(0, s - 1))}
         >
-          <HugeiconsIcon icon={ArrowLeft01Icon} className="size-4" />
+          <Glyph icon={ArrowLeft01Icon} className="size-4" />
           Back
         </Button>
         <div className="flex min-w-0 items-center gap-4">
@@ -694,7 +688,7 @@ function ApplicationForm({ onSubmitted }: { onSubmitted: () => void }) {
               onClick={() => setStep((s) => s + 1)}
             >
               Continue
-              <HugeiconsIcon icon={ArrowRight01Icon} className="size-4" />
+              <Glyph icon={ArrowRight01Icon} className="size-4" />
             </Button>
           ) : (
             <Button
@@ -784,7 +778,7 @@ export default function BecomeInstructorPage() {
       <div className="mx-auto w-full max-w-2xl space-y-8 px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-8 sm:px-6 md:pb-12 md:pt-10">
         <header className="space-y-3 text-center">
           <div className="mx-auto flex size-12 items-center justify-center rounded-[14px] bg-primary/[0.12] text-primary">
-            <HugeiconsIcon icon={Mortarboard01Icon} className="size-6" />
+            <Glyph icon={Mortarboard01Icon} className="size-6" />
           </div>
           <h1 className="font-display text-[28px] font-semibold tracking-[-0.02em] text-foreground">
             Become an instructor

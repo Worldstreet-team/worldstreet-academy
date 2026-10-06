@@ -1,20 +1,8 @@
 "use client"
+import { Glyph, BookOpen01Icon, Certificate01Icon, Mortarboard01Icon, Notification03Icon, PlayCircleIcon, Task01Icon, TaskDone01Icon, UserMultiple02Icon, Video01Icon, Wallet01Icon } from "@/components/icons"
 
 import Image from "next/image"
 import Link from "next/link"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  BookOpen01Icon,
-  Certificate01Icon,
-  Mortarboard01Icon,
-  Notification03Icon,
-  PlayCircleIcon,
-  Task01Icon,
-  TaskDone01Icon,
-  UserMultiple02Icon,
-  Video01Icon,
-  Wallet01Icon,
-} from "@hugeicons/core-free-icons"
 import type { NotificationItem } from "@/lib/actions/notifications"
 import { CATEGORY_LABEL } from "@/lib/notification-categories"
 import { cn } from "@/lib/utils"
@@ -110,12 +98,12 @@ export function NotificationRow({
               n.category === "courses" ? "bg-primary/[0.12] text-primary" : "bg-surface-sunken text-muted-foreground"
             )}
           >
-            <HugeiconsIcon icon={kind.icon} className="size-[18px]" />
+            <Glyph icon={kind.icon} className="size-[18px]" />
           </span>
         )}
         {n.course?.thumbnailUrl && (
           <span className="absolute -bottom-1 -right-1 flex size-5 items-center justify-center rounded-full bg-card text-primary ring-2 ring-card">
-            <HugeiconsIcon icon={kind.icon} className="size-3" />
+            <Glyph icon={kind.icon} className="size-3" />
           </span>
         )}
       </span>

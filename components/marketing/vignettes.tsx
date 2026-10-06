@@ -1,8 +1,8 @@
 "use client"
+import { CheckIcon, LockIcon, PlayIcon } from "@/components/icons"
 
 import * as React from "react"
 import { motion } from "motion/react"
-import { CheckIcon, LockIcon, PlayIcon } from "lucide-react"
 import { SCHOOLS } from "@/lib/schools"
 import { SchoolIcon } from "@/components/shared/school-icon"
 import { EASE_INERTIA, EASE_LUX } from "@/components/marketing/motion/ease"

@@ -1,10 +1,11 @@
 "use client"
+import { ArrowLeft, PaperclipIcon, XIcon } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { ArrowLeft, PaperclipIcon, XIcon } from "lucide-react"
+
 import { Topbar } from "@/components/platform/topbar"
 import { SubmissionFiles, formatSize } from "@/components/assignments/submission-files"
 import { Button } from "@/components/ui/button"

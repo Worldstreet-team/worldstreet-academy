@@ -1,23 +1,9 @@
 "use client"
+import { ArrowRightIcon, AwardIcon, CheckIcon, ChevronDownIcon, ClipboardCheckIcon, HandshakeIcon, LayersIcon, LifeBuoyIcon, ListVideoIcon, MessagesSquareIcon, RadioIcon, ShieldCheckIcon, StarIcon, type IconComponent } from "@/components/icons"
 
 import * as React from "react"
 import { motion } from "motion/react"
-import {
-  ArrowRightIcon,
-  AwardIcon,
-  CheckIcon,
-  ChevronDownIcon,
-  ClipboardCheckIcon,
-  HandshakeIcon,
-  LayersIcon,
-  LifeBuoyIcon,
-  ListVideoIcon,
-  MessagesSquareIcon,
-  RadioIcon,
-  ShieldCheckIcon,
-  StarIcon,
-  type LucideIcon,
-} from "lucide-react"
+
 import type { PublicPackage } from "@/lib/actions/student"
 import type { PackageKey } from "@/lib/db/models"
 import { PACKAGE_LABEL } from "@/lib/entitlements"
@@ -43,7 +29,7 @@ import {
   type ServiceKey,
 } from "@/components/programs/package-model"
 
-const SERVICE_ICON: Record<ServiceKey, LucideIcon> = {
+const SERVICE_ICON: Record<ServiceKey, IconComponent> = {
   liveClasses: RadioIcon,
   instructorQa: MessagesSquareIcon,
   assignments: ClipboardCheckIcon,

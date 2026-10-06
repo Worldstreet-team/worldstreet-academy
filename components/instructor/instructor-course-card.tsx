@@ -1,4 +1,5 @@
 "use client"
+import { Check, Copy, EllipsisVertical, FileQuestion, ListVideo, Pencil, Trash2 } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
@@ -10,15 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import {
-  Check,
-  Copy,
-  EllipsisVertical,
-  FileQuestion,
-  ListVideo,
-  Pencil,
-  Trash2,
-} from "lucide-react"
+
 import { DeleteCourseDialog } from "@/components/instructor/delete-course-dialog"
 import { useUser } from "@/components/providers/user-provider"
 import type { InstructorCourseItem } from "@/lib/actions/instructor"

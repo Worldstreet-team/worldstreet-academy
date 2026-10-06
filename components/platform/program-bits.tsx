@@ -1,6 +1,7 @@
+import { Glyph, type IconComponent } from "@/components/icons"
 import type * as React from "react"
 import Image from "next/image"
-import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react"
+
 import { cn } from "@/lib/utils"
 
 /*
@@ -115,7 +116,7 @@ export function StatusChip({
   className,
 }: {
   tone?: keyof typeof TONE
-  icon?: IconSvgElement
+  icon?: IconComponent
   children: React.ReactNode
   className?: string
 }) {
@@ -127,7 +128,7 @@ export function StatusChip({
         className
       )}
     >
-      {icon && <HugeiconsIcon icon={icon} className="h-3 w-3" aria-hidden />}
+      {icon && <Glyph icon={icon} className="h-3 w-3" aria-hidden />}
       {children}
     </span>
   )

@@ -1,4 +1,5 @@
 "use client"
+import { Link2, Plus, Search } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
@@ -11,7 +12,7 @@ import { InstructorCourseCard } from "@/components/instructor/instructor-course-
 import { CourseCardSkeleton } from "@/components/platform/course-card"
 import { useInstructorCourses } from "@/lib/hooks/queries"
 import { useUser } from "@/components/providers/user-provider"
-import { Link2, Plus, Search } from "lucide-react"
+
 
 type StatusFilter = "all" | "published" | "draft" | "archived"
 

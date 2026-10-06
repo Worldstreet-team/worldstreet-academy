@@ -1,8 +1,9 @@
 "use client"
+import { ArrowRightIcon } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
-import { ArrowRightIcon } from "lucide-react"
+
 import { motion, useScroll, useTransform, type MotionValue } from "motion/react"
 import { cn } from "@/lib/utils"
 import { Reveal } from "@/components/marketing/motion/reveal"

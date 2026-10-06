@@ -1,22 +1,12 @@
 "use client"
+import { Glyph, ArrowRight01Icon, DashboardSpeed01Icon, Logout01Icon, Moon02Icon, Search01Icon, Settings01Icon, Shield01Icon, Sun03Icon, TeachingIcon, UserIcon } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useTheme } from "next-themes"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  ArrowRight01Icon,
-  DashboardSpeed01Icon,
-  Logout01Icon,
-  Moon02Icon,
-  Search01Icon,
-  Settings01Icon,
-  Shield01Icon,
-  Sun03Icon,
-  TeachingIcon,
-  UserIcon,
-} from "@hugeicons/core-free-icons"
+
+
 
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -121,8 +111,8 @@ function ThemeButton() {
       title="Toggle theme"
       className={cn(ICON_TARGET, "hidden sm:inline-flex")}
     >
-      <HugeiconsIcon icon={Sun03Icon} className="size-[18px] dark:hidden" />
-      <HugeiconsIcon icon={Moon02Icon} className="hidden size-[18px] dark:block" />
+      <Glyph icon={Sun03Icon} className="size-[18px] dark:hidden" />
+      <Glyph icon={Moon02Icon} className="hidden size-[18px] dark:block" />
     </button>
   )
 }
@@ -197,7 +187,7 @@ export function Topbar({ title, variant = "platform", breadcrumbOverrides }: Top
                       </BreadcrumbItem>
                       {!isLast && (
                         <BreadcrumbSeparator className="text-muted-foreground/60 [&>svg]:size-3">
-                          <HugeiconsIcon icon={ArrowRight01Icon} />
+                          <Glyph icon={ArrowRight01Icon} />
                         </BreadcrumbSeparator>
                       )}
                     </React.Fragment>
@@ -225,7 +215,7 @@ export function Topbar({ title, variant = "platform", breadcrumbOverrides }: Top
             onClick={triggerSearch}
             className="group flex h-10 w-full max-w-md items-center gap-2.5 rounded-full bg-surface-sunken pl-4 pr-2 text-left outline-none ring-1 ring-border/70 transition-colors duration-[var(--ws-motion-fast)] hover:bg-accent focus-visible:ring-2 focus-visible:ring-primary/40"
           >
-            <HugeiconsIcon icon={Search01Icon} className="size-4 shrink-0 text-muted-foreground" />
+            <Glyph icon={Search01Icon} className="size-4 shrink-0 text-muted-foreground" />
             <span className="flex-1 truncate text-[13px] text-muted-foreground transition-colors duration-[var(--ws-motion-fast)] group-hover:text-foreground">
               {variant === "admin" ? "Search…" : "Search programs, instructors…"}
             </span>
@@ -239,7 +229,7 @@ export function Topbar({ title, variant = "platform", breadcrumbOverrides }: Top
         <div className="ml-auto flex shrink-0 items-center gap-0.5 md:gap-1">
           {/* Mobile search */}
           <button type="button" onClick={triggerSearch} aria-label="Search" className={cn(ICON_TARGET, "md:hidden")}>
-            <HugeiconsIcon icon={Search01Icon} className="size-[18px]" />
+            <Glyph icon={Search01Icon} className="size-[18px]" />
           </button>
 
           {/* Admin console: no wallet balance or translation — admins aren't
@@ -304,7 +294,7 @@ export function Topbar({ title, variant = "platform", breadcrumbOverrides }: Top
               {variant === "platform" && isInstructor && (
                 <>
                   <DropdownMenuItem render={<Link href="/instructor" />}>
-                    <HugeiconsIcon icon={TeachingIcon} />
+                    <Glyph icon={TeachingIcon} />
                     Instructor Portal
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
@@ -313,7 +303,7 @@ export function Topbar({ title, variant = "platform", breadcrumbOverrides }: Top
               {variant !== "admin" && user.role === "ADMIN" && (
                 <>
                   <DropdownMenuItem render={<Link href="/admin" />}>
-                    <HugeiconsIcon icon={Shield01Icon} />
+                    <Glyph icon={Shield01Icon} />
                     Admin Console
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
@@ -322,18 +312,18 @@ export function Topbar({ title, variant = "platform", breadcrumbOverrides }: Top
               {(variant === "instructor" || variant === "admin") && (
                 <>
                   <DropdownMenuItem render={<Link href="/dashboard" />}>
-                    <HugeiconsIcon icon={DashboardSpeed01Icon} />
+                    <Glyph icon={DashboardSpeed01Icon} />
                     Student Dashboard
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                 </>
               )}
               <DropdownMenuItem render={<Link href={variant === "instructor" ? "/instructor/settings" : "/dashboard/profile"} />}>
-                <HugeiconsIcon icon={UserIcon} />
+                <Glyph icon={UserIcon} />
                 Profile
               </DropdownMenuItem>
               <DropdownMenuItem render={<Link href={variant === "instructor" ? "/instructor/settings" : "/dashboard/settings"} />}>
-                <HugeiconsIcon icon={Settings01Icon} />
+                <Glyph icon={Settings01Icon} />
                 Settings
               </DropdownMenuItem>
               <DropdownMenuSeparator />
@@ -341,7 +331,7 @@ export function Topbar({ title, variant = "platform", breadcrumbOverrides }: Top
                 variant="destructive"
                 render={<button type="button" className="w-full" onClick={() => setLogoutOpen(true)} />}
               >
-                <HugeiconsIcon icon={Logout01Icon} />
+                <Glyph icon={Logout01Icon} />
                 Log out
               </DropdownMenuItem>
             </DropdownMenuContent>

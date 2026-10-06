@@ -1,4 +1,5 @@
 "use client"
+import { ImageIcon, LoaderCircleIcon, PlayIcon, Trash2Icon, UploadIcon, VideoIcon } from "@/components/icons"
 
 import { useRef, useState, useCallback, useEffect } from "react"
 import Image from "next/image"
@@ -6,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
-import { ImageIcon, LoaderCircleIcon, PlayIcon, Trash2Icon, UploadIcon, VideoIcon } from "lucide-react"
+
 
 /* ─── Types ─── */
 type MediaType = "image" | "video"

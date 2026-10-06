@@ -1,8 +1,9 @@
 "use client"
+import { ChevronRightIcon, LoaderCircleIcon, PhoneOffIcon, VideoIcon } from "@/components/icons"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { ChevronRightIcon, LoaderCircleIcon, PhoneOffIcon, VideoIcon } from "lucide-react"
+
 import { RenderIcon } from "@/components/shared/render-icon"
 
 /* ── Setup overlay (loading spinner) ── */

@@ -1,8 +1,9 @@
 "use client"
+import { CheckIcon, CopyIcon } from "@/components/icons"
 
 import * as React from "react"
 import type { WalletTxStatus } from "@/lib/actions/wallet"
-import { CheckIcon, CopyIcon } from "lucide-react"
+
 import { RenderIcon } from "@/components/shared/render-icon"
 import { cn } from "@/lib/utils"
 

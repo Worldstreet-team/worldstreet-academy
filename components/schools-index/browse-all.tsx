@@ -1,6 +1,7 @@
+import { ArrowRightIcon } from "@/components/icons"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowRightIcon } from "lucide-react"
+
 import { cn } from "@/lib/utils"
 import { RENDER_THUMB, isRender, plural } from "./model"
 

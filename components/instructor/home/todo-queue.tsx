@@ -1,7 +1,8 @@
 "use client"
+import { ChevronRight, CircleCheck, ClipboardCheck, MessageCircle, UserCheck, VideoOff, type IconComponent } from "@/components/icons"
 
 import Link from "next/link"
-import { ChevronRight, CircleCheck, ClipboardCheck, MessageCircle, UserCheck, VideoOff, type LucideIcon } from "lucide-react"
+
 import { CardShell, EmptyState } from "@/components/ui/system"
 import type { TodoItem } from "@/lib/actions/teaching-home"
 import { waitedLabel } from "@/lib/teaching-home"
@@ -15,7 +16,7 @@ import { cn } from "@/lib/utils"
 
 type QueueRow = Omit<TodoItem, "kind"> & { kind: TodoItem["kind"] | "messages" }
 
-const KIND: Record<QueueRow["kind"], { icon: LucideIcon; tone?: "danger" }> = {
+const KIND: Record<QueueRow["kind"], { icon: IconComponent; tone?: "danger" }> = {
   grade: { icon: ClipboardCheck },
   mentorship: { icon: UserCheck },
   messages: { icon: MessageCircle },

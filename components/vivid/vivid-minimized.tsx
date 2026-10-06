@@ -1,4 +1,5 @@
 "use client"
+import { Maximize2Icon, MicIcon, XIcon } from "@/components/icons"
 
 /**
  * Vivid Minimized Bar — Compact floating assistant bar.
@@ -13,7 +14,7 @@
 import { useRef, useEffect, useState } from "react"
 import { motion } from "motion/react"
 import { useVivid } from "@/lib/vivid/provider"
-import { Maximize2Icon, MicIcon, XIcon } from "lucide-react"
+
 
 const MINI_BARS = 16
 

@@ -1,4 +1,5 @@
 "use client"
+import { Star, Trophy, TrendingUp, Users } from "@/components/icons"
 
 import * as React from "react"
 import Image from "next/image"
@@ -12,7 +13,7 @@ import { useInstructorCourses } from "@/lib/hooks/queries"
 import { useQuery } from "@tanstack/react-query"
 import { fetchInstructorCertificateStats } from "@/lib/actions/certificates"
 import { getMyInstructorEarnings } from "@/lib/actions/earnings"
-import { Star, Trophy, TrendingUp, Users } from "lucide-react"
+
 
 export default function AnalyticsPage() {
   const { data: courses = [], isLoading } = useInstructorCourses()

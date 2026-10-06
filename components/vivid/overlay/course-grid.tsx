@@ -1,8 +1,9 @@
 "use client"
+import { BookOpenIcon, GraduationCapIcon, StarIcon } from "@/components/icons"
 
 import Image from "next/image"
 import { motion } from "motion/react"
-import { BookOpenIcon, GraduationCapIcon, StarIcon } from "lucide-react"
+
 
 export interface CourseItem {
   id?: string

@@ -1,8 +1,9 @@
 "use client"
+import { CheckIcon, MinusIcon, PlusIcon } from "@/components/icons"
 
 import * as React from "react"
 import { motion } from "motion/react"
-import { CheckIcon, MinusIcon, PlusIcon } from "lucide-react"
+
 import { PACKAGE_LABEL } from "@/lib/entitlements"
 import { packagePriceLabel } from "@/lib/program-price"
 import { cn } from "@/lib/utils"

@@ -1,7 +1,8 @@
 "use client"
+import { PhoneIcon, PhoneIncomingIcon, PhoneOutgoingIcon, VideoIcon } from "@/components/icons"
 
 import { cn } from "@/lib/utils"
-import { PhoneIcon, PhoneIncomingIcon, PhoneOutgoingIcon, VideoIcon } from "lucide-react"
+
 
 type CallEventProps = {
   content: string

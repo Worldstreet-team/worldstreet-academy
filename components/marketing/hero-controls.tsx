@@ -1,7 +1,8 @@
 "use client"
+import { PauseIcon, PlayIcon } from "@/components/icons"
 
 import * as React from "react"
-import { PauseIcon, PlayIcon } from "lucide-react"
+
 import { SLIDE_MS } from "@/components/marketing/hero-stage"
 import { cn } from "@/lib/utils"
 

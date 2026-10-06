@@ -1,7 +1,8 @@
 "use client"
+import { ChevronDownIcon, CirclePlayIcon, FileTextIcon, LockIcon, PlayIcon, RadioIcon } from "@/components/icons"
 
 import * as React from "react"
-import { ChevronDownIcon, CirclePlayIcon, FileTextIcon, LockIcon, PlayIcon, RadioIcon } from "lucide-react"
+
 import type { ProgramCurriculumLesson } from "@/lib/actions/program-page"
 import { PACKAGE_LABEL } from "@/lib/entitlements"
 import { cn } from "@/lib/utils"

@@ -1,4 +1,5 @@
 "use client"
+import { GraduationCapIcon } from "@/components/icons"
 
 import Autoplay from "embla-carousel-autoplay"
 import Link from "next/link"
@@ -14,7 +15,7 @@ import {
   CarouselNext,
 } from "@/components/ui/carousel"
 import type { BrowseCourse } from "@/lib/actions/student"
-import { GraduationCapIcon } from "lucide-react"
+
 
 export function CourseCarousel({ courses, title }: { courses: BrowseCourse[]; title: string }) {
   if (courses.length === 0) return null

@@ -1,0 +1,78 @@
+/* VENDORED from worldstreet/design-system by scripts/vendor.mjs. Don't edit: change the design system and re-run it. */
+/* ==========================================================================
+   shadcn bridge: points an app's existing shadcn vocabulary (--background,
+   --card, --primary, --muted-foreground …) at the design system, so the
+   app's current components re-skin without touching their markup.
+
+   Import AFTER the system (styles/index.css) and AFTER the app's own shadcn
+   :root / .dark blocks, so these win.
+
+   It sits on the brand element, not :root: data-brand="worldstreet" re-points
+   the --cx-* tokens on that element, so a bridge on :root would resolve to
+   the default Cryonix ember/black instead of WorldStreet gold/stone.
+
+   Values are full colours (hex/rgba). That matches shadcn on Tailwind v4
+   (`--color-primary: var(--primary)`). A Tailwind v3 app that wraps them as
+   `hsl(var(--primary))` must change its config to plain `var(--primary)`.
+   ========================================================================== */
+[data-brand="worldstreet"] {
+  --background: var(--cx-bg);
+  --foreground: var(--cx-text);
+  --card: var(--cx-elevated);
+  --card-foreground: var(--cx-text);
+  --popover: var(--cx-elevated);
+  --popover-foreground: var(--cx-text);
+  --primary: var(--cx-ember);                 /* WorldStreet gold */
+  --primary-foreground: var(--cx-on-primary); /* ink on gold */
+  --secondary: var(--cx-surface-2);
+  --secondary-foreground: var(--cx-text);
+  --muted: var(--cx-surface-2);
+  --muted-foreground: var(--cx-text-muted);
+  --accent: var(--cx-surface-2);
+  --accent-foreground: var(--cx-text);
+  --destructive: var(--cx-loss);
+  --border: var(--cx-hairline);
+  --input: var(--cx-field-border);
+  --ring: var(--cx-ember-press);
+  --chart-1: var(--cx-chart-1);
+  --chart-2: var(--cx-chart-2);
+  --chart-3: var(--cx-chart-3);
+  --chart-4: var(--cx-chart-4);
+  --chart-5: var(--cx-chart-5);
+
+  /* Money direction and caution (WorldStreet apps call these credit / debit) */
+  --credit: var(--cx-gain);
+  --credit-chip: var(--cx-gain-wash);
+  --debit: var(--cx-loss);
+  --debit-chip: var(--cx-loss-wash);
+  --warning: var(--cx-warning);
+  --warning-chip: var(--cx-warning-wash);
+
+  --sidebar: var(--cx-bg);
+  --sidebar-foreground: var(--cx-text);
+  --sidebar-primary: var(--cx-ember);
+  --sidebar-primary-foreground: var(--cx-on-primary);
+  --sidebar-accent: var(--cx-surface-2);
+  --sidebar-accent-foreground: var(--cx-text);
+  --sidebar-border: var(--cx-hairline);
+  --sidebar-ring: var(--cx-ember-press);
+
+  /* Legacy DS v2 names still used in unmigrated markup */
+  --ws-bg-page: var(--cx-bg);
+  --ws-bg-surface: var(--cx-elevated);
+  --ws-bg-sunken: var(--cx-surface);
+  --ws-bg-raised: var(--cx-surface-2);
+  --ws-border-hairline: var(--cx-hairline);
+  --ws-brand-primary: var(--cx-ember);
+  --ws-brand-on-primary: var(--cx-on-primary);
+  --ws-brand-gold-text: var(--cx-ember-text);
+  --ws-text-primary: var(--cx-text);
+  --ws-text-muted: var(--cx-text-muted);
+  --ws-text-subtle: var(--cx-text-3);
+  --ws-money-credit: var(--cx-gain);
+  --ws-money-credit-chip: var(--cx-gain-wash);
+  --ws-money-debit: var(--cx-loss);
+  --ws-money-debit-chip: var(--cx-loss-wash);
+
+  --radius: 0.75rem;
+}

@@ -1,8 +1,9 @@
 "use client"
+import { ChevronRightIcon, SearchIcon, UserIcon } from "@/components/icons"
 
 import Image from "next/image"
 import { motion } from "motion/react"
-import { ChevronRightIcon, SearchIcon, UserIcon } from "lucide-react"
+
 
 export function SearchResultsList({ data }: { data: unknown }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

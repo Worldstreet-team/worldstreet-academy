@@ -1,4 +1,5 @@
 "use client"
+import { ArrowLeft, Check, Clock, Pencil, Trophy, User } from "@/components/icons"
 
 import Link from "next/link"
 import { useParams } from "next/navigation"
@@ -10,7 +11,7 @@ import { EmptyState } from "@/components/shared/empty-state"
 import { ArtCertificate } from "@/components/shared/illustrations"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Check, Clock, Pencil, Trophy, User } from "lucide-react"
+
 import { Skeleton } from "@/components/ui/skeleton"
 import { useQuery } from "@tanstack/react-query"
 import { fetchCourseCertificates } from "@/lib/actions/certificates"

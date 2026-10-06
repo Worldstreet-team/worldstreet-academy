@@ -1,0 +1,35 @@
+/* VENDORED from worldstreet/design-system by scripts/vendor.mjs. Don't edit: change the design system and re-run it. */
+/* Derived tokens, re-declared on EVERY theme scope.
+   Theme tokens are split in three layers so nested themes work:
+      1) raw per-theme values  2) DERIVED tokens, re-declared on every theme
+      scope so var() resolves against that scope's --cx-fg-rgb  3) light-only
+      overrides of derived tokens. Don't merge them — a derived token declared
+      only on :root is computed once and inherited white into light mode. */
+
+/* 2. Derived — re-declared on every theme scope */
+:root, .cx-dark, .cx-light, [data-theme] {
+  --cx-primary:        var(--cx-ember);
+  --cx-positive:       var(--cx-gain);
+  --cx-surface:        rgba(var(--cx-fg-rgb), 0.04);     /* [site] glass panels */
+  --cx-surface-2:      rgba(var(--cx-fg-rgb), 0.06);     /* [site] floating shapes */
+  --cx-surface-3:      rgba(var(--cx-fg-rgb), 0.10);     /* [site] icon tiles */
+  --cx-row-hover:      rgba(var(--cx-fg-rgb), 0.03);
+  --cx-hairline:       rgba(var(--cx-fg-rgb), 0.10);     /* [site] dividers */
+  --cx-text-3:         rgba(var(--cx-fg-rgb), 0.5);
+  --cx-text-disabled:  rgba(var(--cx-fg-rgb), 0.35);
+  --cx-info-wash:      rgba(var(--cx-fg-rgb), 0.08);
+  --cx-heading-hero:   linear-gradient(270deg, rgba(var(--cx-fg-rgb),.6) 0%, rgb(var(--cx-fg-rgb)) 50%, rgba(var(--cx-fg-rgb),.6) 100%); /* [site] */
+  --cx-heading:        linear-gradient(285deg, rgba(var(--cx-fg-rgb),.5) 5%, rgb(var(--cx-fg-rgb)) 62%);  /* [site] */
+  --cx-lit:            rgb(var(--cx-fg-rgb));
+  --cx-focus-ring:     0 0 0 2px var(--cx-bg), 0 0 0 4px var(--cx-peach);
+  --cx-field:          rgba(var(--cx-fg-rgb), 0.04);
+  --cx-field-hover:    rgba(var(--cx-fg-rgb), 0.07);
+  --cx-field-border:   rgba(var(--cx-fg-rgb), 0.12);
+  --cx-skel-a:         rgba(var(--cx-fg-rgb), 0.05);
+  --cx-skel-b:         rgba(var(--cx-fg-rgb), 0.10);
+  --cx-chart-grid:     rgba(var(--cx-fg-rgb), 0.08);
+  /* Elevation scale [ext] — for elevated surfaces only; cards separate by wash */
+  --cx-shadow-md: 0 8px 24px -8px rgba(var(--cx-shadow-tint), calc(.6 * var(--cx-shadow-alpha))), inset 0 0 0 1px var(--cx-hairline);
+  --cx-shadow-lg: 0 16px 40px -12px rgba(var(--cx-shadow-tint), calc(.8 * var(--cx-shadow-alpha))), inset 0 0 0 1px var(--cx-hairline);
+  --cx-shadow-xl: 0 32px 80px -20px rgba(var(--cx-shadow-tint), calc(.9 * var(--cx-shadow-alpha))), inset 0 0 0 1px var(--cx-hairline);
+}

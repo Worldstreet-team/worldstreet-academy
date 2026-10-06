@@ -1,11 +1,12 @@
 "use client"
+import { BoldIcon, CodeXmlIcon, ItalicIcon, ListIcon, ListOrderedIcon, MinusIcon, QuoteIcon, Redo2Icon, StrikethroughIcon, Undo2Icon } from "@/components/icons"
 
 import { useEditor, EditorContent, type Editor } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
 import Placeholder from "@tiptap/extension-placeholder"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { BoldIcon, CodeXmlIcon, ItalicIcon, ListIcon, ListOrderedIcon, MinusIcon, QuoteIcon, Redo2Icon, StrikethroughIcon, Undo2Icon } from "lucide-react"
+
 
 interface RichTextEditorProps {
   value: string

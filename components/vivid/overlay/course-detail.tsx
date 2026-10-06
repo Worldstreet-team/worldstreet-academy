@@ -1,7 +1,8 @@
 "use client"
+import { BookOpenIcon, GraduationCapIcon, StarIcon, UsersIcon } from "@/components/icons"
 
 import Image from "next/image"
-import { BookOpenIcon, GraduationCapIcon, StarIcon, UsersIcon } from "lucide-react"
+
 
 export function CourseDetail({ data }: { data: unknown }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

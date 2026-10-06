@@ -1,4 +1,5 @@
 "use client"
+import { CheckIcon, ChevronLeftIcon, DownloadIcon } from "@/components/icons"
 
 import { useCallback, useState } from "react"
 import Image from "next/image"
@@ -7,7 +8,6 @@ import Link from "next/link"
 import type { CertificateData } from "@/lib/actions/certificates"
 import { SignatureCanvas } from "@/components/shared/signature-canvas"
 import { useTheme } from "next-themes"
-import { CheckIcon, ChevronLeftIcon, DownloadIcon } from "lucide-react"
 import { BRAND } from "@/lib/brand"
 
 // ── Helper: fetch image as base64 data URL ───────────────────────────────────
@@ -91,10 +91,12 @@ function CertificatePreview({
   })
 
   return (
-    /* Print artifact: always paper — scope the light token mode locally so
-       ws-* classes resolve to ink-on-paper regardless of the app theme. */
+    /* Print artifact: always paper — a light island, so ws-* classes resolve
+       to ink-on-paper regardless of the app theme. The design system's light
+       brand applies to a data-brand element INSIDE data-theme="light". */
+    <div data-theme="light">
     <div
-      data-ws-theme="platform-light"
+      data-brand="worldstreet"
       className="relative w-full aspect-[1.414/1] bg-ws-surface text-ws-primary overflow-clip"
       id="certificate-preview"
     >
@@ -280,6 +282,7 @@ function CertificatePreview({
           {verifyLabel && <span>{`Verify at ${verifyLabel}`}</span>}
         </p>
       </div>
+    </div>
     </div>
   )
 }

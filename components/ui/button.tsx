@@ -1,16 +1,18 @@
 "use client"
+import { LoaderCircleIcon } from "@/components/icons"
 
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva, type VariantProps } from "class-variance-authority"
-import { LoaderCircleIcon } from "lucide-react"
+
 
 import { cn } from "@/lib/utils"
 
-/* 04-components Button spec: radius 7 (radius/sm), pressed = brand/active fill
-   (primary) or bg/chip (secondary/ghost), disabled = 45% opacity, loading =
-   spinner inheriting the label color. `lg` is the 52px primary-action size. */
+/* The design system's Button (2026-10-06): a pill at every size, the gold
+   primary with ink text (one per view), pressed = brand/active fill (primary)
+   or bg/chip (secondary/ghost), disabled = 45% opacity, loading = spinner
+   inheriting the label colour. `lg` is the 52px primary-action size. */
 const buttonVariants = cva(
-  "focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 rounded-sm border border-transparent bg-clip-padding text-sm font-medium focus-visible:ring-3 aria-invalid:ring-3 [&_svg:not([class*='size-'])]:size-4 inline-flex items-center justify-center whitespace-nowrap transition-all disabled:pointer-events-none disabled:opacity-45 [&_svg]:pointer-events-none shrink-0 [&_svg]:shrink-0 outline-none group/button select-none",
+  "focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 rounded-full border border-transparent bg-clip-padding text-sm font-semibold focus-visible:ring-3 aria-invalid:ring-3 [&_svg:not([class*='size-'])]:size-4 inline-flex items-center justify-center whitespace-nowrap transition-all disabled:pointer-events-none disabled:opacity-45 [&_svg]:pointer-events-none shrink-0 [&_svg]:shrink-0 outline-none group/button select-none",
   {
     variants: {
       variant: {
@@ -27,13 +29,13 @@ const buttonVariants = cva(
          `lg` is already 52px and needs no expander. */
       size: {
         default: "ws-touch-target h-9 gap-2 px-4 has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3",
-        xs: "ws-touch-target h-6 gap-1 rounded-[min(var(--radius-md),10px)] px-2 text-xs in-data-[slot=button-group]:rounded-sm has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
-        sm: "ws-touch-target h-8 gap-1.5 rounded-[min(var(--radius-md),12px)] px-3 text-[0.8rem] in-data-[slot=button-group]:rounded-sm has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 [&_svg:not([class*='size-'])]:size-3.5",
+        xs: "ws-touch-target h-6 gap-1 px-2.5 text-xs in-data-[slot=button-group]:rounded-sm has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
+        sm: "ws-touch-target h-8 gap-1.5 px-3.5 text-[0.8rem] in-data-[slot=button-group]:rounded-sm has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 [&_svg:not([class*='size-'])]:size-3.5",
         /* Primary-action size per spec: height 52, SemiBold 16 label. */
         lg: "h-13 gap-2 px-5 text-base font-semibold has-data-[icon=inline-end]:pr-4 has-data-[icon=inline-start]:pl-4",
         icon: "ws-touch-target size-8",
-        "icon-xs": "ws-touch-target size-6 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-sm [&_svg:not([class*='size-'])]:size-3",
-        "icon-sm": "ws-touch-target size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-sm",
+        "icon-xs": "ws-touch-target size-6 in-data-[slot=button-group]:rounded-sm [&_svg:not([class*='size-'])]:size-3",
+        "icon-sm": "ws-touch-target size-7 in-data-[slot=button-group]:rounded-sm",
         "icon-lg": "ws-touch-target size-9",
       },
     },

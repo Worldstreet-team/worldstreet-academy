@@ -1,6 +1,7 @@
+import { ArrowRightIcon } from "@/components/icons"
 import Link from "next/link"
 import Image from "next/image"
-import { ArrowRightIcon } from "lucide-react"
+
 import type { FacultyMember, ProgramDetail } from "@/lib/actions/student"
 import { facultyHref } from "@/lib/faculty"
 import { countryName } from "@/lib/countries"

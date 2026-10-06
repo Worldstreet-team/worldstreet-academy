@@ -1,7 +1,8 @@
 "use client"
+import { ArrowRight } from "@/components/icons"
 
 import Link from "next/link"
-import { ArrowRight } from "lucide-react"
+
 import { CardShell } from "@/components/ui/system"
 import { Countdown } from "@/components/shared/countdown"
 import type { HomeEntry } from "@/lib/actions/teaching-home"

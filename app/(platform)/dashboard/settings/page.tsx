@@ -1,16 +1,10 @@
 "use client"
+import { ChevronRight, LogOut, Mail, Moon, Sun, UserRound } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
 import { useTheme } from "next-themes"
-import {
-  ChevronRight,
-  LogOut,
-  Mail,
-  Moon,
-  Sun,
-  UserRound,
-} from "lucide-react"
+
 import { Topbar } from "@/components/platform/topbar"
 import { PageHeader } from "@/components/shared/page-header"
 import { useUser } from "@/components/providers/user-provider"

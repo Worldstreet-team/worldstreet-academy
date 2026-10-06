@@ -1,9 +1,10 @@
 "use client"
+import { ChartColumnIcon, HandIcon, SmilePlusIcon, MessageCircleIcon, MicIcon, MicOffIcon, PhoneOffIcon, ScreenShareIcon, UsersIcon, VideoIcon, VideoOffIcon, Volume2Icon, XIcon } from "@/components/icons"
 
 import { cn } from "@/lib/utils"
 import { REACTIONS } from "@/components/meetings/participant-tiles"
 import type { ActiveTab } from "@/components/meetings/meeting-side-panel"
-import { ChartColumnIcon, HandIcon, SmilePlusIcon, MessageCircleIcon, MicIcon, MicOffIcon, PhoneOffIcon, ScreenShareIcon, UsersIcon, VideoIcon, VideoOffIcon, Volume2Icon, XIcon } from "lucide-react"
+
 import { RenderIcon } from "@/components/shared/render-icon"
 
 type MeetingControlsProps = {

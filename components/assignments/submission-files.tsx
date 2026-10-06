@@ -1,7 +1,8 @@
 "use client"
+import { DownloadIcon } from "@/components/icons"
 
 import * as React from "react"
-import { DownloadIcon } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
 import { getSubmissionFileUrl } from "@/lib/actions/assignments"
 

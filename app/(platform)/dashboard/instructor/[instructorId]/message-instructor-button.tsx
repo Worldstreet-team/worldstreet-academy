@@ -1,10 +1,10 @@
 "use client"
+import { MessageSquareIcon } from "@/components/icons"
 
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { getOrCreateConversation } from "@/lib/actions/messages"
-import { MessageSquareIcon } from "lucide-react"
 
 interface MessageInstructorButtonProps {
   instructorId: string

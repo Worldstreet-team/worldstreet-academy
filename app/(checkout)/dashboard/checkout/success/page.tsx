@@ -1,16 +1,9 @@
+import { ArrowRightIcon, AwardIcon, HandshakeIcon, MailIcon, PlayIcon, RadioIcon, type IconComponent } from "@/components/icons"
 import type { Metadata } from "next"
 import Image from "next/image"
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import {
-  ArrowRightIcon,
-  AwardIcon,
-  HandshakeIcon,
-  MailIcon,
-  PlayIcon,
-  RadioIcon,
-  type LucideIcon,
-} from "lucide-react"
+
 import { BRAND } from "@/lib/brand"
 import { getCachedUser } from "@/lib/auth/cached"
 import { getCourseAccess, getLearnStart } from "@/lib/course-access"
@@ -29,7 +22,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 }
 
-type NextStep = { icon: LucideIcon; title: string; body: string }
+type NextStep = { icon: IconComponent; title: string; body: string }
 
 /**
  * Spec §12/§17 "Payment successful → Enrollment confirmed" — server-rendered

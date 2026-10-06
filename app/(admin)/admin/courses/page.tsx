@@ -1,4 +1,5 @@
 "use client"
+import { MoreHorizontal, BookOpenIcon, PlusIcon, StarIcon } from "@/components/icons"
 
 import * as React from "react"
 import { Suspense } from "react"
@@ -25,7 +26,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import Link from "next/link"
-import { MoreHorizontal } from "lucide-react"
+
 import { PageHeader } from "@/components/shared/page-header"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -43,7 +44,7 @@ import {
 } from "@/components/admin/shared"
 import { courseAvailability } from "@/lib/types/course"
 import type { CourseStatus } from "@/lib/types/course"
-import { BookOpenIcon, PlusIcon, StarIcon } from "lucide-react"
+
 
 const KIND_LABEL = { marketplace: "Marketplace", "new-economy": "New Economy" } as const
 

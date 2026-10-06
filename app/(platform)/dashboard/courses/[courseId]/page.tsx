@@ -1,3 +1,4 @@
+import { ChevronLeftIcon, ExternalLinkIcon, GraduationCapIcon, HourglassIcon, StarIcon, UsersIcon } from "@/components/icons"
 import { notFound, redirect } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
@@ -28,14 +29,7 @@ import { CourseExamCard } from "@/components/courses/course-exam-card"
 import { CourseOutcomes } from "@/components/courses/course-outcomes"
 import { CourseReviews } from "@/components/courses/course-reviews"
 import { CourseCarousel } from "@/components/learn/course-carousel"
-import {
-  ChevronLeftIcon,
-  ExternalLinkIcon,
-  GraduationCapIcon,
-  HourglassIcon,
-  StarIcon,
-  UsersIcon,
-} from "lucide-react"
+
 import { programRail, programStats } from "@/lib/program-rail"
 import { PackageLadder } from "@/components/programs/package-ladder"
 import type { ProgramAccess } from "@/components/programs/access"
@@ -387,7 +381,7 @@ export default async function CourseDetailPage({
                   {cta}
                   <BookmarkButton
                     courseId={course.id}
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm border border-ws-hairline text-ws-muted transition-colors hover:bg-ws-raised hover:text-ws-primary"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-ws-hairline text-ws-muted transition-colors hover:bg-ws-raised hover:text-ws-primary"
                   />
                 </div>
               </div>

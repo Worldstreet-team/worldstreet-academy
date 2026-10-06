@@ -1,4 +1,5 @@
 "use client"
+import { BookOpen, CircleDollarSign, Inbox, Users } from "@/components/icons"
 
 import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
@@ -7,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
 import { PageHeader } from "@/components/shared/page-header"
 import { StatTile } from "@/components/shared/stat-tile"
-import { BookOpen, CircleDollarSign, Inbox, Users } from "lucide-react"
+
 import { getAdminOverview } from "@/lib/actions/admin-overview"
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import { money, formatDateTime, StatusBadge } from "@/components/admin/shared"

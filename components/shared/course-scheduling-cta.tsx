@@ -1,4 +1,5 @@
 "use client"
+import { CalendarClockIcon, CheckIcon } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
@@ -6,7 +7,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { preEnrollCourse } from "@/lib/actions/enrollments"
 import { loginUrl } from "@/lib/auth/login-url"
 import { AvailabilityCountdown } from "@/components/shared/availability-countdown"
-import { CalendarClockIcon, CheckIcon } from "lucide-react"
+
 
 function formatLaunch(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {
@@ -74,7 +75,7 @@ export function CourseSchedulingCta({
       <div className="flex w-full flex-col gap-2">
         <Link
           href={`/dashboard/checkout?courseId=${courseId}`}
-          className="flex h-11 flex-1 items-center justify-center rounded-sm bg-ws-brand px-5 text-sm font-semibold text-ws-brand-on transition-opacity hover:opacity-90"
+          className="flex h-11 flex-1 items-center justify-center rounded-full bg-ws-brand px-5 text-sm font-semibold text-ws-brand-on transition-opacity hover:opacity-90"
         >
           Start Course{isPaid && price ? ` — Pay $${price}` : ""}
         </Link>
@@ -113,14 +114,14 @@ export function CourseSchedulingCta({
             type="button"
             onClick={handlePreEnroll}
             disabled={pending}
-            className="flex h-11 cursor-pointer items-center justify-center rounded-sm bg-ws-brand px-5 text-sm font-semibold text-ws-brand-on transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="flex h-11 cursor-pointer items-center justify-center rounded-full bg-ws-brand px-5 text-sm font-semibold text-ws-brand-on transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             {pending ? "Enrolling…" : "Enroll Now — Free Until Launch"}
           </button>
         ) : (
           <a
             href={loginUrl(pathname)}
-            className="flex h-11 items-center justify-center rounded-sm bg-ws-brand px-5 text-sm font-semibold text-ws-brand-on transition-opacity hover:opacity-90"
+            className="flex h-11 items-center justify-center rounded-full bg-ws-brand px-5 text-sm font-semibold text-ws-brand-on transition-opacity hover:opacity-90"
           >
             Sign in to enroll
           </a>

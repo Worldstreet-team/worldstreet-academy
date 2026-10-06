@@ -1,0 +1,6 @@
+/* VENDORED from worldstreet/design-system by scripts/vendor.mjs. Don't edit: change the design system and re-run it. */
+/* Cryonix: everything. Import once, globally. */
+@import "./tokens/index.css";
+@import "./components/index.css";
+/* Brands: activate with data-brand="…" on any wrapper */
+@import "./brands/worldstreet.css";

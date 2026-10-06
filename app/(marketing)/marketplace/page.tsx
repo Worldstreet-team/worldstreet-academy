@@ -1,6 +1,7 @@
+import { ArrowRightIcon, SearchIcon, StoreIcon } from "@/components/icons"
 import type { Metadata } from "next"
 import Link from "next/link"
-import { ArrowRightIcon, SearchIcon, StoreIcon } from "lucide-react"
+
 import { BRAND } from "@/lib/brand"
 import { appUrl } from "@/lib/app-url"
 import { SCHOOLS, SCHOOL_BY_SLUG, countProgramsBySchool, isSchoolSlug } from "@/lib/schools"

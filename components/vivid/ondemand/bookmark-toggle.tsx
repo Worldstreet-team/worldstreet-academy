@@ -1,4 +1,5 @@
 "use client"
+import { BookmarkCheckIcon, BookmarkIcon } from "@/components/icons"
 
 import Image from "next/image"
 import { useState } from "react"
@@ -6,7 +7,6 @@ import { motion } from "motion/react"
 import { useVivid } from "@/lib/vivid/provider"
 import type { OnDemandUI } from "@/lib/vivid/types"
 import { parseConfig } from "./helpers"
-import { BookmarkCheckIcon, BookmarkIcon } from "lucide-react"
 import { RenderIcon } from "@/components/shared/render-icon"
 
 export function BookmarkToggleUI({ ui }: { ui: OnDemandUI }) {

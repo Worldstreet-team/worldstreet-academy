@@ -1,5 +1,6 @@
+import { ChevronRightIcon, StarIcon } from "@/components/icons"
 import Link from "next/link"
-import { ChevronRightIcon, StarIcon } from "lucide-react"
+
 import { SCHOOLS, type School } from "@/lib/schools"
 import type { CourseRatingSummary } from "@/lib/actions/reviews"
 import { packagePriceLabel } from "@/lib/program-price"

@@ -1,4 +1,5 @@
 "use client"
+import { BookOpen, Star, Trophy } from "@/components/icons"
 
 import Link from "next/link"
 import Image from "next/image"
@@ -10,7 +11,7 @@ import { ArtCertificate } from "@/components/shared/illustrations"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useQuery } from "@tanstack/react-query"
 import { fetchInstructorCertificateStats } from "@/lib/actions/certificates"
-import { BookOpen, Star, Trophy } from "lucide-react"
+
 
 export default function InstructorCertificatesPage() {
   const { data: stats = [], isLoading } = useQuery({

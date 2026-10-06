@@ -1,12 +1,20 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-/* WorldStreet design tokens — vendored copy of ../design-tokens/tokens.css.
-   Vendored rather than imported across repos because the Dockerfile only
-   copies this directory. Academy runs the `platform` theme (see <html>). */
-@import "./ws-tokens.css";
+/* The WorldStreet design system (2026-10-06), vendored into ds/ by
+   `pnpm ds:sync` — never edit ds/. Tokens, the .cx-* kit and the WorldStreet
+   brand, in Tailwind's components layer so utilities on a kit element still
+   win; then its Tailwind v4 utilities (bg-ember, text-muted, rounded-card …). */
+@import "../ds/styles/index.css" layer(components);
+@import "../ds/styles/theme.css";
+/* The system's shadcn bridge (--primary, --card … and the common --ws-*
+   names). @import has to sit up here, so the Academy's superset below — same
+   selector, later in the file — wins where they overlap. */
+@import "../ds/styles/shadcn-bridge.css";
 
-@custom-variant dark (&:is(.dark *));
+/* The system scopes `dark:` to .cx-dark; next-themes puts .dark (and
+   data-theme) on <html>, so the variant answers to both. */
+@custom-variant dark (&:is(.dark *, .cx-dark *));
 
 @theme inline {
   --color-background: var(--background);
@@ -85,7 +93,7 @@
 
   /* DS v2 kit bridges — the hub's utility vocabulary (bg-credit-chip,
      text-debit, bg-surface-sunken …) used by components/ui/system.tsx. Each
-     points at a canonical token ws-tokens.css already defines in BOTH modes
+     points at a design-system token that already covers BOTH modes
      (dark 500s @14% chips, light 700s @10%); no values live here. */
   --color-credit: var(--credit);
   --color-credit-chip: var(--credit-chip);
@@ -102,56 +110,118 @@
   --color-ws-glow: var(--ws-glow-brand);
 }
 
-/* Light mode is NOT defined here. ThemeProvider syncs next-themes' choice to
-   data-ws-theme="platform" | "platform-light" on <html>, and ws-tokens.css
-   (the vendored canonical token file) carries both palettes. Never override
-   --ws-* values in app code. */
+/* ── The Academy's vocabulary, pointed at the design system ─────────────
+   The Academy wears the WorldStreet brand (data-brand on <body>, see
+   app/layout.tsx); dark is the default and light is supported (data-theme on
+   <html>, set by next-themes). Every shadcn token and every legacy --ws-*
+   name the components still use resolves to a --cx-* value HERE, on the
+   brand element — the brand re-points --cx-* on that element, so a mapping
+   on :root would resolve against the kit's default palette. A "dark island"
+   (a section that stays dark in light mode) carries data-theme="dark" AND
+   data-brand="worldstreet", so this block re-evaluates there.
+   New code reaches for the system's names directly (bg-ember, text-muted,
+   bg-surface-2, rounded-card, <Card/> from @/ds/components). */
+[data-brand="worldstreet"] {
+  /* Manrope everywhere; Noto Sans fills only the ₦ glyph Manrope lacks. */
+  --cx-font: var(--font-manrope), var(--font-noto), system-ui, sans-serif;
+  --font-sans: var(--cx-font);
+  --font-display: var(--cx-font);
 
-/* Same mapping as `.dark` below — shadcn's variables resolve to design-system
-   tokens so components inherit the theme without being rewritten. */
-:root {
-  --background: var(--ws-bg-page);
-  --foreground: var(--ws-text-primary);
-  --card: var(--ws-bg-surface);
-  --card-foreground: var(--ws-text-primary);
-  --popover: var(--ws-bg-surface);
-  --popover-foreground: var(--ws-text-primary);
-  --primary: var(--ws-brand-primary);
-  --primary-foreground: var(--ws-brand-on-primary);
-  --secondary: var(--ws-bg-raised);
-  --secondary-foreground: var(--ws-text-primary);
-  --muted: var(--ws-bg-raised);
-  --muted-foreground: var(--ws-text-muted);
-  --accent: var(--ws-bg-raised);
-  --accent-foreground: var(--ws-text-primary);
-  --destructive: var(--ws-status-danger);
-  --border: var(--ws-border-hairline);
-  --input: var(--ws-border-hairline);
-  --ring: var(--ws-brand-primary);
-  --chart-1: var(--ws-brand-primary);
-  --chart-2: var(--ws-status-success);
-  --chart-3: var(--ws-accent-crypto);
-  --chart-4: var(--ws-accent-forex);
-  --chart-5: var(--ws-accent-vision);
-  /* Design-system radius ladder: sm 7 / md 10 / lg 13 at 0.45rem. Deliberately
-     tighter than stock Tailwind — that gap is what makes the UI read geometric
-     rather than pillowy. */
-  --radius: 0.8125rem;
-  /* App shells sit on the SUNKEN step (design-system 01/04), under the
-     cards the rail holds — not on the card step itself. */
-  --sidebar: var(--ws-bg-sunken);
-  --sidebar-foreground: var(--ws-text-primary);
-  --sidebar-primary: var(--ws-brand-primary);
-  --sidebar-primary-foreground: var(--ws-brand-on-primary);
-  --sidebar-accent: var(--ws-bg-raised);
-  --sidebar-accent-foreground: var(--ws-text-primary);
-  --sidebar-border: var(--ws-border-hairline);
-  --sidebar-ring: var(--ws-brand-primary);
+  --background: var(--cx-bg);
+  --foreground: var(--cx-text);
+  --card: var(--cx-elevated);
+  --card-foreground: var(--cx-text);
+  --popover: var(--cx-elevated);
+  --popover-foreground: var(--cx-text);
+  --primary: var(--cx-ember);
+  --primary-foreground: var(--cx-on-primary);
+  --secondary: var(--cx-surface-2);
+  --secondary-foreground: var(--cx-text);
+  --muted: var(--cx-surface-2);
+  --muted-foreground: var(--cx-text-muted);
+  --accent: var(--cx-surface-2);
+  --accent-foreground: var(--cx-text);
+  --destructive: var(--cx-loss);
+  --border: var(--cx-hairline);
+  --input: var(--cx-field-border);
+  --ring: var(--cx-ember-press);
+  --chart-1: var(--cx-chart-1);
+  --chart-2: var(--cx-chart-2);
+  --chart-3: var(--cx-chart-3);
+  --chart-4: var(--cx-chart-4);
+  --chart-5: var(--cx-chart-5);
+  --surface-sunken: var(--cx-surface);
+  --subtle: var(--cx-text-3);
+  --warning: var(--cx-warning);
+  --warning-chip: var(--cx-warning-wash);
+
+  --sidebar: var(--cx-bg);
+  --sidebar-foreground: var(--cx-text);
+  --sidebar-primary: var(--cx-ember);
+  --sidebar-primary-foreground: var(--cx-on-primary);
+  --sidebar-accent: var(--cx-surface-2);
+  --sidebar-accent-foreground: var(--cx-text);
+  --sidebar-border: var(--cx-hairline);
+  --sidebar-ring: var(--cx-ember-press);
+
+  /* Legacy --ws-* names the bridge doesn't carry. Colours, motion and radii
+     follow the system; spacing, z-order and the product accent hues keep the
+     values they had in the retired token file (they don't change with the
+     theme). Never add a raw palette hex outside this block. */
+  --ws-status-success: var(--cx-gain);
+  --ws-status-danger: var(--cx-loss);
+  --ws-status-warning: var(--cx-warning);
+  --ws-status-warning-chip: var(--cx-warning-wash);
+  --ws-bg-chip: var(--cx-surface-3);
+  --ws-bg-track: var(--cx-surface-3);
+  --ws-brand-active: var(--cx-ember-press);
+  --ws-brand-dim: var(--cx-ember-text);
+  --ws-glow-brand: var(--cx-brand-wash);
+  --ws-focus-ring: var(--cx-focus-ring);
+  --ws-money-convert: var(--cx-ember-text);
+  --ws-money-convert-chip: var(--cx-brand-wash);
+  --ws-overlay-scrim: rgba(0, 0, 0, 0.6);
+  --ws-font-display: var(--cx-font);
+  --ws-font-ui: var(--cx-font);
+  --ws-ease: var(--cx-ease);
+  --ws-ease-rise: var(--cx-spring);
+  --ws-motion-fast: var(--cx-dur-fast);
+  --ws-motion-base: var(--cx-dur);
+  --ws-motion-slow: var(--cx-dur-slow);
+  --ws-radius-sm: var(--cx-r-sm);
+  --ws-radius-md: var(--cx-r-md);
+  --ws-radius-lg: var(--cx-r-lg);
+  --ws-radius-xl: var(--cx-r-card);
+  --ws-radius-pill: var(--cx-r-pill);
+  --ws-shadow-nav: var(--cx-shadow-md);
+  --ws-shadow-sheet: var(--cx-shadow-lg);
+  --ws-accent-academy: #10b981;
+  --ws-accent-community: #10b981;
+  --ws-accent-crypto: #8b5cf6;
+  --ws-accent-forex: #3b82f6;
+  --ws-accent-prediction: #14b8a6;
+  --ws-accent-shop: #f59e0b;
+  --ws-accent-social: #6366f1;
+  --ws-accent-star: #f97316;
+  --ws-accent-vision: #f43f5e;
+  --ws-accent-vivid: var(--cx-ember);
+  --ws-accent-xtreme: #f97316;
+  --ws-space-1: 4px;
+  --ws-space-2: 8px;
+  --ws-space-3: 12px;
+  --ws-space-4: 16px;
+  --ws-space-6: 24px;
+  --ws-space-8: 32px;
+  --ws-z-sticky: 100;
+  --ws-z-dropdown: 400;
+  --ws-z-modal: 800;
+  --ws-z-toast: 1200;
+  --ws-bp-sm: 640px;
+  --ws-bp-lg: 1024px;
+  --ws-bp-xl: 1280px;
+  --ws-container-max: 1280px;
+  --ws-feed-width: 620px;
 }
-
-/* Note: shadcn's variables resolve to --ws-* in :root above for BOTH modes —
-   the palette flips via data-ws-theme (platform / platform-light) on <html>,
-   not via a parallel class-scoped variable set. Never put a raw hex here. */
 
 @layer base {
   * {
@@ -293,49 +363,19 @@
   display: none;
 }
 
-/* ── Two-tone icons (Hugeicons) ─────────────────────────────────────────────
-   The house icon look (design-system/03-icons): the outer path is ink
-   (currentColor), inner detail strokes are gold. Ported from the hub's
-   `svg[viewBox="0 0 24 24"] > path:not(:first-child)`, NARROWED — that bare
-   selector would also recolour this repo's other 24-box svgs:
-     · lucide-react icons (still the default outside migrated surfaces) are
-       24-box multi-path svgs;
-     · the inline spinners (signature upload/canvas, profile avatar upload,
-       video player) are 24-box `<circle>` + `<path>`, so their arc matches
-       `path:not(:first-child)` and would take a gold stroke.
-   The marker: HugeiconsIcon always writes a `color` attribute on its <svg>
-   (`color={primaryColor || color}`, default "currentColor" —
-   @hugeicons/react dist/esm/HugeiconsIcon.js). lucide-react never does (it
-   maps `color` to `stroke`), and no inline svg here sets one (audited
-   2026-09-15). `:not(.lucide)` is a second guard in case a future lucide
-   starts passing `color` through. Un-layered on purpose, like the hub: the
-   exceptions below must beat Tailwind's layered utilities.
-
-   Specificity: base (0,4,2); each exception adds a class → (0,5,2). */
-svg[viewBox="0 0 24 24"][color]:not(.lucide) > path:not(:first-child) {
-  stroke: var(--color-primary);
+/* ── Duotone icons on gold and on meaning (design system, 2026-10-06) ─────
+   Every icon is the system's duotone glyph (components/icons.tsx), drawn in
+   the WorldStreet gold gradient by default. On a gold fill (a primary button,
+   an active gold chip) the gradient would paint gold on gold and vanish, so
+   the glyph takes the surface's own foreground (ink) instead. `.ws-icon-mono`
+   on the ELEMENT WRAPPING an icon does the same where the icon's colour
+   carries information (an eye that reads gold when hidden, muted when shown).
+   Un-layered on purpose: the kit's icon rules sit in the components layer. */
+:is(.bg-primary, .bg-ws-brand, .ws-icon-mono) .cx-icon--gradient .b,
+:is(.bg-primary, .bg-ws-brand, .ws-icon-mono) .cx-icon--gradient .s {
+  fill: currentColor;
 }
-
-/* …except on the gold fill itself, where the treatment paints the accent ON
-   the accent and the glyph half-vanishes. The two-tone rule assumes a
-   neutral surface behind the icon; a primary-filled button isn't one, so the
-   whole glyph takes the button's own foreground. `.bg-ws-brand` is Academy's
-   older name for the same gold fill. A Tailwind utility could not do this
-   from the call site: layered utilities lose to un-layered rules whatever
-   their specificity. */
-.bg-primary svg[viewBox="0 0 24 24"][color]:not(.lucide) > path:not(:first-child),
-.bg-ws-brand svg[viewBox="0 0 24 24"][color]:not(.lucide) > path:not(:first-child) {
-  stroke: currentColor;
-}
-
-/* …and an explicit opt-out, for icons whose COLOUR carries information (an
-   eye that reads gold when figures are hidden and muted when shown would be
-   gold in both states under the unconditional rule). `[&_path]:stroke-current`
-   from a className looks like it should work and silently does not — same
-   cascade reason as above.
-
-   Put it on the ELEMENT WRAPPING the icon (button, span), not the icon. */
-.ws-icon-mono svg[viewBox="0 0 24 24"][color]:not(.lucide) > path:not(:first-child) {
+:is(.bg-primary, .bg-ws-brand, .ws-icon-mono) .cx-icon--gradient .f {
   stroke: currentColor;
 }
 

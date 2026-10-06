@@ -1,11 +1,12 @@
 "use client"
+import { ChartColumnIcon, HandIcon, CheckIcon, ChevronDownIcon, ChevronRightIcon, MessageCircleIcon, MicOffIcon, PlusIcon, ScreenShareIcon, SendIcon, UsersIcon, VideoOffIcon, XIcon } from "@/components/icons"
 
 import { useRef, useEffect, useState } from "react"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
-import { ChartColumnIcon, HandIcon, CheckIcon, ChevronDownIcon, ChevronRightIcon, MessageCircleIcon, MicOffIcon, PlusIcon, ScreenShareIcon, SendIcon, UsersIcon, VideoOffIcon, XIcon } from "lucide-react"
+
 import { RenderIcon } from "@/components/shared/render-icon"
 
 export type ActiveTab = "people" | "chat" | "polls"

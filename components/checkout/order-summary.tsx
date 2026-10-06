@@ -1,10 +1,11 @@
 "use client"
+import { BadgeCheckIcon, ChevronDownIcon, ReceiptTextIcon } from "@/components/icons"
 
 import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { motion } from "motion/react"
-import { BadgeCheckIcon, ChevronDownIcon, ReceiptTextIcon } from "lucide-react"
+
 import type { ProgramDetail, PublicPackage } from "@/lib/actions/student"
 import { SCHOOL_BY_SLUG } from "@/lib/schools"
 import { cn } from "@/lib/utils"

@@ -1,9 +1,10 @@
 "use client"
+import { StarIcon } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { StarIcon } from "lucide-react"
+
 import { cn } from "@/lib/utils"
 import { levelChipStyle } from "@/components/shared/level-badge"
 import { WishlistButton, autoBookmark } from "@/components/marketing/wishlist-button"

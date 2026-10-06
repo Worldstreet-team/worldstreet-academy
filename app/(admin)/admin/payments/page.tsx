@@ -1,4 +1,5 @@
 "use client"
+import { CircleDollarSignIcon } from "@/components/icons"
 
 import * as React from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
@@ -43,7 +44,7 @@ import {
   FilterChips,
   Pagination,
 } from "@/components/admin/shared"
-import { CircleDollarSignIcon } from "lucide-react"
+
 
 /* ═════════════ Orders tab ═════════════ */
 

@@ -1,4 +1,5 @@
 "use client"
+import { CalendarClockIcon, ChevronLeftIcon, ChevronRightIcon, CircleCheckIcon, CopyIcon, LoaderCircleIcon, SearchIcon, UserIcon, UsersIcon, VideoIcon, XIcon } from "@/components/icons"
 
 import { useState, useCallback, useRef, useEffect } from "react"
 import Image from "next/image"
@@ -12,7 +13,7 @@ import {
   searchUsersByEmail,
   type InviteResult,
 } from "@/lib/actions/meetings"
-import { CalendarClockIcon, ChevronLeftIcon, ChevronRightIcon, CircleCheckIcon, CopyIcon, LoaderCircleIcon, SearchIcon, UserIcon, UsersIcon, VideoIcon, XIcon } from "lucide-react"
+
 import { RenderIcon } from "@/components/shared/render-icon"
 import { isoToLocalInput, localInputToIso } from "@/lib/datetime-local"
 

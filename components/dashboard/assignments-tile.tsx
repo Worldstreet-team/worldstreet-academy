@@ -1,8 +1,9 @@
 "use client"
+import { Glyph, Award01Icon, Notebook01Icon, TaskDone01Icon, type IconComponent } from "@/components/icons"
 
 import Link from "next/link"
-import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react"
-import { Award01Icon, Notebook01Icon, TaskDone01Icon } from "@hugeicons/core-free-icons"
+
+
 import { Chevron, DATA_CHIP, TILE_FOOT_LINK, TILE_ROW, TILE_ROWS } from "@/components/dashboard/tile-bits"
 import { CardHeader, CardShell } from "@/components/ui/system"
 import type { MyAssessment } from "@/lib/actions/exams"
@@ -28,7 +29,7 @@ export function assessmentKindLabel(assessment: MyAssessment): string {
   return assessment.dueAt ? `Assignment · due ${formatDateTime(assessment.dueAt)}` : "Assignment"
 }
 
-const KIND_ICON: Record<MyAssessment["scope"], IconSvgElement> = {
+const KIND_ICON: Record<MyAssessment["scope"], IconComponent> = {
   final: Award01Icon,
   lesson: TaskDone01Icon,
   assignment: Notebook01Icon,
@@ -60,7 +61,7 @@ export function AssignmentsTile() {
           return (
             <Link key={`${a.scope}-${a.id}`} href={a.href} className={TILE_ROW}>
               <span className={DATA_CHIP}>
-                <HugeiconsIcon icon={KIND_ICON[a.scope]} className="h-[18px] w-[18px] text-muted-foreground" aria-hidden />
+                <Glyph icon={KIND_ICON[a.scope]} className="h-[18px] w-[18px] text-muted-foreground" aria-hidden />
               </span>
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate text-[14px] font-medium" title={a.title}>

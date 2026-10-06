@@ -1,8 +1,9 @@
 "use client"
+import { UploadIcon } from "@/components/icons"
 
 import { useRef, useState, useCallback } from "react"
 import { useVivid } from "@/lib/vivid/provider"
-import { UploadIcon } from "lucide-react"
+
 
 export function FileUploadUI() {
   const vivid = useVivid()

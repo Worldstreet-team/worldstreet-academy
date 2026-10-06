@@ -1,10 +1,9 @@
 "use client"
+import { Glyph, CalendarAdd01Icon, PlayCircle02Icon } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
 import { useQueryClient } from "@tanstack/react-query"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { CalendarAdd01Icon, PlayCircle02Icon } from "@hugeicons/core-free-icons"
 import { Countdown } from "@/components/shared/countdown"
 import { Button } from "@/components/ui/button"
 import { CardShell, Eyebrow } from "@/components/ui/system"
@@ -99,7 +98,7 @@ function AddToCalendar({ uid, title, startsAt, minutes = 60, href }: {
         })
       }
     >
-      <HugeiconsIcon icon={CalendarAdd01Icon} className="h-4 w-4" aria-hidden />
+      <Glyph icon={CalendarAdd01Icon} className="h-4 w-4" aria-hidden />
       Add to calendar
     </Button>
   )
@@ -255,7 +254,7 @@ export function ClassBand({ entry }: { entry: ClassBoardEntry | undefined }) {
         </div>
         <span className="hidden @2xl:block" />
         <Button variant="outline" className="rounded-full" render={<Link href={entry.latestRecording.href} />}>
-          <HugeiconsIcon icon={PlayCircle02Icon} className="h-4 w-4" aria-hidden />
+          <Glyph icon={PlayCircle02Icon} className="h-4 w-4" aria-hidden />
           Watch last class
         </Button>
       </BandShell>

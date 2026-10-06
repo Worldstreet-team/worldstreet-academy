@@ -1,4 +1,5 @@
 "use client"
+import { Maximize2Icon, Minimize2Icon, XIcon } from "@/components/icons"
 
 /**
  * Vivid Top Bar — status indicator, minimize, expand, close controls.
@@ -6,7 +7,6 @@
 
 import { motion } from "motion/react"
 import { useVivid } from "@/lib/vivid/provider"
-import { Maximize2Icon, Minimize2Icon, XIcon } from "lucide-react"
 
 const stateLabels: Record<string, string> = {
   idle: "Offline",

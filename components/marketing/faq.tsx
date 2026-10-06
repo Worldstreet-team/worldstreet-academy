@@ -1,8 +1,8 @@
 "use client"
+import { PlusIcon } from "@/components/icons"
 
 import * as React from "react"
 import { motion } from "motion/react"
-import { PlusIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Reveal, RevealGroup } from "@/components/marketing/motion/reveal"
 import { SectionLabel, SectionTitle } from "@/components/marketing/section-heading"

@@ -1,7 +1,8 @@
 "use client"
+import { UsersIcon } from "@/components/icons"
 
 import { motion } from "motion/react"
-import { UsersIcon } from "lucide-react"
+
 
 export interface MeetingItem {
   id?: string

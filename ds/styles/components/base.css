@@ -1,0 +1,17 @@
+/* VENDORED from worldstreet/design-system by scripts/vendor.mjs. Don't edit: change the design system and re-run it. */
+/* ---- Base --------------------------------------------------------------- */
+.cx-root {
+  background: var(--cx-bg); color: var(--cx-text);
+  font-family: var(--cx-font); font-feature-settings: var(--cx-font-features);
+  font-size: var(--cx-body); line-height: var(--cx-body-lh); letter-spacing: var(--cx-body-ls);
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+}
+.cx-root *, .cx-root *::before, .cx-root *::after { box-sizing: border-box; }
+.cx-root :focus-visible { outline: none; box-shadow: var(--cx-focus-ring); }
+.cx-root ::selection { background: var(--cx-brand-wash); color: var(--cx-text); }
+.cx-num { font-variant-numeric: tabular-nums; }
+.cx-mono { font-family: var(--cx-font-mono); font-size: .92em; letter-spacing: 0; }
+.cx-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.cx-skip { position: absolute; left: 16px; top: -60px; z-index: var(--cx-z-tooltip); padding: 10px 16px; border-radius: var(--cx-r-sm);
+  background: var(--cx-ember); color: var(--cx-on-primary); text-decoration: none; transition: top var(--cx-dur-fast); }
+.cx-skip:focus { top: 16px; }

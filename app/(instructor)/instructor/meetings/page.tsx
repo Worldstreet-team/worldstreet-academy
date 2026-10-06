@@ -1,4 +1,5 @@
 "use client"
+import { LinkIcon, Minimize2Icon } from "@/components/icons"
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useQueryClient } from "@tanstack/react-query"
@@ -65,7 +66,7 @@ import {
   MeetingHistory,
   ReturnToMeetingBanner,
 } from "@/components/meetings"
-import { LinkIcon, Minimize2Icon } from "lucide-react"
+
 import { Whiteboard } from "@/components/meetings/whiteboard"
 import type { ActiveTab, ChatMessage, Poll, PollVoter } from "@/components/meetings"
 import { useMyMeetings, useMeetingHistory, useInstructorMeetingCourses, queryKeys } from "@/lib/hooks/queries"

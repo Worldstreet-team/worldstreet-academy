@@ -1,4 +1,5 @@
 "use client"
+import { SearchIcon } from "@/components/icons"
 
 import * as React from "react"
 import { Topbar } from "@/components/platform/topbar"
@@ -9,7 +10,7 @@ import { ArtCourses } from "@/components/shared/illustrations"
 import { isFinished, isInProgress } from "@/lib/dashboard-home"
 import { useEnrollments } from "@/lib/hooks/queries"
 import { cn } from "@/lib/utils"
-import { SearchIcon } from "lucide-react"
+
 
 const TABS = ["All", "In Progress", "Completed"] as const
 type Tab = (typeof TABS)[number]

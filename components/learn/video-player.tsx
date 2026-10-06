@@ -1,4 +1,5 @@
 "use client"
+import { CheckIcon, FastForwardIcon, LightbulbIcon, MaximizeIcon, MinimizeIcon, PauseIcon, PlayIcon, RewindIcon, SettingsIcon, Volume1Icon, Volume2Icon, VolumeXIcon } from "@/components/icons"
 
 import { useRef, useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
@@ -16,7 +17,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { CheckIcon, FastForwardIcon, LightbulbIcon, MaximizeIcon, MinimizeIcon, PauseIcon, PlayIcon, RewindIcon, SettingsIcon, Volume1Icon, Volume2Icon, VolumeXIcon } from "lucide-react"
+
 import { RenderIcon } from "@/components/shared/render-icon"
 
 /* ------------------------------------------------------------------ */

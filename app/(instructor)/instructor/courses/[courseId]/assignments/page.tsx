@@ -1,10 +1,11 @@
 "use client"
+import { ArrowLeft, PlusIcon } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { ArrowLeft, PlusIcon } from "lucide-react"
+
 import { Topbar } from "@/components/platform/topbar"
 import { PageHeader } from "@/components/shared/page-header"
 import { SubmissionFiles } from "@/components/assignments/submission-files"

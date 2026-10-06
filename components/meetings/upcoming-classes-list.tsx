@@ -1,6 +1,6 @@
 "use client"
+import { CalendarClockIcon, ChevronRightIcon } from "@/components/icons"
 
-import { CalendarClockIcon, ChevronRightIcon } from "lucide-react"
 import { useUpcomingClasses } from "@/lib/hooks/queries"
 
 /**

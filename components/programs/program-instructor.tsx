@@ -1,5 +1,6 @@
+import { ArrowRightIcon, BookOpenIcon, UsersIcon } from "@/components/icons"
 import Link from "next/link"
-import { ArrowRightIcon, BookOpenIcon, UsersIcon } from "lucide-react"
+
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { facultyHref } from "@/lib/faculty"
 import { ClampedText } from "@/components/programs/clamped-text"

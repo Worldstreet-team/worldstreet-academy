@@ -1,22 +1,11 @@
 "use client"
+import { Glyph, AlertCircleIcon, ArrowDownLeft01Icon, ArrowRight01Icon, ArrowUpRight01Icon, BankIcon, Clock01Icon, DollarCircleIcon, RefreshIcon, SecurityCheckIcon, ViewIcon, ViewOffIcon } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  AlertCircleIcon,
-  ArrowDownLeft01Icon,
-  ArrowRight01Icon,
-  ArrowUpRight01Icon,
-  BankIcon,
-  Clock01Icon,
-  DollarCircleIcon,
-  RefreshIcon,
-  SecurityCheckIcon,
-  ViewIcon,
-  ViewOffIcon,
-} from "@hugeicons/core-free-icons"
+
+
 import { Topbar } from "@/components/platform/topbar"
 import {
   ActionPill,
@@ -57,14 +46,14 @@ const HUB_WALLET_URL = "https://www.worldstreetgold.com/wallet/modern"
 const MASK = "••••"
 
 type GlyphProps = { className?: string }
-const DepositGlyph = ({ className }: GlyphProps) => <HugeiconsIcon icon={ArrowDownLeft01Icon} className={className} />
-const WithdrawGlyph = ({ className }: GlyphProps) => <HugeiconsIcon icon={ArrowUpRight01Icon} className={className} />
-const VerifyGlyph = ({ className }: GlyphProps) => <HugeiconsIcon icon={SecurityCheckIcon} className={className} />
-const DollarGlyph = ({ className }: GlyphProps) => <HugeiconsIcon icon={DollarCircleIcon} className={className} />
-const NairaGlyph = ({ className }: GlyphProps) => <HugeiconsIcon icon={BankIcon} className={className} />
-const RefreshGlyph = ({ className }: GlyphProps) => <HugeiconsIcon icon={RefreshIcon} className={className} />
-const ShowGlyph = ({ className }: GlyphProps) => <HugeiconsIcon icon={ViewIcon} className={className} />
-const HideGlyph = ({ className }: GlyphProps) => <HugeiconsIcon icon={ViewOffIcon} className={className} />
+const DepositGlyph = ({ className }: GlyphProps) => <Glyph icon={ArrowDownLeft01Icon} className={className} />
+const WithdrawGlyph = ({ className }: GlyphProps) => <Glyph icon={ArrowUpRight01Icon} className={className} />
+const VerifyGlyph = ({ className }: GlyphProps) => <Glyph icon={SecurityCheckIcon} className={className} />
+const DollarGlyph = ({ className }: GlyphProps) => <Glyph icon={DollarCircleIcon} className={className} />
+const NairaGlyph = ({ className }: GlyphProps) => <Glyph icon={BankIcon} className={className} />
+const RefreshGlyph = ({ className }: GlyphProps) => <Glyph icon={RefreshIcon} className={className} />
+const ShowGlyph = ({ className }: GlyphProps) => <Glyph icon={ViewIcon} className={className} />
+const HideGlyph = ({ className }: GlyphProps) => <Glyph icon={ViewOffIcon} className={className} />
 
 /* ── Transactions filter ─────────────────────────────────────────────────── */
 
@@ -119,7 +108,7 @@ function signedAmount(tx: WalletTxItem): string {
 
 /* ── Rows ────────────────────────────────────────────────────────────────── */
 
-const chevron = <HugeiconsIcon icon={ArrowRight01Icon} aria-hidden className="h-4 w-4 shrink-0 text-muted-foreground" />
+const chevron = <Glyph icon={ArrowRight01Icon} aria-hidden className="h-4 w-4 shrink-0 text-muted-foreground" />
 
 /**
  * ListRow geometry (40px gold rounded-square chip, 14px title, 12.5px muted
@@ -205,7 +194,7 @@ function TxRow({
     // text on a phone, without rendering the button twice.
     <li className="grid grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-3 sm:grid-cols-[2.5rem_minmax(0,1fr)_auto_auto]">
       <span className={cn("ws-icon-mono flex h-10 w-10 items-center justify-center rounded-md", chip.className)}>
-        <HugeiconsIcon icon={chip.icon} aria-hidden className="h-[18px] w-[18px]" />
+        <Glyph icon={chip.icon} aria-hidden className="h-[18px] w-[18px]" />
       </span>
       <div className="flex min-w-0 flex-col">
         <div className="flex min-w-0 items-center gap-2">
@@ -234,7 +223,7 @@ function TxRow({
           onClick={onSync}
           className="ws-icon-mono col-start-2 col-end-4 inline-flex h-9 items-center gap-1.5 justify-self-start rounded-full border border-border px-3 text-[12px] font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:pointer-events-none disabled:opacity-50 sm:col-start-4 sm:col-end-5 sm:row-start-1 sm:h-8"
         >
-          <HugeiconsIcon icon={RefreshIcon} aria-hidden className="h-3.5 w-3.5" />
+          <Glyph icon={RefreshIcon} aria-hidden className="h-3.5 w-3.5" />
           {syncing ? "Checking…" : "Sync"}
         </button>
       )}

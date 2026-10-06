@@ -1,4 +1,5 @@
 "use client"
+import { BookOpenIcon, BookmarkIcon, ChartNoAxesColumnIcon, HouseIcon, LogOutIcon, MoonIcon, SearchIcon, SettingsIcon, SunIcon, UserIcon, type IconComponent } from "@/components/icons"
 
 import * as React from "react"
 import Image from "next/image"
@@ -16,8 +17,8 @@ import {
 } from "@/components/ui/sheet"
 import { type BrowseCourse } from "@/lib/actions/student"
 import { useBrowseCourses } from "@/lib/hooks/queries"
-import { BookOpenIcon, BookmarkIcon, ChartNoAxesColumnIcon, HouseIcon, LogOutIcon, MoonIcon, SearchIcon, SettingsIcon, SunIcon, UserIcon } from "lucide-react"
-import type { LucideIcon } from "lucide-react"
+
+
 import { RenderIcon } from "@/components/shared/render-icon"
 
 /* ── Types ────────────────────────────────────────────── */
@@ -25,7 +26,7 @@ type CommandItem = {
   id: string
   label: string
   description?: string
-  icon: LucideIcon
+  icon: IconComponent
   thumbnail?: string | null
   action: () => void
   section: "courses" | "pages" | "tools"

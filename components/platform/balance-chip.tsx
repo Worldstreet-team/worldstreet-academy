@@ -1,9 +1,10 @@
 "use client"
+import { Glyph, ViewIcon, ViewOffIcon, Wallet01Icon } from "@/components/icons"
 
 import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { ViewIcon, ViewOffIcon, Wallet01Icon } from "@hugeicons/core-free-icons"
+
+
 import { getMyWalletBalance } from "@/lib/actions/wallet"
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import { useBalanceHidden } from "@/components/wallet/shared"
@@ -55,7 +56,7 @@ export function BalanceChip() {
         aria-label={`Wallet balance ${hidden ? "hidden" : formatted}. Open wallet.`}
         className="flex h-full items-center gap-2 rounded-full pl-3.5 pr-1.5 outline-none"
       >
-        <HugeiconsIcon icon={Wallet01Icon} aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+        <Glyph icon={Wallet01Icon} aria-hidden className="size-4 shrink-0 text-muted-foreground" />
         {/* No pre-mount visibility guard needed: the figure only exists after a
             client fetch, by which point the store has its stored value. */}
         <span className="text-[13px] font-semibold leading-none tabular-nums text-foreground">
@@ -70,7 +71,7 @@ export function BalanceChip() {
         aria-pressed={hidden}
         className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors duration-[var(--ws-motion-fast)] hover:bg-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary/40"
       >
-        <HugeiconsIcon icon={hidden ? ViewOffIcon : ViewIcon} className="size-3.5" />
+        <Glyph icon={hidden ? ViewOffIcon : ViewIcon} className="size-3.5" />
       </button>
     </div>
   )

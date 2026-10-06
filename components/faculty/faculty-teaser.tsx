@@ -1,5 +1,5 @@
+import { ArrowRightIcon } from "@/components/icons"
 import Link from "next/link"
-import { ArrowRightIcon } from "lucide-react"
 import type { FacultyMember } from "@/lib/actions/student"
 import { BRAND } from "@/lib/brand"
 import { FacultyCard } from "@/components/faculty/faculty-card"

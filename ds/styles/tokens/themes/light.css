@@ -1,0 +1,43 @@
+/* VENDORED from worldstreet/design-system by scripts/vendor.mjs. Don't edit: change the design system and re-run it. */
+/* Light theme: raw overrides [ext]. Paper inversion; every text colour re-picked for >=5:1. */
+
+/* 1b. Raw — light [ext]. Paper inversion; ember unchanged (white on it 5.2:1);
+   every semantic text colour re-picked to clear 5:1 on white/paper.        */
+.cx-light, [data-theme="light"] {
+  color-scheme: light;
+  --cx-fg-rgb:       10, 10, 10;
+  --cx-bg:           #faf7f5;
+  --cx-elevated:     #ffffff;
+  --cx-overlay:      rgba(20, 12, 8, 0.45);
+  --cx-text:         #0a0a0a;          /* 19.8:1 */
+  --cx-text-2:       #3d3a38;          /* 11.3:1 */
+  --cx-text-muted:   #6b6663;          /* 5.7:1 */
+  --cx-ember-text:   #c22500;          /* 5.9:1 */
+  --cx-ember-press:  #a81f00;
+  --cx-gain:    #087a33; --cx-gain-wash:    rgba(8, 122, 51, 0.10);    /* 5.5:1 */
+  --cx-loss:    #c01f42; --cx-loss-wash:    rgba(192, 31, 66, 0.08);   /* 6.0:1 */
+  --cx-warning: #8a5a00; --cx-warning-wash: rgba(245, 180, 0, 0.16);   /* 5.9:1 */
+  --cx-info:    #3d3a38;
+  --cx-brand-wash:   rgba(211, 40, 0, 0.10);
+  --cx-loss-border:  rgba(192, 31, 66, 0.35);
+  --cx-panel:        linear-gradient(129deg, #ffffff 0%, #fbe9e2 100%);
+  --cx-wash-opacity: 0.07;
+  --cx-orb-opacity:  0.28;
+  --cx-halo:         rgba(252, 109, 1, 0.22);
+  --cx-aurora-opacity: 0.5;
+  --cx-aurora-blend:   multiply;
+  --cx-aurora-core:  rgba(255, 150, 110, 0.75);
+  --cx-aurora-mid:   rgba(252, 109, 1, 0.45);
+  --cx-aurora-edge:  rgba(211, 40, 0, 0.18);
+  --cx-ridge-line:   #c22500;
+  --cx-spot:           rgba(211, 40, 0, 0.09);
+  --cx-grain-opacity:  0.035;
+  --cx-lit-opacity:  0.14;
+  --cx-focus-border: rgba(211, 40, 0, 0.55);
+  --cx-focus-halo:   0 0 0 3px rgba(211, 40, 0, 0.14);
+  --cx-shadow-tint:  40, 20, 10;
+  --cx-thumb-shadow: 0 1px 4px rgba(40, 20, 10, 0.25);
+  --cx-shadow-alpha: 0.28;
+  --cx-chart-1: #d32800; --cx-chart-2: #e86200; --cx-chart-3: #f08a70;
+  --cx-chart-4: #c89200; --cx-chart-5: #3d3a38; --cx-chart-6: #9a9591;
+}

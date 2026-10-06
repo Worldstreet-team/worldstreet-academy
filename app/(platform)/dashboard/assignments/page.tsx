@@ -1,7 +1,8 @@
 "use client"
+import { ChevronRightIcon } from "@/components/icons"
 
 import Link from "next/link"
-import { ChevronRightIcon } from "lucide-react"
+
 import { Topbar } from "@/components/platform/topbar"
 import { PageHeader } from "@/components/shared/page-header"
 import { ASSESSMENT_STATUS, assessmentKindLabel } from "@/components/dashboard/assignments-tile"

@@ -1,9 +1,9 @@
 "use client"
+import { StarIcon } from "@/components/icons"
 
 import { useState } from "react"
 import { motion } from "motion/react"
 import { useVivid } from "@/lib/vivid/provider"
-import { StarIcon } from "lucide-react"
 
 export function RatingUI() {
   const vivid = useVivid()

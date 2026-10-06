@@ -1,9 +1,10 @@
 "use client"
+import { ReceiptTextIcon } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
-import { ReceiptTextIcon } from "lucide-react"
+
 import { Topbar } from "@/components/platform/topbar"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"

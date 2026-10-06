@@ -1,7 +1,8 @@
 "use client"
+import { Glyph, ArrowDown01Icon } from "@/components/icons"
 
-import { HugeiconsIcon } from "@hugeicons/react"
-import { ArrowDown01Icon } from "@hugeicons/core-free-icons"
+
+
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
 export type Faq = { question: string; answer: string }
@@ -21,7 +22,7 @@ export function FaqList({ faqs }: { faqs: readonly Faq[] }) {
           <dt>
             <CollapsibleTrigger className="group flex min-h-14 w-full items-center justify-between gap-4 px-4 py-3.5 text-left text-[14px] font-medium transition-colors duration-[var(--ws-motion-fast)] hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40">
               <span className="min-w-0">{faq.question}</span>
-              <HugeiconsIcon
+              <Glyph
                 icon={ArrowDown01Icon}
                 aria-hidden
                 className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-[var(--ws-motion-base)] ease-[var(--ws-ease)] group-data-[panel-open]:rotate-180 motion-reduce:transition-none"

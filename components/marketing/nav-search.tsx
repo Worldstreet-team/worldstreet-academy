@@ -1,9 +1,10 @@
 "use client"
+import { SearchIcon } from "@/components/icons"
 
 import * as React from "react"
 import Form from "next/form"
 import { usePathname, useSearchParams } from "next/navigation"
-import { SearchIcon } from "lucide-react"
+
 import { cn } from "@/lib/utils"
 
 type NavSearchProps = {

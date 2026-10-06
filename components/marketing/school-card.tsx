@@ -1,6 +1,7 @@
+import { ArrowRightIcon } from "@/components/icons"
 import Link from "next/link"
 import Image from "next/image"
-import { ArrowRightIcon } from "lucide-react"
+
 import type { School } from "@/lib/schools"
 import { schoolCover } from "@/lib/school-art"
 import { SchoolIcon } from "@/components/shared/school-icon"

@@ -1,8 +1,8 @@
 "use client"
+import { Check, CircleCheck } from "@/components/icons"
 
 import { useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { Check, CircleCheck } from "lucide-react"
 import { markLessonComplete } from "@/lib/actions/student"
 
 type MarkCompleteButtonProps = {

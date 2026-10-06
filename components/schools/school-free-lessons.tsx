@@ -1,5 +1,6 @@
+import { PlayIcon } from "@/components/icons"
 import Image from "next/image"
-import { PlayIcon } from "lucide-react"
+
 import { plural, formatClock } from "@/components/programs/format"
 import { PreviewTrigger, type ProgramPreview } from "@/components/programs/preview-player"
 import { SCHOOL_SECTION, SectionHead } from "@/components/schools/section-head"

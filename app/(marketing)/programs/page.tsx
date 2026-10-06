@@ -1,7 +1,8 @@
+import { ArrowRightIcon, SearchIcon } from "@/components/icons"
 import type { Metadata } from "next"
 import Link from "next/link"
 import Image from "next/image"
-import { ArrowRightIcon, SearchIcon } from "lucide-react"
+
 import { SCHOOLS, SCHOOL_BY_SLUG, countProgramsBySchool, type School, type SchoolSlug } from "@/lib/schools"
 import { schoolCover } from "@/lib/school-art"
 import { BRAND } from "@/lib/brand"
@@ -143,7 +144,7 @@ export default async function ProgramsPage({
           </p>
           <Link
             href="/programs"
-            className="mt-6 inline-flex h-11 items-center justify-center rounded-sm border border-ws-hairline px-6 text-[14px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-surface"
+            className="mt-6 inline-flex h-11 items-center justify-center rounded-full border border-ws-hairline px-6 text-[14px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-surface"
           >
             Clear search
           </Link>
@@ -158,7 +159,7 @@ export default async function ProgramsPage({
           </p>
           <Link
             href="/schools"
-            className="mt-6 inline-flex h-11 items-center justify-center rounded-sm border border-ws-hairline px-6 text-[14px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:border-ws-brand/40 hover:text-ws-gold"
+            className="mt-6 inline-flex h-11 items-center justify-center rounded-full border border-ws-hairline px-6 text-[14px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:border-ws-brand/40 hover:text-ws-gold"
           >
             Explore the schools
           </Link>

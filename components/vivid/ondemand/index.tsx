@@ -1,4 +1,5 @@
 "use client"
+import { XIcon } from "@/components/icons"
 
 /**
  * Vivid On-Demand UI — Modular interactive panels.
@@ -19,7 +20,6 @@ import { ProgressDashboardUI } from "./progress-dashboard"
 import { ContactCardUI } from "./contact-card"
 import { CheckoutConfirmUI } from "./checkout-confirm"
 import { FriendSearchUI } from "./friend-search"
-import { XIcon } from "lucide-react"
 
 export function OnDemandUIPanel({ ui }: { ui: OnDemandUI }) {
   const vivid = useVivid()

@@ -1,27 +1,22 @@
 import type { Metadata, Viewport } from "next";
-import { Public_Sans, Dancing_Script, Poppins, Noto_Sans } from "next/font/google";
+import { Dancing_Script, Manrope, Noto_Sans } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "@/components/theme-provider";
+import { IconDefs } from "@/ds/components/icon";
 import { BRAND, SITE_DESCRIPTION } from "@/lib/brand";
 import { APP_URL } from "@/lib/app-url";
 import "./globals.css";
 
-const publicSans = Public_Sans({subsets:['latin'],variable:'--font-sans'});
+// The WorldStreet design system (2026-10-06): Manrope carries everything —
+// variable, so the 300 hero weight is there. Replaces Poppins + Public Sans.
+const manrope = Manrope({ subsets: ["latin"], variable: "--font-manrope", display: "swap" });
 
 // Certificate-only script face for the printed recipient name — a sanctioned
-// print-artifact exception; the UI itself is Poppins + Public Sans only.
+// print-artifact exception; the UI itself is Manrope only.
 const dancingScript = Dancing_Script({
   subsets: ['latin'],
   variable: '--font-cursive',
   weight: ['400', '500', '600', '700'],
-});
-
-// Display/brand voice in the WorldStreet design system — headlines lead with
-// Poppins, body and labels stay Public Sans.
-const poppins = Poppins({
-  subsets: ["latin"],
-  variable: "--font-display",
-  weight: ["300", "600", "700", "800"],
 });
 
 // design-system/02 ₦ glyph rule — the brand faces' Latin files carry no naira
@@ -46,8 +41,8 @@ const notoSans = Noto_Sans({
  */
 const primaryFace = (font: { style: { fontFamily: string } }) => font.style.fontFamily.split(",")[0];
 const nairaStacks: React.CSSProperties = {
-  ["--font-naira-display" as string]: `${primaryFace(poppins)}, ${primaryFace(notoSans)}, var(--font-display)`,
-  ["--font-naira-sans" as string]: `${primaryFace(publicSans)}, ${primaryFace(notoSans)}, var(--font-sans)`,
+  ["--font-naira-display" as string]: `${primaryFace(manrope)}, ${primaryFace(notoSans)}, var(--font-display)`,
+  ["--font-naira-sans" as string]: `${primaryFace(manrope)}, ${primaryFace(notoSans)}, var(--font-sans)`,
 };
 
 // No maximumScale: the design system bans blocking pinch-zoom (06-motion-a11y).
@@ -110,19 +105,19 @@ export default function RootLayout({
             signUpFallbackRedirectUrl: "/dashboard",
           })}
     >
-      {/* data-ws-theme selects the Academy's palette from the shared design
-          tokens. DS v2 (2026-08-05): stone ladder #0C0A09 + gold #EAB308, dark default
-          (not the `shell` stone + #EAB308 used by wallet/auth). */}
-      <html
-        lang="en"
-        className={publicSans.variable}
-        data-ws-theme="platform"
-        suppressHydrationWarning
-      >
+      {/* The WorldStreet design system: data-theme (dark default, light
+          supported) on <html> — next-themes keeps it in step — and
+          data-brand on <body>, which re-colours the kit as WorldStreet
+          (gold on stone). cx-root sets the kit's base type. */}
+      <html lang="en" className={manrope.variable} data-theme="dark" suppressHydrationWarning>
         <body
-          className={`${dancingScript.variable} ${poppins.variable} ${notoSans.variable} antialiased`}
+          data-brand="worldstreet"
+          className={`cx-root ${dancingScript.variable} ${notoSans.variable} antialiased`}
           style={nairaStacks}
         >
+          {/* The icon set's gradients: SVG gradients resolve where they're defined. */}
+          <IconDefs />
+          <IconDefs brand="worldstreet" />
           <ThemeProvider
             attribute="class"
             defaultTheme="dark"

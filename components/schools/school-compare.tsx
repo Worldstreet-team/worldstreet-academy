@@ -1,6 +1,7 @@
+import { ArrowRightIcon, CheckIcon, StarIcon } from "@/components/icons"
 import Link from "next/link"
 import Image from "next/image"
-import { ArrowRightIcon, CheckIcon, StarIcon } from "lucide-react"
+
 import { PACKAGE_LABEL } from "@/lib/entitlements"
 import { cn } from "@/lib/utils"
 import { plural } from "@/components/programs/format"

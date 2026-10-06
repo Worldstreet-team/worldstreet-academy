@@ -1,4 +1,5 @@
 "use client"
+import { ChevronRightIcon, UserIcon, VideoIcon } from "@/components/icons"
 
 import { useState, useEffect } from "react"
 import Image from "next/image"
@@ -7,7 +8,7 @@ import {
   getMyMeetingInvites,
   type MeetingInviteItem,
 } from "@/lib/actions/meetings"
-import { ChevronRightIcon, UserIcon, VideoIcon } from "lucide-react"
+
 
 /* ═══════════════════════════════════════════════════════════
    MEETING INVITES LIST

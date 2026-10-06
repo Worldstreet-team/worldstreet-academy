@@ -1,5 +1,6 @@
+import { ShieldCheckIcon } from "@/components/icons"
 import { redirect } from "next/navigation"
-import { ShieldCheckIcon } from "lucide-react"
+
 import { BrandLockup } from "@/components/shared/brand-lockup"
 import { UserProvider } from "@/components/providers/user-provider"
 import { QueryProvider } from "@/components/providers/query-provider"

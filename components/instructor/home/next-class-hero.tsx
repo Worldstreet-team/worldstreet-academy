@@ -1,7 +1,8 @@
 "use client"
+import { CalendarDays, CalendarPlus, Users } from "@/components/icons"
 
 import Link from "next/link"
-import { CalendarDays, CalendarPlus, Users } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
 import { CardShell, Eyebrow } from "@/components/ui/system"
 import { Countdown } from "@/components/shared/countdown"

@@ -1,4 +1,5 @@
 "use client"
+import { CompassIcon, GaugeIcon, GraduationCapIcon, HammerIcon, TrendingUpIcon, UsersIcon, type IconComponent } from "@/components/icons"
 
 import * as React from "react"
 import {
@@ -9,15 +10,6 @@ import {
   useTransform,
   type MotionValue,
 } from "motion/react"
-import {
-  CompassIcon,
-  GaugeIcon,
-  GraduationCapIcon,
-  HammerIcon,
-  TrendingUpIcon,
-  UsersIcon,
-  type LucideIcon,
-} from "lucide-react"
 import { Reveal } from "@/components/marketing/motion/reveal"
 import { useMediaQuery, useMotionOK } from "@/components/marketing/motion/bus"
 import { SectionLabel, SectionTitle } from "@/components/marketing/section-heading"
@@ -43,7 +35,7 @@ import { cn } from "@/lib/utils"
  *
  * Reduced motion: no sticking, no scrub — the six cards stand in a plain grid.
  */
-const PILLARS: readonly { icon: LucideIcon; title: string; line: string }[] = [
+const PILLARS: readonly { icon: IconComponent; title: string; line: string }[] = [
   {
     icon: GraduationCapIcon,
     title: "Learn From Experts",

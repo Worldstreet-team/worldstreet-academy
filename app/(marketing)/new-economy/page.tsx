@@ -1,6 +1,7 @@
+import { SparklesIcon } from "@/components/icons"
 import type { Metadata } from "next"
 import Link from "next/link"
-import { SparklesIcon } from "lucide-react"
+
 import { BRAND } from "@/lib/brand"
 import { appUrl } from "@/lib/app-url"
 import { fetchBrowseCourses } from "@/lib/actions/student"

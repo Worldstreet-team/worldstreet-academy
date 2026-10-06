@@ -1,23 +1,15 @@
 "use client"
+import { BookOpen, ChartLine, House, Plus, Settings, Store, User, type IconComponent } from "@/components/icons"
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import {
-  BookOpen,
-  ChartLine,
-  House,
-  Plus,
-  Settings,
-  Store,
-  User,
-  type LucideIcon,
-} from "lucide-react"
+
 
 type BottomNavItem = {
   title: string
   href: string
-  icon: LucideIcon
+  icon: IconComponent
   match?: (pathname: string) => boolean
 }
 

@@ -1,7 +1,8 @@
+import { ReceiptTextIcon } from "@/components/icons"
 import type { Metadata } from "next"
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { ReceiptTextIcon } from "lucide-react"
+
 import { getCachedUser } from "@/lib/auth/cached"
 import { checkEnrollment } from "@/lib/actions/enrollments"
 import { getMyWalletBalance } from "@/lib/actions/wallet"

@@ -1,8 +1,9 @@
 "use client"
+import { ChevronLeftIcon, PhoneIcon, VideoIcon } from "@/components/icons"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { ChevronLeftIcon, PhoneIcon, VideoIcon } from "lucide-react"
+
 
 type ChatHeaderProps = {
   name: string

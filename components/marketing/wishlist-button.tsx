@@ -1,8 +1,9 @@
 "use client"
+import { Heart } from "@/components/icons"
 
 import { useCallback, useEffect, useState, useTransition } from "react"
 import { usePathname } from "next/navigation"
-import { Heart } from "lucide-react"
+
 import { cn } from "@/lib/utils"
 import { loginUrl } from "@/lib/auth/login-url"
 import {

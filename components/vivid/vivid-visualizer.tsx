@@ -1,4 +1,5 @@
 "use client"
+import { MicIcon, MicOffIcon } from "@/components/icons"
 
 /**
  * Vivid Visualizer — Mirrored waveform + mic control.
@@ -7,7 +8,6 @@
 import { useRef, useEffect } from "react"
 import { motion } from "motion/react"
 import { useVivid } from "@/lib/vivid/provider"
-import { MicIcon, MicOffIcon } from "lucide-react"
 
 const BAR_COUNT = 40
 

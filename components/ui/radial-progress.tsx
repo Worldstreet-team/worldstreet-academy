@@ -1,7 +1,8 @@
 "use client"
+import { CheckIcon } from "@/components/icons"
 
 import { cn } from "@/lib/utils"
-import { CheckIcon } from "lucide-react"
+
 
 type RadialProgressProps = {
   value: number

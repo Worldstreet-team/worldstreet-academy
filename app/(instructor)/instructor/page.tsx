@@ -1,7 +1,8 @@
 "use client"
+import { Plus } from "@/components/icons"
 
 import Link from "next/link"
-import { Plus } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
 import { Topbar } from "@/components/platform/topbar"
 import { PageHeader } from "@/components/shared/page-header"

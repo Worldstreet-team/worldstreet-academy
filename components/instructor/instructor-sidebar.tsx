@@ -1,4 +1,5 @@
 "use client"
+import { BookOpen, CalendarDays, ChartLine, ChevronDown, Gift, House, LayoutDashboard, LogOut, MessageCircle, Plus, Settings, Store, Trophy, User, Users, type IconComponent } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
@@ -17,24 +18,7 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import {
-  BookOpen,
-  CalendarDays,
-  ChartLine,
-  ChevronDown,
-  Gift,
-  House,
-  LayoutDashboard,
-  LogOut,
-  MessageCircle,
-  Plus,
-  Settings,
-  Store,
-  Trophy,
-  User,
-  Users,
-  type LucideIcon,
-} from "lucide-react"
+
 import { useUser } from "@/components/providers/user-provider"
 import { LogoutConfirmDialog } from "@/components/shared/logout-confirm-dialog"
 import { useUnreadCount } from "@/lib/hooks/use-unread-count"
@@ -58,7 +42,7 @@ import { BrandLockup } from "@/components/shared/brand-lockup"
 type NavItem = {
   title: string
   href: string
-  icon: LucideIcon
+  icon: IconComponent
   match?: (pathname: string) => boolean
 }
 

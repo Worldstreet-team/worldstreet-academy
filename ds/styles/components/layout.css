@@ -1,0 +1,18 @@
+/* VENDORED from worldstreet/design-system by scripts/vendor.mjs. Don't edit: change the design system and re-run it. */
+/* ---- Layout [site] ------------------------------------------------------ */
+.cx-container { width: 100%; max-width: calc(var(--cx-container) + 2 * var(--cx-gutter)); margin-inline: auto; padding-inline: var(--cx-gutter); }
+.cx-container--narrow { max-width: calc(var(--cx-container-narrow) + 2 * var(--cx-gutter)); }
+.cx-section { padding-block: 0 var(--cx-section); }
+.cx-section-head { display: grid; gap: var(--cx-s-5); margin-bottom: var(--cx-s-9); }
+.cx-section-head--center { justify-items: center; text-align: center; }
+.cx-section-head--split { grid-template-columns: 1fr minmax(0, 420px); align-items: end; }
+@media (max-width: 767px) { .cx-section-head--split { grid-template-columns: 1fr; } }
+.cx-divider { height: 1px; border: 0; margin: 0; background: var(--cx-hairline); }
+.cx-divider--v { width: 1px; height: auto; align-self: stretch; }
+/* Hero halo — the amber glow from above [site] */
+.cx-halo { position: relative; isolation: isolate; overflow: hidden; }
+.cx-halo::before { content: ""; position: absolute; left: 50%; top: -520px; width: min(970px, 160vw); height: 782px; transform: translateX(-50%);
+  border-radius: 50%; background: var(--cx-halo); filter: blur(160px); z-index: -1; pointer-events: none; }
+/* Visibility by breakpoint */
+@media (max-width: 767px) { .cx-hide-sm { display: none !important; } }
+@media (min-width: 768px) { .cx-show-sm { display: none !important; } }

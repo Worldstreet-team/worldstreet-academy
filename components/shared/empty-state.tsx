@@ -1,5 +1,6 @@
+import { type IconComponent } from "@/components/icons"
 import Link from "next/link"
-import type { LucideIcon } from "lucide-react"
+
 import { RenderIcon } from "@/components/shared/render-icon"
 
 /**
@@ -20,7 +21,7 @@ type EmptyStateProps = {
   /** Spot illustration (preferred) — rendered ~176px wide above the title. */
   art?: React.ReactNode
   /** Fallback icon-chip treatment when no `art` exists for the surface. */
-  icon?: LucideIcon
+  icon?: IconComponent
   title: string
   description: string
   actionLabel?: string
@@ -61,7 +62,7 @@ export function EmptyState({ art, icon, title, description, actionLabel, actionH
       {actionLabel && actionHref && (
         <Link
           href={actionHref}
-          className="mt-6 inline-flex h-10 items-center justify-center rounded-sm bg-ws-brand px-5 text-sm font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90"
+          className="mt-6 inline-flex h-10 items-center justify-center rounded-full bg-ws-brand px-5 text-sm font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90"
         >
           {actionLabel}
         </Link>

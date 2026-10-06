@@ -1,9 +1,9 @@
 "use client"
+import { GlobeIcon } from "@/components/icons"
 
 import { motion } from "motion/react"
 import { useVivid } from "@/lib/vivid/provider"
 import { LANG_OPTIONS } from "./helpers"
-import { GlobeIcon } from "lucide-react"
 
 export function LanguagePickerUI() {
   const vivid = useVivid()

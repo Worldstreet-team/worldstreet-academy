@@ -1,0 +1,11 @@
+/* VENDORED from worldstreet/design-system by scripts/vendor.mjs. Don't edit: change the design system and re-run it. */
+/* ---- Accordion [site: FAQ] — native <details> --------------------------- */
+.cx-accordion { border-top: 1px solid var(--cx-hairline); }
+.cx-accordion details { border-bottom: 1px solid var(--cx-hairline); }
+.cx-accordion summary { display: grid; grid-template-columns: 1fr 24px; gap: 24px; align-items: center; padding: 32px 0; cursor: pointer; list-style: none;
+  font-size: var(--cx-body-lg); border-radius: 4px; }
+.cx-accordion summary::-webkit-details-marker { display: none; }
+.cx-accordion summary .idx { color: var(--cx-text-muted); margin-right: 8px; font-variant-numeric: tabular-nums; }
+.cx-accordion summary::after { content: "+"; font-size: 26px; line-height: 1; font-weight: 300; text-align: center; transition: transform var(--cx-dur) var(--cx-ease); }
+.cx-accordion details[open] summary::after { transform: rotate(45deg); }
+.cx-accordion .body { padding: 0 48px 32px 0; color: var(--cx-text-2); font-size: var(--cx-body-lg); line-height: 1.6; max-width: 72ch; }

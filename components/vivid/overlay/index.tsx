@@ -1,4 +1,5 @@
 "use client"
+import { FileBadgeIcon, GraduationCapIcon, MessageCircleIcon, SearchIcon, UserIcon, UsersIcon, type IconComponent } from "@/components/icons"
 
 /**
  * Vivid Overlay — Modular side panel for displaying data.
@@ -17,15 +18,15 @@ import { ProfileCard } from "./profile-card"
 import { CertificateList } from "./certificate-list"
 import { SearchResultsList } from "./search-results"
 import { GenericData } from "./generic-data"
-import { FileBadgeIcon, GraduationCapIcon, MessageCircleIcon, SearchIcon, UserIcon, UsersIcon } from "lucide-react"
-import type { LucideIcon } from "lucide-react"
+
+
 import { RenderIcon } from "@/components/shared/render-icon"
 
 // ============================================================================
 // Constants
 // ============================================================================
 
-const SECTION_ICONS: Record<OverlaySection, LucideIcon> = {
+const SECTION_ICONS: Record<OverlaySection, IconComponent> = {
   courses: GraduationCapIcon,
   meetings: UsersIcon,
   messages: MessageCircleIcon,

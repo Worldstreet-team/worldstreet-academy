@@ -1,10 +1,9 @@
 "use client"
+import { Glyph, ArrowRight01Icon } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { ArrowRight01Icon } from "@hugeicons/core-free-icons"
 import { Topbar } from "@/components/platform/topbar"
 import { CourseCard, CourseCardSkeleton } from "@/components/platform/course-card"
 import { AssignmentsTile } from "@/components/dashboard/assignments-tile"
@@ -86,7 +85,7 @@ function SectionHeading({
         className="inline-flex shrink-0 items-center gap-1 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
       >
         See all
-        <HugeiconsIcon icon={ArrowRight01Icon} className="h-3.5 w-3.5" aria-hidden />
+        <Glyph icon={ArrowRight01Icon} className="h-3.5 w-3.5" aria-hidden />
       </Link>
     </div>
   )

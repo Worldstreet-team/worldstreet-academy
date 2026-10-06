@@ -1,18 +1,7 @@
+import { AwardIcon, CircleCheckIcon, ClipboardCheckIcon, HandshakeIcon, ListVideoIcon, MessagesSquareIcon, MonitorPlayIcon, PlayIcon, RadioIcon, SquarePlayIcon, type IconComponent } from "@/components/icons"
 import Link from "next/link"
 import Image from "next/image"
-import {
-  AwardIcon,
-  CircleCheckIcon,
-  ClipboardCheckIcon,
-  HandshakeIcon,
-  ListVideoIcon,
-  MessagesSquareIcon,
-  MonitorPlayIcon,
-  PlayIcon,
-  RadioIcon,
-  SquarePlayIcon,
-  type LucideIcon,
-} from "lucide-react"
+
 import type { ProgramDetail } from "@/lib/actions/student"
 import type { IPackageEntitlements, PackageKey } from "@/lib/db/models"
 import { PACKAGE_LABEL } from "@/lib/entitlements"
@@ -37,7 +26,7 @@ export type ProgramFacts = {
 }
 
 export type IncludedItem = {
-  icon: LucideIcon
+  icon: IconComponent
   label: string
   /** The tier that unlocks it when that is above the cheapest one; null = included from the first price. */
   tier: PackageKey | null
@@ -48,7 +37,7 @@ export type IncludedItem = {
  * support stays in the ladder's comparison table; it is not a thing a learner
  * does, so it doesn't belong on a list of what the program includes.
  */
-const SERVICES: ReadonlyArray<{ key: keyof IPackageEntitlements; label: string; icon: LucideIcon }> = [
+const SERVICES: ReadonlyArray<{ key: keyof IPackageEntitlements; label: string; icon: IconComponent }> = [
   { key: "liveClasses", label: "Live classes", icon: RadioIcon },
   { key: "instructorQa", label: "Instructor Q&A", icon: MessagesSquareIcon },
   { key: "assignments", label: "Graded assignments", icon: ClipboardCheckIcon },

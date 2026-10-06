@@ -1,0 +1,111 @@
+/* VENDORED from worldstreet/design-system by scripts/vendor.mjs. Don't edit: change the design system and re-run it. */
+/* ---- Form fields [ext] -------------------------------------------------- */
+.cx-field { display: grid; gap: 8px; min-width: 0; }
+.cx-label { font-size: 14px; font-weight: 500; color: var(--cx-text-2); display: flex; justify-content: space-between; gap: 8px; }
+.cx-label .opt { font-weight: 400; color: var(--cx-text-muted); }
+.cx-help { font-size: 13px; color: var(--cx-text-muted); line-height: 1.5; }
+.cx-input, .cx-select, .cx-textarea {
+  width: 100%; height: var(--cx-control-h); padding: 0 18px; border-radius: var(--cx-r-md);
+  background-color: var(--cx-field); color: var(--cx-text); border: 1px solid var(--cx-field-border);
+  font: 400 16px/1.4 var(--cx-font); letter-spacing: -.2px; outline: none;
+  transition: background-color var(--cx-dur-fast), border-color var(--cx-dur-fast), box-shadow var(--cx-dur-fast);
+}
+.cx-textarea { height: auto; min-height: 120px; padding: 14px 18px; resize: vertical; line-height: 1.6; display: block; }
+.cx-input::placeholder, .cx-textarea::placeholder { color: var(--cx-text-muted); }
+.cx-input:hover, .cx-select:hover, .cx-textarea:hover { background-color: var(--cx-field-hover); }
+.cx-input:focus, .cx-select:focus, .cx-textarea:focus { border-color: var(--cx-focus-border); box-shadow: var(--cx-focus-halo); }
+.cx-input:disabled, .cx-select:disabled, .cx-textarea:disabled { color: var(--cx-text-disabled); background-color: transparent; cursor: not-allowed; }
+.cx-input[readonly] { background-color: transparent; border-style: dashed; }
+.cx-field--error .cx-input, .cx-field--error .cx-textarea, .cx-field--error .cx-select, .cx-input[aria-invalid="true"] { border-color: var(--cx-loss-border); }
+.cx-field--error .cx-input:focus, .cx-field--error .cx-textarea:focus, .cx-field--error .cx-select:focus, .cx-input[aria-invalid="true"]:focus { box-shadow: 0 0 0 3px var(--cx-loss-wash); }
+.cx-field--error .cx-help { color: var(--cx-loss); }
+.cx-counter { font-size: 12px; color: var(--cx-text-muted); text-align: right; font-variant-numeric: tabular-nums; }
+.cx-select { appearance: none; padding-right: 44px; cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--cx-text-2) 50%), linear-gradient(135deg, var(--cx-text-2) 50%, transparent 50%);
+  background-position: calc(100% - 23px) 50%, calc(100% - 18px) 50%; background-size: 5px 5px; background-repeat: no-repeat; }
+.cx-select option { background: var(--cx-elevated); color: var(--cx-text); }
+/* Input with leading icon / trailing action (search, show-password) */
+.cx-affix { position: relative; display: flex; align-items: center; min-width: 0; }
+.cx-affix > svg { position: absolute; left: 16px; width: 18px; height: 18px; stroke: var(--cx-text-muted); fill: none; stroke-width: 1.8; pointer-events: none; z-index: 1; }
+.cx-affix > svg ~ .cx-input { padding-left: 46px; }
+.cx-affix > .cx-affix-end { position: absolute; right: 6px; display: flex; gap: 4px; align-items: center; }
+.cx-affix--end .cx-input { padding-right: 96px; }
+.cx-search .cx-input { border-radius: var(--cx-r-pill); }
+.cx-search .cx-input::-webkit-search-cancel-button { display: none; }
+/* Copy field — addresses, referral codes */
+.cx-copy { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 16px; border-radius: var(--cx-r-md);
+  background: var(--cx-field); border: 1px solid var(--cx-field-border); min-width: 0; }
+.cx-copy code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 14px var(--cx-font-mono); color: var(--cx-text-2); }
+.cx-copy[data-copied="true"] .cx-btn { color: var(--cx-gain); }
+/* Amount input */
+.cx-amount { display: flex; align-items: baseline; gap: 6px; padding: 18px; border-radius: var(--cx-r-card); background: var(--cx-field); border: 1px solid var(--cx-field-border); cursor: text; }
+.cx-amount:focus-within { border-color: var(--cx-focus-border); box-shadow: var(--cx-focus-halo); }
+.cx-amount > span { font-size: 28px; color: var(--cx-text-muted); }
+.cx-amount input { flex: 1; width: 100%; min-width: 0; background: none; border: 0; outline: none; color: var(--cx-text);
+  font: 300 40px/1.1 var(--cx-font); letter-spacing: -1.5px; font-variant-numeric: tabular-nums; }
+.cx-amount input:focus-visible { box-shadow: none; }
+.cx-amount-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.cx-amount-chips button { height: 32px; padding: 0 14px; border-radius: var(--cx-r-pill); border: 1px solid var(--cx-field-border); background: transparent;
+  color: var(--cx-text-2); font: 400 14px var(--cx-font); cursor: pointer; }
+.cx-amount-chips button:hover { background: var(--cx-surface-2); color: var(--cx-text); }
+.cx-amount-chips button[aria-pressed="true"] { background: var(--cx-brand-wash); border-color: var(--cx-ember); color: var(--cx-text); }
+.cx-amount-chips button:focus-visible { box-shadow: var(--cx-focus-ring); }
+/* Inline input + button pill [site: newsletter field] */
+.cx-inline { display: flex; align-items: center; gap: 6px; padding: 4px 4px 4px 18px; border-radius: var(--cx-r-pill); border: 1px solid var(--cx-field-border); background: var(--cx-field); }
+.cx-inline input { flex: 1; width: 100%; min-width: 0; background: none; border: 0; outline: none; color: var(--cx-text); font: 400 15px var(--cx-font); }
+.cx-inline input:focus-visible { box-shadow: none; }
+.cx-inline input::placeholder { color: var(--cx-text-muted); }
+.cx-inline:focus-within { border-color: var(--cx-focus-border); box-shadow: var(--cx-focus-halo); }
+/* OTP / PIN */
+.cx-otp { display: flex; gap: 10px; flex-wrap: wrap; }
+.cx-otp input { width: 52px; height: 60px; flex: none; text-align: center; border-radius: var(--cx-r-md); border: 1px solid var(--cx-field-border);
+  background: var(--cx-field); color: var(--cx-text); font: 400 26px var(--cx-font); font-variant-numeric: tabular-nums; outline: none; caret-color: var(--cx-ember); }
+.cx-otp input:focus { border-color: var(--cx-focus-border); box-shadow: var(--cx-focus-halo); }
+.cx-otp .sep { align-self: center; color: var(--cx-text-muted); }
+@media (max-width: 420px) { .cx-otp { gap: 6px; } .cx-otp input { width: 44px; height: 54px; font-size: 22px; } }
+/* Slider — set --pct inline (or via JS) for the WebKit fill */
+.cx-range { --pct: 50%; appearance: none; -webkit-appearance: none; width: 100%; height: 24px; background: transparent; cursor: pointer; margin: 0; }
+.cx-range::-webkit-slider-runnable-track { height: 6px; border-radius: 999px; background: linear-gradient(90deg, var(--cx-ember) var(--pct), var(--cx-surface-3) var(--pct)); }
+.cx-range::-moz-range-track { height: 6px; border-radius: 999px; background: var(--cx-surface-3); }
+.cx-range::-moz-range-progress { height: 6px; border-radius: 999px; background: var(--cx-ember); }
+.cx-range::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -8px; border-radius: 50%; background: var(--cx-white); box-shadow: var(--cx-thumb-shadow), 0 0 0 4px var(--cx-brand-wash); }
+.cx-range::-moz-range-thumb { width: 22px; height: 22px; border: 0; border-radius: 50%; background: var(--cx-white); box-shadow: var(--cx-thumb-shadow); }
+.cx-range:focus-visible { box-shadow: none; }
+.cx-range:focus-visible::-webkit-slider-thumb { box-shadow: var(--cx-focus-ring); }
+.cx-range:focus-visible::-moz-range-thumb { box-shadow: var(--cx-focus-ring); }
+/* Checkbox / radio / switch */
+.cx-check { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; font-size: 15px; min-height: var(--cx-touch); }
+.cx-check input:not(.cx-switch) { appearance: none; width: 20px; height: 20px; flex: none; margin: 0; border-radius: var(--cx-r-xs); border: 1px solid var(--cx-field-border);
+  background: var(--cx-field); display: grid; place-items: center; cursor: pointer; transition: background var(--cx-dur-fast); }
+.cx-check input:not(.cx-switch)[type="radio"] { border-radius: 50%; }
+.cx-check input:not(.cx-switch):checked { background: var(--cx-ember); border-color: var(--cx-ember); }
+.cx-check input:not(.cx-switch)[type="checkbox"]:checked::after { content: ""; width: 10px; height: 6px; border: 2px solid var(--cx-on-primary); border-top: 0; border-right: 0; transform: rotate(-45deg) translate(1px,-1px); }
+.cx-check input:not(.cx-switch)[type="checkbox"]:indeterminate { background: var(--cx-ember); border-color: var(--cx-ember); }
+.cx-check input:not(.cx-switch)[type="checkbox"]:indeterminate::after { content: ""; width: 10px; height: 2px; background: var(--cx-on-primary); }
+.cx-check input:not(.cx-switch)[type="radio"]:checked::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--cx-on-primary); }
+.cx-check input:disabled { opacity: .4; cursor: not-allowed; }
+.cx-check input:not(.cx-switch):focus-visible { box-shadow: var(--cx-focus-ring); }
+.cx-switch { appearance: none; width: 44px; height: 26px; flex: none; margin: 0; border-radius: 999px; background: var(--cx-surface-3); position: relative; cursor: pointer; transition: background var(--cx-dur); }
+.cx-switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--cx-white); box-shadow: var(--cx-thumb-shadow); transition: transform var(--cx-dur) var(--cx-ease); }
+.cx-switch:checked { background: var(--cx-ember); }
+.cx-switch:checked::after { transform: translateX(18px); }
+.cx-switch:focus-visible { box-shadow: var(--cx-focus-ring); }
+/* Choice cards — radio as a selectable card (plans, networks) */
+.cx-choice { position: relative; display: flex; gap: 14px; align-items: flex-start; padding: 18px; border-radius: var(--cx-r-md); cursor: pointer;
+  border: 1px solid var(--cx-field-border); background: var(--cx-field); transition: border-color var(--cx-dur-fast), background var(--cx-dur-fast); }
+.cx-choice:hover { background: var(--cx-field-hover); }
+.cx-choice:has(input:checked) { border-color: var(--cx-ember); background: var(--cx-brand-wash); }
+.cx-choice:has(input:focus-visible) { box-shadow: var(--cx-focus-ring); }
+.cx-choice input { position: absolute; opacity: 0; pointer-events: none; }
+.cx-choice:has(input:disabled) { opacity: .45; cursor: not-allowed; }
+.cx-choice:has(input:disabled):hover { background: var(--cx-field); }
+.cx-choice .main { flex: 1; min-width: 0; display: grid; gap: 2px; }
+/* File upload / dropzone */
+.cx-drop { position: relative; display: grid; justify-items: center; gap: 8px; padding: 36px 24px; text-align: center; border-radius: var(--cx-r-card);
+  border: 1.5px dashed var(--cx-field-border); background: var(--cx-field); cursor: pointer; transition: border-color var(--cx-dur-fast), background var(--cx-dur-fast); }
+.cx-drop:hover, .cx-drop[data-dragging="true"] { border-color: var(--cx-ember); background: var(--cx-brand-wash); }
+.cx-drop:focus-within { box-shadow: var(--cx-focus-ring); }
+.cx-drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.cx-file { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--cx-r-md); background: var(--cx-surface); }
+.cx-file .meta { flex: 1; min-width: 0; display: grid; gap: 6px; }
+.cx-file .name { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

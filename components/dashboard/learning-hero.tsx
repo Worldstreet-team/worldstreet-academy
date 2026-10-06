@@ -1,11 +1,10 @@
 "use client"
+import { Glyph, BookOpen01Icon, LiveStreaming02Icon, PlayIcon, type IconComponent } from "@/components/icons"
 
 import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useQueryClient } from "@tanstack/react-query"
-import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react"
-import { BookOpen01Icon, LiveStreaming02Icon, PlayIcon } from "@hugeicons/core-free-icons"
 import { AvailabilityCountdown } from "@/components/shared/availability-countdown"
 import { PackageChip, ProgramCover, ProgressTrack } from "@/components/platform/program-bits"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -197,7 +196,7 @@ function HeroFrame({
   )
 }
 
-const LESSON_ICON: Record<ResumeLesson["type"], IconSvgElement> = {
+const LESSON_ICON: Record<ResumeLesson["type"], IconComponent> = {
   video: PlayIcon,
   text: BookOpen01Icon,
   live: LiveStreaming02Icon,
@@ -235,12 +234,12 @@ function StageArt({
           aria-hidden
           className="ws-icon-mono absolute left-1/2 top-1/2 flex size-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white ring-1 ring-white/20 transition-colors duration-[var(--ws-motion-base)] hover:bg-black/75 @2xl:size-[72px]"
         >
-          <HugeiconsIcon icon={PlayIcon} className="size-7 translate-x-px" />
+          <Glyph icon={PlayIcon} className="size-7 translate-x-px" />
         </Link>
       )}
       {lesson && (
         <span className="ws-icon-mono absolute bottom-3 left-3 inline-flex max-w-[calc(100%-1.5rem)] items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-[12px] font-semibold text-white tabular-nums @2xl:bottom-4 @2xl:left-auto @2xl:right-4">
-          <HugeiconsIcon icon={LESSON_ICON[lesson.type]} className="size-3.5 shrink-0" aria-hidden />
+          <Glyph icon={LESSON_ICON[lesson.type]} className="size-3.5 shrink-0" aria-hidden />
           <span className="truncate">{lessonChipText(lesson)}</span>
         </span>
       )}
@@ -354,7 +353,7 @@ function HeroActions({
         render={<Link href={primary.href} />}
         className="h-11 gap-2 rounded-full px-5 text-[14px] font-semibold"
       >
-        {primary.icon && <HugeiconsIcon icon={PlayIcon} className="size-4" aria-hidden />}
+        {primary.icon && <Glyph icon={PlayIcon} className="size-4" aria-hidden />}
         {primary.label}
       </Button>
       {secondary && (

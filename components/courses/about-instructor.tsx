@@ -1,4 +1,5 @@
 "use client"
+import { BadgeCheckIcon, BookOpenIcon, ChevronRightIcon, MessageSquareIcon, StarIcon, UsersIcon } from "@/components/icons"
 
 import { useState, useTransition } from "react"
 import Link from "next/link"
@@ -8,7 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { getOrCreateConversation } from "@/lib/actions/messages"
 import type { InstructorCourse } from "@/lib/actions/student"
-import { BadgeCheckIcon, BookOpenIcon, ChevronRightIcon, MessageSquareIcon, StarIcon, UsersIcon } from "lucide-react"
+
 
 interface AboutInstructorProps {
   instructorId: string

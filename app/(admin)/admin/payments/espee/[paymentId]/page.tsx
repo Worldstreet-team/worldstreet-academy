@@ -1,10 +1,10 @@
 "use client"
+import { ExternalLinkIcon, FileTextIcon } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { ExternalLinkIcon, FileTextIcon } from "lucide-react"
 import { Topbar } from "@/components/platform/topbar"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"

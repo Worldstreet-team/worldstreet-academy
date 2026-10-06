@@ -1,4 +1,5 @@
 "use client"
+import { FileBadgeIcon } from "@/components/icons"
 
 import * as React from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
@@ -19,7 +20,7 @@ import {
 } from "@/components/ui/dialog"
 import { adminListExams, adminResetExamAttempts, type AdminExamRow } from "@/lib/actions/exams"
 import { StatusBadge } from "@/components/admin/shared"
-import { FileBadgeIcon } from "lucide-react"
+
 
 export default function AdminExamsPage() {
   const queryClient = useQueryClient()

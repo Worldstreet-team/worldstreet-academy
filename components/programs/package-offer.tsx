@@ -1,4 +1,5 @@
-import { CalendarRangeIcon } from "lucide-react"
+import { CalendarRangeIcon } from "@/components/icons"
+
 import type { PublicPackage } from "@/lib/actions/student"
 import { packagePriceLabel } from "@/lib/program-price"
 import { cn } from "@/lib/utils"

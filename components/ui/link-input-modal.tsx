@@ -1,4 +1,5 @@
 "use client"
+import { Trash2Icon } from "@/components/icons"
 
 import { useState, useEffect } from "react"
 import {
@@ -11,7 +12,7 @@ import {
 } from "@/components/ui/responsive-modal"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Trash2Icon } from "lucide-react"
+
 
 interface LinkInputModalProps {
   /** Current URL value */

@@ -1,7 +1,8 @@
 "use client"
+import { PlayIcon } from "@/components/icons"
 
 import * as React from "react"
-import { PlayIcon } from "lucide-react"
+
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { formatClock } from "@/components/programs/format"

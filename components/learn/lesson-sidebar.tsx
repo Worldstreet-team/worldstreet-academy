@@ -1,4 +1,5 @@
 "use client"
+import { CheckIcon, FileIcon, LockIcon, VideoIcon, WifiIcon } from "@/components/icons"
 
 import Link from "next/link"
 import Image from "next/image"
@@ -6,7 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import { cn } from "@/lib/utils"
 import type { LearnLesson } from "@/lib/actions/student"
-import { CheckIcon, FileIcon, LockIcon, VideoIcon, WifiIcon } from "lucide-react"
+
 import { RenderIcon } from "@/components/shared/render-icon"
 
 type LessonSidebarProps = {

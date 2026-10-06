@@ -1,4 +1,5 @@
 "use client"
+import { FilePenIcon, ImageIcon, MicIcon, PauseIcon, PlayIcon, PlusIcon, SendIcon, SmileIcon, SquareIcon, Trash2Icon, VideoIcon, XIcon } from "@/components/icons"
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import dynamic from "next/dynamic"
@@ -9,7 +10,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import type { EmojiClickData } from "emoji-picker-react"
-import { FilePenIcon, ImageIcon, MicIcon, PauseIcon, PlayIcon, PlusIcon, SendIcon, SmileIcon, SquareIcon, Trash2Icon, VideoIcon, XIcon } from "lucide-react"
+
 import { RenderIcon } from "@/components/shared/render-icon"
 
 // Dynamically import emoji picker to avoid SSR issues

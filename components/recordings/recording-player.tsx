@@ -1,8 +1,9 @@
 "use client"
+import { LoaderCircleIcon } from "@/components/icons"
 
 import { useRef, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { LoaderCircleIcon } from "lucide-react"
+
 import { getRecordingPlayback } from "@/lib/actions/recordings"
 
 /** Give up after this many fresh links in a row without the video playing again. */

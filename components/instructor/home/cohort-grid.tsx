@@ -1,7 +1,8 @@
 "use client"
+import { ArrowRight, ExternalLink } from "@/components/icons"
 
 import Link from "next/link"
-import { ArrowRight, ExternalLink } from "lucide-react"
+
 import { CardShell, EmptyState } from "@/components/ui/system"
 import { Countdown } from "@/components/shared/countdown"
 import { ProgramCover } from "@/components/platform/program-bits"

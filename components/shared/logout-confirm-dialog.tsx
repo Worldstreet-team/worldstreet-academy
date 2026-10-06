@@ -1,4 +1,5 @@
 "use client"
+import { LogOutIcon } from "@/components/icons"
 
 import { useState } from "react"
 import { useClerk } from "@clerk/nextjs"
@@ -13,7 +14,7 @@ import {
   AlertDialogAction,
   AlertDialogMedia,
 } from "@/components/ui/alert-dialog"
-import { LogOutIcon } from "lucide-react"
+
 
 const LOGOUT_URL = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_")
   ? "/login"

@@ -1,7 +1,8 @@
 "use client"
+import { Glyph, ArrowRight01Icon, Certificate01Icon, Compass01Icon, Mortarboard01Icon, Wallet01Icon } from "@/components/icons"
 
-import { HugeiconsIcon } from "@hugeicons/react"
-import { ArrowRight01Icon, Certificate01Icon, Compass01Icon, Mortarboard01Icon, Wallet01Icon } from "@hugeicons/core-free-icons"
+
+
 import { CardHeader, CardShell, ListRow } from "@/components/ui/system"
 
 export type QuickLinkIcon = "tour" | "wallet" | "certificates" | "instructor"
@@ -27,11 +28,11 @@ export function QuickLinks({ links }: { links: readonly QuickLink[] }) {
           return (
             <ListRow
               key={link.href}
-              icon={({ className }) => <HugeiconsIcon icon={glyph} className={className} />}
+              icon={({ className }) => <Glyph icon={glyph} className={className} />}
               title={link.title}
               subtitle={link.description}
               href={link.href}
-              right={<HugeiconsIcon icon={ArrowRight01Icon} aria-hidden className="h-4 w-4 shrink-0 text-muted-foreground" />}
+              right={<Glyph icon={ArrowRight01Icon} aria-hidden className="h-4 w-4 shrink-0 text-muted-foreground" />}
             />
           )
         })}

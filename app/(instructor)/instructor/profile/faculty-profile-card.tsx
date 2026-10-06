@@ -1,7 +1,7 @@
 "use client"
+import { CheckIcon } from "@/components/icons"
 
 import { useState, useTransition } from "react"
-import { CheckIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FacultyProfileFields } from "@/components/faculty/faculty-profile-fields"

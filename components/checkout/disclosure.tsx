@@ -1,7 +1,8 @@
 "use client"
+import { ChevronDownIcon, type IconComponent } from "@/components/icons"
 
 import * as React from "react"
-import { ChevronDownIcon, type LucideIcon } from "lucide-react"
+
 import { cn } from "@/lib/utils"
 import { useMediaQuery } from "@/components/marketing/motion/bus"
 
@@ -31,7 +32,7 @@ export function Disclosure({
   defaultOpen = false,
   children,
 }: {
-  icon: LucideIcon
+  icon: IconComponent
   title: string
   /** One quiet line under the title — what the row holds. */
   summary?: string

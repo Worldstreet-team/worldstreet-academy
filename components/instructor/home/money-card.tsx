@@ -1,7 +1,8 @@
 "use client"
+import { ArrowRight } from "@/components/icons"
 
 import Link from "next/link"
-import { ArrowRight } from "lucide-react"
+
 import { CardShell } from "@/components/ui/system"
 import type { TeachingMoney } from "@/lib/actions/teaching-home"
 import { formatMinor } from "@/lib/teaching-home"

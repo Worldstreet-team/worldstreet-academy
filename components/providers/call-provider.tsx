@@ -1,4 +1,5 @@
 "use client"
+import { PhoneIcon, PhoneOffIcon, VideoIcon, WifiIcon } from "@/components/icons"
 
 import {
   createContext,
@@ -23,7 +24,7 @@ import { useUser } from "@/components/providers/user-provider"
 import { callSounds } from "@/lib/call-sounds"
 import { rtkClient, preloadRTKSDK } from "@/lib/rtk-client"
 import type { CallEventPayload, SSEEventPayload } from "@/lib/call-events"
-import { PhoneIcon, PhoneOffIcon, VideoIcon, WifiIcon } from "lucide-react"
+
 import { RenderIcon } from "@/components/shared/render-icon"
 
 type CallType = "video" | "audio"

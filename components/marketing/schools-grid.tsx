@@ -1,7 +1,7 @@
 "use client"
+import { ArrowRightIcon } from "@/components/icons"
 
 import * as React from "react"
-import { ArrowRightIcon } from "lucide-react"
 import { motion, useMotionValue, useScroll, useSpring, useTransform, type MotionValue } from "motion/react"
 import type { SchoolSlug } from "@/lib/schools"
 import { SCHOOLS } from "@/lib/schools"

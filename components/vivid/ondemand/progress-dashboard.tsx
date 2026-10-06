@@ -1,4 +1,5 @@
 "use client"
+import { CheckIcon } from "@/components/icons"
 
 import Image from "next/image"
 import { useState, useEffect } from "react"
@@ -6,7 +7,6 @@ import { motion } from "motion/react"
 import { useVivid } from "@/lib/vivid/provider"
 import type { OnDemandUI } from "@/lib/vivid/types"
 import { parseConfig } from "./helpers"
-import { CheckIcon } from "lucide-react"
 
 export function ProgressDashboardUI({ ui }: { ui: OnDemandUI }) {
   const vivid = useVivid()

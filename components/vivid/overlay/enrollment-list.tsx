@@ -1,8 +1,9 @@
 "use client"
+import { CheckIcon, FileBadgeIcon, GraduationCapIcon } from "@/components/icons"
 
 import Image from "next/image"
 import { motion } from "motion/react"
-import { CheckIcon, FileBadgeIcon, GraduationCapIcon } from "lucide-react"
+
 
 export interface EnrollmentItem {
   id?: string

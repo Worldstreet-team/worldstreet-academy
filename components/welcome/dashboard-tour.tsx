@@ -1,9 +1,8 @@
 "use client"
+import { Glyph, ArrowLeft01Icon, ArrowRight01Icon } from "@/components/icons"
 
 import * as React from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { ArrowLeft01Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons"
 import { Button } from "@/components/ui/button"
 import { completeOnboarding } from "@/lib/actions/onboarding"
 import { TOUR_OPEN_GROUP_EVENT } from "@/lib/dashboard-tour"
@@ -394,12 +393,12 @@ export function DashboardTour({ autoStart, firstName }: { autoStart: boolean; fi
                 aria-label="Back"
                 className="rounded-full text-muted-foreground hover:text-foreground"
               >
-                <HugeiconsIcon icon={ArrowLeft01Icon} className="size-4" />
+                <Glyph icon={ArrowLeft01Icon} className="size-4" />
               </Button>
             )}
             <Button ref={primaryRef} type="button" onClick={next} className="h-9 rounded-full px-4 text-[13.5px] font-semibold">
               {index === 0 ? "Show me around" : last ? "Done" : "Next"}
-              {index > 0 && !last && <HugeiconsIcon icon={ArrowRight01Icon} className="size-4" aria-hidden />}
+              {index > 0 && !last && <Glyph icon={ArrowRight01Icon} className="size-4" aria-hidden />}
             </Button>
           </div>
         </div>

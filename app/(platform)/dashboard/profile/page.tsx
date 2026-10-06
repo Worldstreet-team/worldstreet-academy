@@ -1,4 +1,5 @@
 "use client"
+import { CameraIcon, CheckIcon, PencilLineIcon } from "@/components/icons"
 
 import { useRef, useState, useTransition } from "react"
 import { Topbar } from "@/components/platform/topbar"
@@ -15,7 +16,7 @@ import { CountryCard } from "@/components/platform/country-card"
 import { updateAvatar, updateProfile } from "@/lib/actions/profile"
 import { getImageUploadUrl } from "@/lib/actions/upload"
 import { cn } from "@/lib/utils"
-import { CameraIcon, CheckIcon, PencilLineIcon } from "lucide-react"
+
 
 export default function ProfilePage() {
   const user = useUser()

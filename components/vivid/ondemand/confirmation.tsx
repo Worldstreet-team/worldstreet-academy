@@ -1,9 +1,9 @@
 "use client"
+import { CheckIcon } from "@/components/icons"
 
 import { motion } from "motion/react"
 import { useVivid } from "@/lib/vivid/provider"
 import type { OnDemandUI } from "@/lib/vivid/types"
-import { CheckIcon } from "lucide-react"
 
 export function ConfirmationUI({ ui }: { ui: OnDemandUI }) {
   const vivid = useVivid()

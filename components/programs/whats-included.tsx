@@ -1,21 +1,8 @@
-import {
-  AwardIcon,
-  CircleHelpIcon,
-  ClipboardListIcon,
-  CompassIcon,
-  DownloadIcon,
-  HandshakeIcon,
-  ListChecksIcon,
-  RadioIcon,
-  SquarePlayIcon,
-  TrendingUpIcon,
-  UsersIcon,
-  type LucideIcon,
-} from "lucide-react"
+import { AwardIcon, CircleHelpIcon, ClipboardListIcon, CompassIcon, DownloadIcon, HandshakeIcon, ListChecksIcon, RadioIcon, SquarePlayIcon, TrendingUpIcon, UsersIcon, type IconComponent } from "@/components/icons"
 import { SectionLabel } from "@/components/marketing/section-heading"
 
 /** Spec §9 — the eleven inclusions, verbatim and static. */
-const INCLUDED: ReadonlyArray<{ label: string; icon: LucideIcon }> = [
+const INCLUDED: ReadonlyArray<{ label: string; icon: IconComponent }> = [
   { label: "Structured curriculum", icon: ListChecksIcon },
   { label: "Video lessons", icon: SquarePlayIcon },
   { label: "Live classes", icon: RadioIcon },

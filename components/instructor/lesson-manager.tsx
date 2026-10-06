@@ -1,4 +1,5 @@
 "use client"
+import { FileText, GripVertical, Plus, Trash2, Video, type IconComponent } from "@/components/icons"
 
 import Link from "next/link"
 import { useActionState, useState, useTransition } from "react"
@@ -36,14 +37,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { EmptyState } from "@/components/shared/empty-state"
 import { ArtCourses } from "@/components/shared/illustrations"
-import {
-  FileText,
-  GripVertical,
-  Plus,
-  Trash2,
-  Video,
-  type LucideIcon,
-} from "lucide-react"
+
 import type { Lesson } from "@/lib/types"
 import type { PackageKey } from "@/lib/db/models"
 import { PACKAGE_LABEL } from "@/lib/entitlements"
@@ -60,7 +54,7 @@ const initialState: CourseFormState = {
   fieldErrors: {},
 }
 
-const typeIcons: Record<string, LucideIcon> = {
+const typeIcons: Record<string, IconComponent> = {
   video: Video,
   text: FileText,
 }

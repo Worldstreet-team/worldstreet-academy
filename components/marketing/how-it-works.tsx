@@ -117,7 +117,7 @@ export function HowItWorks() {
           </p>
           <Link
             href="/schools"
-            className="inline-flex h-12 items-center justify-center rounded-sm bg-ws-brand px-8 text-[15px] font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90"
+            className="inline-flex h-12 items-center justify-center rounded-full bg-ws-brand px-8 text-[15px] font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90"
           >
             Explore programs
           </Link>

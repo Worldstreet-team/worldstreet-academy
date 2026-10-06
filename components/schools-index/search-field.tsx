@@ -1,7 +1,8 @@
 "use client"
+import { SearchIcon, XIcon } from "@/components/icons"
 
 import * as React from "react"
-import { SearchIcon, XIcon } from "lucide-react"
+
 import { cn } from "@/lib/utils"
 
 /**

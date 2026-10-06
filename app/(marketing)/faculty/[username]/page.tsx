@@ -1,8 +1,9 @@
+import { ArrowLeftIcon, AwardIcon, ExternalLinkIcon, GlobeIcon, type IconComponent } from "@/components/icons"
 import type { Metadata } from "next"
 import { cache } from "react"
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ArrowLeftIcon, AwardIcon, ExternalLinkIcon, GlobeIcon, type LucideIcon } from "lucide-react"
+
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ProgramRow } from "@/components/marketing/program-row"
 import { fetchBrowseCourses, fetchFacultyProfile } from "@/lib/actions/student"
@@ -54,8 +55,8 @@ export default async function FacultyProfilePage({ params }: Params) {
       { href: profile.socialLinks.website, label: "Website", icon: GlobeIcon },
       { href: profile.socialLinks.linkedin, label: "LinkedIn", icon: ExternalLinkIcon },
       { href: profile.socialLinks.twitter, label: "X (Twitter)", icon: ExternalLinkIcon },
-    ] satisfies { href: string | null; label: string; icon: LucideIcon }[]
-  ).filter((link): link is { href: string; label: string; icon: LucideIcon } => link.href !== null)
+    ] satisfies { href: string | null; label: string; icon: IconComponent }[]
+  ).filter((link): link is { href: string; label: string; icon: IconComponent } => link.href !== null)
 
   return (
     <div className="mx-auto max-w-7xl px-6 pb-24 pt-10 md:pb-32 md:pt-16">

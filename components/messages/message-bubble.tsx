@@ -1,11 +1,12 @@
 "use client"
+import { CheckCheckIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, DownloadIcon, FileIcon, ImageIcon, PauseIcon, PlayIcon, XIcon } from "@/components/icons"
 
 import Image from "next/image"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
 import { useState, useRef, useEffect, useCallback } from "react"
 import { motion } from "motion/react"
-import { CheckCheckIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, DownloadIcon, FileIcon, ImageIcon, PauseIcon, PlayIcon, XIcon } from "lucide-react"
+
 import { RenderIcon } from "@/components/shared/render-icon"
 
 export type MessageType = {

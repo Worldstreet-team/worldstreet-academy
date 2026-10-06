@@ -1,0 +1,23 @@
+/* VENDORED from worldstreet/design-system by scripts/vendor.mjs. Don't edit: change the design system and re-run it. */
+/* ---- Card [site] -------------------------------------------------------- */
+.cx-card { position: relative; border-radius: var(--cx-r-card); overflow: clip; padding: var(--cx-card-pad); isolation: isolate;
+  display: flex; flex-direction: column; gap: 8px; }
+.cx-card::before { content: ""; position: absolute; inset: 0; background: var(--cx-wash); opacity: var(--cx-wash-opacity); z-index: -2; pointer-events: none; }
+.cx-card--elevated { background: var(--cx-elevated); box-shadow: var(--cx-shadow-lg); }
+.cx-card--elevated::before { display: none; }
+.cx-card--interactive { cursor: pointer; transition: transform var(--cx-dur) var(--cx-ease); text-decoration: none; color: inherit; }
+.cx-card--interactive::before { transition: opacity var(--cx-dur); }
+.cx-card--interactive:hover::before { opacity: calc(var(--cx-wash-opacity) * 1.75); }
+.cx-card--interactive:hover { transform: translateY(-2px); }
+.cx-card-head { display: flex; align-items: center; justify-content: space-between; gap: var(--cx-s-3); margin-bottom: var(--cx-s-2); }
+.cx-orb { position: absolute; width: 246px; height: 246px; border-radius: 50%; background: var(--cx-ember); opacity: var(--cx-orb-opacity);
+  filter: var(--cx-glow-blur); z-index: -1; pointer-events: none; }
+.cx-orb--tl { top: -120px; left: -90px; } .cx-orb--tr { top: -120px; right: -80px; }
+.cx-orb--bl { bottom: -110px; left: -90px; } .cx-orb--br { bottom: -110px; right: -80px; }
+.cx-orb--center { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+.cx-orb--soft { filter: blur(150px); }
+.cx-glass { background: var(--cx-surface); backdrop-filter: var(--cx-blur-glass); -webkit-backdrop-filter: var(--cx-blur-glass); border-radius: var(--cx-r-card); padding: 18px; }
+.cx-icon-tile { width: 64px; height: 64px; flex: none; border-radius: var(--cx-r-icon); background: var(--cx-surface-3); display: grid; place-items: center; }
+.cx-icon-tile svg { width: 28px; height: 28px; stroke: var(--cx-flame); fill: none; stroke-width: 1.6; }
+.cx-icon-tile--sm { width: 40px; height: 40px; border-radius: 10px; }
+.cx-icon-tile--sm svg { width: 20px; height: 20px; }

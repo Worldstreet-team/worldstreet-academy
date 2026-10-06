@@ -1,10 +1,11 @@
 "use client"
+import { FastForwardIcon, MaximizeIcon, MinimizeIcon, PauseIcon, PlayIcon, RewindIcon, ShoppingCartIcon, Volume2Icon, VolumeXIcon } from "@/components/icons"
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
-import { FastForwardIcon, MaximizeIcon, MinimizeIcon, PauseIcon, PlayIcon, RewindIcon, ShoppingCartIcon, Volume2Icon, VolumeXIcon } from "lucide-react"
+
 import { RenderIcon } from "@/components/shared/render-icon"
 
 interface PreviewVideoPlayerProps {

@@ -1,6 +1,7 @@
+import { ArrowRightIcon, CheckIcon, PlusIcon } from "@/components/icons"
 import type { Metadata } from "next"
 import Link from "next/link"
-import { ArrowRightIcon, CheckIcon, PlusIcon } from "lucide-react"
+
 import { BRAND } from "@/lib/brand"
 import { appUrl } from "@/lib/app-url"
 import { EARNINGS_CLEARING_DAYS, INSTRUCTOR_REVENUE_SHARE, REFERRAL_COMMISSION_RATE } from "@/lib/db/models"

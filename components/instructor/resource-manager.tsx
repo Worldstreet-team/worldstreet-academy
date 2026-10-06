@@ -1,4 +1,5 @@
 "use client"
+import { FileIcon, LinkIcon, LoaderCircleIcon, Trash2Icon, UploadIcon } from "@/components/icons"
 
 import { useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
@@ -12,7 +13,7 @@ import {
   addResource,
   deleteResource,
 } from "@/lib/actions/resources"
-import { FileIcon, LinkIcon, LoaderCircleIcon, Trash2Icon, UploadIcon } from "lucide-react"
+
 import { RenderIcon } from "@/components/shared/render-icon"
 
 function formatSize(bytes: number) {

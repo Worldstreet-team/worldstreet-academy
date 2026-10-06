@@ -1,0 +1,19 @@
+/* VENDORED from worldstreet/design-system by scripts/vendor.mjs. Don't edit: change the design system and re-run it. */
+/* ---- Badge, chips, count [site + ext] ----------------------------------- */
+.cx-badge { position: relative; isolation: isolate; display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px;
+  border-radius: var(--cx-r-pill); overflow: hidden; font-size: 16px; line-height: 1.2; }
+.cx-badge::before { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, var(--cx-ember), var(--cx-ember-50)); opacity: .15; z-index: -1; }
+.cx-badge svg { width: 18px; height: 18px; fill: var(--cx-flame); }
+.cx-chip { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 10px; border-radius: var(--cx-r-pill); white-space: nowrap;
+  font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; background: var(--cx-info-wash); color: var(--cx-info); }
+.cx-chip--gain { background: var(--cx-gain-wash); color: var(--cx-gain); }
+.cx-chip--loss { background: var(--cx-loss-wash); color: var(--cx-loss); }
+.cx-chip--warning { background: var(--cx-warning-wash); color: var(--cx-warning); }
+.cx-chip--brand { background: var(--cx-brand-wash); color: var(--cx-ember-text); }
+.cx-chip--dot::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.cx-count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px;
+  background: var(--cx-ember); color: var(--cx-on-primary); font: 500 11px/1 var(--cx-font); font-variant-numeric: tabular-nums; }
+.cx-count--dot { min-width: 8px; width: 8px; height: 8px; padding: 0; }
+.cx-with-count { position: relative; display: inline-flex; }
+.cx-with-count > .cx-count { position: absolute; top: -4px; right: -4px; box-shadow: 0 0 0 2px var(--cx-bg); }
+.cx-gain { color: var(--cx-gain); } .cx-loss { color: var(--cx-loss); } .cx-warning-text { color: var(--cx-warning); }

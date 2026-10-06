@@ -1,4 +1,5 @@
 "use client"
+import { LoaderCircle, CircleCheckBigIcon, ClockIcon, XIcon } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
@@ -17,7 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { LoaderCircle } from "lucide-react"
+
 import {
   getStudentExamStatus,
   startExamAttempt,
@@ -27,7 +28,7 @@ import {
   type ExamResult,
 } from "@/lib/actions/exams"
 import { queryKeys } from "@/lib/hooks/queries/keys"
-import { CircleCheckBigIcon, ClockIcon, XIcon } from "lucide-react"
+
 import { RenderIcon } from "@/components/shared/render-icon"
 import { PackageLockNotice } from "@/components/learn/package-lock-notice"
 

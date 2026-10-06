@@ -1,9 +1,9 @@
 "use client"
+import { ArrowRightIcon } from "@/components/icons"
 
 import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowRightIcon } from "lucide-react"
 import { motion, useInView, useScroll, useTransform } from "motion/react"
 import { useMotionOK } from "@/components/marketing/motion/bus"
 import { EASE_INERTIA } from "@/components/marketing/motion/ease"
@@ -67,7 +67,8 @@ export function SchoolRow({
         href={`/schools/${school.slug}`}
         tabIndex={-1}
         aria-hidden
-        data-ws-theme="platform"
+        data-theme="dark"
+          data-brand="worldstreet"
         className={cn(
           "group relative block aspect-[16/10] text-ws-primary lg:col-span-7",
           flip && "lg:order-2"

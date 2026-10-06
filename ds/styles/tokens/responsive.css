@@ -1,0 +1,10 @@
+/* VENDORED from worldstreet/design-system by scripts/vendor.mjs. Don't edit: change the design system and re-run it. */
+/* Responsive overrides. Breakpoints [site]: mobile <768, tablet 768-1199, desktop >=1200. */
+
+@media (max-width: 1199px) {
+  :root { --cx-h1: 52px; --cx-h2: 42px; --cx-h3: 26px; }
+}
+@media (max-width: 767px) {
+  :root { --cx-h1: 40px; --cx-h2: 30px; --cx-h3: 24px; --cx-h4: 20px;
+          --cx-gutter: 16px; --cx-section: 64px; --cx-card-pad: 20px; --cx-gap: 16px; --cx-nav-h: 72px; }
+}

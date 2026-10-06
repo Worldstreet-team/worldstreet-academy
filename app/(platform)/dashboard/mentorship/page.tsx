@@ -1,9 +1,10 @@
 "use client"
+import { CalendarClockIcon, CompassIcon } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { CalendarClockIcon, CompassIcon } from "lucide-react"
+
 import { Topbar } from "@/components/platform/topbar"
 import { PageHeader } from "@/components/shared/page-header"
 import { Button } from "@/components/ui/button"

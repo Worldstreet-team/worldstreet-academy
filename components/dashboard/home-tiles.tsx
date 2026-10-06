@@ -1,20 +1,10 @@
 "use client"
+import { Glyph, BookOpen01Icon, Calendar03Icon, Certificate01Icon, ChampionIcon, CustomerSupportIcon, HelpCircleIcon, LinkSquare02Icon, SecurityCheckIcon, Tick02Icon, UserGroupIcon } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
-import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  BookOpen01Icon,
-  Calendar03Icon,
-  Certificate01Icon,
-  ChampionIcon,
-  CustomerSupportIcon,
-  HelpCircleIcon,
-  LinkSquare02Icon,
-  SecurityCheckIcon,
-  Tick02Icon,
-  UserGroupIcon,
-} from "@hugeicons/core-free-icons"
+
+
 import { MessageInstructorButton } from "@/app/(platform)/dashboard/instructor/[instructorId]/message-instructor-button"
 import { Chevron, TILE_FOOT_LINK, TILE_ROW, TILE_ROWS, TileEmpty, glyph } from "@/components/dashboard/tile-bits"
 import { ProgramCover, ProgressTrack, StatusChip } from "@/components/platform/program-bits"
@@ -454,7 +444,7 @@ export function SupportTile({ priority, communities }: { priority: boolean; comm
                 {row.subtitle}
               </span>
             </span>
-            <HugeiconsIcon icon={LinkSquare02Icon} className="h-4 w-4 shrink-0 text-muted-foreground/70" aria-hidden />
+            <Glyph icon={LinkSquare02Icon} className="h-4 w-4 shrink-0 text-muted-foreground/70" aria-hidden />
             <span className="sr-only">(opens in a new tab)</span>
           </a>
         ))}

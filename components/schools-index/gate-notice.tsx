@@ -1,4 +1,5 @@
-import { CompassIcon } from "lucide-react"
+import { CompassIcon } from "@/components/icons"
+
 
 /**
  * Why a signed-in learner is looking at the schools: the gate sent them

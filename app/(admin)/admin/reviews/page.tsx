@@ -1,4 +1,5 @@
 "use client"
+import { StarIcon } from "@/components/icons"
 
 import * as React from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
@@ -15,7 +16,7 @@ import {
 } from "@/lib/actions/admin-courses"
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import { formatDate, FilterChips, Pagination } from "@/components/admin/shared"
-import { StarIcon } from "lucide-react"
+
 
 type Filter = "all" | "reported" | "hidden" | "featured"
 

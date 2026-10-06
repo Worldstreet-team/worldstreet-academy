@@ -1,0 +1,16 @@
+/* VENDORED from worldstreet/design-system by scripts/vendor.mjs. Don't edit: change the design system and re-run it. */
+/* ---- Stat tile + sparkline [ext] ---------------------------------------- */
+.cx-stat { display: grid; gap: 6px; }
+.cx-stat-label { font-size: 14px; color: var(--cx-text-muted); }
+.cx-stat-value { font-size: 32px; font-weight: 400; letter-spacing: -1px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.cx-stat-foot { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--cx-text-muted); flex-wrap: wrap; }
+.cx-spark { display: block; width: 100%; height: 48px; overflow: visible; }
+.cx-spark path { fill: none; stroke: var(--cx-chart-1); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.cx-spark .area { fill: var(--cx-chart-1); stroke: none; opacity: .12; }
+.cx-spark--gain path { stroke: var(--cx-gain); } .cx-spark--gain .area { fill: var(--cx-gain); }
+.cx-spark--loss path { stroke: var(--cx-loss); } .cx-spark--loss .area { fill: var(--cx-loss); }
+.cx-meter { display: flex; height: 8px; border-radius: 999px; overflow: hidden; gap: 2px; background: var(--cx-surface-2); }
+.cx-meter > span { display: block; height: 100%; }
+.cx-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; list-style: none; padding: 0; margin: 0; font-size: 13px; color: var(--cx-text-2); }
+.cx-legend li { display: inline-flex; align-items: center; gap: 6px; }
+.cx-legend i { width: 8px; height: 8px; border-radius: 2px; }

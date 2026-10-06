@@ -1,4 +1,5 @@
 "use client"
+import { Glyph, ArrowLeft01Icon, ArrowRight01Icon } from "@/components/icons"
 
 /**
  * System primitives — ported from the hub's reference implementation
@@ -37,7 +38,7 @@
  * Icons: kit props typed `React.ComponentType<{ className?: string }>` take a
  * Hugeicons glyph through a one-line wrapper, as the hub does:
  *   const WalletGlyph = ({ className }: { className?: string }) =>
- *     <HugeiconsIcon icon={Wallet01Icon} className={className} />
+ *     <Glyph icon={Wallet01Icon} className={className} />
  * The global two-tone rule (app/globals.css) inks the outer path and golds the
  * inner strokes; wrap an icon in `.ws-icon-mono` when it must be one colour.
  */
@@ -45,8 +46,6 @@
 import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { ArrowLeft01Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons"
 import { cn } from "@/lib/utils"
 import { RollingAmount } from "@/components/ui/rolling-amount"
 
@@ -363,7 +362,7 @@ export function BackAction({ to, className }: { to: string | (() => void); class
     "mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface-sunken text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:h-8 sm:w-8",
     className,
   )
-  const icon = <HugeiconsIcon icon={ArrowLeft01Icon} className="h-[18px] w-[18px]" />
+  const icon = <Glyph icon={ArrowLeft01Icon} className="h-[18px] w-[18px]" />
   return typeof to === "string" ? (
     <Link href={to} aria-label="Back" title="Back" className={cls}>{icon}</Link>
   ) : (
@@ -477,7 +476,7 @@ export function CardHeader({
           className="inline-flex shrink-0 items-center gap-1 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
           {link.label}
-          <HugeiconsIcon icon={ArrowRight01Icon} className="h-3.5 w-3.5" />
+          <Glyph icon={ArrowRight01Icon} className="h-3.5 w-3.5" />
         </Link>
       )}
     </div>

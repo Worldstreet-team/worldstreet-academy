@@ -1,18 +1,10 @@
 "use client"
+import { CheckIcon, ClockIcon, CopyIcon, FileTextIcon, ImageIcon, LoaderCircleIcon, RefreshCwIcon, UploadIcon } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import {
-  CheckIcon,
-  ClockIcon,
-  CopyIcon,
-  FileTextIcon,
-  ImageIcon,
-  LoaderCircleIcon,
-  RefreshCwIcon,
-  UploadIcon,
-} from "lucide-react"
+
 import {
   getPaymentProofUploadUrl,
   submitEspeePayment,

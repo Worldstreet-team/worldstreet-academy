@@ -1,0 +1,100 @@
+/* VENDORED from worldstreet/design-system by scripts/vendor.mjs. Don't edit: change the design system and re-run it. */
+/* ---- Motion ---------------------------------------------------------------
+   Smoothness rules: only transform / opacity / filter animate (compositor-only,
+   no layout); will-change is set only while moving; springs come from
+   --cx-spring* (linear() sampled from physics); everything honours
+   prefers-reduced-motion at the bottom of this file.                         */
+
+/* Reveal: rises 24px while resolving from blur into focus.
+   Stagger siblings with .cx-reveal-group (children get --i) or set --i. */
+.cx-reveal, .cx-reveal-group > * {
+  opacity: 0; transform: translate3d(0, var(--cx-rise), 0); filter: blur(var(--cx-reveal-blur));
+  transition: opacity var(--cx-dur-reveal) var(--cx-spring), transform var(--cx-dur-reveal) var(--cx-spring), filter calc(var(--cx-dur-reveal) * .7) var(--cx-ease);
+  transition-delay: calc(var(--i, 0) * var(--cx-stagger));
+  will-change: opacity, transform, filter;
+}
+.cx-reveal.is-in, .cx-reveal-group.is-in > * { opacity: 1; transform: none; filter: none; }
+.cx-reveal.is-done, .cx-reveal-group.is-done > * { will-change: auto; }
+
+/* Word rise: each word lifts out of its own mask, staggered */
+.cx-words { display: inline; }
+.cx-words .w { display: inline-block; overflow: clip; overflow-clip-margin: .12em; vertical-align: top; padding-bottom: .06em; }
+.cx-words .w > span { display: inline-block; transform: translate3d(0, 105%, 0); opacity: 0;
+  transition: transform 1s var(--cx-spring), opacity .6s var(--cx-ease); transition-delay: calc(var(--i, 0) * 45ms); }
+.cx-words.is-in .w > span { transform: none; opacity: 1; }
+/* Inside gradient headlines, background-clip:text can't follow transformed words,
+   so each word carries its own alpha along the fade curve (<WordReveal fade>). */
+.cx-words .w > span { color: rgba(var(--cx-fg-rgb), var(--a, 1)); -webkit-text-fill-color: currentColor; }
+
+/* Rolling number: each digit is a vertical strip 0-9 that springs to its value */
+.cx-roll { display: inline-flex; font-variant-numeric: tabular-nums; line-height: 1; }
+.cx-roll .d { display: inline-block; height: 1em; overflow: clip; overflow-clip-margin: .08em; }
+.cx-roll .d > span { display: flex; flex-direction: column; transform: translate3d(0, calc(var(--n, 0) * -1em), 0);
+  transition: transform 1.2s var(--cx-spring), filter .6s var(--cx-ease); transition-delay: calc(var(--i, 0) * 70ms); }
+.cx-roll .d > span > span { height: 1em; display: block; text-align: center; }
+.cx-roll.is-rolling .d > span { filter: blur(.6px); }   /* a hint of motion blur while it spins */
+
+/* Sliding thumb for segmented tabs (<Tabs> sets --x/--w on the list) */
+.cx-tabs--slide { position: relative; isolation: isolate; }
+.cx-tabs--slide .cx-tab[aria-selected="true"] { background: none; }
+.cx-tabs--slide::before { content: ""; position: absolute; z-index: -1; top: 4px; bottom: 4px; left: 0; width: var(--w, 0); border-radius: var(--cx-r-pill);
+  background: var(--cx-surface-3); transform: translate3d(var(--x, 0), 0, 0);
+  transition: transform .5s var(--cx-spring-snappy), width .5s var(--cx-spring-snappy); }
+.cx-tabs--line.cx-tabs--slide::before { top: auto; bottom: 0; height: 2px; background: var(--cx-text); border-radius: 2px; }
+
+/* Tilt: 3D card that follows the pointer, with a moving glare. <TiltCard> sets --rx/--ry/--gx/--gy */
+.cx-tilt { transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); transform-style: preserve-3d;
+  transition: transform .8s var(--cx-spring); outline: 1px solid transparent; /* anti-aliases rotated edges */ backface-visibility: hidden; }
+.cx-tilt.is-active { transition: transform .12s linear; will-change: transform; }
+.cx-tilt > .cx-glare { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 2; opacity: 0; mix-blend-mode: soft-light;
+  background: radial-gradient(420px circle at var(--gx, 50%) var(--gy, 50%), rgba(255, 255, 255, .45), transparent 45%); transition: opacity .5s var(--cx-ease); }
+.cx-tilt.is-active > .cx-glare { opacity: 1; }
+.cx-tilt .cx-depth { transform: translateZ(40px); }   /* children that float above the card */
+
+/* Magnetic: element leans toward the pointer, then springs home with a small overshoot */
+.cx-magnetic { transform: translate3d(var(--mx, 0), var(--my, 0), 0); transition: transform .7s var(--cx-spring-bouncy); }
+.cx-magnetic.is-active { transition: transform .15s var(--cx-ease); }
+
+/* Float: glass shapes that drift and bob, never in sync (vary --float-dur) */
+.cx-float { animation: cx-float var(--float-dur, 7s) var(--cx-ease-in-out) infinite alternate; animation-delay: var(--float-delay, 0s); will-change: transform; }
+@keyframes cx-float { from { transform: translate3d(0, -6px, 0) rotate(-1.2deg); } to { transform: translate3d(0, 8px, 0) rotate(1.4deg); } }
+
+/* Pop: an element arriving with a soft overshoot (toasts, chips, badges) */
+.cx-pop-in { animation: cx-pop-in .7s var(--cx-spring-bouncy) both; }
+@keyframes cx-pop-in { from { opacity: 0; transform: scale(.9); filter: blur(4px); } }
+
+/* Theme switch: a circle of the new theme spreads from the click point (View Transitions) */
+::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+::view-transition-new(root) { animation: cx-theme-reveal .75s var(--cx-spring-snappy); }
+@keyframes cx-theme-reveal { from { clip-path: circle(0 at var(--vt-x, 50%) var(--vt-y, 0%)); } to { clip-path: circle(var(--vt-r, 150vmax) at var(--vt-x, 50%) var(--vt-y, 0%)); } }
+
+.cx-marquee { overflow: hidden; -webkit-mask: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent); mask: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent); }
+.cx-marquee > div { display: flex; width: max-content; animation: cx-marquee 40s linear infinite; }
+.cx-marquee > div > * { margin-right: var(--cx-gap); }   /* not gap: -50% needs the trailing space */
+.cx-marquee:hover > div { animation-play-state: paused; }
+@keyframes cx-spin { to { transform: rotate(360deg); } }
+@keyframes cx-shimmer { to { background-position: -200% 0; } }
+@keyframes cx-pop { from { opacity: 0; transform: scale(.96) translateY(8px); } }
+@keyframes cx-rise { from { opacity: 0; transform: translateY(12px); } }
+@keyframes cx-slide-in { from { transform: translateX(100%); } }
+@keyframes cx-sheet-in { from { transform: translateY(100%); } }
+@keyframes cx-indet { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
+@keyframes cx-marquee { to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) {
+  .cx-root *, .cx-root *::before, .cx-root *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  .cx-reveal, .cx-reveal-group > * { opacity: 1; transform: none; filter: none; }
+  .cx-words .w > span { transform: none; opacity: 1; }
+  .cx-tilt, .cx-magnetic { transform: none !important; }
+  .cx-float { animation: none; }
+  ::view-transition-new(root) { animation: none; }
+  .cx-marquee > div { animation: none; flex-wrap: wrap; width: auto; }
+}
+@media (forced-colors: active) {
+  .cx-btn, .cx-input, .cx-select, .cx-textarea, .cx-card, .cx-chip, .cx-tab[aria-selected="true"] { border: 1px solid CanvasText; }
+  .cx-h1, .cx-h2 { color: CanvasText; background: none; }
+}
+@media print {
+  .cx-root { background: #fff; color: #000; }
+  .cx-orb, .cx-halo::before, .cx-nav, .cx-bottom-nav, .cx-toast-stack { display: none !important; }
+  .cx-h1, .cx-h2 { color: #000; background: none; }
+}

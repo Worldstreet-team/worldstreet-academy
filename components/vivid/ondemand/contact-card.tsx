@@ -1,11 +1,11 @@
 "use client"
+import { MessageCircleIcon, PhoneIcon, RotateCcwIcon, UserIcon } from "@/components/icons"
 
 import Image from "next/image"
 import { motion } from "motion/react"
 import { useVivid } from "@/lib/vivid/provider"
 import type { OnDemandUI } from "@/lib/vivid/types"
 import { parseConfig } from "./helpers"
-import { MessageCircleIcon, PhoneIcon, RotateCcwIcon, UserIcon } from "lucide-react"
 
 export function ContactCardUI({ ui }: { ui: OnDemandUI }) {
   const vivid = useVivid()

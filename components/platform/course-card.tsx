@@ -1,8 +1,9 @@
 "use client"
+import { Glyph, ArrowRight01Icon, Bookmark01Icon, PlayIcon, StarIcon, Tick02Icon } from "@/components/icons"
 
 import Link from "next/link"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { ArrowRight01Icon, Bookmark01Icon, PlayIcon, StarIcon, Tick02Icon } from "@hugeicons/core-free-icons"
+
+
 import { levelChipStyle } from "@/components/shared/level-badge"
 import { AvailabilityCountdown } from "@/components/shared/availability-countdown"
 import { PackageChip, ProgramCover, ProgressTrack } from "@/components/platform/program-bits"
@@ -133,14 +134,14 @@ export function CourseCard({
           {/* Lessons · duration */}
           {coverMeta.length > 0 && (
             <span className="ws-icon-mono absolute bottom-2.5 left-3 inline-flex items-center gap-1.5 text-[11px] font-medium tabular-nums text-white/90">
-              <HugeiconsIcon icon={PlayIcon} className="h-3 w-3" aria-hidden />
+              <Glyph icon={PlayIcon} className="h-3 w-3" aria-hidden />
               {coverMeta.join(" · ")}
             </span>
           )}
 
           {isComplete && (
             <span className="ws-icon-mono absolute bottom-2.5 right-3 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-white">
-              <HugeiconsIcon icon={Tick02Icon} className="h-3 w-3" aria-hidden />
+              <Glyph icon={Tick02Icon} className="h-3 w-3" aria-hidden />
               Completed
             </span>
           )}
@@ -157,7 +158,7 @@ export function CourseCard({
               }}
               className="ws-touch-target ws-icon-mono absolute right-2.5 top-2.5 flex h-8 w-8 items-center justify-center rounded-full bg-black/45 text-white transition-colors duration-[var(--ws-motion-fast)] hover:bg-black/65 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
             >
-              <HugeiconsIcon
+              <Glyph
                 icon={Bookmark01Icon}
                 fill={isBookmarked ? "currentColor" : "none"}
                 className={cn("h-4 w-4", isBookmarked ? "text-primary" : "text-white")}
@@ -219,7 +220,7 @@ export function CourseCard({
                   </span>
                   {rating ? (
                     <span className="inline-flex items-center gap-1">
-                      <HugeiconsIcon icon={StarIcon} fill="currentColor" className="h-3 w-3 text-ws-rating" aria-hidden />
+                      <Glyph icon={StarIcon} fill="currentColor" className="h-3 w-3 text-ws-rating" aria-hidden />
                       <span className="text-[13px] tabular-nums text-muted-foreground">{rating}</span>
                     </span>
                   ) : null}
@@ -256,7 +257,7 @@ function FooterAction({ label, muted = false }: { label: string; muted?: boolean
       )}
     >
       {label}
-      <HugeiconsIcon
+      <Glyph
         icon={ArrowRight01Icon}
         className="h-3.5 w-3.5 transition-transform duration-[var(--ws-motion-fast)] group-hover:translate-x-0.5"
         aria-hidden

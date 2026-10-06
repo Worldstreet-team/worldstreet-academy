@@ -1,4 +1,5 @@
 "use client"
+import { CheckIcon, PlusIcon, SquarePenIcon, Trash2Icon, XIcon } from "@/components/icons"
 
 import * as React from "react"
 import { useParams, useSearchParams } from "next/navigation"
@@ -31,7 +32,7 @@ import {
   type QuestionInput,
 } from "@/lib/actions/exams"
 import { queryKeys } from "@/lib/hooks/queries/keys"
-import { CheckIcon, PlusIcon, SquarePenIcon, Trash2Icon, XIcon } from "lucide-react"
+
 
 /* ── Question editor dialog ── */
 

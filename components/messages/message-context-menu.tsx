@@ -1,4 +1,5 @@
 "use client"
+import { CopyIcon, Trash2Icon } from "@/components/icons"
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import { cn } from "@/lib/utils"
@@ -13,7 +14,7 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
 } from "@/components/ui/alert-dialog"
-import { CopyIcon, Trash2Icon } from "lucide-react"
+
 
 type MessageContextMenuProps = {
   children: React.ReactNode

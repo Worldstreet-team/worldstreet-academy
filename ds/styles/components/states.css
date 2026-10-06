@@ -1,0 +1,7 @@
+/* VENDORED from worldstreet/design-system by scripts/vendor.mjs. Don't edit: change the design system and re-run it. */
+/* ---- Loading / empty / error states [ext] ------------------------------- */
+.cx-skel { border-radius: var(--cx-r-sm); background: linear-gradient(90deg, var(--cx-skel-a) 25%, var(--cx-skel-b) 50%, var(--cx-skel-a) 75%);
+  background-size: 200% 100%; animation: cx-shimmer 1.4s linear infinite; }
+.cx-empty { display: grid; justify-items: center; gap: 10px; text-align: center; padding: 48px 24px; }
+.cx-empty .cx-icon-tile { margin-bottom: 6px; }
+.cx-empty--error .cx-icon-tile svg { stroke: var(--cx-loss); }

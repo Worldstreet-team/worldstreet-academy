@@ -1,8 +1,9 @@
 "use client"
+import { Glyph, Copy01Icon, Tick02Icon } from "@/components/icons"
 
 import * as React from "react"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { Copy01Icon, Tick02Icon } from "@hugeicons/core-free-icons"
+
+
 import { CardShell, Eyebrow } from "@/components/ui/system"
 import { cn } from "@/lib/utils"
 
@@ -45,7 +46,7 @@ export function ReferralShare({ code, link }: { code: string; link: string }) {
           aria-label="Copy your code"
           className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors duration-[var(--ws-motion-fast)] hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
         >
-          <HugeiconsIcon icon={copied === "code" ? Tick02Icon : Copy01Icon} className="size-[18px]" />
+          <Glyph icon={copied === "code" ? Tick02Icon : Copy01Icon} className="size-[18px]" />
         </button>
       </div>
 
@@ -62,7 +63,7 @@ export function ReferralShare({ code, link }: { code: string; link: string }) {
           // Mono: the icon's gold inner strokes would vanish on the gold fill.
           className="ws-icon-mono inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-primary px-5 text-[14px] font-semibold text-primary-foreground transition-colors duration-[var(--ws-motion-fast)] hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
-          <HugeiconsIcon icon={copied === "link" ? Tick02Icon : Copy01Icon} className="size-4" />
+          <Glyph icon={copied === "link" ? Tick02Icon : Copy01Icon} className="size-4" />
           {copied === "link" ? "Copied" : "Copy link"}
         </button>
       </div>

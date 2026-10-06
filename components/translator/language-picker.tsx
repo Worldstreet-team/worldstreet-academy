@@ -1,4 +1,5 @@
 "use client"
+import { CheckIcon, SearchIcon, XIcon } from "@/components/icons"
 
 import { useState, useCallback, useMemo, useTransition, useRef, useEffect } from "react"
 import { cn } from "@/lib/utils"
@@ -19,7 +20,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { CheckIcon, SearchIcon, XIcon } from "lucide-react"
+
 
 type LanguagePickerProps = {
   defaultLanguage?: string | null

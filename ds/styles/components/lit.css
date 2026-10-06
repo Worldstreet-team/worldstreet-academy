@@ -1,0 +1,12 @@
+/* VENDORED from worldstreet/design-system by scripts/vendor.mjs. Don't edit: change the design system and re-run it. */
+/* ---- Corner-lit hairline [site] ----------------------------------------- */
+.cx-lit { position: relative; }
+.cx-lit::after { content: ""; }
+.cx-lit::after, .cx-lit-2 {
+  position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  border: 1px solid var(--cx-lit); opacity: var(--cx-lit-opacity);
+  -webkit-mask: linear-gradient(320deg, #000 16%, transparent 20%); mask: linear-gradient(320deg, #000 16%, transparent 20%);
+}
+.cx-lit-2 { opacity: calc(var(--cx-lit-opacity) * .6); -webkit-mask: linear-gradient(137deg, #000 0%, transparent 22%); mask: linear-gradient(137deg, #000 0%, transparent 22%); }
+/* In light mode the corner light alone is too faint to define an edge — add a full hairline */
+.cx-light .cx-card:not(.cx-card--elevated), [data-theme="light"] .cx-card:not(.cx-card--elevated) { box-shadow: inset 0 0 0 1px var(--cx-hairline); }

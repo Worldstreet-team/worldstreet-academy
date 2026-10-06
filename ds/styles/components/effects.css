@@ -1,0 +1,121 @@
+/* VENDORED from worldstreet/design-system by scripts/vendor.mjs. Don't edit: change the design system and re-run it. */
+/* ---- Effects [ext] — aurora, spotlight, border beam, grain, bento ---------
+   All colour comes from theme tokens, so every effect re-skins in light mode.
+   Everything here stops moving under prefers-reduced-motion (see bottom).     */
+
+/* Aurora v2. Aurora is LIGHT: bright cores that fall off fast into black.
+   Low-alpha ember over black reads as brown fog, so every layer here is a
+   small, high-luminance core (peach -> amber -> ember -> transparent) added
+   with screen blending, and most of the box stays dark on purpose.
+   Drop <div class="cx-aurora"></div> as the first child of a clipped box.   */
+.cx-aurora { position: absolute; inset: 0; z-index: -1; overflow: hidden; border-radius: inherit; pointer-events: none; isolation: isolate;
+  opacity: var(--cx-aurora-opacity); transition: opacity var(--cx-dur-slow) var(--cx-ease); }
+.cx-aurora::before, .cx-aurora::after { content: ""; position: absolute; will-change: transform; mix-blend-mode: var(--cx-aurora-blend); }
+
+/* Bloom: two drifting light pools, one high-left, one low-right */
+.cx-aurora::before {
+  width: 78%; aspect-ratio: 1.5; left: -12%; top: -26%; filter: blur(34px);
+  background: radial-gradient(closest-side, var(--cx-aurora-core), var(--cx-aurora-mid) 38%, var(--cx-aurora-edge) 66%, transparent);
+  animation: cx-aurora-a 17s var(--cx-ease-in-out) infinite alternate;
+}
+.cx-aurora::after {
+  width: 64%; aspect-ratio: 1.7; right: -16%; bottom: -30%; filter: blur(40px); opacity: .85;
+  background: radial-gradient(closest-side, var(--cx-aurora-mid), var(--cx-aurora-edge) 55%, transparent);
+  animation: cx-aurora-b 23s var(--cx-ease-in-out) infinite alternate;
+}
+
+/* Ribbon: northern-lights curtain. A bright band with fine vertical rays,
+   swaying and shimmering. The rays are what make it read as aurora. */
+.cx-aurora--ribbon::before {
+  width: 150%; left: -25%; top: 18%; height: 58%; aspect-ratio: auto; filter: blur(1.5px); transform-origin: 50% 100%;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 5px, rgba(255, 214, 196, .55) 6px, transparent 8px 13px),
+    linear-gradient(to top, transparent 0%, var(--cx-aurora-edge) 30%, var(--cx-aurora-mid) 62%, var(--cx-aurora-core) 80%, transparent 100%);
+  -webkit-mask: radial-gradient(60% 90% at 50% 70%, #000 30%, transparent 72%); mask: radial-gradient(60% 90% at 50% 70%, #000 30%, transparent 72%);
+  animation: cx-aurora-sway 13s var(--cx-ease-in-out) infinite alternate, cx-aurora-rays 6s linear infinite;
+}
+.cx-aurora--ribbon::after {
+  width: 90%; aspect-ratio: 3; left: 5%; right: auto; top: 48%; bottom: auto; filter: blur(38px); opacity: .7;
+  background: radial-gradient(closest-side, var(--cx-aurora-mid), var(--cx-aurora-edge) 60%, transparent);
+  animation: cx-aurora-b 19s var(--cx-ease-in-out) infinite alternate;
+}
+/* Low: one wide light pool rising from the bottom edge (heroes, CTAs) */
+.cx-aurora--low::before { width: 115%; aspect-ratio: 3; left: -8%; top: auto; bottom: -44%; filter: blur(40px); }
+.cx-aurora--low::after { width: 52%; aspect-ratio: 2.4; right: 6%; bottom: -24%; filter: blur(28px); }
+/* Quiet until hovered or focused, for grids */
+.cx-aurora--hover { opacity: 0; }
+:hover > .cx-aurora--hover, :focus-visible > .cx-aurora--hover { opacity: var(--cx-aurora-opacity); }
+
+@keyframes cx-aurora-a {
+  0%   { transform: translate(0, 0) rotate(0deg) scale(1); }
+  50%  { transform: translate(14%, 10%) rotate(12deg) scale(1.08); }
+  100% { transform: translate(6%, 22%) rotate(-6deg) scale(.96); }
+}
+@keyframes cx-aurora-b {
+  0%   { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(-18%, -12%) scale(1.12); }
+}
+@keyframes cx-aurora-sway {
+  0%   { transform: skewX(-8deg) translateX(-4%) scaleY(.92); }
+  100% { transform: skewX(9deg) translateX(5%) scaleY(1.06); }
+}
+@keyframes cx-aurora-rays { to { background-position: 26px 0, 0 0; } }
+
+/* Aurora chart ("ridge"): the balance history drawn as the aurora itself.
+   Rendered by <AuroraChart>. Rays shimmer; the line draws once on load. */
+.cx-ridge { display: block; width: 100%; overflow: visible; }
+.cx-ridge .glow { filter: blur(14px); opacity: .9; mix-blend-mode: var(--cx-aurora-blend); }
+.cx-ridge .line { fill: none; stroke: var(--cx-ridge-line); stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke;
+  stroke-dasharray: 1; stroke-dashoffset: 1; animation: cx-ridge-draw 1.6s var(--cx-ease) .2s forwards; }
+.cx-ridge .rays { animation: cx-ridge-rays 5s linear infinite; }
+.cx-ridge .dot { fill: var(--cx-ridge-line); }
+.cx-ridge .dot-halo { fill: var(--cx-aurora-mid); opacity: .5; transform-box: fill-box; transform-origin: center; animation: cx-ridge-pulse 2.4s var(--cx-ease-in-out) infinite; }
+@keyframes cx-ridge-draw { to { stroke-dashoffset: 0; } }
+@keyframes cx-ridge-rays { to { transform: translateX(-12px); } }
+@keyframes cx-ridge-pulse { 0%, 100% { transform: scale(1); opacity: .5; } 50% { transform: scale(1.8); opacity: 0; } }
+
+/* Spotlight: a soft ember light + lit border that follow the cursor.
+   <SpotlightCard> (React) sets --mx/--my; without JS it simply stays dark. */
+.cx-spotlight { position: relative; isolation: isolate; }
+.cx-spotlight::before, .cx-spotlight::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  opacity: 0; transition: opacity var(--cx-dur) var(--cx-ease); }
+.cx-spotlight::before { z-index: -1; background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), var(--cx-spot), transparent 45%); }
+.cx-spotlight::after { padding: 1px; background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 50%), var(--cx-amber), transparent 60%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+.cx-spotlight:hover::before, .cx-spotlight:hover::after { opacity: 1; }
+/* In a group, the border light shows on every card as the cursor moves across */
+.cx-spotlight-group:hover .cx-spotlight::after { opacity: .6; }
+.cx-spotlight-group .cx-spotlight:hover::after { opacity: 1; }   /* the card under the cursor wins */
+
+/* Border beam: a spark of light that travels round the edge (featured plan, live state) */
+@property --cx-beam-angle { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+.cx-beam { position: relative; isolation: isolate; }
+.cx-beam::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.5px; pointer-events: none; z-index: 1;
+  background: conic-gradient(from var(--cx-beam-angle), transparent 0 72%, var(--cx-ember) 84%, var(--cx-amber) 92%, var(--cx-peach) 96%, transparent 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: cx-beam 5s linear infinite; }
+.cx-beam--slow::before { animation-duration: 9s; }
+@keyframes cx-beam { to { --cx-beam-angle: 360deg; } }
+
+/* Grain: fine film noise over a surface (the site's hero texture) */
+.cx-grain { position: relative; }
+.cx-grain::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: var(--cx-grain-opacity); mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+
+/* Shine text: a slow light sweep across a gradient headline */
+.cx-shine { background-image: linear-gradient(100deg, rgba(var(--cx-fg-rgb), .55) 20%, rgb(var(--cx-fg-rgb)) 40%, var(--cx-peach) 50%, rgb(var(--cx-fg-rgb)) 60%, rgba(var(--cx-fg-rgb), .55) 80%);
+  background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: cx-shine 7s linear infinite; }
+@keyframes cx-shine { from { background-position: 125% 0; } to { background-position: -125% 0; } }
+
+/* Bento: 6-column feature grid; collapses to 2 then 1 */
+.cx-bento { display: grid; grid-template-columns: repeat(6, 1fr); grid-auto-rows: minmax(200px, auto); gap: var(--cx-gap); }
+.cx-bento > * { grid-column: span 2; min-width: 0; }
+.cx-bento > .span-3 { grid-column: span 3; } .cx-bento > .span-4 { grid-column: span 4; } .cx-bento > .span-6 { grid-column: span 6; }
+.cx-bento > .tall { grid-row: span 2; }
+@media (max-width: 999px) { .cx-bento { grid-template-columns: repeat(2, 1fr); } .cx-bento > *, .cx-bento > [class*="span-"] { grid-column: span 1; } .cx-bento > .span-6, .cx-bento > .span-4 { grid-column: span 2; } }
+@media (max-width: 640px) { .cx-bento { grid-template-columns: 1fr; } .cx-bento > *, .cx-bento > [class*="span-"] { grid-column: span 1; } .cx-bento > .tall { grid-row: auto; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .cx-aurora::before, .cx-aurora::after, .cx-beam::before, .cx-shine, .cx-ridge .rays, .cx-ridge .dot-halo { animation: none !important; }
+  .cx-ridge .line { animation: none; stroke-dashoffset: 0; }
+}

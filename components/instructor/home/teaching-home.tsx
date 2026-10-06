@@ -1,7 +1,8 @@
 "use client"
+import { RotateCcw } from "@/components/icons"
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
-import { RotateCcw } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
 import { CardShell, Rise, Skel, SkeletonRows } from "@/components/ui/system"
 import { getTeachingHome } from "@/lib/actions/teaching-home"

@@ -1,3 +1,4 @@
+import { ArrowLeft, Pencil } from "@/components/icons"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -5,7 +6,7 @@ import { Topbar } from "@/components/platform/topbar"
 import { PageHeader } from "@/components/shared/page-header"
 import { fetchCourseForEdit } from "@/lib/actions/instructor"
 import { LessonManager } from "@/components/instructor/lesson-manager"
-import { ArrowLeft, Pencil } from "lucide-react"
+
 import { PACKAGE_KEYS } from "@/lib/entitlements"
 
 export default async function CourseLessonsPage({

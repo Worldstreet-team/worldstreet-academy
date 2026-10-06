@@ -1,4 +1,5 @@
 "use client"
+import { CheckIcon, ChevronDownIcon, ChevronLeftIcon, CopyIcon, EyeIcon, FileIcon, PlusIcon, SendIcon, SquarePenIcon, Trash2Icon, VideoIcon } from "@/components/icons"
 
 import { useActionState, useState } from "react"
 import Link from "next/link"
@@ -39,7 +40,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useUser } from "@/components/providers/user-provider"
 import type { Lesson, CourseLevel, CoursePricing, CourseStatus } from "@/lib/types"
-import { CheckIcon, ChevronDownIcon, ChevronLeftIcon, CopyIcon, EyeIcon, FileIcon, PlusIcon, SendIcon, SquarePenIcon, Trash2Icon, VideoIcon } from "lucide-react"
+
 import { RenderIcon } from "@/components/shared/render-icon"
 import { SCHOOLS, type SchoolSlug } from "@/lib/schools"
 import type { CourseKind, CourseReviewStatus, ICoursePackage, PackageKey } from "@/lib/db/models"
@@ -420,7 +421,7 @@ export function CourseEditor({
 
             <DropdownMenu>
               <DropdownMenuTrigger
-                className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-sm bg-ws-brand px-4 text-sm font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90 disabled:opacity-50"
+                className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-full bg-ws-brand px-4 text-sm font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90 disabled:opacity-50"
               >
                 {isPending ? "Saving…" : "Save"}
                 <ChevronDownIcon  size={14} />

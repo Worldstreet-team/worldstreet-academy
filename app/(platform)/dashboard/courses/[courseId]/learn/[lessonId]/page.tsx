@@ -1,6 +1,7 @@
+import { ArrowLeft, InfoIcon, UsersIcon } from "@/components/icons"
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
-import { ArrowLeft, InfoIcon, UsersIcon } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"

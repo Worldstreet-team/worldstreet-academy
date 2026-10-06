@@ -1,0 +1,11 @@
+/* VENDORED from worldstreet/design-system by scripts/vendor.mjs. Don't edit: change the design system and re-run it. */
+/* ---- Alert, banner [ext] ------------------------------------------------ */
+.cx-alert { display: flex; gap: 12px; align-items: flex-start; padding: 16px 18px; border-radius: var(--cx-r-md); background: var(--cx-info-wash); font-size: 15px; line-height: 1.5; color: var(--cx-text); }
+.cx-alert b { font-weight: 500; display: block; }
+.cx-alert > svg { width: 20px; height: 20px; flex: none; margin-top: 1px; fill: none; stroke: currentColor; stroke-width: 1.8; color: var(--cx-info); }
+.cx-alert .cx-btn { margin-left: auto; align-self: center; }
+.cx-alert--gain { background: var(--cx-gain-wash); } .cx-alert--gain > svg { color: var(--cx-gain); }
+.cx-alert--loss { background: var(--cx-loss-wash); } .cx-alert--loss > svg { color: var(--cx-loss); }
+.cx-alert--warning { background: var(--cx-warning-wash); } .cx-alert--warning > svg { color: var(--cx-warning); }
+.cx-banner { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; padding: 10px var(--cx-gutter); font-size: 14px;
+  background: var(--cx-brand-wash); color: var(--cx-text); text-align: center; }

@@ -1,8 +1,9 @@
 "use client"
+import { MoonIcon, SunIcon } from "@/components/icons"
 
 import { useTheme } from "next-themes"
 import { cn } from "@/lib/utils"
-import { MoonIcon, SunIcon } from "lucide-react"
+
 
 export function ThemeToggle({ className }: { className?: string }) {
   const { resolvedTheme, setTheme } = useTheme()

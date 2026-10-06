@@ -1,10 +1,11 @@
 "use client"
+import { CheckIcon, Trash2Icon, UploadIcon } from "@/components/icons"
 
 import { useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { saveSignature } from "@/lib/actions/signature"
 import { getImageUploadUrl } from "@/lib/actions/upload"
-import { CheckIcon, Trash2Icon, UploadIcon } from "lucide-react"
+
 
 export function InstructorSignatureUpload({
   currentSignatureUrl,

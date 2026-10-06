@@ -1,6 +1,7 @@
+import { Glyph, Store01Icon } from "@/components/icons"
 import type { Metadata } from "next"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { Store01Icon } from "@hugeicons/core-free-icons"
+
+
 import { Topbar } from "@/components/platform/topbar"
 import { SellerApplyPanel } from "@/components/sell/seller-apply-panel"
 import { getMySellerApplication } from "@/lib/actions/seller-applications"
@@ -24,7 +25,7 @@ export default async function SellApplyPage() {
       <div className="mx-auto w-full max-w-2xl space-y-8 px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-8 sm:px-6 md:pb-12 md:pt-10">
         <header className="space-y-3 text-center">
           <div className="mx-auto flex size-12 items-center justify-center rounded-[14px] bg-primary/[0.12] text-primary">
-            <HugeiconsIcon icon={Store01Icon} className="size-6" />
+            <Glyph icon={Store01Icon} className="size-6" />
           </div>
           <h1 className="font-display text-[28px] font-semibold tracking-[-0.02em] text-foreground">
             Sell on the marketplace

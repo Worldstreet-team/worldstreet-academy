@@ -1,0 +1,66 @@
+/* VENDORED from worldstreet/design-system by scripts/vendor.mjs. Don't edit: change the design system and re-run it. */
+/* ---- Animate [ext]: scroll-linked motion, bursts, ripples, flips ----------
+   Same rules as motion.css: transform / opacity / filter only, springs from
+   --cx-spring*, and stillness under prefers-reduced-motion (bottom).        */
+
+/* Scroll-linked: tied to scroll position by the browser (animation-timeline),
+   no JavaScript, no observers. Browsers without it simply show the content.  */
+@supports (animation-timeline: view()) {
+  /* Rises and resolves from blur as it enters, fully settled by a third of the way in */
+  .cx-scroll-rise { animation: cx-scroll-rise linear both; animation-timeline: view(); animation-range: entry 0% cover 32%; }
+  @keyframes cx-scroll-rise { from { opacity: 0; transform: translate3d(0, 56px, 0) scale(.97); filter: blur(8px); } to { opacity: 1; transform: none; filter: none; } }
+
+  /* Grows to full size as it scrolls in: big cards, screenshots, the pay card */
+  .cx-scroll-zoom { animation: cx-scroll-zoom linear both; animation-timeline: view(); animation-range: entry 0% cover 45%; }
+  @keyframes cx-scroll-zoom { from { transform: scale(.84); opacity: .35; } to { transform: none; opacity: 1; } }
+
+  /* Parallax: drifts against the scroll. --speed .1 (subtle) to .5 (deep) */
+  .cx-parallax { animation: cx-parallax linear both; animation-timeline: view(); }
+  @keyframes cx-parallax { from { transform: translate3d(0, calc(var(--speed, .2) * 160px), 0); } to { transform: translate3d(0, calc(var(--speed, .2) * -160px), 0); } }
+
+  /* Reading progress: a hairline of light across the top that fills with the page */
+  .cx-scroll-progress { position: fixed; inset: 0 0 auto; height: 2px; z-index: var(--cx-z-popover); pointer-events: none; transform-origin: 0 50%;
+    background: linear-gradient(90deg, var(--cx-aurora-edge), var(--cx-aurora-mid), var(--cx-aurora-core)); box-shadow: 0 0 12px rgba(var(--cx-accent-rgb), .6);
+    animation: cx-scroll-progress linear both; animation-timeline: scroll(root); }
+  @keyframes cx-scroll-progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+}
+@supports not (animation-timeline: view()) { .cx-scroll-progress { display: none; } }
+
+/* Burst: sparks of light thrown from a point: payment sent, goal hit, streak.
+   useBurst() places them at the click; each spark carries its own vector. */
+.cx-burst { position: fixed; left: 0; top: 0; width: 0; height: 0; z-index: var(--cx-z-toast); pointer-events: none; }
+.cx-burst > i { position: absolute; left: 0; top: 0; width: var(--s, 8px); height: var(--s, 8px); border-radius: 50%; translate: -50% -50%;
+  background: radial-gradient(circle, var(--cx-aurora-core), var(--cx-aurora-mid) 55%, transparent 72%);
+  animation: cx-burst var(--d, 900ms) cubic-bezier(.12, .8, .3, 1) forwards; }
+.cx-burst > i:nth-child(3n) { background: var(--cx-peach); border-radius: 2px; }
+.cx-burst > b { position: absolute; left: 0; top: 0; width: 120px; height: 120px; translate: -50% -50%; border-radius: 50%;
+  border: 1.5px solid var(--cx-aurora-mid); box-shadow: 0 0 24px rgba(var(--cx-accent-rgb), .55), inset 0 0 18px rgba(var(--cx-accent-rgb), .35);
+  animation: cx-burst-ring 700ms var(--cx-ease) forwards; }
+@keyframes cx-burst { 0% { transform: translate3d(0, 0, 0) scale(1); opacity: 1; } 70% { opacity: 1; } 100% { transform: translate3d(var(--x), var(--y), 0) scale(.2) rotate(var(--r, 0deg)); opacity: 0; } }
+@keyframes cx-burst-ring { from { transform: scale(.1); opacity: 1; } to { transform: scale(1.4); opacity: 0; } }
+
+/* Ripple: light spreading from where a surface was pressed. useRipple() */
+.cx-ripple-host { position: relative; overflow: hidden; isolation: isolate; }
+.cx-ripple { position: absolute; left: var(--x); top: var(--y); width: var(--size); aspect-ratio: 1; border-radius: 50%; pointer-events: none; z-index: 0;
+  translate: -50% -50%; background: radial-gradient(closest-side, rgba(var(--cx-accent-rgb), .38), rgba(var(--cx-accent-rgb), .12) 60%, transparent);
+  animation: cx-ripple 750ms var(--cx-ease) forwards; }
+@keyframes cx-ripple { from { transform: scale(0); opacity: 1; } to { transform: scale(1); opacity: 0; } }
+
+/* Flip: a card with two faces that turns on the bouncy spring. <FlipCard front back /> */
+.cx-flip { perspective: 1200px; display: grid; cursor: pointer; border-radius: var(--cx-r-card); -webkit-tap-highlight-color: transparent; }
+.cx-flip__inner { display: grid; transform-style: preserve-3d; transition: transform 1s var(--cx-spring-bouncy); border-radius: inherit; }
+.cx-flip.is-flipped .cx-flip__inner { transform: rotateY(180deg); }
+.cx-flip__face { grid-area: 1 / 1; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: inherit; outline: 1px solid transparent; }
+.cx-flip__face--back { transform: rotateY(180deg); }
+.cx-flip:focus-visible { outline: none; box-shadow: var(--cx-focus-ring); }
+
+/* Scramble: characters settle out of noise (<ScrambleText>). Tabular so width holds. */
+.cx-scramble { font-variant-numeric: tabular-nums; }
+.cx-scramble .n { color: var(--cx-ember-text); opacity: .7; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cx-scroll-rise, .cx-scroll-zoom, .cx-parallax { animation: none !important; opacity: 1; transform: none; filter: none; }
+  .cx-scroll-progress { display: none; }
+  .cx-burst, .cx-ripple { display: none; }
+  .cx-flip__inner { transition: none; }
+}

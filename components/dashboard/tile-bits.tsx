@@ -1,7 +1,6 @@
+import { Glyph, ArrowRight01Icon, type IconComponent } from "@/components/icons"
 import type * as React from "react"
 import Link from "next/link"
-import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react"
-import { ArrowRight01Icon } from "@hugeicons/core-free-icons"
 import { CardShell, Skel, SkeletonRows } from "@/components/ui/system"
 
 /* Shared grammar for the student home's tiles (design-system 04: ListRow rows
@@ -10,9 +9,9 @@ import { CardShell, Skel, SkeletonRows } from "@/components/ui/system"
 export type Glyph = React.ComponentType<{ className?: string }>
 
 /** A Hugeicons glyph as the kit's `icon` prop — components/ui/system.tsx takes a component. Call at module scope. */
-export function glyph(icon: IconSvgElement): Glyph {
+export function glyph(icon: IconComponent): Glyph {
   function IconGlyph({ className }: { className?: string }) {
-    return <HugeiconsIcon icon={icon} className={className} aria-hidden />
+    return <Glyph icon={icon} className={className} aria-hidden />
   }
   return IconGlyph
 }
@@ -32,7 +31,7 @@ export const TILE_FOOT_LINK =
 export const DATA_CHIP = "flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-foreground/[0.05]"
 
 export function Chevron() {
-  return <HugeiconsIcon icon={ArrowRight01Icon} className="h-4 w-4 shrink-0 text-muted-foreground/70" aria-hidden />
+  return <Glyph icon={ArrowRight01Icon} className="h-4 w-4 shrink-0 text-muted-foreground/70" aria-hidden />
 }
 
 /**

@@ -1,9 +1,10 @@
 "use client"
+import { ArrowRightIcon, ChevronDownIcon } from "@/components/icons"
 
 import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowRightIcon, ChevronDownIcon } from "lucide-react"
+
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { SchoolIcon } from "@/components/shared/school-icon"
 import { SCHOOLS, type School, type SchoolSlug } from "@/lib/schools"

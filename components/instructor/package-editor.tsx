@@ -1,4 +1,5 @@
 "use client"
+import { PlusIcon, Trash2Icon } from "@/components/icons"
 
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -15,7 +16,7 @@ import {
 } from "@/components/ui/select"
 import type { ICoursePackage, IPackageEntitlements, PackageKey } from "@/lib/db/models"
 import { PACKAGE_KEYS, PACKAGE_LABEL } from "@/lib/entitlements"
-import { PlusIcon, Trash2Icon } from "lucide-react"
+
 
 /**
  * Editor-side row for one package. Mirrors ICoursePackage except that

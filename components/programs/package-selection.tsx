@@ -1,8 +1,9 @@
 "use client"
+import { ArrowRightIcon } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
-import { ArrowRightIcon } from "lucide-react"
+
 import type { PublicPackage } from "@/lib/actions/student"
 import type { PackageKey } from "@/lib/db/models"
 import { PACKAGE_LABEL } from "@/lib/entitlements"

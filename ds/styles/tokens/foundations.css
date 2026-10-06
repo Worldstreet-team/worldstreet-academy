@@ -1,0 +1,78 @@
+/* VENDORED from worldstreet/design-system by scripts/vendor.mjs. Don't edit: change the design system and re-run it. */
+/* Theme-independent foundations: type ramp, spacing, layout, radii, controls, z-index, motion. */
+
+/* ---- Theme-independent foundations -------------------------------------- */
+:root {
+  /* Typography [site] */
+  --cx-font:          var(--font-manrope, "Manrope"), system-ui, sans-serif;  /* next/font sets --font-manrope */
+  --cx-font-mono:     ui-monospace, "SF Mono", "Cascadia Code", monospace;  /* [ext] addresses, hashes */
+  --cx-font-features: "blwf" on, "cv09" on, "cv03" on, "cv04" on, "cv11" on;
+  --cx-h1:  64px;  --cx-h1-ls: -2.5px;  --cx-h1-lh: 1.2;
+  --cx-h2:  52px;  --cx-h2-ls: -0.5px;  --cx-h2-lh: 1.2;
+  --cx-h3:  32px;  --cx-h3-ls: -0.5px;  --cx-h3-lh: 41px;
+  --cx-h4:  22px;  --cx-h4-ls: -0.4px;  --cx-h4-lh: 1.3;     /* [ext] panel titles */
+  --cx-lead: 20px; --cx-lead-ls: -0.3px; --cx-lead-lh: 27px;
+  --cx-body-lg: 18px; --cx-body-lg-ls: -0.2px; --cx-body-lg-lh: 1.5;
+  --cx-body: 16px; --cx-body-ls: -0.2px; --cx-body-lh: 1.7;
+  --cx-small: 14px; --cx-small-ls: -0.02em; --cx-small-lh: 1.9;
+  --cx-caption: 12px; --cx-caption-ls: 0.02em;               /* [ext] labels, axis ticks */
+  --cx-balance: clamp(40px, 5vw, 56px);                      /* [ext] 300 weight, −2px */
+
+  /* Spacing scale [ext] — 4px base; site values 24/30/100 sit on it */
+  --cx-s-1: 4px;  --cx-s-2: 8px;  --cx-s-3: 12px; --cx-s-4: 16px; --cx-s-5: 20px;
+  --cx-s-6: 24px; --cx-s-7: 32px; --cx-s-8: 40px; --cx-s-9: 48px; --cx-s-10: 64px;
+  --cx-s-11: 80px; --cx-s-12: 100px; --cx-s-13: 120px;
+
+  /* Layout [site] */
+  --cx-container: 1320px;
+  --cx-container-narrow: 760px;   /* [ext] forms, reading */
+  --cx-gutter:    30px;
+  --cx-section:   100px;
+  --cx-card-pad:  24px;
+  --cx-gap:       24px;
+  --cx-nav-h:     107px;          /* fixed nav incl. padding */
+  --cx-sidebar-w: 264px;          /* [ext] */
+
+  /* Radii [site] */
+  --cx-r-xs:    6px;    /* [ext] checkboxes, kbd */
+  --cx-r-sm:    8px;
+  --cx-r-icon:  12px;
+  --cx-r-md:    16px;
+  --cx-r-card:  20px;
+  --cx-r-lg:    30px;
+  --cx-r-pill:  100px;
+
+  /* Controls [ext] */
+  --cx-control-h:    48px;
+  --cx-control-h-sm: 36px;
+  --cx-control-h-lg: 56px;
+  --cx-touch:        44px;        /* minimum hit target */
+
+  /* Effects [site] */
+  --cx-blur-nav:   blur(16px);
+  --cx-blur-glass: blur(20px);
+  --cx-glow-blur:  blur(100px);
+
+  /* Z-index scale [ext] */
+  --cx-z-base: 0; --cx-z-raised: 10; --cx-z-sticky: 100; --cx-z-nav: 200;
+  --cx-z-drawer: 300; --cx-z-modal: 400; --cx-z-popover: 500; --cx-z-toast: 600; --cx-z-tooltip: 700;
+
+  /* Motion [ext] */
+  --cx-ease:      cubic-bezier(0.22, 1, 0.36, 1);
+  --cx-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --cx-dur-fast:  140ms;
+  --cx-dur:       240ms;
+  --cx-dur-slow:  600ms;
+  --cx-rise:      24px;
+  /* Springs, sampled from spring physics into CSS linear(): natural motion, no JS loop.
+     smooth = critically damped (reveals, rolls) · snappy = UI state · bouncy = 12% overshoot (pops) */
+  --cx-spring:        linear(0, 0.0265, 0.0902, 0.1734, 0.2642, 0.3554, 0.4422, 0.5221, 0.594, 0.6575, 0.7127, 0.7603, 0.8009, 0.8352, 0.8641, 0.8883, 0.9084, 0.9251, 0.9389, 0.9503, 0.9596, 0.9672, 0.9734, 0.9785, 0.9826, 0.986, 0.9887, 0.9909, 0.9927, 0.9941, 0.9953, 0.9962, 0.997, 0.9976, 0.9981, 0.9985, 1);
+  --cx-spring-snappy: linear(0, 0.0616, 0.1912, 0.3374, 0.4751, 0.594, 0.6916, 0.7689, 0.8288, 0.8743, 0.9084, 0.9337, 0.9523, 0.9658, 0.9756, 0.9826, 0.9877, 0.9913, 0.9939, 0.9957, 0.997, 0.9979, 0.9985, 0.999, 0.9993, 0.9995, 0.9997, 0.9998, 0.9998, 0.9999, 1);
+  --cx-spring-bouncy: linear(0, 0.0341, 0.1219, 0.2437, 0.3828, 0.5256, 0.6619, 0.7845, 0.8891, 0.9736, 1.0377, 1.0827, 1.1106, 1.124, 1.1258, 1.1191, 1.1063, 1.09, 1.0722, 1.0543, 1.0375, 1.0227, 1.0103, 1.0005, 0.9932, 0.9882, 0.9853, 0.9841, 0.9843, 0.9854, 0.9872, 0.9893, 0.9916, 0.9938, 0.9959, 0.9977, 0.9991, 1.0003, 1.0011, 1.0016, 1);
+  --cx-dur-reveal:    900ms;
+  --cx-stagger:       60ms;
+  --cx-reveal-blur:   8px;
+
+  /* Breakpoints (reference — CSS vars can't drive @media):
+     mobile < 768 · tablet 768–1199 · desktop ≥ 1200  [site] */
+}

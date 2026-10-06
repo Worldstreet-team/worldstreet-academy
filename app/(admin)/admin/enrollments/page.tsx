@@ -1,4 +1,5 @@
 "use client"
+import { DownloadIcon, GraduationCapIcon, MoreHorizontal, XIcon } from "@/components/icons"
 
 import * as React from "react"
 import { Suspense } from "react"
@@ -56,7 +57,7 @@ import {
 } from "@/components/admin/shared"
 import { PACKAGE_KEYS, PACKAGE_LABEL } from "@/lib/entitlements"
 import type { PackageKey } from "@/lib/db/models"
-import { DownloadIcon, GraduationCapIcon, MoreHorizontal, XIcon } from "lucide-react"
+
 
 const ENROLLMENT_FILTERS = [
   { value: "all", label: "All" },

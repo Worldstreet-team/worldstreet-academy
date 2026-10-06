@@ -1,10 +1,11 @@
 "use client"
+import { Glyph, CheckmarkCircle02Icon, Clock01Icon, Store01Icon } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { CheckmarkCircle02Icon, Clock01Icon, Store01Icon } from "@hugeicons/core-free-icons"
+
+
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -72,7 +73,7 @@ function StatusPanel({
   return (
     <section className={`${PANEL} space-y-4 p-6 text-center sm:p-8`}>
       <div className="mx-auto flex size-11 items-center justify-center rounded-[12px] bg-primary/[0.12] text-primary">
-        <HugeiconsIcon icon={icon} className="size-5" />
+        <Glyph icon={icon} className="size-5" />
       </div>
       <div className="space-y-1.5">
         <p className="text-[15px] font-semibold text-foreground">{title}</p>
@@ -215,7 +216,7 @@ function ApplicationForm({
         <ul className="space-y-1.5">
           {QUALITY_CRITERIA.map((c) => (
             <li key={c.title} className="flex gap-2 text-[13px] leading-relaxed text-muted-foreground">
-              <HugeiconsIcon icon={CheckmarkCircle02Icon} className="mt-0.5 size-4 shrink-0 text-primary" />
+              <Glyph icon={CheckmarkCircle02Icon} className="mt-0.5 size-4 shrink-0 text-primary" />
               <span>
                 <span className="font-medium text-foreground">{c.title}.</span> {c.body}
               </span>

@@ -30,7 +30,7 @@ import { plural, type IndexSchool } from "./model"
  * type. Reduced motion: no unveil, no drift; the dimming stays (it carries
  * meaning, and it is opacity only).
  *
- * The tiles are dark islands (`data-ws-theme="platform"`): the renders are
+ * The tiles are dark islands (`data-theme="dark"` + `data-brand`): the renders are
  * dark in both modes, so the ink over them keeps the dark palette.
  */
 
@@ -116,7 +116,8 @@ function Tile({
             e.preventDefault()
             onJump(school.slug)
           }}
-          data-ws-theme="platform"
+          data-theme="dark"
+          data-brand="worldstreet"
           aria-label={`${school.name} · ${count === 0 ? "programs coming soon" : plural(count, "program")}`}
           className="group relative block aspect-[4/5] overflow-hidden rounded-[12px] bg-ws-sunken text-ws-primary outline-none sm:rounded-[16px]"
         >

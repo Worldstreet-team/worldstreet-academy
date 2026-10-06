@@ -1,4 +1,5 @@
 "use client"
+import { XIcon } from "@/components/icons"
 
 import * as React from "react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
@@ -6,7 +7,7 @@ import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { cn } from "@/lib/utils"
 import { useMediaQuery } from "@/lib/hooks/use-media-query"
 import { Button } from "@/components/ui/button"
-import { XIcon } from "lucide-react"
+
 
 /* ─── Context to share viewport mode with children ─── */
 const DesktopContext = React.createContext(true)

@@ -1,4 +1,5 @@
-import { CheckIcon } from "lucide-react"
+import { CheckIcon } from "@/components/icons"
+
 
 /**
  * Sales-layer sections shared by both course detail pages: "What you'll

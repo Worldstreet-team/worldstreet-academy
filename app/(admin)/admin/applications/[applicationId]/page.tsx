@@ -1,4 +1,5 @@
 "use client"
+import { Ban } from "@/components/icons"
 
 import * as React from "react"
 import { useParams } from "next/navigation"
@@ -18,7 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { Ban } from "lucide-react"
+
 import { useUser } from "@/components/providers/user-provider"
 import {
   adminGetApplication,

@@ -1,8 +1,9 @@
 "use client"
+import { ExternalLinkIcon, StoreIcon } from "@/components/icons"
 
 import * as React from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { ExternalLinkIcon, StoreIcon } from "lucide-react"
+
 import { Topbar } from "@/components/platform/topbar"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"

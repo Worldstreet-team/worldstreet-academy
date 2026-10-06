@@ -1,4 +1,5 @@
 "use client"
+import { CalendarDaysIcon, ChevronRightIcon, ClockIcon, MessageSquareIcon, UsersIcon, VideoIcon } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
@@ -10,7 +11,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
 import { getMyMeetings, getMyMeetingInvites, type MeetingWithDetails, type MeetingInviteItem } from "@/lib/actions/meetings"
 import { getConversations, type ConversationWithDetails } from "@/lib/actions/messages"
-import { CalendarDaysIcon, ChevronRightIcon, ClockIcon, MessageSquareIcon, UsersIcon, VideoIcon } from "lucide-react"
+
 
 /* ── Status badge helper ── */
 function MeetingStatusBadge({ status }: { status: string }) {

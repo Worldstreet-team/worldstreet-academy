@@ -1,4 +1,5 @@
 "use client"
+import { BookIcon, ClipboardListIcon, DownloadIcon, FileIcon, LinkIcon, LoaderCircleIcon, LockIcon, PresentationIcon } from "@/components/icons"
 
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
@@ -6,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { listCourseResources, getResourceDownloadUrl } from "@/lib/actions/resources"
 import type { ResourceKind } from "@/lib/db/models/resource"
-import { BookIcon, ClipboardListIcon, DownloadIcon, FileIcon, LinkIcon, LoaderCircleIcon, LockIcon, PresentationIcon } from "lucide-react"
+
 import { RenderIcon } from "@/components/shared/render-icon"
 
 const KIND_ICON: Record<ResourceKind, typeof FileIcon> = {

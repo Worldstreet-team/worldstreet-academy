@@ -1,4 +1,5 @@
 "use client"
+import { StarIcon } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
@@ -11,7 +12,7 @@ import {
   useTransform,
   type MotionValue,
 } from "motion/react"
-import { StarIcon } from "lucide-react"
+
 import { cn } from "@/lib/utils"
 import { Reveal, RevealGroup } from "@/components/marketing/motion/reveal"
 import { useMediaQuery, useMotionOK } from "@/components/marketing/motion/bus"
@@ -404,21 +405,21 @@ export function FinaleCta({
           >
             <Link
               href="/schools"
-              className="inline-flex h-12 items-center justify-center rounded-sm bg-ws-brand px-9 text-[15px] font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90"
+              className="inline-flex h-12 items-center justify-center rounded-full bg-ws-brand px-9 text-[15px] font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90"
             >
               Explore programs
             </Link>
             {signedIn ? (
               <Link
                 href="/dashboard/courses"
-                className="inline-flex h-12 items-center justify-center rounded-sm border border-ws-hairline px-8 text-[15px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:border-ws-brand/40 hover:text-ws-gold"
+                className="inline-flex h-12 items-center justify-center rounded-full border border-ws-hairline px-8 text-[15px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:border-ws-brand/40 hover:text-ws-gold"
               >
                 Enrol now
               </Link>
             ) : (
               <a
                 href={registerUrl}
-                className="inline-flex h-12 items-center justify-center rounded-sm border border-ws-hairline px-8 text-[15px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:border-ws-brand/40 hover:text-ws-gold"
+                className="inline-flex h-12 items-center justify-center rounded-full border border-ws-hairline px-8 text-[15px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:border-ws-brand/40 hover:text-ws-gold"
               >
                 Enrol now
               </a>

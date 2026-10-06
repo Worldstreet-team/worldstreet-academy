@@ -1,6 +1,7 @@
+import { ArrowRightIcon } from "@/components/icons"
 import Link from "next/link"
 import Image from "next/image"
-import { ArrowRightIcon } from "lucide-react"
+
 import type { BrowseCourse } from "@/lib/actions/student"
 import { courseAvailability } from "@/lib/types/course"
 import { levelChipStyle } from "@/components/shared/level-badge"

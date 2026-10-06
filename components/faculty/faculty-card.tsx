@@ -1,5 +1,5 @@
+import { ArrowRightIcon } from "@/components/icons"
 import Link from "next/link"
-import { ArrowRightIcon } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import type { FacultyMember } from "@/lib/actions/student"
 import { countryName } from "@/lib/countries"

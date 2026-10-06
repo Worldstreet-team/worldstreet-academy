@@ -1,0 +1,12 @@
+/* VENDORED from worldstreet/design-system by scripts/vendor.mjs. Don't edit: change the design system and re-run it. */
+/* ==========================================================================
+   Cryonix tokens: entry point. Order matters: raw themes, then derived, then the rest.
+   [site] = measured on cryonix.framer.website, [ext] = our extension.
+   Dark = default (:root, .cx-dark, [data-theme="dark"]);
+   light = .cx-light / [data-theme="light"]. Themes can nest.
+   ========================================================================== */
+@import "./themes/dark.css";
+@import "./themes/light.css";
+@import "./derived.css";
+@import "./foundations.css";
+@import "./responsive.css";

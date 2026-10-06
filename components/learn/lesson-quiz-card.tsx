@@ -1,4 +1,5 @@
 "use client"
+import { CircleCheckBigIcon, ClockIcon } from "@/components/icons"
 
 import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
@@ -6,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { getStudentExamStatus } from "@/lib/actions/exams"
 import { queryKeys } from "@/lib/hooks/queries/keys"
-import { CircleCheckBigIcon, ClockIcon } from "lucide-react"
+
 import { RenderIcon } from "@/components/shared/render-icon"
 
 /**

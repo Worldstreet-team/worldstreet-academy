@@ -1,4 +1,5 @@
 "use client"
+import { ClockIcon, FileBadgeIcon } from "@/components/icons"
 
 import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
@@ -7,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { getStudentExamStatus } from "@/lib/actions/exams"
 import { queryKeys } from "@/lib/hooks/queries/keys"
-import { ClockIcon, FileBadgeIcon } from "lucide-react"
+
 import { PackageLockNotice } from "@/components/learn/package-lock-notice"
 
 /**

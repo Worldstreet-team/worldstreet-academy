@@ -1,14 +1,6 @@
+import { AwardIcon, CalendarClockIcon, ChevronRightIcon, ListVideoIcon, MonitorPlayIcon, ChartNoAxesColumnIncreasingIcon, SquarePlayIcon, UsersIcon } from "@/components/icons"
 import Link from "next/link"
-import {
-  AwardIcon,
-  CalendarClockIcon,
-  ChevronRightIcon,
-  ListVideoIcon,
-  MonitorPlayIcon,
-  ChartNoAxesColumnIncreasingIcon,
-  SquarePlayIcon,
-  UsersIcon,
-} from "lucide-react"
+
 import type { ProgramDetail } from "@/lib/actions/student"
 import { SCHOOL_BY_SLUG } from "@/lib/schools"
 import { ACADEMY_FACULTY, FACULTY_PUBLIC, facultyHref } from "@/lib/faculty"

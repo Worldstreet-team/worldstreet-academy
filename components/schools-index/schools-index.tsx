@@ -1,8 +1,9 @@
 "use client"
+import { ArrowRightIcon, PlayIcon, SearchXIcon } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
-import { ArrowRightIcon, PlayIcon, SearchXIcon } from "lucide-react"
+
 import type { SchoolSlug } from "@/lib/schools"
 import { BRAND } from "@/lib/brand"
 import { Segmented } from "@/components/ui/system"

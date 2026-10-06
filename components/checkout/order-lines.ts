@@ -1,11 +1,5 @@
-import {
-  AwardIcon,
-  ClipboardCheckIcon,
-  HandshakeIcon,
-  MessagesSquareIcon,
-  RadioIcon,
-  type LucideIcon,
-} from "lucide-react"
+import { AwardIcon, ClipboardCheckIcon, HandshakeIcon, MessagesSquareIcon, RadioIcon, type IconComponent } from "@/components/icons"
+
 import type { ProgramDetail, PublicPackage } from "@/lib/actions/student"
 import type { IPackageEntitlements, PackageKey } from "@/lib/db/models"
 import { PACKAGE_LABEL } from "@/lib/entitlements"
@@ -63,7 +57,7 @@ export function splitFeatures(features: string[]): { lead: string | null; rest: 
   return { lead: null, rest: features }
 }
 
-export type Service = { key: keyof IPackageEntitlements; label: string; icon: LucideIcon }
+export type Service = { key: keyof IPackageEntitlements; label: string; icon: IconComponent }
 
 /** The services a package can grant, in the order a buyer climbs them. */
 const SERVICES: readonly Service[] = [

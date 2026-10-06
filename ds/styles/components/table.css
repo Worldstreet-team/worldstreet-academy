@@ -1,0 +1,30 @@
+/* VENDORED from worldstreet/design-system by scripts/vendor.mjs. Don't edit: change the design system and re-run it. */
+/* ---- Table / list [ext] ------------------------------------------------- */
+.cx-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.cx-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.cx-table th { text-align: left; font-weight: 400; font-size: 13px; color: var(--cx-text-muted); padding: 0 16px 12px; border-bottom: 1px solid var(--cx-hairline); white-space: nowrap; }
+.cx-table th[aria-sort] { cursor: pointer; user-select: none; }
+/* Sortable header: put a <button> inside the th so it's keyboard-operable */
+.cx-table th > button { all: unset; cursor: pointer; border-radius: 4px; font: inherit; color: inherit; }
+.cx-table th > button:hover { color: var(--cx-text); }
+.cx-table th > button:focus-visible { box-shadow: var(--cx-focus-ring); }
+.cx-table th[aria-sort]::after { content: " ↕"; opacity: .4; }
+.cx-table th[aria-sort="ascending"]::after { content: " ↑"; opacity: 1; }
+.cx-table th[aria-sort="descending"]::after { content: " ↓"; opacity: 1; }
+.cx-table td { padding: 16px; border-bottom: 1px solid var(--cx-hairline); font-size: 15px; }
+.cx-table tr:last-child td { border-bottom: 0; }
+.cx-table tbody tr { transition: background var(--cx-dur-fast); }
+.cx-table tbody tr:hover { background: var(--cx-row-hover); }
+.cx-table tbody tr[aria-selected="true"] { background: var(--cx-brand-wash); }
+.cx-table .r { text-align: right; }
+.cx-asset { display: flex; align-items: center; gap: 12px; white-space: nowrap; }
+.cx-asset i { width: 36px; height: 36px; flex: none; border-radius: 10px; background: var(--cx-surface-3); display: grid; place-items: center; font-style: normal; font-size: 13px; font-weight: 500; }
+.cx-asset small { display: block; font-size: 13px; color: var(--cx-text-muted); }
+.cx-list { list-style: none; padding: 0; margin: 0; }
+.cx-list-row { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--cx-hairline); min-height: 64px; }
+.cx-list-row:last-child { border-bottom: 0; }
+.cx-list-row .main { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.cx-list-row .main strong { font-weight: 500; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cx-list-row .main small { font-size: 13px; color: var(--cx-text-muted); }
+.cx-list-row .end { text-align: right; display: grid; gap: 2px; font-variant-numeric: tabular-nums; }
+.cx-list-row .end small { font-size: 13px; }

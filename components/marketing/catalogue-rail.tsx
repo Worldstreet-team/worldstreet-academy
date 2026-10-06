@@ -1,9 +1,10 @@
 "use client"
+import { ChevronLeftIcon, ChevronRightIcon } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
 import { motion, useScroll, useSpring, useTransform, type MotionValue } from "motion/react"
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
+
 import { MarketingCourseCard } from "@/components/marketing/course-card"
 import { Marquee } from "@/components/marketing/motion/marquee"
 import { useMediaQuery, useMotionOK } from "@/components/marketing/motion/bus"

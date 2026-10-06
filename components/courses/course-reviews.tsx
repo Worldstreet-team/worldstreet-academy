@@ -1,4 +1,5 @@
 "use client"
+import { FlagIcon, StarIcon, ThumbsUpIcon } from "@/components/icons"
 
 import { useState } from "react"
 import Link from "next/link"
@@ -17,7 +18,7 @@ import {
   type ReviewItem,
 } from "@/lib/actions/reviews"
 import { cn } from "@/lib/utils"
-import { FlagIcon, StarIcon, ThumbsUpIcon } from "lucide-react"
+
 
 const PAGE_SIZE = 5
 

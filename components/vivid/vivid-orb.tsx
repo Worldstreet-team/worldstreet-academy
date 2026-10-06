@@ -1,4 +1,5 @@
 "use client"
+import { MicIcon } from "@/components/icons"
 
 /**
  * Vivid Orb Button — Floating trigger rendered as a molten-gold orb.
@@ -17,7 +18,7 @@
 
 import { useRef, useEffect } from "react"
 import { useVivid } from "@/lib/vivid/provider"
-import { MicIcon } from "lucide-react"
+
 
 /** Dark ink for content sitting on gold (--ws-brand-on-primary). */
 const INK_ON_GOLD = "#1B1A16"

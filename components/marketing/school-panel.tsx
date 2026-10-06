@@ -1,9 +1,9 @@
 "use client"
+import { ArrowRightIcon } from "@/components/icons"
 
 import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowRightIcon } from "lucide-react"
 import { motion, useMotionValue, useTransform, type MotionValue } from "motion/react"
 import type { School } from "@/lib/schools"
 import { schoolCover } from "@/lib/school-art"
@@ -29,7 +29,7 @@ const LEAD = "School of "
  *     copy's spacing tighten and the blurb clamps to two lines, so the number
  *     never meets the copy.
  *
- * The panel is a dark island (`data-ws-theme="platform"`): the art is dark in
+ * The panel is a dark island (`data-theme="dark"` + `data-brand`): the art is dark in
  * both modes, so the copy over it keeps the dark palette's ink — the same
  * token scoping `certificate-view.tsx` uses for its paper island.
  *
@@ -76,7 +76,8 @@ export function SchoolPanel({
     <div className="relative h-full">
       <Link
         href={`/schools/${school.slug}`}
-        data-ws-theme="platform"
+        data-theme="dark"
+          data-brand="worldstreet"
         onFocus={onFocus}
         className="group @container relative flex h-full flex-col overflow-hidden rounded-[20px] bg-ws-surface text-ws-primary outline-none"
       >

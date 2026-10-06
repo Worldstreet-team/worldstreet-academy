@@ -1,6 +1,7 @@
+import { ArrowRightIcon, CalendarClockIcon, StarIcon } from "@/components/icons"
 import Link from "next/link"
 import Image from "next/image"
-import { ArrowRightIcon, CalendarClockIcon, StarIcon } from "lucide-react"
+
 import type { School } from "@/lib/schools"
 import { PACKAGE_LABEL } from "@/lib/entitlements"
 import { ACADEMY_FACULTY, FACULTY_PUBLIC } from "@/lib/faculty"

@@ -1,0 +1,77 @@
+/* VENDORED from worldstreet/design-system by scripts/vendor.mjs. Don't edit: change the design system and re-run it. */
+/* Dark theme: raw values (default). Brand palette [site] lives here too. */
+
+/* 1a. Raw — dark (default) */
+:root, .cx-dark, [data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Brand palette [site] — identical in both themes */
+  --cx-black:        #000000;
+  --cx-ink:          #0a0a0a;
+  --cx-white:        #ffffff;
+  --cx-mist:         #f0f0f0;
+  --cx-mist-2:       #f3f3f3;
+  --cx-ember:        #d32800;   /* PRIMARY — CTA fill, washes, glows */
+  --cx-ember-50:     #d3280080;
+  --cx-flame:        #f53f16;   /* logo, orbs, icon strokes */
+  --cx-amber:        #fc6d01;   /* hero halo */
+  --cx-peach:        #ffa08a;   /* soft glow, focus ring */
+  --cx-green:        #0cbe4d;
+
+  /* Brand hooks [ext]: everything a brand re-colours beyond the palette above */
+  --cx-accent-rgb:   211, 40, 0;        /* glows and shadows under accent objects */
+  --cx-accent-shade: 120, 20, 0;        /* inner shade on accent tiles */
+  --cx-metal-hi:     #ff8a4c;           /* brushed-metal payment card */
+  --cx-metal:        #d32800;
+  --cx-metal-top:    #f5561c;
+  --cx-metal-lo:     #8a1a00;
+  --cx-metal-ink:    #ffffff;           /* text on the card */
+  --cx-metal-chip:   linear-gradient(135deg, #ffe2cf, #f0a47d 45%, #ffd6bf);
+
+  /* Foreground channel [ext] — translucent layers derive from it */
+  --cx-fg-rgb:       255, 255, 255;
+
+  --cx-bg:           #000000;                  /* [site] */
+  --cx-elevated:     #141414;                  /* [ext] modals, menus, toasts */
+  --cx-overlay:      rgba(0, 0, 0, 0.72);
+  --cx-text:         #ffffff;                  /* [site] */
+  --cx-text-2:       #f0f0f0;                  /* [site] */
+  --cx-text-muted:   #8a8a8a;                  /* 5.3:1 */
+  --cx-on-primary:   #ffffff;                  /* white on ember 5.2:1 */
+  --cx-ember-text:   #ff6a3d;   /* ember as text — raw ember is 3.6:1 here */
+  --cx-ember-press:  #b82300;
+
+  /* Money + status [ext]. Loss is ROSE — a different hue from ember. */
+  --cx-gain:    #0cbe4d; --cx-gain-wash:    rgba(12, 190, 77, 0.14);    /* 7.5:1 */
+  --cx-loss:    #ff5c7a; --cx-loss-wash:    rgba(255, 92, 122, 0.12);   /* 6.2:1 */
+  --cx-warning: #f5b400; --cx-warning-wash: rgba(245, 180, 0, 0.12);    /* 10:1 */
+  --cx-info:    #f0f0f0;
+  --cx-brand-wash:   rgba(211, 40, 0, 0.16);
+  --cx-loss-border:  rgba(255, 92, 122, 0.4);
+
+  --cx-wash:         linear-gradient(124deg, #d32800 0%, rgba(211, 40, 0, 0.3) 100%);  /* [site] */
+  --cx-wash-opacity: 0.08;                                                              /* [site] */
+  --cx-panel:        linear-gradient(129deg, #000 0%, #1e0600 100%);                   /* [site] */
+  --cx-orb-opacity:  1;
+  --cx-halo:         rgba(252, 109, 1, 0.4);                                           /* [site] */
+  --cx-aurora-opacity: 0.85;   /* [ext] animated aurora layer */
+  --cx-aurora-blend:   screen;
+  --cx-aurora-core:  rgba(255, 196, 170, 0.95);   /* bright peach-white core */
+  --cx-aurora-mid:   rgba(252, 109, 1, 0.75);
+  --cx-aurora-edge:  rgba(211, 40, 0, 0.35);
+  --cx-ridge-line:   #ffd2bf;
+  --cx-spot:           rgba(252, 109, 1, 0.16);   /* cursor spotlight */
+  --cx-grain-opacity:  0.05;
+  --cx-lit-opacity:  0.25;
+  --cx-focus-border: rgba(255, 160, 138, 0.6);
+  --cx-focus-halo:   0 0 0 3px rgba(211, 40, 0, 0.25);
+  --cx-shadow-sm:    0 0.6px 1.57px -1.5px rgba(0,0,0,.17), 0 2.29px 5.95px -3px rgba(0,0,0,.14), 0 10px 26px -4.5px rgba(0,0,0,.02); /* [site] */
+  --cx-glow-cta:     0 8px 32px -6px rgba(211, 40, 0, 0.65);
+  --cx-shadow-tint:  0, 0, 0;
+  --cx-thumb-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);   /* slider/switch thumbs */
+  --cx-shadow-alpha: 1;
+
+  /* Chart palette [ext] — warm → neutral; gain/loss stay semantic */
+  --cx-chart-1: #ff6a3d;  --cx-chart-2: #fc6d01;  --cx-chart-3: #ffa08a;
+  --cx-chart-4: #f5b400;  --cx-chart-5: #f0f0f0;  --cx-chart-6: #8a8a8a;
+}

@@ -1,4 +1,5 @@
 "use client"
+import { Trash2 } from "@/components/icons"
 
 import * as React from "react"
 import {
@@ -11,7 +12,6 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Trash2 } from "lucide-react"
 import { deleteCourse } from "@/lib/actions/instructor"
 
 /**

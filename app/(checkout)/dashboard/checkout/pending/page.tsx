@@ -1,7 +1,8 @@
+import { ClockIcon, ReceiptTextIcon } from "@/components/icons"
 import type { Metadata } from "next"
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { ClockIcon, ReceiptTextIcon } from "lucide-react"
+
 import { BRAND } from "@/lib/brand"
 import { getCachedUser } from "@/lib/auth/cached"
 import { getMyEspeePayments, type EspeeProofView, type EspeeRejectionView } from "@/lib/actions/manual-payments"

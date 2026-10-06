@@ -1,10 +1,11 @@
+import { ChevronRightIcon } from "@/components/icons"
 import Link from "next/link"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Topbar } from "@/components/platform/topbar"
 import { fetchMyCertificates } from "@/lib/actions/certificates"
 import { EmptyState } from "@/components/shared/empty-state"
 import { ArtCertificate, SealRosette } from "@/components/shared/illustrations"
-import { ChevronRightIcon } from "lucide-react"
+
 
 export default async function CertificatesPage() {
   const certificates = await fetchMyCertificates()

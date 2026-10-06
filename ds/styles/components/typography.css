@@ -1,0 +1,18 @@
+/* VENDORED from worldstreet/design-system by scripts/vendor.mjs. Don't edit: change the design system and re-run it. */
+/* ---- Type [site] -------------------------------------------------------- */
+.cx-h1, .cx-h2 { font-weight: 400; color: transparent; -webkit-background-clip: text; background-clip: text; margin: 0; }
+.cx-h1 { font-size: var(--cx-h1); letter-spacing: var(--cx-h1-ls); line-height: var(--cx-h1-lh); background-image: var(--cx-heading-hero); }
+.cx-h2 { font-size: var(--cx-h2); letter-spacing: var(--cx-h2-ls); line-height: var(--cx-h2-lh); background-image: var(--cx-heading); }
+.cx-h3 { font-size: var(--cx-h3); letter-spacing: var(--cx-h3-ls); line-height: var(--cx-h3-lh); font-weight: 500; margin: 0; }
+.cx-h4 { font-size: var(--cx-h4); letter-spacing: var(--cx-h4-ls); line-height: var(--cx-h4-lh); font-weight: 500; margin: 0; }
+.cx-lead { font-size: var(--cx-lead); letter-spacing: var(--cx-lead-ls); line-height: var(--cx-lead-lh); margin: 0; }
+.cx-body-lg { font-size: var(--cx-body-lg); line-height: var(--cx-body-lg-lh); margin: 0; }
+.cx-small { font-size: var(--cx-small); letter-spacing: var(--cx-small-ls); line-height: var(--cx-small-lh); color: var(--cx-text-2); margin: 0; }
+.cx-caption { font-size: var(--cx-caption); letter-spacing: var(--cx-caption-ls); color: var(--cx-text-muted); text-transform: uppercase; }
+.cx-balance { font-size: var(--cx-balance); font-weight: 300; letter-spacing: -2px; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.cx-muted { color: var(--cx-text-muted); }
+.cx-link { color: var(--cx-ember-text); text-decoration: none; border-radius: 4px; }
+.cx-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.cx-kbd { display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 6px; border-radius: var(--cx-r-xs);
+  background: var(--cx-surface-2); box-shadow: inset 0 -1px 0 var(--cx-hairline), inset 0 0 0 1px var(--cx-hairline);
+  font: 500 12px/1 var(--cx-font-mono); color: var(--cx-text-2); }

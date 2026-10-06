@@ -1,3 +1,4 @@
+import { ArrowLeft, ClipboardCheck, FileQuestion, Pencil } from "@/components/icons"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
@@ -7,7 +8,7 @@ import { Topbar } from "@/components/platform/topbar"
 import { PageHeader } from "@/components/shared/page-header"
 import { EmptyState } from "@/components/shared/empty-state"
 import { ArtCourses } from "@/components/shared/illustrations"
-import { ArrowLeft, ClipboardCheck, FileQuestion, Pencil } from "lucide-react"
+
 import { fetchCourseForEdit } from "@/lib/actions/instructor"
 import { ResourceManager } from "@/components/instructor/resource-manager"
 import { DeleteCourseButton } from "@/components/instructor/delete-course-dialog"

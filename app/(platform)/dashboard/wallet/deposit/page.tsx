@@ -1,4 +1,5 @@
 "use client"
+import { Landmark, RefreshCw } from "@/components/icons"
 
 import * as React from "react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -7,7 +8,7 @@ import { Topbar } from "@/components/platform/topbar"
 import { PageHeader } from "@/components/ui/system"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Landmark, RefreshCw } from "lucide-react"
+
 import {
   getMyWalletOverview,
   startDollarDeposit,
@@ -159,7 +160,7 @@ function DepositPageInner() {
                   type="button"
                   disabled={sync.isPending}
                   onClick={() => sync.mutate(pending)}
-                  className="inline-flex h-10 items-center gap-2 rounded-sm bg-ws-brand px-4 text-[13px] font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90 disabled:pointer-events-none disabled:opacity-50"
+                  className="inline-flex h-10 items-center gap-2 rounded-full bg-ws-brand px-4 text-[13px] font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90 disabled:pointer-events-none disabled:opacity-50"
                 >
                   <RefreshCw size={13} strokeWidth={2} className={sync.isPending ? "animate-spin" : undefined} aria-hidden />
                   {sync.isPending ? "Checking…" : "I've paid — confirm"}

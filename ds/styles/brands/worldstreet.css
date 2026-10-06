@@ -1,0 +1,111 @@
+/* VENDORED from worldstreet/design-system by scripts/vendor.mjs. Don't edit: change the design system and re-run it. */
+/* ==========================================================================
+   Brand: WorldStreet. The Cryonix engine (type, components, motion, aurora,
+   corner-lit cards, gradient icons) re-coloured as WorldStreet's own system:
+     accent  ember  -> WorldStreet gold      base  black -> WorldStreet stone
+     money   emerald in / red out            text on gold: ink (white fails contrast)
+   Apply with data-brand="worldstreet" on any wrapper (layout, section, app root).
+   Nothing structural lives here: only colour tokens and brand hooks.
+   ========================================================================== */
+[data-brand="worldstreet"] {
+  /* Palette */
+  --ws-gold: #EAB308; --ws-gold-hi: #FACC15; --ws-gold-lo: #CA8A04; --ws-gold-deep: #A16207; --ws-gold-pale: #FDE68A;
+  --ws-stone: #0C0A09; --ws-stone-card: #1C1917; --ws-ink: #1C1917;
+
+  /* Brand palette slots */
+  --cx-black: var(--ws-stone);
+  --cx-ember: var(--ws-gold);
+  --cx-ember-50: #EAB30880;
+  --cx-flame: var(--ws-gold-hi);
+  --cx-amber: var(--ws-gold-hi);
+  --cx-peach: var(--ws-gold-pale);
+  --cx-green: #10B981;
+
+  /* Surfaces + text on the stone base */
+  --cx-bg: var(--ws-stone);
+  --cx-elevated: var(--ws-stone-card);
+  --cx-text-muted: #A8A29E;                        /* stone-400: 6.4:1 on stone-900 */
+
+  /* Accent in use */
+  --cx-ember-text: var(--ws-gold);
+  --cx-ember-press: var(--ws-gold-lo);
+  --cx-on-primary: var(--ws-ink);                  /* ink on gold 9.1:1 */
+  --cx-brand-wash: rgba(234, 179, 8, .16);
+  --cx-wash: linear-gradient(124deg, #EAB308 0%, rgba(234, 179, 8, .3) 100%);
+  --cx-halo: rgba(250, 204, 21, .32);
+  --cx-glow-cta: 0 8px 32px -6px rgba(234, 179, 8, .6);
+  --cx-focus-ring: 0 0 0 2px var(--ws-stone), 0 0 0 4px var(--ws-gold-pale);
+  --cx-focus-border: rgba(253, 230, 138, .6);
+  --cx-focus-halo: 0 0 0 3px rgba(234, 179, 8, .25);
+
+  /* Money direction */
+  --cx-gain: #10B981; --cx-gain-wash: rgba(16, 185, 129, .14);
+  --cx-loss: #EF4444; --cx-loss-wash: rgba(239, 68, 68, .12); --cx-loss-border: rgba(239, 68, 68, .4);
+  --cx-warning: #F59E0B; --cx-warning-wash: rgba(245, 158, 11, .12);
+
+  /* Effects */
+  --cx-aurora-core: rgba(255, 240, 200, .95);
+  --cx-aurora-mid: rgba(234, 179, 8, .75);
+  --cx-aurora-edge: rgba(161, 98, 7, .35);
+  --cx-ridge-line: #FDE68A;
+  --cx-spot: rgba(250, 204, 21, .14);
+  --cx-chart-1: #FACC15; --cx-chart-2: #EAB308; --cx-chart-3: #FDE68A; --cx-chart-4: #CA8A04; --cx-chart-5: #F5F5F4; --cx-chart-6: #A8A29E;
+
+  /* Brand hooks */
+  --cx-accent-rgb: 234, 179, 8;
+  --cx-accent-shade: 120, 70, 0;
+  --cx-metal-hi: #FEF3C7;
+  --cx-metal-top: #FDE047;
+  --cx-metal: #EAB308;
+  --cx-metal-lo: #A16207;
+  --cx-metal-ink: var(--ws-ink);
+  --cx-metal-chip: linear-gradient(135deg, #fff7df, #d6b45a 45%, #fbe8b0);
+
+  /* Manrope carries the type; Noto Sans only fills the ₦ glyph Manrope's subset lacks */
+  --cx-font: var(--font-manrope, "Manrope"), "Noto Sans", system-ui, sans-serif;
+
+  /* Inherited properties resolve at <body>, so re-apply them on the brand root */
+  font-family: var(--cx-font);
+  background: var(--cx-bg);
+  color: var(--cx-text);
+}
+/* Light, unless a dark island is nested inside the light page (a dark CTA band,
+   the call room inside a light shell): themes nest, so the light override must
+   stop at any data-theme="dark" on or above the brand element. */
+[data-theme="light"] [data-brand="worldstreet"]:not([data-theme="dark"], [data-theme="dark"] *) {
+  --cx-bg: #FFFFFF;
+  --cx-elevated: #FFFFFF;
+  --cx-ember: #EFBE04;
+  --cx-text-muted: #78716C;                        /* stone-500: 4.8:1 on white */
+  --cx-ember-text: var(--ws-gold-deep);            /* gold as text on white needs the deep shade */
+  --cx-ember-press: var(--ws-gold-lo);
+  --cx-brand-wash: rgba(202, 138, 4, .12);
+  --cx-halo: rgba(250, 204, 21, .24);
+  --cx-focus-ring: 0 0 0 2px #fff, 0 0 0 4px var(--ws-gold-lo);
+  --cx-gain: #047857; --cx-gain-wash: rgba(4, 120, 87, .10);
+  --cx-loss: #B91C1C; --cx-loss-wash: rgba(185, 28, 28, .08); --cx-loss-border: rgba(185, 28, 28, .35);
+  --cx-warning: #B45309; --cx-warning-wash: rgba(245, 158, 11, .16);
+  --cx-aurora-core: rgba(250, 204, 21, .7);
+  --cx-aurora-mid: rgba(234, 179, 8, .4);
+  --cx-aurora-edge: rgba(202, 138, 4, .16);
+  --cx-ridge-line: var(--ws-gold-deep);
+  --cx-spot: rgba(202, 138, 4, .09);
+  --cx-chart-5: #44403C; --cx-chart-6: #A8A29E;
+  /* Icon gradient: yellow on white too (Owen, 2026-09-28: the deep golds read
+     as orange). Brand gold into gold-lo: the 35% back layer stays yellow and
+     the darker end keeps 2px strokes legible, since pure bright gold on white
+     is only ~1.5:1. Gold TEXT still steps down to the deep shade (above). */
+  --cx-icon-from: var(--ws-gold);
+  --cx-icon-to: var(--ws-gold-lo);
+}
+
+/* Icons: the gradient is defined per brand (<IconDefs brand="worldstreet">), because
+   an SVG gradient resolves its colours where it is defined, not where it is used. */
+[data-brand="worldstreet"] .cx-icon--gradient .b, [data-brand="worldstreet"] .cx-icon--gradient .s { fill: url(#cx-ig-worldstreet); }
+[data-brand="worldstreet"] .cx-icon--gradient .f { stroke: url(#cx-ig-worldstreet); }
+/* Brand tiles are gold, so their glyph turns ink */
+[data-brand="worldstreet"] .cx-itile--brand .cx-icon--white .b, [data-brand="worldstreet"] .cx-itile--brand .cx-icon--white .s { fill: var(--ws-ink); }
+[data-brand="worldstreet"] .cx-itile--brand .cx-icon--white .f { stroke: var(--ws-ink); }
+/* Gold gradient words (manifesto highlights) */
+[data-brand="worldstreet"] .xp-manifesto .mw.hot { background: linear-gradient(100deg, var(--ws-gold-pale), var(--ws-gold-hi) 50%, var(--ws-gold)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+[data-theme="light"] [data-brand="worldstreet"]:not([data-theme="dark"], [data-theme="dark"] *) .xp-manifesto .mw.hot { background: linear-gradient(100deg, var(--ws-gold-lo), var(--ws-gold-deep)); -webkit-background-clip: text; background-clip: text; }

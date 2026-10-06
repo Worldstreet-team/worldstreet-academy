@@ -1,4 +1,5 @@
 "use client"
+import { MicIcon, MicOffIcon, MinimizeIcon, PhoneIcon, PhoneOffIcon, VideoIcon, VideoOffIcon, Volume2Icon, VolumeIcon, WifiIcon, XIcon } from "@/components/icons"
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import { cn } from "@/lib/utils"
@@ -15,7 +16,7 @@ import {
 import { useCallEvents } from "@/lib/hooks/use-call-events"
 import { useUser } from "@/components/providers/user-provider"
 import type { CallEventPayload } from "@/lib/call-events"
-import { MicIcon, MicOffIcon, MinimizeIcon, PhoneIcon, PhoneOffIcon, VideoIcon, VideoOffIcon, Volume2Icon, VolumeIcon, WifiIcon, XIcon } from "lucide-react"
+
 import { RenderIcon } from "@/components/shared/render-icon"
 
 type CallType = "video" | "audio"

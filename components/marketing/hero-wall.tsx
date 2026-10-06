@@ -1,4 +1,5 @@
 "use client"
+import { XIcon } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
@@ -10,7 +11,6 @@ import {
   useTransform,
   type MotionValue,
 } from "motion/react"
-import { XIcon } from "lucide-react"
 import { EASE_INERTIA } from "@/components/marketing/motion/ease"
 import { useMotionOK } from "@/components/marketing/motion/bus"
 import { HeroStage, PEOPLE_COUNT, slideOf, useHeroSlideshow } from "@/components/marketing/hero-stage"
@@ -55,7 +55,7 @@ function clearPick() {
  * while the tab is hidden. Reduced motion: no autoplay and no drift — the
  * stage only changes when a school is chosen, with a short crossfade.
  *
- * The stage is a dark island (`data-ws-theme="platform"`): the covers are
+ * The stage is a dark island (`data-theme="dark"` + `data-brand`): the covers are
  * dark renders in both modes, so in light mode the hero is a rounded dark
  * stage set into the paper — the same token scoping the Schools showcase
  * panels use. Below lg the picture is a band across the top of the stage
@@ -148,7 +148,7 @@ export function HeroWall({
 
   const cta = school ? `Explore the ${school.name}` : "Explore programs"
   const secondary =
-    "inline-flex h-12 w-full items-center justify-center rounded-sm border border-ws-hairline px-7 text-[15px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:border-ws-brand/40 hover:text-ws-gold sm:w-auto"
+    "inline-flex h-12 w-full items-center justify-center rounded-full border border-ws-hairline px-7 text-[15px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:border-ws-brand/40 hover:text-ws-gold sm:w-auto"
 
   return (
     <section
@@ -163,7 +163,8 @@ export function HeroWall({
       }}
     >
       <div
-        data-ws-theme="platform"
+        data-theme="dark"
+          data-brand="worldstreet"
         className="relative isolate overflow-hidden rounded-[20px] bg-ws-page text-ws-primary [--band:15rem] sm:[--band:24rem] md:[--band:27rem]"
       >
         {/* The show's one control: first in the hero, seen only on keyboard focus. */}
@@ -331,7 +332,7 @@ export function HeroWall({
                   href={school ? `/schools/${school.slug}` : "/programs"}
                   transition={{ layout: ok ? GLIDE : { duration: 0 } }}
                   style={{ borderRadius: 7 }}
-                  className="relative inline-flex min-h-14 w-full items-center justify-center overflow-hidden bg-ws-brand px-6 py-2.5 text-center text-[15px] font-semibold leading-[1.2] text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-ws-page sm:min-h-12 sm:w-auto sm:px-8"
+                  className="relative inline-flex min-h-14 w-full items-center justify-center overflow-hidden rounded-full bg-ws-brand px-6 py-2.5 text-center text-[15px] font-semibold leading-[1.2] text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-ws-page sm:min-h-12 sm:w-auto sm:px-8"
                 >
                   <AnimatePresence mode="popLayout" initial={false}>
                     <motion.span

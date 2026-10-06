@@ -1,7 +1,8 @@
 "use client"
+import { RotateCcw } from "@/components/icons"
 
 import { useEffect } from "react"
-import { RotateCcw } from "lucide-react"
+
 
 /**
  * Admin console error boundary — same ws-token styling as the rest of the
@@ -38,7 +39,7 @@ export default function AdminError({
           <button
             type="button"
             onClick={reset}
-            className="mt-6 inline-flex h-10 items-center justify-center gap-2 rounded-sm bg-ws-brand px-5 text-sm font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90"
+            className="mt-6 inline-flex h-10 items-center justify-center gap-2 rounded-full bg-ws-brand px-5 text-sm font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90"
           >
             <RotateCcw size={16} strokeWidth={2} />
             Try again

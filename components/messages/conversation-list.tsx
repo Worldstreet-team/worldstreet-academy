@@ -1,4 +1,5 @@
 "use client"
+import { ImageIcon, MicIcon, PaperclipIcon, PhoneIcon, SearchIcon, VideoIcon } from "@/components/icons"
 
 import { useState } from "react"
 import { Input } from "@/components/ui/input"
@@ -6,7 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence, LayoutGroup } from "motion/react"
-import { ImageIcon, MicIcon, PaperclipIcon, PhoneIcon, SearchIcon, VideoIcon } from "lucide-react"
+
 import { RenderIcon } from "@/components/shared/render-icon"
 
 export type Conversation = {

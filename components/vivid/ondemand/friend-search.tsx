@@ -1,11 +1,11 @@
 "use client"
+import { CheckIcon, SearchIcon, UserIcon, UserPlusIcon, XIcon } from "@/components/icons"
 
 import { useState, useTransition, useRef, useEffect, useCallback } from "react"
 import Image from "next/image"
 import { motion, AnimatePresence } from "motion/react"
 import { useVivid } from "@/lib/vivid/provider"
 import { Input } from "@/components/ui/input"
-import { CheckIcon, SearchIcon, UserIcon, UserPlusIcon, XIcon } from "lucide-react"
 import { RenderIcon } from "@/components/shared/render-icon"
 
 interface SearchUser {

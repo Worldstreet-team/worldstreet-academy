@@ -1,7 +1,8 @@
 "use client"
+import { Award, BookOpen, GraduationCap } from "@/components/icons"
 
 import Link from "next/link"
-import { Award, BookOpen, GraduationCap } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
 import { ArtCertificate } from "@/components/shared/illustrations"
 import { CourseRating, type OwnReview } from "@/components/learn/course-rating"

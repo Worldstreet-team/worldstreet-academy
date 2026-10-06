@@ -1,4 +1,5 @@
 "use client"
+import { GraduationCapIcon } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
@@ -14,7 +15,7 @@ import { PageHeader } from "@/components/shared/page-header"
 import { adminListApplications, adminExportApplicationsCsv } from "@/lib/actions/applications"
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import { formatDate, StatusBadge, FilterChips, Pagination } from "@/components/admin/shared"
-import { GraduationCapIcon } from "lucide-react"
+
 
 type StatusFilter = "active" | "all" | "submitted" | "under_review" | "approved" | "rejected"
 

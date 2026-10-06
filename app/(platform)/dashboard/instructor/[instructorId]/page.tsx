@@ -1,3 +1,4 @@
+import { BookOpenIcon, CalendarIcon, ChevronLeftIcon, ExternalLinkIcon, GlobeIcon, StarIcon, UsersIcon } from "@/components/icons"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
@@ -15,7 +16,7 @@ import {
   fetchFacultyUsername,
 } from "@/lib/actions/student"
 import { facultyHref } from "@/lib/faculty"
-import { BookOpenIcon, CalendarIcon, ChevronLeftIcon, ExternalLinkIcon, GlobeIcon, StarIcon, UsersIcon } from "lucide-react"
+
 
 // Force dynamic rendering to show fresh instructor avatars
 export const revalidate = 0

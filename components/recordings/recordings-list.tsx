@@ -1,9 +1,10 @@
 "use client"
+import { PlayIcon, VideoIcon } from "@/components/icons"
 
 import { useState } from "react"
 import Image from "next/image"
 import { useQuery } from "@tanstack/react-query"
-import { PlayIcon, VideoIcon } from "lucide-react"
+
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { CardShell, EmptyState } from "@/components/ui/system"
 import { listMyRecordings, type RecordingView } from "@/lib/actions/recordings"
@@ -77,7 +78,7 @@ export function RecordingsList({ courseId }: { courseId?: string }) {
                 onClick={() => setPlaying(r)}
                 className="flex w-full items-center gap-3 rounded-md bg-ws-surface p-3 text-left transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-raised"
               >
-                <span className="relative flex h-12 w-20 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-ws-raised">
+                <span className="relative flex h-12 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[9px] bg-ws-raised">
                   {r.courseArt ? (
                     <Image src={r.courseArt} alt="" fill sizes="80px" className="object-cover" />
                   ) : (

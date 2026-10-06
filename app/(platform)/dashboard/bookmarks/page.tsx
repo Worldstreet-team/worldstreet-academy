@@ -1,4 +1,5 @@
 "use client"
+import { SearchIcon } from "@/components/icons"
 
 import * as React from "react"
 import { Topbar } from "@/components/platform/topbar"
@@ -7,7 +8,7 @@ import { EmptyState } from "@/components/shared/empty-state"
 import { ArtBookmarks } from "@/components/shared/illustrations"
 import { CardShell, EmptyState as RetryEmptyState } from "@/components/ui/system"
 import { useBookmarks, useToggleBookmark } from "@/lib/hooks/queries"
-import { SearchIcon } from "lucide-react"
+
 
 export default function BookmarksPage() {
   const [search, setSearch] = React.useState("")

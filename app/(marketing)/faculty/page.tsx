@@ -66,7 +66,7 @@ export default async function FacultyPage() {
             </p>
             <Link
               href="/programs"
-              className="mt-6 inline-flex h-11 items-center justify-center rounded-sm border border-ws-hairline px-6 text-[14px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:border-ws-brand/40 hover:text-ws-gold"
+              className="mt-6 inline-flex h-11 items-center justify-center rounded-full border border-ws-hairline px-6 text-[14px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:border-ws-brand/40 hover:text-ws-gold"
             >
               Explore programs
             </Link>

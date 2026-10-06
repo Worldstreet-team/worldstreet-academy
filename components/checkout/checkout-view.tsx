@@ -1,26 +1,12 @@
 "use client"
+import { ArrowRightLeftIcon, BadgeCheckIcon, BookOpenIcon, CheckIcon, ChevronLeftIcon, CopyCheckIcon, LoaderCircleIcon, LockKeyholeIcon, MailIcon, PackageCheckIcon, ReceiptTextIcon, RotateCcwIcon, ShieldCheckIcon, WalletIcon } from "@/components/icons"
 
 import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
-import {
-  ArrowRightLeftIcon,
-  BadgeCheckIcon,
-  BookOpenIcon,
-  CheckIcon,
-  ChevronLeftIcon,
-  CopyCheckIcon,
-  LoaderCircleIcon,
-  LockKeyholeIcon,
-  MailIcon,
-  PackageCheckIcon,
-  ReceiptTextIcon,
-  RotateCcwIcon,
-  ShieldCheckIcon,
-  WalletIcon,
-} from "lucide-react"
+
 import { purchaseCourse } from "@/lib/actions/enrollments"
 import { getMyWalletBalance, type MyWalletBalance } from "@/lib/actions/wallet"
 import { saveEnrollmentIntent } from "@/lib/actions/enrollment-intent"

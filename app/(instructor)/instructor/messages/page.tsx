@@ -1,4 +1,5 @@
 "use client"
+import { SearchIcon, UserPlusIcon, XIcon } from "@/components/icons"
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useQueryClient } from "@tanstack/react-query"
@@ -47,7 +48,7 @@ import { ConversationListSkeleton, MessagesAreaSkeleton } from "@/components/ske
 import { useCall } from "@/components/providers/call-provider"
 import { useConversations, queryKeys } from "@/lib/hooks/queries"
 import type { ConversationWithDetails as ConvType } from "@/lib/actions/messages"
-import { SearchIcon, UserPlusIcon, XIcon } from "lucide-react"
+
 
 // Extended message type with status for optimistic updates
 type OptimisticMessage = MessageWithDetails & { status?: "pending" | "sent" | "error"; uploadProgress?: number }

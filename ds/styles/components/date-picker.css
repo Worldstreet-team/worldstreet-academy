@@ -1,0 +1,17 @@
+/* VENDORED from worldstreet/design-system by scripts/vendor.mjs. Don't edit: change the design system and re-run it. */
+/* ---- Date picker [ext] -------------------------------------------------- */
+.cx-cal { width: 312px; max-width: 100%; padding: 16px; border-radius: var(--cx-r-card); background: var(--cx-elevated); box-shadow: var(--cx-shadow-lg); }
+.cx-cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.cx-cal-head strong { font-weight: 500; font-size: 16px; }
+.cx-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px 0; text-align: center; }
+.cx-cal-grid .dow { font-size: 12px; color: var(--cx-text-muted); padding: 6px 0; }
+.cx-cal-grid button { aspect-ratio: 1; border: 0; border-radius: 10px; background: none; color: var(--cx-text); font: 400 14px var(--cx-font);
+  font-variant-numeric: tabular-nums; cursor: pointer; }
+.cx-cal-grid button:hover { background: var(--cx-surface-2); }
+.cx-cal-grid button.out { color: var(--cx-text-disabled); }
+.cx-cal-grid button.today { box-shadow: inset 0 0 0 1px var(--cx-field-border); }
+.cx-cal-grid button.in-range { background: var(--cx-brand-wash); border-radius: 0; }
+.cx-cal-grid button[aria-pressed="true"], .cx-cal-grid button[data-selected="true"], .cx-cal-grid button[aria-selected="true"] { background: var(--cx-ember); color: var(--cx-on-primary); border-radius: 10px; }
+.cx-cal-grid button:disabled { color: var(--cx-text-disabled); cursor: not-allowed; background: none; text-decoration: line-through; }
+.cx-cal-grid button:focus-visible { box-shadow: var(--cx-focus-ring); }
+.cx-cal-presets { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--cx-hairline); }

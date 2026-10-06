@@ -1,16 +1,4 @@
-import {
-  BlocksIcon,
-  BotIcon,
-  BriefcaseIcon,
-  ChartColumnIcon,
-  ClapperboardIcon,
-  CodeIcon,
-  GraduationCapIcon,
-  LandmarkIcon,
-  ShieldCheckIcon,
-  type LucideIcon,
-  type LucideProps,
-} from "lucide-react"
+import { BlocksIcon, BotIcon, BriefcaseIcon, ChartColumnIcon, ClapperboardIcon, CodeIcon, GraduationCapIcon, LandmarkIcon, ShieldCheckIcon, type IconComponent, type IconProps } from "@/components/icons"
 import { RenderIcon } from "@/components/shared/render-icon"
 
 /**
@@ -19,7 +7,7 @@ import { RenderIcon } from "@/components/shared/render-icon"
  * Unknown names fall back to the graduation cap rather than rendering
  * nothing.
  */
-const SCHOOL_ICONS: Record<string, LucideIcon> = {
+const SCHOOL_ICONS: Record<string, IconComponent> = {
   landmark: LandmarkIcon,
   blocks: BlocksIcon,
   bot: BotIcon,
@@ -30,6 +18,6 @@ const SCHOOL_ICONS: Record<string, LucideIcon> = {
   briefcase: BriefcaseIcon,
 }
 
-export function SchoolIcon({ name, ...props }: LucideProps & { name: string }) {
+export function SchoolIcon({ name, ...props }: IconProps & { name: string }) {
   return <RenderIcon icon={SCHOOL_ICONS[name] ?? GraduationCapIcon} {...props} />
 }

@@ -1,8 +1,9 @@
 "use client"
+import { BookmarkIcon } from "@/components/icons"
 
 import { useCallback, useEffect, useState, useTransition } from "react"
 import { toggleCourseBookmark, checkCoursesBookmarked } from "@/lib/actions/student"
-import { BookmarkIcon } from "lucide-react"
+
 
 export function BookmarkButton({ courseId, className }: { courseId: string; className?: string }) {
   const [isBookmarked, setIsBookmarked] = useState(false)

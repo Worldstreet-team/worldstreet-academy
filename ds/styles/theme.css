@@ -1,0 +1,159 @@
+/* VENDORED from worldstreet/design-system by scripts/vendor.mjs. Don't edit: change the design system and re-run it. */
+/* ==========================================================================
+   Cryonix — Tailwind CSS v4 theme bridge
+   Import AFTER src/styles/tokens/index.css:
+     @import "tailwindcss";
+     @import "./design-system-cryonix/src/styles/tokens/index.css";
+     @import "./design-system-cryonix/integrations/theme.css";
+   `inline` makes utilities emit var(--cx-*) directly, so the dark/light switch
+   (.cx-light / [data-theme="light"]) re-skins them at runtime.
+   Utility names match tailwind.preset.cjs (v3): bg-ember, text-muted,
+   rounded-card, p-cx-4, shadow-lg, z-modal, ease-cx, text-h1 …
+   ========================================================================== */
+
+@custom-variant dark (&:where(.cx-dark, .cx-dark *));
+
+@theme inline {
+  /* brand */
+  --color-black: var(--cx-black);
+  --color-ink: var(--cx-ink);
+  --color-white: var(--cx-white);
+  --color-mist: var(--cx-mist);
+  --color-mist-2: var(--cx-mist-2);
+  --color-ember: var(--cx-ember);
+  --color-ember-50: var(--cx-ember-50);
+  --color-ember-text: var(--cx-ember-text);
+  --color-ember-press: var(--cx-ember-press);
+  --color-flame: var(--cx-flame);
+  --color-amber: var(--cx-amber);
+  --color-peach: var(--cx-peach);
+  --color-green: var(--cx-green);
+  --color-primary: var(--cx-primary);
+  --color-on-primary: var(--cx-on-primary);
+
+  /* surfaces */
+  --color-bg: var(--cx-bg);
+  --color-elevated: var(--cx-elevated);
+  --color-overlay: var(--cx-overlay);
+  --color-surface: var(--cx-surface);
+  --color-surface-2: var(--cx-surface-2);
+  --color-surface-3: var(--cx-surface-3);
+  --color-row-hover: var(--cx-row-hover);
+  --color-hairline: var(--cx-hairline);
+  --color-field: var(--cx-field);
+  --color-field-hover: var(--cx-field-hover);
+  --color-field-border: var(--cx-field-border);
+
+  /* text */
+  --color-text: var(--cx-text);
+  --color-text-2: var(--cx-text-2);
+  --color-text-3: var(--cx-text-3);
+  --color-text-muted: var(--cx-text-muted);
+  --color-text-disabled: var(--cx-text-disabled);
+  --color-muted: var(--cx-text-muted);
+
+  /* money + status */
+  --color-gain: var(--cx-gain);
+  --color-gain-wash: var(--cx-gain-wash);
+  --color-loss: var(--cx-loss);
+  --color-loss-wash: var(--cx-loss-wash);
+  --color-loss-border: var(--cx-loss-border);
+  --color-warning: var(--cx-warning);
+  --color-warning-wash: var(--cx-warning-wash);
+  --color-info: var(--cx-info);
+  --color-info-wash: var(--cx-info-wash);
+  --color-positive: var(--cx-positive);
+  --color-brand-wash: var(--cx-brand-wash);
+  --color-halo: var(--cx-halo);
+
+  /* charts */
+  --color-chart-1: var(--cx-chart-1);
+  --color-chart-2: var(--cx-chart-2);
+  --color-chart-3: var(--cx-chart-3);
+  --color-chart-4: var(--cx-chart-4);
+  --color-chart-5: var(--cx-chart-5);
+  --color-chart-6: var(--cx-chart-6);
+  --color-chart-grid: var(--cx-chart-grid);
+
+  /* type */
+  --font-sans: var(--cx-font);
+  --font-mono: var(--cx-font-mono);
+  --text-h1: var(--cx-h1);            --text-h1--line-height: var(--cx-h1-lh);            --text-h1--letter-spacing: var(--cx-h1-ls);
+  --text-h2: var(--cx-h2);            --text-h2--line-height: var(--cx-h2-lh);            --text-h2--letter-spacing: var(--cx-h2-ls);
+  --text-h3: var(--cx-h3);            --text-h3--line-height: var(--cx-h3-lh);            --text-h3--letter-spacing: var(--cx-h3-ls);            --text-h3--font-weight: 500;
+  --text-h4: var(--cx-h4);            --text-h4--line-height: var(--cx-h4-lh);            --text-h4--letter-spacing: var(--cx-h4-ls);            --text-h4--font-weight: 500;
+  --text-lead: var(--cx-lead);        --text-lead--line-height: var(--cx-lead-lh);        --text-lead--letter-spacing: var(--cx-lead-ls);
+  --text-body-lg: var(--cx-body-lg);  --text-body-lg--line-height: var(--cx-body-lg-lh);  --text-body-lg--letter-spacing: var(--cx-body-lg-ls);
+  --text-body: var(--cx-body);        --text-body--line-height: var(--cx-body-lh);        --text-body--letter-spacing: var(--cx-body-ls);
+  --text-small: var(--cx-small);      --text-small--line-height: var(--cx-small-lh);      --text-small--letter-spacing: var(--cx-small-ls);
+  --text-caption: var(--cx-caption);  --text-caption--letter-spacing: var(--cx-caption-ls);
+  --text-balance: var(--cx-balance);  --text-balance--line-height: 1.05;                  --text-balance--letter-spacing: -2px;                  --text-balance--font-weight: 300;
+
+  /* spacing — prefixed so the default numeric scale (p-4 = 1rem) survives */
+  --spacing-cx-1: var(--cx-s-1);
+  --spacing-cx-2: var(--cx-s-2);
+  --spacing-cx-3: var(--cx-s-3);
+  --spacing-cx-4: var(--cx-s-4);
+  --spacing-cx-5: var(--cx-s-5);
+  --spacing-cx-6: var(--cx-s-6);
+  --spacing-cx-7: var(--cx-s-7);
+  --spacing-cx-8: var(--cx-s-8);
+  --spacing-cx-9: var(--cx-s-9);
+  --spacing-cx-10: var(--cx-s-10);
+  --spacing-cx-11: var(--cx-s-11);
+  --spacing-cx-12: var(--cx-s-12);
+  --spacing-cx-13: var(--cx-s-13);
+  --spacing-gutter: var(--cx-gutter);
+  --spacing-section: var(--cx-section);
+  --spacing-card-pad: var(--cx-card-pad);
+  --spacing-gap: var(--cx-gap);
+  --spacing-nav-h: var(--cx-nav-h);
+  --spacing-sidebar: var(--cx-sidebar-w);
+  --spacing-control: var(--cx-control-h);
+  --spacing-control-sm: var(--cx-control-h-sm);
+  --spacing-control-lg: var(--cx-control-h-lg);
+  --spacing-touch: var(--cx-touch);
+  --container-container: var(--cx-container);
+  --container-narrow: var(--cx-container-narrow);
+
+  /* radius */
+  --radius-xs: var(--cx-r-xs);
+  --radius-sm: var(--cx-r-sm);
+  --radius-icon: var(--cx-r-icon);
+  --radius-md: var(--cx-r-md);
+  --radius-card: var(--cx-r-card);
+  --radius-lg: var(--cx-r-lg);
+  --radius-pill: var(--cx-r-pill);
+
+  /* elevation */
+  --shadow-sm: var(--cx-shadow-sm);
+  --shadow-md: var(--cx-shadow-md);
+  --shadow-lg: var(--cx-shadow-lg);
+  --shadow-xl: var(--cx-shadow-xl);
+  --shadow-cta: var(--cx-glow-cta);
+  --shadow-focus: var(--cx-focus-ring);
+  --shadow-focus-halo: var(--cx-focus-halo);
+  --blur-nav: 16px;
+  --blur-glass: 20px;
+
+  /* motion */
+  --ease-cx: var(--cx-ease);
+  --ease-cx-in-out: var(--cx-ease-in-out);
+
+  /* breakpoints (mirror tokens.css notes) */
+  --breakpoint-tablet: 768px;
+  --breakpoint-desktop: 1200px;
+}
+
+/* z-index + duration have no v4 theme namespace — plain utilities instead */
+@utility z-raised  { z-index: var(--cx-z-raised); }
+@utility z-sticky  { z-index: var(--cx-z-sticky); }
+@utility z-nav     { z-index: var(--cx-z-nav); }
+@utility z-drawer  { z-index: var(--cx-z-drawer); }
+@utility z-modal   { z-index: var(--cx-z-modal); }
+@utility z-popover { z-index: var(--cx-z-popover); }
+@utility z-toast   { z-index: var(--cx-z-toast); }
+@utility z-tooltip { z-index: var(--cx-z-tooltip); }
+@utility duration-fast { transition-duration: var(--cx-dur-fast); }
+@utility duration-cx   { transition-duration: var(--cx-dur); }
+@utility duration-slow { transition-duration: var(--cx-dur-slow); }

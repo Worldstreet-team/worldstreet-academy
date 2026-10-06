@@ -1,4 +1,5 @@
 "use client"
+import { Landmark, ShieldCheck, Trash2, Plus } from "@/components/icons"
 
 import * as React from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
@@ -15,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Landmark, ShieldCheck, Trash2, Plus } from "lucide-react"
+
 import {
   getMyWalletOverview,
   getNgnBanks,
