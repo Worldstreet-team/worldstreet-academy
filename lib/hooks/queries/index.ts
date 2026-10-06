@@ -9,6 +9,7 @@ export {
   useMeetingHistory,
   useMeetingInvites,
   useUpcomingClasses,
+  useClassBoard,
   useInstructorMeetingCourses,
   useInvalidateMeetings,
 } from "./use-meetings"

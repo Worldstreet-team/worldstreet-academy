@@ -4,15 +4,19 @@ import type * as React from "react"
 import Link from "next/link"
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react"
 import {
+  Award01Icon,
   BookOpen01Icon,
   Calendar03Icon,
   Certificate01Icon,
   PlayCircleIcon,
+  Task01Icon,
   Tick02Icon,
 } from "@hugeicons/core-free-icons"
+import { Countdown } from "@/components/shared/countdown"
 import { Skel } from "@/components/ui/system"
-import { splitClasses, type LearningTotals } from "@/lib/dashboard-home"
-import { useMyCertificates, useUpcomingClasses } from "@/lib/hooks/queries"
+import type { ClassBoardEntry } from "@/lib/actions/class-board"
+import type { LearningTotals } from "@/lib/dashboard-home"
+import { useClassBoard, useMyCertificates, useMyPoints } from "@/lib/hooks/queries"
 import { cn } from "@/lib/utils"
 
 /*
@@ -90,19 +94,23 @@ function StatCell({
 
 /**
  * Figures from real rows only. Completed appears once there is one; lessons
- * once a package opens any; certificates and classes only for packages that
- * include them (the page decides, and their queries run only then).
+ * once a package opens any; the next class only for packages with live
+ * classes; certificates once one is earned (before that, points say more);
+ * assignments only while some are open (the page decides, and the queries run
+ * only then).
  */
 export function HeroStats({
   totals,
   showCertificates,
   showClasses,
-  now,
+  toDo = 0,
 }: {
   totals: LearningTotals
   showCertificates: boolean
   showClasses: boolean
-  now: number
+  /** Open assignments and exams (assessmentCounts). */
+  toDo?: number
+  now?: number
 }) {
   return (
     <div aria-label="Your learning at a glance" className={CELLS}>
@@ -122,47 +130,86 @@ export function HeroStats({
           label="Lessons done"
         />
       )}
+      {showClasses && <NextClassStat />}
+      <PointsStat />
+      {toDo > 0 && (
+        <StatCell icon={Task01Icon} value={toDo} label={toDo === 1 ? "Assignment due" : "Assignments due"} href="/dashboard/assignments" />
+      )}
       {showCertificates && <CertificatesStat />}
-      {showClasses && <ClassesStat now={now} />}
     </div>
   )
 }
 
-/** None earned yet: the cell says when one arrives instead of printing a zero. */
-function CertificatesStat() {
-  const { data: certificates = [], isLoading } = useMyCertificates()
-  const none = !isLoading && certificates.length === 0
+/** Points so far; the page explains how they're earned. */
+function PointsStat() {
+  const { data, isLoading } = useMyPoints()
   return (
     <StatCell
-      icon={Certificate01Icon}
-      value={isLoading ? <Skel className="h-5 w-8" /> : none ? "On completion" : certificates.length}
-      label={none ? "Your certificate" : certificates.length === 1 ? "Certificate" : "Certificates"}
-      href="/dashboard/certificates"
-      quiet={none}
+      icon={Award01Icon}
+      value={isLoading ? <Skel className="h-5 w-8" /> : (data?.total ?? 0).toLocaleString()}
+      label={data && data.thisWeek > 0 ? `Points · +${data.thisWeek} this week` : "Points"}
+      href="/dashboard/points"
     />
   )
 }
 
-/** `getUpcomingClasses`'s own limit: a full list may have more behind it. */
-const CLASS_LIST_LIMIT = 10
+/** The soonest thing across the board: a live class, the next class, else the cohort start. */
+function soonest(board: ClassBoardEntry[]):
+  | { kind: "live"; course: string; href: string }
+  | { kind: "next" | "cohort"; course: string; at: string; href: string }
+  | null {
+  const live = board.find((b) => b.live)
+  if (live?.live) return { kind: "live", course: live.courseTitle, href: live.live.joinHref }
+  const next = board
+    .filter((b) => b.next)
+    .sort((a, b) => (a.next as { startsAt: string }).startsAt.localeCompare((b.next as { startsAt: string }).startsAt))[0]
+  if (next?.next) return { kind: "next", course: next.courseTitle, at: next.next.startsAt, href: "/dashboard/meetings" }
+  const cohort = board.find((b) => b.cohortStartsAt)
+  if (cohort?.cohortStartsAt) return { kind: "cohort", course: cohort.courseTitle, at: cohort.cohortStartsAt, href: "/dashboard" }
+  return null
+}
 
-/**
- * Classes still ahead, read through `splitClasses` like the Upcoming classes
- * tile — one waiting for its host has started, so it isn't upcoming. A full
- * list reads "N+".
- */
-function ClassesStat({ now }: { now: number }) {
-  const { data: classes = [], isLoading } = useUpcomingClasses()
-  const { ahead } = splitClasses(classes, now)
-  const more = classes.length >= CLASS_LIST_LIMIT
-  const none = !isLoading && ahead.length === 0
+/** The next live class as a running countdown — "None scheduled" only when there truly is none. */
+function NextClassStat() {
+  const { data: board = [], isLoading } = useClassBoard()
+  const s = soonest(board)
+  if (isLoading) return <StatCell icon={Calendar03Icon} value={<Skel className="h-5 w-16" />} label="Next live class" />
+  if (!s) return <StatCell icon={Calendar03Icon} value="None scheduled" label="Next live class" href="/dashboard/meetings" quiet />
+  if (s.kind === "live") {
+    return (
+      <StatCell
+        icon={Calendar03Icon}
+        value={
+          <span className="inline-flex items-center gap-2 text-ws-danger">
+            <span aria-hidden className="size-2 rounded-full bg-ws-danger" />
+            Live now
+          </span>
+        }
+        label={s.course}
+        href={s.href}
+      />
+    )
+  }
   return (
     <StatCell
       icon={Calendar03Icon}
-      value={isLoading ? <Skel className="h-5 w-8" /> : none ? "None scheduled" : more ? `${ahead.length}+` : ahead.length}
-      label={ahead.length === 1 && !more ? "Upcoming class" : "Upcoming classes"}
-      href="/dashboard/meetings"
-      quiet={none}
+      value={<Countdown target={s.at} variant="compact" className="text-[17px]" endedLabel="Starting now" />}
+      label={s.kind === "cohort" ? "Until your cohort begins" : `Next class · ${s.course}`}
+      href={s.href}
+    />
+  )
+}
+
+/** Only once one is earned — before that the cell said "On completion", which the points beside it now outrank. */
+function CertificatesStat() {
+  const { data: certificates = [], isLoading } = useMyCertificates()
+  if (isLoading || certificates.length === 0) return null
+  return (
+    <StatCell
+      icon={Certificate01Icon}
+      value={certificates.length}
+      label={certificates.length === 1 ? "Certificate" : "Certificates"}
+      href="/dashboard/certificates"
     />
   )
 }

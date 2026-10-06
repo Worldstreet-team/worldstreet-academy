@@ -27,7 +27,8 @@ import {
   type HomeHero,
   type LearningStep,
 } from "@/lib/dashboard-home"
-import { useUpcomingClasses } from "@/lib/hooks/queries"
+import { useClassBoard, useUpcomingClasses } from "@/lib/hooks/queries"
+import { ClassBand, classTabBadge } from "@/components/dashboard/class-band"
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import { useClientNow } from "@/lib/hooks/use-now"
 import { schoolCover } from "@/lib/school-art"
@@ -145,15 +146,17 @@ const COVER_SIZES = "(min-width: 1280px) 640px, (min-width: 768px) 60vw, 100vw"
 /**
  * The stage: copy on the left and the program's art full-bleed on the right
  * from ~672px of card width; the art stacks above the copy below that. `top`
- * (the program switcher) stays put while the program under it changes:
- * `contentKey` remounts the copy and the art, and `fade` cross-fades them in —
- * set after a switch, never on the first paint. `footer` (the HeroStats cells)
- * closes the card under both columns, so the program and the student's totals
- * read as one card.
+ * (the program switcher) runs across the card above both and stays put while
+ * the program under it changes: `contentKey` remounts the copy, the art and
+ * the band, and `fade` cross-fades them in — set after a switch, never on the
+ * first paint. `band` (the program's live class) and then `footer` (the
+ * HeroStats cells) close the card under both columns, so the program, its
+ * next class and the student's totals read as one card.
  */
 function HeroFrame({
   art,
   top,
+  band,
   footer,
   contentKey,
   fade = false,
@@ -161,6 +164,8 @@ function HeroFrame({
 }: {
   art: React.ReactNode
   top?: React.ReactNode
+  /** The program's live-class band (ClassBand), under both columns and above the totals. */
+  band?: React.ReactNode
   footer?: React.ReactNode
   contentKey: string
   fade?: boolean
@@ -169,9 +174,11 @@ function HeroFrame({
   const enter = fade ? "ws-animate-fade" : undefined
   return (
     <CardShell className="@container">
+      {/* The switcher spans the card (2026-10-06): inside the copy column it
+          clipped the third program and hid the fourth. */}
+      {top && <div className="min-w-0 px-5 pt-5 sm:px-6 sm:pt-6 @2xl:px-8 @2xl:pt-7">{top}</div>}
       <div className={HERO_COLUMNS}>
-        <div className={COPY_CLASS}>
-          {top}
+        <div className={cn(COPY_CLASS, top && "pt-4 sm:pt-5 @2xl:pt-6")}>
           <div key={contentKey} className={cn("flex min-w-0 flex-1 flex-col gap-6", enter)}>
             {children}
           </div>
@@ -180,6 +187,11 @@ function HeroFrame({
           {art}
         </div>
       </div>
+      {band && (
+        <div key={contentKey} className={enter}>
+          {band}
+        </div>
+      )}
       {footer}
     </CardShell>
   )
@@ -488,7 +500,12 @@ function LessonProgress({ enrollment: e, step }: { enrollment: StudentEnrollment
 
 type HeroProps = { enrollment: StudentEnrollment; footer?: React.ReactNode }
 
-type Switcher = { programs: StudentEnrollment[]; onChange: (id: string) => void }
+type Switcher = {
+  programs: StudentEnrollment[]
+  onChange: (id: string) => void
+  /** A marker per enrollment id — the live dot or "in 2d" (classTabBadge). */
+  badges?: Record<string, React.ReactNode>
+}
 
 /** Whole words, short enough to sit in a Segmented option. */
 function switcherLabel(title: string): string {
@@ -500,7 +517,7 @@ function switcherLabel(title: string): string {
 }
 
 /** The programs in progress, as the one tab system; it scrolls sideways where the options outrun the column. */
-function ProgramSwitcher({ programs, value, onChange }: Switcher & { value: string }) {
+function ProgramSwitcher({ programs, value, onChange, badges }: Switcher & { value: string }) {
   return (
     <div
       role="group"
@@ -509,7 +526,7 @@ function ProgramSwitcher({ programs, value, onChange }: Switcher & { value: stri
     >
       <Segmented
         size="sm"
-        options={programs.map((p) => ({ key: p.id, label: switcherLabel(p.courseTitle) }))}
+        options={programs.map((p) => ({ key: p.id, label: switcherLabel(p.courseTitle), badge: badges?.[p.id] }))}
         value={value}
         onChange={onChange}
       />
@@ -520,10 +537,11 @@ function ProgramSwitcher({ programs, value, onChange }: Switcher & { value: stri
 function ContinueHero({
   enrollment: e,
   footer,
+  band,
   now,
   switcher,
   fade,
-}: HeroProps & { now: number; switcher: Switcher | null; fade: boolean }) {
+}: HeroProps & { band?: React.ReactNode; now: number; switcher: Switcher | null; fade: boolean }) {
   const step = learningStep(e)
   const face = continueFace(e, step)
   const playing = step === "start" || step === "resume"
@@ -534,6 +552,7 @@ function ContinueHero({
     <HeroFrame
       art={<StageArt enrollment={e} play={face.primary.icon ? face.primary : null} lesson={lesson} />}
       top={switcher && <ProgramSwitcher {...switcher} value={e.id} />}
+      band={band}
       footer={footer}
       contentKey={e.id}
       fade={fade}
@@ -719,6 +738,9 @@ export function LearningHero({
   intent?: MyEnrollmentIntent | null
 }) {
   const [picked, setPicked] = React.useState<string | null>(null)
+  // Live classes per program: the band under the hero and the tab markers.
+  const { data: board = [] } = useClassBoard(Boolean(hero))
+  const boardBy = new Map(board.map((b) => [b.courseId, b]))
   if (!hero && intent) return <FinishEnrollingHero intent={intent} />
   if (!hero) return <StartHero returning={hasEnrollments} />
   if (hero.mode === "reserved") return <ReservedHero enrollment={hero.enrollment} footer={footer} />
@@ -727,12 +749,14 @@ export function LearningHero({
   const offered = programs.slice(0, SWITCHER_MAX)
   const switchable = offered.length > 1 && offered.some((p) => p.id === hero.enrollment.id)
   const shown = (switchable && offered.find((p) => p.id === picked)) || hero.enrollment
+  const badges = Object.fromEntries(offered.map((p) => [p.id, classTabBadge(boardBy.get(p.courseId), now)]))
   return (
     <ContinueHero
       enrollment={shown}
       footer={footer}
+      band={<ClassBand entry={boardBy.get(shown.courseId)} />}
       now={now}
-      switcher={switchable ? { programs: offered, onChange: setPicked } : null}
+      switcher={switchable ? { programs: offered, onChange: setPicked, badges } : null}
       fade={picked !== null}
     />
   )

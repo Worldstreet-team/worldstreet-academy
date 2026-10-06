@@ -8,6 +8,7 @@ import { ArrowRight01Icon } from "@hugeicons/core-free-icons"
 import { Topbar } from "@/components/platform/topbar"
 import { CourseCard, CourseCardSkeleton } from "@/components/platform/course-card"
 import { AssignmentsTile } from "@/components/dashboard/assignments-tile"
+import { LiveClassBanner } from "@/components/dashboard/class-band"
 import { HomeBento, type BentoTile } from "@/components/dashboard/home-bento"
 import { HeroStats, HeroStatsSkeleton } from "@/components/dashboard/home-strip"
 import {
@@ -37,6 +38,7 @@ import {
   useBookmarkedIds,
   useBookmarks,
   useBrowseCourses,
+  useClassBoard,
   useEnrollments,
   useMyAssessments,
   useMyCertificates,
@@ -123,6 +125,8 @@ export default function DashboardPage() {
   const { data: bookmarks = [], isLoading: loadingBookmarks } = useBookmarks()
   const { data: browseCourses = [], isLoading: loadingBrowse } = useBrowseCourses()
   const { data: intent = null } = useMyEnrollmentIntent()
+  // Live classes per program (shared with the hero's band and tabs — one query).
+  const { data: classBoard = [] } = useClassBoard(enrollments.length > 0)
   const bookmarkedIds = useBookmarkedIds()
   const toggleBookmark = useToggleBookmark()
 
@@ -192,6 +196,8 @@ export default function DashboardPage() {
               style={{ background: "radial-gradient(680px 440px at 68% 42%, var(--color-ws-glow), transparent 70%)" }}
             />
             <div className="relative flex flex-col gap-5">
+              {/* A class of theirs is live: the first thing on the page. */}
+              <LiveClassBanner board={classBoard} />
               <Rise>
                 <HomeGreeting
                   firstName={user.firstName}
@@ -227,7 +233,7 @@ export default function DashboardPage() {
                             totals={totals}
                             showCertificates={showCertificates}
                             showClasses={showClasses}
-                            now={now}
+                            toDo={toDo}
                           />
                         ) : null
                       }

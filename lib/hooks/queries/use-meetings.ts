@@ -12,6 +12,7 @@ import {
   type MeetingInviteItem,
   type UpcomingClass,
 } from "@/lib/actions/meetings"
+import { getMyClassBoard, type ClassBoardEntry } from "@/lib/actions/class-board"
 import { queryKeys } from "./keys"
 
 export function useMyMeetings() {
@@ -58,6 +59,21 @@ export function useUpcomingClasses() {
   })
 }
 
+/**
+ * The dashboard's live-class board: per program, the class live now, the next
+ * one, the latest recording and the cohort start. Polled, so "live now"
+ * appears within half a minute of the tutor starting the class.
+ */
+export function useClassBoard(enabled = true) {
+  return useQuery<ClassBoardEntry[]>({
+    queryKey: queryKeys.classBoard,
+    queryFn: () => getMyClassBoard(),
+    enabled,
+    staleTime: 20 * 1000,
+    refetchInterval: 30 * 1000,
+  })
+}
+
 export function useInstructorMeetingCourses() {
   return useQuery({
     queryKey: queryKeys.instructorMeetingCourses,
@@ -77,5 +93,6 @@ export function useInvalidateMeetings() {
     qc.invalidateQueries({ queryKey: queryKeys.meetingHistory })
     qc.invalidateQueries({ queryKey: queryKeys.meetingInvites })
     qc.invalidateQueries({ queryKey: queryKeys.upcomingClasses })
+    qc.invalidateQueries({ queryKey: queryKeys.classBoard })
   }
 }
