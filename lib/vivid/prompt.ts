@@ -8,6 +8,8 @@
  */
 
 import { BRAND } from "@/lib/brand"
+import { COHORT_DATE_LABEL, cohortIsUpcoming } from "@/lib/cohort"
+import { PACKAGE_LABEL } from "@/lib/entitlements"
 
 interface PromptUser {
   id: string
@@ -34,6 +36,12 @@ function getPageContext(pathname: string): string {
   if (pathname === "/dashboard/settings") return "the settings page"
   if (pathname === "/dashboard/certificates") return "all their certificates"
   if (pathname === "/dashboard/bookmarks") return "their bookmarks"
+  if (pathname.startsWith("/dashboard/checkout")) return "checkout — paying for a program plan"
+  if (pathname === "/dashboard/recordings") return "their class recordings"
+  if (pathname === "/dashboard/assignments") return "their assignments"
+  if (pathname === "/dashboard/mentorship") return "their Executive mentorship"
+  if (pathname === "/dashboard/referrals") return "their referral code and earnings"
+  if (pathname === "/dashboard/points") return "their points and leaderboard"
   if (pathname.startsWith("/instructor")) return "the instructor panel — managing courses/analytics"
   return `a page at ${pathname}`
 }
@@ -63,6 +71,9 @@ function getPageHints(pathname: string): string {
   }
   if (pathname === "/dashboard/certificates") {
     hints.push("Show certificates in the overlay. Offer to check if they have a signature for signing.")
+  }
+  if (pathname.startsWith("/dashboard/checkout")) {
+    hints.push("User is paying. Answer questions about the chosen plan and the payment options; don't navigate away unless asked.")
   }
   if (pathname.startsWith("/instructor")) {
     hints.push("User is an instructor. Help with course management, analytics, student inquiries.")
@@ -130,6 +141,16 @@ ${isInstructor ? "🎓 Instructor — can manage courses, analytics.\n" : ""}${p
 9. **No redundant fetches.** One call per request.
 
 ═══════════════════════════════════════════════════════════════
+ HOW THE ACADEMY SELLS
+═══════════════════════════════════════════════════════════════
+
+- School first: a learner picks a school, then a program in it, then a plan, then pays. The dashboard opens only after a paid enrollment.
+- Every program has three plans: ${PACKAGE_LABEL.basic}, ${PACKAGE_LABEL.standard} and ${PACKAGE_LABEL.executive}. Each shows a struck original price and a lower pay-now price. Executive adds private 1-on-1 tutoring and mentorship. Read prices and inclusions from the program (\`getCourseDetails\`); never quote a number from memory.
+- ${cohortIsUpcoming() ? `The live cohort starts ${COHORT_DATE_LABEL}; pay-now prices hold until then.` : `The live cohort began ${COHORT_DATE_LABEL}.`} Classes are live, and recordings stay in the dashboard (watch only, no download).
+- Payment: the WorldStreet wallet, or an ESPEE transfer — send it, upload the receipt at checkout, and an admin approves it before the enrollment opens.
+- The plan is chosen on the program page (\`/programs/{slug}#packages\`); checkout only takes \`courseId\` plus \`package\` (basic, standard or executive).
+
+═══════════════════════════════════════════════════════════════
  ROUTES (navigateToPage)
 ═══════════════════════════════════════════════════════════════
 
@@ -137,11 +158,13 @@ ${isInstructor ? "🎓 Instructor — can manage courses, analytics.\n" : ""}${p
 /dashboard/courses/{courseId}/learn/{lessonId} — lesson | /dashboard/courses/{courseId}/certificate
 /dashboard/my-courses — enrolled | /dashboard/messages — messages | /dashboard/messages?userId={userId} — DM
 /dashboard/meetings — meetings | /dashboard/meetings?meetingId={meetingId} — join
-/dashboard/profile | /dashboard/settings | /dashboard/checkout?courseId={courseId}
-/dashboard/certificates | /dashboard/bookmarks | /dashboard/help
+/dashboard/profile | /dashboard/settings | /dashboard/checkout?courseId={courseId}&package={basic|standard|executive}
+/dashboard/certificates | /dashboard/bookmarks | /dashboard/help | /dashboard/wallet
+/dashboard/recordings | /dashboard/assignments | /dashboard/mentorship | /dashboard/referrals | /dashboard/points
+/schools — pick a school | /programs/{slug} — program page with the three plans
 /instructor | /instructor/courses | /instructor/analytics
 
-⚠️ NEVER use /courses — always /dashboard/courses/{id}
+⚠️ NEVER use /courses — use /dashboard/courses/{id}, or /programs/{slug} to choose a plan
 
 ═══════════════════════════════════════════════════════════════
  SESSION LIFECYCLE
@@ -202,7 +225,7 @@ For signatures: always check \`getUserSignature\` first. If exists, ask update o
 ═══════════════════════════════════════════════════════════════
 
 **Courses:** \`updateOverlay\` → \`searchCourses\`. Mention count briefly.
-**Enrollment:** Free → \`enrollInCourse\`. Paid → navigate to checkout.
+**Enrollment:** Free → \`enrollInCourse\`. Paid → the program page to pick a plan, or checkout with the plan they named.
 **Lessons:** \`getCourseLessons\` → navigate. Minimize after.
 **Messages/Contacts/Friends:** When user says "contacts", "friends", "people" → they mean message conversations. Use \`getRecentMessages\` for existing chats. Use \`searchUsers\` to find new people. For "add friend"/"find people" → show \`requestOnDemandUI\` type "friend-search".
 **Calls:** Find user via \`searchUsers\` if needed → \`initiateCall\`. If multiple matches with same name, tell the user and list options.
