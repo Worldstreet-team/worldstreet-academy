@@ -19,9 +19,13 @@ const LEAD = "School of "
  *
  * The panel is a size container with two compositions, so the server HTML is
  * already right at every width (no JS layout switch):
- *   · narrow (< 32rem — the swipe row on phones, tablets and reduced motion):
- *     the cover on top, copy below, the number set over the cover's dark
- *     left side;
+ *   · narrow (< 32rem — phones and tablets, and the swipe row under reduced
+ *     motion): the cover on top, copy below, the number set over the cover's
+ *     dark left side. On the pinned stage below lg (upright, with motion)
+ *     the card has a set height, and the cover grows to fill what the copy
+ *     leaves — a taller window onto the render, never a clipped footer —
+ *     framed farther right, where the renders keep their subject. Under
+ *     640px tall the blurb clamps to two lines so the cover keeps a window;
  *   · wide (≥ 32rem — the pinned stage at lg+): the cover full-bleed and the
  *     copy in a column over its left. The renders put their subject right of
  *     centre on a dark ground, so the column sits on empty backdrop. On short
@@ -84,11 +88,15 @@ export function SchoolPanel({
         {/* The cover — on top when narrow, full-bleed when wide. */}
         <div
           aria-hidden
-          className="relative aspect-[16/10] shrink-0 overflow-hidden bg-ws-sunken @min-[32rem]:absolute @min-[32rem]:inset-0 @min-[32rem]:aspect-auto"
+          className="relative aspect-[16/10] shrink-0 overflow-hidden bg-ws-sunken @min-[32rem]:absolute @min-[32rem]:inset-0 @min-[32rem]:aspect-auto max-lg:portrait:motion-safe:@max-[32rem]:aspect-auto max-lg:portrait:motion-safe:@max-[32rem]:min-h-24 max-lg:portrait:motion-safe:@max-[32rem]:flex-1"
         >
           {cover ? (
             <motion.div
-              className={cn("absolute inset-0 @min-[32rem]:-inset-x-[7%]", stage && "will-change-transform")}
+              className={cn(
+                "absolute inset-0 @min-[32rem]:-inset-x-[7%]",
+                // The drift needs bleed at every width once the panel is on a stage.
+                stage && "-inset-x-[7%] will-change-transform"
+              )}
               style={stage ? { x: artX } : undefined}
             >
               <Image
@@ -96,8 +104,8 @@ export function SchoolPanel({
                 alt=""
                 fill
                 loading="eager"
-                sizes="(min-width: 1024px) 66vw, 26rem"
-                className="object-cover object-[62%_50%]"
+                sizes="(min-width: 1024px) 66vw, 32rem"
+                className="object-cover object-[62%_50%] max-lg:portrait:motion-safe:@max-[32rem]:object-[85%_50%]"
               />
             </motion.div>
           ) : (
@@ -129,7 +137,7 @@ export function SchoolPanel({
           style={stage ? { x: copyX, opacity: copyOpacity } : undefined}
           className={cn(
             stage && "will-change-[transform,opacity]",
-            "flex flex-1 flex-col p-5 pt-1 @min-[32rem]:absolute @min-[32rem]:inset-y-0 @min-[32rem]:left-0 @min-[32rem]:w-[min(50%,30rem)] @min-[48rem]:w-[min(48%,30rem)] @min-[32rem]:justify-end @min-[32rem]:p-[clamp(1.75rem,5.5cqi,3.25rem)]"
+            "flex flex-1 flex-col p-5 pt-1 max-lg:portrait:motion-safe:@max-[32rem]:flex-none @min-[32rem]:absolute @min-[32rem]:inset-y-0 @min-[32rem]:left-0 @min-[32rem]:w-[min(50%,30rem)] @min-[48rem]:w-[min(48%,30rem)] @min-[32rem]:justify-end @min-[32rem]:p-[clamp(1.75rem,5.5cqi,3.25rem)]"
           )}
         >
           <h3 className="font-display">
@@ -142,7 +150,7 @@ export function SchoolPanel({
               {title}
             </span>
           </h3>
-          <p className="mt-2.5 text-[14px] leading-relaxed text-ws-muted @min-[32rem]:mt-4 @min-[32rem]:text-[clamp(0.9375rem,1.6cqi,1.0625rem)] @min-[32rem]:[@media(max-height:780px)]:mt-3 @min-[32rem]:[@media(max-height:780px)]:line-clamp-2">
+          <p className="mt-2.5 text-[14px] leading-relaxed text-ws-muted @min-[32rem]:mt-4 @min-[32rem]:text-[clamp(0.9375rem,1.6cqi,1.0625rem)] @min-[32rem]:[@media(max-height:780px)]:mt-3 @min-[32rem]:[@media(max-height:780px)]:line-clamp-2 max-lg:portrait:motion-safe:@max-[32rem]:[@media(max-height:640px)]:line-clamp-2">
             {school.blurb}
           </p>
 

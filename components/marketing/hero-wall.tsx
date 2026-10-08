@@ -16,7 +16,6 @@ import { useMotionOK } from "@/components/marketing/motion/bus"
 import { HeroStage, PEOPLE_COUNT, slideOf, useHeroSlideshow } from "@/components/marketing/hero-stage"
 import { HeroPauseToggle, useSlideClock } from "@/components/marketing/hero-controls"
 import { HeroCopy } from "@/components/marketing/hero-copy"
-import { HeroChipScrollbar } from "@/components/marketing/hero-chip-scrollbar"
 import { useStartSchool } from "@/components/marketing/start-school-store"
 import { BRAND } from "@/lib/brand"
 import { SCHOOLS, SCHOOL_BY_SLUG, type School, type SchoolSlug } from "@/lib/schools"
@@ -94,7 +93,6 @@ export function HeroWall({
   const heroRef = React.useRef<HTMLElement>(null)
   const subRef = React.useRef<HTMLDivElement>(null)
   const pickRef = React.useRef<HTMLDivElement>(null)
-  const chipRowRef = React.useRef<HTMLDivElement>(null)
   const ctaRef = React.useRef<HTMLDivElement>(null)
   const leave = useHeroLeave(ok, heroRef, subRef, pickRef, ctaRef)
 
@@ -165,7 +163,7 @@ export function HeroWall({
       <div
         data-theme="dark"
           data-brand="worldstreet"
-        className="relative isolate overflow-hidden rounded-[20px] bg-ws-page text-ws-primary [--band:15rem] sm:[--band:24rem] md:[--band:27rem]"
+        className="relative isolate overflow-hidden rounded-[20px] bg-ws-page text-ws-primary [--band:26rem] sm:[--band:24rem] md:[--band:27rem]"
       >
         {/* The show's one control: first in the hero, seen only on keyboard focus. */}
         {ok && <HeroPauseToggle paused={paused} onToggle={() => setPaused((p) => !p)} />}
@@ -186,8 +184,11 @@ export function HeroWall({
         <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
           {/* Solid for 12rem past the band's foot: the picture lags the page
               by up to 180px on the way out, and must never slip out from
-              under the veil. */}
-          <div className="absolute inset-x-0 top-0 h-[calc(var(--band)+12rem)] bg-[linear-gradient(to_bottom,transparent_0,transparent_calc(var(--band)*0.3),color-mix(in_oklab,var(--ws-bg-page)_55%,transparent)_calc(var(--band)*0.48),color-mix(in_oklab,var(--ws-bg-page)_88%,transparent)_calc(var(--band)*0.64),var(--ws-bg-page)_calc(var(--band)*0.86))] lg:hidden" />
+              under the veil. Phones, with the taller band (no picker), key
+              the ramp to the band's FOOT instead of its proportions: the
+              picture stays clear down to 12rem above the foot, and the
+              veil is dense where the copy overlaps (the last 6.5rem). */}
+          <div className="absolute inset-x-0 top-0 h-[calc(var(--band)+12rem)] bg-[linear-gradient(to_bottom,transparent_0,transparent_calc(var(--band)*0.3),color-mix(in_oklab,var(--ws-bg-page)_55%,transparent)_calc(var(--band)*0.48),color-mix(in_oklab,var(--ws-bg-page)_88%,transparent)_calc(var(--band)*0.64),var(--ws-bg-page)_calc(var(--band)*0.86))] max-sm:bg-[linear-gradient(to_bottom,transparent_0,transparent_calc(var(--band)-12rem),color-mix(in_oklab,var(--ws-bg-page)_55%,transparent)_calc(var(--band)-8.5rem),color-mix(in_oklab,var(--ws-bg-page)_88%,transparent)_calc(var(--band)-6rem),var(--ws-bg-page)_calc(var(--band)-2.5rem))] lg:hidden" />
           <div className="absolute inset-0 hidden bg-[linear-gradient(90deg,var(--ws-bg-page)_0%,var(--ws-bg-page)_34%,color-mix(in_oklab,var(--ws-bg-page)_82%,transparent)_48%,color-mix(in_oklab,var(--ws-bg-page)_30%,transparent)_62%,transparent_74%)] lg:block xl:bg-[linear-gradient(90deg,var(--ws-bg-page)_0%,var(--ws-bg-page)_26%,color-mix(in_oklab,var(--ws-bg-page)_82%,transparent)_40%,color-mix(in_oklab,var(--ws-bg-page)_34%,transparent)_54%,transparent_66%)]" />
           <div className="absolute inset-x-0 bottom-0 hidden h-2/5 bg-[linear-gradient(to_top,color-mix(in_oklab,var(--ws-bg-page)_70%,transparent),transparent)] lg:block" />
         </div>
@@ -213,8 +214,9 @@ export function HeroWall({
 
             {/* lg+ widens the picker to 3xl so the eight chips sit in two
                 rows (three would push the CTA under a 768px fold). Phones
-                close every gap a step, with the shorter band and the
-                one-sentence sub-copy, so the gold CTA makes the first screen. */}
+                have no picker (owner, 2026-09-21): its height goes to a
+                bigger picture, and the sticky school bar's "Choose a
+                school" is their way into the schools. */}
             <motion.div
               className="mt-6 max-w-2xl sm:mt-7 lg:max-w-3xl"
               initial={{ opacity: 0, y: 20 }}
@@ -226,7 +228,7 @@ export function HeroWall({
                   keyboard focus inside brings them back to full strength. */}
               <motion.div
                 ref={pickRef}
-                className="focus-within:opacity-100!"
+                className="focus-within:opacity-100! max-sm:hidden"
                 style={ok ? { y: leave.pickY, opacity: leave.pickOpacity } : STILL}
                 onPointerEnter={holdOn}
                 onPointerLeave={holdOff}
@@ -257,16 +259,8 @@ export function HeroWall({
                   </AnimatePresence>
                 </div>
                 {/* A choice list, not tabs: the chosen chip is raised, never
-                    gold — gold stays on the one CTA. Phones scroll the row
-                    sideways inside the gutter (with a visible scrollbar
-                    below it, owner 2026-09-18); sm+ wraps. */}
-                <motion.div
-                  ref={chipRowRef}
-                  layoutScroll
-                  role="group"
-                  aria-labelledby="hero-pick"
-                  className="-mx-6 mt-3 flex gap-2 overflow-x-auto px-6 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden"
-                >
+                    gold — gold stays on the one CTA. The chips wrap. */}
+                <div role="group" aria-labelledby="hero-pick" className="mt-3 flex flex-wrap gap-2 pb-1">
                   {SCHOOLS.map((s) => {
                     const on = picked === s.slug
                     return (
@@ -274,16 +268,7 @@ export function HeroWall({
                         key={s.slug}
                         type="button"
                         aria-pressed={on}
-                        onClick={(e) => {
-                          choose(s.slug)
-                          // Phones: centre the chip in its sideways row (never scroll the page).
-                          const row = e.currentTarget.parentElement
-                          if (row && row.scrollWidth > row.clientWidth) {
-                            const c = e.currentTarget.getBoundingClientRect()
-                            const r = row.getBoundingClientRect()
-                            row.scrollBy({ left: c.left + c.width / 2 - (r.left + r.width / 2), behavior: ok ? "smooth" : "auto" })
-                          }
-                        }}
+                        onClick={() => choose(s.slug)}
                         className={cn(
                           "group relative h-10 shrink-0 rounded-full px-3.5 text-[13px] font-medium transition-colors duration-[var(--ws-motion-base)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/50",
                           on ? "text-ws-primary" : "text-ws-muted hover:text-ws-primary"
@@ -312,8 +297,7 @@ export function HeroWall({
                       </button>
                     )
                   })}
-                </motion.div>
-                <HeroChipScrollbar rowRef={chipRowRef} className="mt-1" />
+                </div>
               </motion.div>
 
               {/* `id="hero-cta"`: the sticky school bar takes over as this row fades. */}

@@ -110,11 +110,18 @@ function eyebrow(school: School | null): string {
 }
 
 const EYEBROW = "text-[11px] font-medium uppercase tracking-[0.14em] text-ws-gold"
+/**
+ * Phones scale the claim with the screen so its three beats hold three lines
+ * ("Own Your Future." is ~8.15em wide: 9.6vw keeps it inside the gutters from
+ * 320px up) — the clamp's 44px floor broke it over two lines below ~420px.
+ * A school's name keeps its step below the claim (~0.83×). Both meet their
+ * sm sizes at the breakpoint.
+ */
 const H1_DEFAULT =
-  "mt-5 max-w-4xl font-display text-[clamp(2.75rem,6.5vw,5.5rem)] font-semibold leading-[1.02] tracking-[-0.03em] text-ws-primary"
+  "mt-5 max-w-4xl font-display text-[clamp(2.75rem,6.5vw,5.5rem)] max-sm:text-[length:min(9.6vw,2.75rem)] font-semibold leading-[1.02] tracking-[-0.03em] text-ws-primary"
 // lg narrows the name to the copy column; the picture stands right of it.
 const H1_SCHOOL =
-  "mt-5 max-w-3xl lg:max-w-xl xl:max-w-3xl font-display text-[clamp(2.25rem,4.4vw,4rem)] font-semibold leading-[1.04] tracking-[-0.03em] text-ws-primary"
+  "mt-5 max-w-3xl lg:max-w-xl xl:max-w-3xl font-display text-[clamp(2.25rem,4.4vw,4rem)] max-sm:text-[length:min(8vw,2.25rem)] font-semibold leading-[1.04] tracking-[-0.03em] text-ws-primary"
 const SUB = "max-w-xl text-[15px] leading-relaxed text-ws-muted md:text-lg xl:max-w-2xl"
 const FACTS = "mt-3 text-[14px] leading-6 tabular-nums text-ws-primary/80"
 
@@ -228,8 +235,10 @@ type Styles = React.ComponentProps<typeof motion.div>["style"]
 
 /**
  * The claim and its sub-copy, in one cell. The cell is as tall as the
- * tallest variant (the default, at every width we ship — a school's name is
- * set smaller), and each variant stands on the cell's FOOT: a shorter school
+ * tallest variant (from sm the default — a school's name is set smaller;
+ * phones have no school picker, so there only the default sizes it — the
+ * school sizers are hidden below sm), and each variant stands on the cell's
+ * FOOT: a shorter
  * block sits directly over the chips it answers, and the slack goes above
  * its eyebrow rather than opening a hole between its name and its tagline.
  *
@@ -256,7 +265,7 @@ export function HeroCopy({
   return (
     <div className="grid">
       {[null, ...SCHOOLS].map((s) => (
-        <div key={s?.slug ?? "default"} aria-hidden className="invisible self-end [grid-area:1/1]">
+        <div key={s?.slug ?? "default"} aria-hidden className={cn("invisible self-end [grid-area:1/1]", s && "max-sm:hidden")}>
           <HeadContent school={s} ok={ok} intro={false} live={false} />
           <div ref={s ? undefined : subRef} className="mt-5 sm:mt-6">
             <SubContent school={s} facts={s ? factsFor(s) : null} ok={ok} intro={false} live={false} />

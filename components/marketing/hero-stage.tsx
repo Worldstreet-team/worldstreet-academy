@@ -423,12 +423,12 @@ function Cover({ i, src, onLoaded }: { i: number; src: string; onLoaded: (i: num
  */
 const PORTRAIT_FIT = {
   tall: {
-    className: "h-[19.75rem] w-auto sm:h-[27.5rem] md:h-[30.5rem] lg:h-[80%]",
-    sizes: "(min-width: 1536px) 40rem, (min-width: 1024px) 32rem, (min-width: 768px) 24rem, (min-width: 640px) 21.5rem, 15.5rem",
+    className: "h-[25rem] w-auto sm:h-[27.5rem] md:h-[30.5rem] lg:h-[80%]",
+    sizes: "(min-width: 1536px) 40rem, (min-width: 1024px) 32rem, (min-width: 768px) 24rem, (min-width: 640px) 21.5rem, 20rem",
   },
   wide: {
-    className: "h-auto w-[23rem] max-w-[96%] sm:w-[34rem] md:w-[38rem] lg:h-[64%] lg:w-auto lg:max-w-none",
-    sizes: "(min-width: 1536px) 52rem, (min-width: 1024px) 44rem, (min-width: 768px) 38rem, (min-width: 640px) 34rem, 23rem",
+    className: "h-auto w-full sm:w-[34rem] md:w-[38rem] lg:h-[64%] lg:w-auto",
+    sizes: "(min-width: 1536px) 52rem, (min-width: 1024px) 44rem, (min-width: 768px) 38rem, (min-width: 640px) 34rem, 100vw",
   },
 } as const
 
