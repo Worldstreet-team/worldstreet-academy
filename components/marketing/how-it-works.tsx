@@ -134,7 +134,7 @@ function Heading() {
       <SectionTitle id="how-heading" className="mt-4 max-w-2xl">
         Start your journey
         <br />
-        in four simple steps.
+        in 4 simple steps.
       </SectionTitle>
     </Reveal>
   )

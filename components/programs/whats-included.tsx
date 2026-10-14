@@ -1,5 +1,5 @@
 import { AwardIcon, CircleHelpIcon, ClipboardListIcon, CompassIcon, DownloadIcon, HandshakeIcon, ListChecksIcon, RadioIcon, SquarePlayIcon, TrendingUpIcon, UsersIcon, type IconComponent } from "@/components/icons"
-import { SectionLabel } from "@/components/marketing/section-heading"
+import { PROGRAM_H2 } from "@/components/programs/section-title"
 
 /** Spec §9 — the eleven inclusions, verbatim and static. */
 const INCLUDED: ReadonlyArray<{ label: string; icon: IconComponent }> = [
@@ -16,24 +16,25 @@ const INCLUDED: ReadonlyArray<{ label: string; icon: IconComponent }> = [
   { label: "Certificate upon completion", icon: AwardIcon },
 ]
 
+/**
+ * The program page's "What's included?" section. It is the general list, not
+ * a promise: what a given tier opens is spelled out in the package chooser,
+ * hence the closing note.
+ */
 export function WhatsIncluded() {
   return (
-    <section className="mt-16 border-t border-ws-hairline pt-10" aria-labelledby="included-heading">
-      <SectionLabel>What&apos;s included</SectionLabel>
-      <h2
-        id="included-heading"
-        className="mt-3 font-display text-2xl font-semibold tracking-[-0.015em] text-ws-primary"
-      >
+    <section aria-labelledby="included-heading">
+      <h2 id="included-heading" className={PROGRAM_H2}>
         Your learning experience
       </h2>
       <p className="mt-2 text-[15px] text-ws-muted">Depending on the program, students may receive:</p>
-      <ul className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <ul className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {INCLUDED.map(({ label, icon: Icon }) => (
           <li
             key={label}
-            className="flex items-center gap-3 rounded-[14px] border border-ws-hairline bg-ws-surface px-4 py-3.5 transition-colors duration-[var(--ws-motion-base)] hover:bg-ws-raised dark:border-transparent"
+            className="flex items-center gap-3 rounded-[14px] border border-ws-hairline bg-ws-surface px-4 py-3.5 dark:border-transparent"
           >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ws-brand/10 text-ws-gold">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-[9px] bg-ws-brand/[0.13]">
               <Icon size={15} aria-hidden />
             </span>
             <span className="text-[14px] font-medium text-ws-primary">{label}</span>

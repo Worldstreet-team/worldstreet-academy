@@ -47,7 +47,7 @@ const GOLD_CTA =
  * so arrow keys move the choice) and, beside it, the SELECTED tier's full
  * breakdown — its services, then every feature line in the instructor's own
  * words, "Everything in Basic" opening to the inherited list. ONE gold action
- * — "Continue to payment · $X" — carries the chosen tier to checkout. Below,
+ * — "Enrol for $X" — carries the chosen tier to checkout. Below,
  * "Compare packages" opens the feature × tier table built from the same data.
  *
  * A single-price program (one tier, or the synthesized "Full program" of a

@@ -394,8 +394,21 @@ export function FinaleCta({
             delay={0.14}
             className="mx-auto mt-5 max-w-md font-display text-[16px] font-semibold leading-relaxed tracking-[-0.01em] text-ws-primary md:text-[17px]"
           >
-            Choose a skill. Build your knowledge. Develop your capability. Create
-            your opportunity.
+            {/* Spec §16 sets these as four lines. */}
+            <span className="block">Choose a skill.</span>
+            <span className="block">Build your knowledge.</span>
+            <span className="block">Develop your capability.</span>
+            <span className="block">Create your opportunity.</span>
+          </Reveal>
+          {/* The closing line comes before the buttons, as in spec §16. */}
+          <Reveal
+            as="p"
+            amount={0.2}
+            delay={0.17}
+            className="mx-auto mt-5 max-w-xl text-[15px] leading-relaxed text-ws-muted md:text-[16px]"
+          >
+            Welcome to {BRAND.name}.{" "}
+            <span className="font-semibold text-ws-primary">Learn Skills. Build Value. Create Your Future.</span>
           </Reveal>
           {/* Phones: one column of equal-width buttons, not two ragged centred pills. */}
           <Reveal
@@ -424,15 +437,6 @@ export function FinaleCta({
                 Enrol now
               </a>
             )}
-          </Reveal>
-          <Reveal
-            as="p"
-            amount={0.2}
-            delay={0.26}
-            className="mx-auto mt-10 max-w-xl text-[13px] leading-relaxed text-ws-muted"
-          >
-            Welcome to {BRAND.name}.{" "}
-            <span className="font-semibold text-ws-primary">Learn Skills. Build Value. Create Your Future.</span>
           </Reveal>
         </motion.div>
       </div>

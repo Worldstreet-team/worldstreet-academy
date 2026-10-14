@@ -7,6 +7,7 @@
 import type { PublicPackage } from "@/lib/actions/student"
 import type { IPackageEntitlements, PackageKey } from "@/lib/db/models"
 import { PACKAGE_LABEL, PACKAGE_RANK } from "@/lib/entitlements"
+import { packagePriceLabel } from "@/lib/program-price"
 
 export type ServiceKey = keyof IPackageEntitlements
 
@@ -80,13 +81,15 @@ export function checkoutHref(courseId: string, pkg: PublicPackage, tierCount: nu
 
 /**
  * The primary action's words. The instructor's own button copy wins (spec
- * §6 "APPLY / ENROL FOR $999"); otherwise "Continue to payment" (or "Enrol
- * now" on a single-price program), with the price shown beside it.
+ * §6 "APPLY / ENROL FOR $999"); otherwise a tier reads "Enrol for $X" (spec
+ * §6 "ENROL FOR $49"), and a single-price program "Enrol now" with the price
+ * shown beside it (spec §8).
  */
 export function actionLabel(pkg: PublicPackage, single: boolean): { text: string; showPrice: boolean } {
   if (pkg.ctaLabel) return { text: pkg.ctaLabel, showPrice: false }
   if (pkg.price === 0) return { text: "Enrol for free", showPrice: false }
-  return { text: single ? "Enrol now" : "Continue to payment", showPrice: true }
+  if (!single) return { text: `Enrol for ${packagePriceLabel(pkg.price)}`, showPrice: false }
+  return { text: "Enrol now", showPrice: true }
 }
 
 /** How many published lessons each tier opens (free previews and untiered lessons open for all). */

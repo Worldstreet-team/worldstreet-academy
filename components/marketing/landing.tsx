@@ -19,6 +19,7 @@ import { Faq } from "@/components/marketing/faq"
 import { StickySchoolBar } from "@/components/marketing/sticky-school-bar"
 import { FreePreviewRail } from "@/components/marketing/free-preview-rail"
 import { InstitutionBand } from "@/components/marketing/institution-band"
+import { CertificateBand } from "@/components/marketing/certificate-band"
 import { CourseTeaser } from "@/components/marketing/course-teaser"
 import { ScrollProgress } from "@/components/marketing/motion/scroll-progress"
 
@@ -155,6 +156,9 @@ export async function Landing() {
 
       {/* Upcoming drops (renders only when something is scheduled) */}
       {drops.length > 0 && <UpcomingDrops drops={drops} />}
+
+      {/* Certification — the claim and a sample certificate (spec §13) */}
+      <CertificateBand />
 
       {/* Testimonials — real reviews only; hides at zero (spec §14) */}
       <Testimonials reviews={reviews} />

@@ -43,7 +43,7 @@ export function SchoolPrograms({
     <section id="programs" aria-labelledby="programs-heading" className={SCHOOL_SECTION}>
       <SectionHead
         id="programs-heading"
-        title={count > 1 ? "Choose your program" : count === 1 ? "The program" : "Programs"}
+        title="Available programs"
         lede={
           count > 1
             ? "Each program's page has its full curriculum and the packages to choose from."

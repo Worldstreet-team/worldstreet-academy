@@ -23,7 +23,7 @@ export function ProgramOutcomes({ items }: { items: string[] }) {
       className="rounded-[20px] border border-ws-hairline bg-ws-surface p-6 dark:border-transparent sm:p-8"
     >
       <h2 id="learn-heading" className={PROGRAM_H2}>
-        What you&apos;ll learn
+        What you will learn
       </h2>
       <ul className={cn("mt-6 grid gap-x-10 gap-y-4", items.length > 1 && "sm:grid-cols-2")}>
         {items.map((item) => (

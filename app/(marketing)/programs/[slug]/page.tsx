@@ -19,6 +19,7 @@ import { StickyPurchase } from "@/components/programs/sticky-purchase"
 import { SectionNav, type SectionLink } from "@/components/programs/section-nav"
 import { ProgramOutcomes, ProgramPrerequisites } from "@/components/programs/program-outcomes"
 import { ProgramCurriculum } from "@/components/programs/program-curriculum"
+import { WhatsIncluded } from "@/components/programs/whats-included"
 import { ClampedText } from "@/components/programs/clamped-text"
 import { ProgramInstructor } from "@/components/programs/program-instructor"
 import { PackageChooser } from "@/components/programs/package-chooser"
@@ -265,9 +266,7 @@ export default async function ProgramPage({
             </div>
 
             <div id="overview" className={cn("col-start-1 row-start-3 min-w-0 space-y-14 pt-10 lg:space-y-16 lg:pt-12", SECTION_SCROLL_MT)}>
-              <ProgramOutcomes items={program.whatYouWillLearn} />
-              {curriculum.length > 0 && <ProgramCurriculum id="curriculum" lessons={curriculum} />}
-              <ProgramPrerequisites requirements={program.requirements} targetAudience={program.targetAudience} />
+              {/* Spec §6–§8 order: the intro, what you will learn, the curriculum. */}
               {program.description && (
                 <section aria-labelledby="about-heading">
                   <h2 id="about-heading" className={PROGRAM_H2}>
@@ -278,6 +277,12 @@ export default async function ProgramPage({
                   </div>
                 </section>
               )}
+              <ProgramOutcomes items={program.whatYouWillLearn} />
+              {curriculum.length > 0 && <ProgramCurriculum id="curriculum" lessons={curriculum} />}
+              <ProgramPrerequisites requirements={program.requirements} targetAudience={program.targetAudience} />
+              {/* Spec §9 is the Academy's own program page; a marketplace or
+                  New Economy course promises only what its tier lists. */}
+              {isProgram && <WhatsIncluded />}
               {/* No person on the public site while FACULTY_PUBLIC is off (owner 2026-10-03). */}
               {FACULTY_PUBLIC && (
                 <ProgramInstructor
