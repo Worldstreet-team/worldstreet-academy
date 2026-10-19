@@ -35,8 +35,6 @@ export type School = {
   tagline: string | null
   /** §8 School Overview: the hero paragraph. */
   intro: string | null
-  /** §14 School Community (D26): an external group link; absent or null until product supplies one. */
-  communityUrl?: string | null
   /** lucide icon name for RenderIcon. */
   icon: string
   order: number
@@ -48,7 +46,7 @@ export type School = {
   careers: readonly string[]
   /** §7 study areas, verbatim and in order. */
   areas: readonly StudyArea[]
-  /** The school's community link; Phase 15 fills it. */
+  /** §14 School Community (D26): an external group link; null until product supplies one. */
   communityUrl: string | null
   /** Retired slugs that now resolve to this school. */
   legacySlugs: readonly string[]
