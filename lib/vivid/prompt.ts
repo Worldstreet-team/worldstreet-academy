@@ -160,7 +160,7 @@ ${isInstructor ? "🎓 Instructor — can manage courses, analytics.\n" : ""}${p
 /dashboard/meetings — meetings | /dashboard/meetings?meetingId={meetingId} — join
 /dashboard/profile | /dashboard/settings | /dashboard/checkout?courseId={courseId}&package={basic|standard|executive}
 /dashboard/certificates | /dashboard/bookmarks | /dashboard/help | /dashboard/wallet
-/dashboard/recordings | /dashboard/assignments | /dashboard/mentorship | /dashboard/referrals | /dashboard/points
+/dashboard/recordings | /dashboard/assignments | /dashboard/assessments | /dashboard/communities | /dashboard/notifications — inbox | /dashboard/mentorship | /dashboard/referrals | /dashboard/points
 /schools — pick a school | /programs/{slug} — program page with the three plans
 /instructor | /instructor/courses | /instructor/analytics
 

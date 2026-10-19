@@ -87,8 +87,11 @@ Coolify → the academy application → Environment Variables. Names only here; 
 | `WALLET_BASE_URL`, `WALLET_SERVICE_TOKEN` | Yes | Runtime | Missing either → purchases fail closed and `/api/cron/earnings` answers `503 wallet_disabled`. |
 | `SITE_URL` | Yes | Runtime | `https://academy.worldstreetgold.com`, no trailing slash. `lib/app-url.ts` builds email links, canonical URLs, the sitemap, share-card URLs and certificate verify URLs from it. |
 | `NEXT_PUBLIC_APP_URL` | Optional | Runtime (server) | If set, it wins over `SITE_URL` — make it the same public origin. A localhost value is ignored in production. |
-| `NEXT_PUBLIC_COMMUNITY_URL` | Optional | **Build** | The dashboard's Community tile reads it in the browser, so Next bakes it in during the build: tick "Build Variable" and redeploy after any change. Unset → the tile is hidden. |
+| `NEXT_PUBLIC_COMMUNITY_URL` | Optional | **Build** | The Academy community, shown to every learner with an open program, on `/dashboard/communities` and the dashboard's Help & community tile. Inlined at build: tick "Build Variable" and redeploy after any change. Unset → no Academy row. |
+| `NEXT_PUBLIC_EXECUTIVE_COMMUNITY_URL` | Optional | **Build** | The Executive community, shown only to learners on an Executive plan. Build variable, as above. Unset → hidden. |
 | `CRON_SECRET` | Yes | Runtime | A long random value (`openssl rand -hex 32`). The four scheduled tasks (§5) send it as a bearer token. |
+
+School community links are code (`communityUrl` on each school in `lib/schools.ts`). Product supplies them, and a deploy ships them.
 
 Also confirm these existing names are present (don't change working values): `MONGODB_URI`, `CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `NEXT_PUBLIC_WALLET_FUNDING_URL`, `NEXT_PUBLIC_WALLET_WITHDRAW_URL`, `RESEND_API_KEY`, `EMAIL_FROM`, `ABLY_API_KEY`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_REALTIME_ORG_ID`, `CLOUDFLARE_REALTIME_API_KEY`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_RESOURCES_BUCKET_NAME` (that bucket must have no public access; assignment uploads and submission downloads fail closed without it — B6; students' browsers upload straight to it, so its CORS allows PUT with `Content-Type` from the academy origin (`https://academy.worldstreetgold.com`)), `R2_PUBLIC_URL`, `OPENAI_API_KEY`.
 

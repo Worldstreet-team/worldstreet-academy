@@ -216,3 +216,13 @@ Indexes: `{ key: 1 }` unique, `{ user: 1, createdAt: -1 }`, `{ course: 1, user: 
 | `extraDocumentUrl` | string \| `null` | An optional extra PDF, uploaded like `cvUrl`. |
 
 The web requires the first five on every new application. Any wholesale application write must keep them (write dotted paths or keep the fields).
+
+## 12. Phase 15 — the welcome email (institutional blueprint §10, D27)
+
+Go needs no patch.
+
+**`users.welcomedAt`** is a date or `null` (missing = `null`). It is web-only, and Go may ignore it.
+
+- The web claims it with a filtered update (`{ _id, welcomedAt: null }`) before sending the one-time "Welcome to WorldStreet Mastery Academy" email, after a learner's first paid enrollment (a wallet purchase or an ESPEE approval).
+- If Go ever sends that welcome, it must claim the same field the same way first.
+- Any wholesale user write must keep it.

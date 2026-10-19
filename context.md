@@ -132,3 +132,11 @@ Online education platform for cryptocurrency/trading courses. Instructor portal 
 - **Removed** `link-tmp.cjs` and `link-mobile-identity.cjs` (one-off Clerk-id linking; `lib/auth/sync.ts` links by email).
 - **Launch:** env, crons, catalogue, certificate backfill, §17 QA and rollback live in `docs/launch-runbook.md`.
 - The sections above predate the Mastery rebuild (`/courses` routes, Hugeicons, `#44A08E`) — `CLAUDE.md` and `design-system/` are current.
+
+### 2026-10-19 — Student portal, communities and the welcome email (Phase 15)
+- **Sidebar (§11):** Learn = Dashboard, My programs, My classes (`/dashboard/meetings`; instructors keep "Meetings"), Recordings, Assignments, Assessments, My points, Certificates, Mentorship; Connect = Inbox (with the bell's unread count, via the shared `useNotificationFeed`), Messages, Communities.
+- **Assessments vs Assignments:** `/dashboard/assessments` lists final exams and knowledge checks (attempts, best score, pass mark, next action); `/dashboard/assignments` lists assignments only. One client list component serves both; `getMyAssessments()` keeps its signature and pages split rows with `assessmentKindOf`.
+- **Communities (D26):** `lib/communities.ts` builds one deduplicated, `safeWebUrl`-checked list (program, school, Academy, Executive). The Academy row shows to every learner with an active or completed enrollment; Executive only on an Executive plan. The page and the dashboard's Help & community tile share it. School links are code (`School.communityUrl`, none set yet).
+- **Welcome email (D27):** "Welcome to WorldStreet Mastery Academy", on a learner's first paid enrollment only (wallet purchase or ESPEE approval), at most once, claimed atomically through `users.welcomedAt`; never retried; learners who paid before this release get none.
+- **Campus (D19):** the greeting eyebrow reads "WMA Campus · <date>".
+- **Checkout return path:** middleware forwards `x-next-search`; the checkout layout redirects a signed-out visitor to `loginUrl()` with the plan's checkout as the return path.
