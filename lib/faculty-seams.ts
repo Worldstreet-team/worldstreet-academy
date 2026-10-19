@@ -1,15 +1,16 @@
 import "server-only"
 import type { Types } from "mongoose"
 import { Course, type PackageKey } from "@/lib/db/models"
+import { cohortsForEnrollments } from "@/lib/cohort-calendar"
+import { PROGRAM_KIND_FILTER } from "@/lib/course-kind"
 import { masteryInputsForMany } from "@/lib/mastery-inputs"
 import { masteryView, type MasteryResult } from "@/lib/mastery-score"
 
 /*
- * The faculty dashboard's two seams (institutional blueprint Phase 19). The
- * Phase 16 seam (Mastery) is filled; the Phase 12 seam (cohorts) is one line
- * marked SEAM, which whoever merges Phase 12 replaces with the fill below it.
- * While a seam returns an empty map, My Students and Student Performance hide
- * every cohort or Mastery column, filter and card.
+ * The faculty dashboard's two seams (institutional blueprint Phase 19), both
+ * filled: cohorts (Phase 12) and Mastery (Phase 16). While a seam returns an
+ * empty map, My Students and Student Performance hide every cohort or Mastery
+ * column, filter and card.
  */
 
 /** The enrollment fields both seams receive (lean rows). */
@@ -32,13 +33,21 @@ export type CohortTag = { number: number; name: string }
 export type { MasteryResult }
 
 /**
- * Each enrollment's cohort, keyed by enrollment id.
- * Phase 12 fill (lib/cohort-calendar.ts + lib/cohort-rules.ts; pass the enrolment date Phase 12's read model passes):
- *   const { all } = await getCohortCalendar(); return new Map(rows.flatMap((r) => { const c = cohortForEnrolment(all, r.activatedAt ?? r.purchasedAt); return c ? [[r._id.toString(), { number: c.number, name: c.name }] as [string, CohortTag]] : [] }))
+ * Each enrollment's cohort, keyed by enrollment id, through Phase 12's read
+ * model (`cohortsForEnrollments`: `purchasedAt`, or an earlier approved ESPEE
+ * proof). Only active or completed school-program rows have one (ruling 3).
  */
 export async function cohortsFor(rows: SeamEnrollment[]): Promise<Map<string, CohortTag>> {
-  void rows // delete with the fill
-  return new Map() // SEAM(phase-12)
+  const live = rows.filter((r) => r.status === "active" || r.status === "completed")
+  if (live.length === 0) return new Map()
+  const programs = await Course.find({ _id: { $in: live.map((r) => r.course) }, ...PROGRAM_KIND_FILTER })
+    .select("_id")
+    .lean()
+  const programIds = new Set(programs.map((c) => c._id.toString()))
+  const placed = await cohortsForEnrollments(live.filter((r) => programIds.has(r.course.toString())))
+  return new Map(
+    [...placed].flatMap(([id, c]) => (c ? [[id, { number: c.number, name: c.name }] as [string, CohortTag]] : []))
+  )
 }
 
 /** Each enrollment's Mastery Score and parts (parts the plan excludes are nulled), keyed by enrollment id. */
