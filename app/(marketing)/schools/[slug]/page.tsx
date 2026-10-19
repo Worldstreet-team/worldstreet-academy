@@ -24,6 +24,7 @@ import { SchoolTopics } from "@/components/schools/school-topics"
 import { SchoolPath } from "@/components/schools/school-path"
 import { SchoolFreeLessons } from "@/components/schools/school-free-lessons"
 import { SchoolFaculty, type SchoolFacultyMember } from "@/components/schools/school-faculty"
+import { SchoolCohorts, schoolCohortRows } from "@/components/schools/school-cohorts"
 import { SchoolReviews } from "@/components/schools/school-reviews"
 import { OtherSchools } from "@/components/schools/other-schools"
 import { SchoolClosing } from "@/components/schools/school-closing"
@@ -75,6 +76,8 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
  *   path          2+ levels, beginner → advanced
  *   free lessons  the shared preview player; hidden when none
  *   faculty       hidden when none, and while FACULTY_PUBLIC is off
+ *   cohorts       the next cohort and the plans with live classes; hidden
+ *                 with no next cohort or no such program
  *   reviews       combined rating + the best written reviews; hidden when none
  *   FAQ · other schools · closing band · phone bar
  *
@@ -113,6 +116,7 @@ export default async function SchoolPage({ params }: Params) {
   const cheapest = cheapestAll[school.slug]
   const hasTopics = topicMap(programs).total > 0
   const hasPath = levelsOf(programs).length > 1
+  const cohortRows = schoolCohortRows(programs)
   const hasReviews = reviews.summary !== null || reviews.reviews.length > 0
 
   const facultyMembers: SchoolFacultyMember[] = faculty.flatMap((member) => {
@@ -166,6 +170,7 @@ export default async function SchoolPage({ params }: Params) {
     hasPath ? { id: "path", label: "Path" } : null,
     previews.length > 0 ? { id: "free-lessons", label: "Free lessons" } : null,
     facultyMembers.length > 0 ? { id: "faculty", label: "Faculty" } : null,
+    calendar.next && cohortRows.length > 0 ? { id: "cohorts", label: "Cohorts" } : null,
     hasReviews ? { id: "reviews", label: "Reviews" } : null,
     { id: "faq", label: "FAQ" },
     { id: "other-schools", label: "Other schools" },
@@ -215,6 +220,7 @@ export default async function SchoolPage({ params }: Params) {
           <SchoolPath programs={programs} />
           <SchoolFreeLessons previews={previews} />
           <SchoolFaculty members={facultyMembers} />
+          <SchoolCohorts cohort={calendar.next} rows={cohortRows} />
           <SchoolReviews data={reviews} />
           <div className="pt-6 md:pt-10">
             <Faq />
