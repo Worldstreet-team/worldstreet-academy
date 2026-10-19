@@ -8,6 +8,7 @@
  */
 
 import { buildAcademyPrompt, generateFunctionInstructions } from "../prompt"
+import { getCohortCalendar } from "@/lib/cohort-calendar"
 import { allVividFunctions } from "../functions"
 
 // ── Domain imports ─────────────────────────────────────────────────────
@@ -100,7 +101,8 @@ export async function createVividSession(params: CreateSessionParams) {
       ? { id: params.userId, firstName: params.userName, lastName: params.userLastName, email: params.userEmail, role: params.userRole }
       : null
 
-    let instructions = buildAcademyPrompt(user, params.pathname || "/")
+    const calendar = await getCohortCalendar()
+    let instructions = buildAcademyPrompt(user, params.pathname || "/", { next: calendar.next, current: calendar.current })
     const functionNames = allVividFunctions.map((f) => f.name)
     instructions += generateFunctionInstructions(functionNames)
 

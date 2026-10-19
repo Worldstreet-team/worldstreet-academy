@@ -315,6 +315,7 @@ function AdminEnrollmentsInner() {
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">
                           {formatDate(e.enrolledAt)}
+                          {e.cohortName && <p className="text-[10px]">{e.cohortName}</p>}
                           {e.completedAt && (
                             <p className="text-[10px]">done {formatDate(e.completedAt)}</p>
                           )}

@@ -183,3 +183,9 @@ Online education platform for cryptocurrency/trading courses. Instructor portal 
 - **`recordings` entitlement:** a plan includes recorded classes when `recordings || liveClasses` (`recordingsAllowed`), so plans saved before the flag keep their recordings. Basic now has recordings, assignments and the certificate; live classes and instructor Q&A stay off.
 - **"Recorded classes"** joins every list of what a plan includes (chooser, ladder, purchase panel, checkout lines).
 - **Executive's label** is "Executive" (was "Executive 101"); the stored plan name is unchanged.
+
+### 2026-10-19 — Cohorts as data (Phase 12)
+- **Cohorts are data.** The `cohorts` collection (web-only) is entered by an admin at `/admin/cohorts`; every countdown, banner, strip, offer timer, school page and learner card follows it with no redeploy. The public Academic Calendar is `/calendar`, and school pages list "Upcoming cohorts" (in Phase 13's slot, between Faculty and Learning pathways).
+- **A learner's cohort is derived, never stored** (rulings 2 and 3): the enrolment date is `purchasedAt` (or an earlier approved ESPEE proof's `createdAt`), and only active or completed school-program enrollments have one.
+- **Env fallback:** `NEXT_PUBLIC_COHORT_STARTS_AT` and `NEXT_PUBLIC_COHORT_NUMBER` apply only while the collection is empty.
+- **Go:** no patch (`docs/go-patches-phase-3.md` §18).

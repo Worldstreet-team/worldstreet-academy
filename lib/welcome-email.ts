@@ -1,9 +1,11 @@
 import "server-only"
 
 import { connectDB } from "@/lib/db"
-import { Enrollment, User } from "@/lib/db/models"
+import { Course, Enrollment, User } from "@/lib/db/models"
 import { sendWelcomeEmail } from "@/lib/email"
-import { COHORT_DATE_LABEL, cohortIsUpcoming } from "@/lib/cohort"
+import { cohortDateLabel } from "@/lib/cohort"
+import { cohortsForEnrollments } from "@/lib/cohort-calendar"
+import { courseKindOf } from "@/lib/course-kind"
 
 /**
  * The one-time welcome to the WMA Student Portal (blueprint §10, D27).
@@ -24,7 +26,7 @@ export async function sendWelcomeOnce(userId: string, enrollmentId: string): Pro
     await connectDB()
 
     const current = await Enrollment.findOne({ _id: enrollmentId, user: userId })
-      .select("pricePaid purchasedAt")
+      .select("pricePaid purchasedAt createdAt status course")
       .lean()
     if (!current || !(current.pricePaid > 0)) return
 
@@ -45,10 +47,17 @@ export async function sendWelcomeOnce(userId: string, enrollmentId: string): Pro
     const user = await User.findById(userId).select("email firstName").lean()
     if (!user?.email) return
 
+    // The learner's own cohort (Phase 12 rulings 2–3), named only while it is still ahead.
+    const course = await Course.findById(current.course).select("kind").lean()
+    const placed =
+      course && courseKindOf(course) === "program" && (current.status === "active" || current.status === "completed")
+        ? ((await cohortsForEnrollments([current])).get(String(current._id)) ?? null)
+        : null
+
     await sendWelcomeEmail({
       to: user.email,
       firstName: user.firstName ?? "",
-      cohortStartLabel: cohortIsUpcoming() ? COHORT_DATE_LABEL : null,
+      cohortStartLabel: placed && Date.parse(placed.startsAt) > Date.now() ? cohortDateLabel(placed.startsAt) : null,
     })
   } catch (err) {
     console.error("[Welcome] failed:", err)

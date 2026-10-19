@@ -51,6 +51,11 @@ export function Footer({ showFaculty }: { showFaculty: boolean }) {
                 </Link>
               </li>
               <li>
+                <Link href="/calendar" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  Academic Calendar
+                </Link>
+              </li>
+              <li>
                 <Link href="/marketplace" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                   Marketplace
                 </Link>

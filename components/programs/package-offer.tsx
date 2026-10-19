@@ -10,8 +10,8 @@ import { discountOf } from "@/components/programs/package-model"
  * The launch offer as every package price shows it (owner, 2026-10-03): the
  * pre-discount price struck through in muted text and a neutral "Save NN%"
  * chip beside the price, and — where a package's detail or action is shown —
- * "Offer ends in 12d 04h 31m 09s", counting down to the live cohort start
- * (lib/cohort.ts) and gone, prefix and all, once it begins. A package without
+ * "Offer ends in 12d 04h 31m 09s", counting down to the next cohort's start
+ * (passed in by the page from getCohortCalendar().next) and gone, prefix and all, once it begins. A package without
  * a list price above its price shows none of it. No gold: gold is for the
  * primary action. Server-safe; the countdown is its own client component.
  */
@@ -68,12 +68,14 @@ export function PackageDiscount({
 /**
  * "Offer ends in 12d 04h 31m 09s" — only for a package on launch discount.
  * The countdown renders nothing once the cohort starts, so `className`
- * carries any spacing (a wrapper would strand an empty gap).
+ * carries any spacing (a wrapper would strand an empty gap). Nothing when
+ * there is no next cohort (`endsAt` null).
  */
-export function OfferEnds({ pkg, className }: { pkg: Priced; className?: string }) {
-  if (!discountOf(pkg)) return null
+export function OfferEnds({ pkg, endsAt, className }: { pkg: Priced; endsAt: string | null; className?: string }) {
+  if (!endsAt || !discountOf(pkg)) return null
   return (
     <CohortCountdown
+      startsAt={endsAt}
       variant="compact"
       prefix="Offer ends in "
       className={cn("text-[13px] font-medium text-ws-muted", className)}

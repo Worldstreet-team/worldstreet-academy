@@ -1,13 +1,14 @@
 import { ArrowRightIcon } from "@/components/icons"
 import Link from "next/link"
-import { COHORT_DATE_LABEL, COHORT_DATE_SHORT, COHORT_NAME, cohortIsUpcoming } from "@/lib/cohort"
+import { cohortDateLabel, cohortDateShort } from "@/lib/cohort"
+import type { CohortView } from "@/lib/cohort-rules"
 import { PACKAGE_LABEL } from "@/lib/entitlements"
 import { cn } from "@/lib/utils"
 import { CardShell, Eyebrow } from "@/components/ui/system"
 import { CohortCountdown, WhileCohortUpcoming } from "@/components/shared/cohort-countdown"
 import { GOLD_CTA } from "@/components/schools/cta"
 
-type Props =
+type Props = (
   | { variant: "bar" }
   | { variant: "band"; className?: string }
   | {
@@ -16,14 +17,15 @@ type Props =
       note?: string
       className?: string
     }
+) & { cohort: CohortView | null }
 
 /**
  * Institutional blueprint §18: the band names its cohort ("Cohort 001 —
  * Starts Monday 19 October") and offers Explore Programs / Join Cohort.
  * "Live cohort begins on the 19th" — the owner's countdown and call to action
  * (meeting 2026-10-03: join the upcoming cohort, choose your school, choose
- * your program, pay now to join). The date and countdown come from
- * lib/cohort.ts; every variant renders nothing once the cohort has begun —
+ * your program, pay now to join). The cohort comes from
+ * `getCohortCalendar().next` (lib/cohort-calendar.ts); every variant renders nothing once the cohort has begun —
  * on the server, and in the browser for a page cached from before it.
  *
  *   bar    one line above the navbar on every marketing page, the whole bar a
@@ -39,15 +41,16 @@ type Props =
  * gold, and red appears only as the static live dot (the danger token).
  */
 export function CohortBanner(props: Props) {
-  if (!cohortIsUpcoming()) return null
+  const { cohort } = props
+  if (!cohort) return null
   return (
-    <WhileCohortUpcoming>
+    <WhileCohortUpcoming startsAt={cohort.startsAt}>
       {props.variant === "bar" ? (
-        <CohortBar />
+        <CohortBar cohort={cohort} />
       ) : props.variant === "band" ? (
-        <CohortBand className={props.className} />
+        <CohortBand cohort={cohort} className={props.className} />
       ) : (
-        <CohortStrip note={props.note} className={props.className} />
+        <CohortStrip cohort={cohort} note={props.note} className={props.className} />
       )}
     </WhileCohortUpcoming>
   )
@@ -67,7 +70,7 @@ function LiveEyebrow() {
   )
 }
 
-function CohortBar() {
+function CohortBar({ cohort }: { cohort: CohortView }) {
   return (
     <Link
       href="/schools"
@@ -81,13 +84,13 @@ function CohortBar() {
         <span className="flex items-center gap-2 font-semibold text-ws-primary">
           <LiveDot />
           <span className="md:hidden">
-            {COHORT_NAME} starts {COHORT_DATE_SHORT}
+            {cohort.name} starts {cohortDateShort(cohort.startsAt)}
           </span>
           <span className="hidden md:inline">
-            {COHORT_NAME} starts {COHORT_DATE_LABEL}
+            {cohort.name} starts {cohortDateLabel(cohort.startsAt)}
           </span>
         </span>
-        <CohortCountdown variant="compact" prefix="· " className="inline-block min-w-[8.9em] text-ws-muted" />
+        <CohortCountdown startsAt={cohort.startsAt} variant="compact" prefix="· " className="inline-block min-w-[8.9em] text-ws-muted" />
         <span aria-hidden className="hidden text-ws-subtle sm:inline">
           ·
         </span>
@@ -105,7 +108,7 @@ function CohortBar() {
   )
 }
 
-function CohortBand({ className }: { className?: string }) {
+function CohortBand({ cohort, className }: { cohort: CohortView; className?: string }) {
   return (
     <section id="cohort" aria-labelledby="cohort-heading" className={cn("mx-auto max-w-7xl scroll-mt-24 px-6", className)}>
       <CardShell className="gap-8 p-6 sm:p-8 md:p-10 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-12">
@@ -115,7 +118,7 @@ function CohortBand({ className }: { className?: string }) {
             id="cohort-heading"
             className="mt-4 text-balance font-display text-[clamp(1.875rem,3.2vw,2.625rem)] font-semibold leading-[1.08] tracking-[-0.02em] text-ws-primary"
           >
-            {`${COHORT_NAME} — Starts ${COHORT_DATE_LABEL}`}
+            {`${cohort.name} — Starts ${cohortDateLabel(cohort.startsAt)}`}
           </h2>
           <p className="mt-4 max-w-xl text-pretty text-[16px] leading-relaxed text-ws-muted md:text-[17px]">
             Learn live with your tutor, rewatch every class from your dashboard, and choose the plan that fits:{" "}
@@ -137,6 +140,7 @@ function CohortBand({ className }: { className?: string }) {
             The min sizes hold the tiles' room before they mount, so the
             headline never re-wraps when the time appears. */}
         <CohortCountdown
+          startsAt={cohort.startsAt}
           variant="blocks"
           className="flex min-h-[78px] w-full gap-2 sm:min-h-[94px] sm:w-auto sm:min-w-[22.25rem] sm:gap-3"
           blockClassName="min-w-0 flex-1 bg-ws-chip px-2 py-3 sm:min-w-20 sm:flex-none sm:py-4 [&>span:first-child]:text-[28px] sm:[&>span:first-child]:text-[34px] [&>span:last-child]:mt-1 [&>span:last-child]:text-[10px]"
@@ -146,7 +150,7 @@ function CohortBand({ className }: { className?: string }) {
   )
 }
 
-function CohortStrip({ note, className }: { note?: string; className?: string }) {
+function CohortStrip({ cohort, note, className }: { cohort: CohortView; note?: string; className?: string }) {
   return (
     <CardShell
       className={cn(
@@ -157,12 +161,12 @@ function CohortStrip({ note, className }: { note?: string; className?: string })
       <div className="min-w-0">
         <LiveEyebrow />
         <p className="mt-2 text-balance font-display text-[19px] font-semibold leading-snug tracking-[-0.01em] text-ws-primary sm:text-[21px]">
-          {`${COHORT_NAME} — Starts ${COHORT_DATE_LABEL}`}
+          {`${cohort.name} — Starts ${cohortDateLabel(cohort.startsAt)}`}
         </p>
         {note && <p className="mt-1.5 text-pretty text-[14.5px] leading-relaxed text-ws-muted">{note}</p>}
       </div>
       {/* min sizes: the tiles' room, held before they mount. */}
-      <CohortCountdown variant="blocks" className="flex min-h-12 min-w-[15.5rem] shrink-0" />
+      <CohortCountdown startsAt={cohort.startsAt} variant="blocks" className="flex min-h-12 min-w-[15.5rem] shrink-0" />
     </CardShell>
   )
 }

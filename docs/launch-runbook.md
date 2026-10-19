@@ -29,7 +29,7 @@ From the 2026-10-03 meeting: three plans on every program, ESPEE proof-of-paymen
    - `ESPEE_PAYMENT_DETAILS` is the account details learners send ESPEE to. Free text; literal `\n` becomes a line break.
    - `R2_RESOURCES_BUCKET_NAME` is the private bucket, with no public access. Receipts go there under `worldstreet-academy/payment-proofs/<userId>/`.
    - The private bucket's CORS must allow `PUT` with `Content-Type` from `https://academy.worldstreetgold.com`. Assignment uploads need the same rule.
-   - `NEXT_PUBLIC_COHORT_STARTS_AT` is optional. It defaults to `2026-10-19T00:00:00+01:00` and is read at build time, so a change needs a redeploy.
+   - `NEXT_PUBLIC_COHORT_STARTS_AT` is the fallback while no cohort exists in `/admin/cohorts`. It defaults to `2026-10-19T00:00:00+01:00` and is read at build time, so a change needs a redeploy.
 2. **Deploy** (§4).
 3. **Catalogue** (§6). Every program becomes Basic $49 (was $300), Standard $199 (was $1,000, 9 weeks) and Executive $999 (was $10,000, 9 weeks), so the dry run shows a price change on every program. Apply with `--allow-price-change`.
    - Existing slugs are kept. `--rename-slugs` would break every shared `/programs/<slug>` link.
@@ -43,6 +43,7 @@ From the 2026-10-03 meeting: three plans on every program, ESPEE proof-of-paymen
 6. **Sales export.** On `/admin/users`, use "Export interested learners".
 7. **Go team.** Point them at `docs/go-patches-phase-3.md` §7–§11: ESPEE orders have no wallet charge; referral earnings and seller shares (§8); course `kind` — Go must hide marketplace and New Economy courses wherever it lists programs (§9); recordings and the go-live notice (§10); points and the new application answers (§11).
    - Phase 14: §16 (Basic certifies; `recordings` is web-only).
+   - Phase 12: §18 (no patch; `cohorts` is a web-only collection).
 8. **Marketplace, referrals, teaching (2026-10-05, same release).**
    - Recordings need the same `R2_RESOURCES_BUCKET_NAME` and the new hourly `academy-recordings` task (§5). RealtimeKit bills recording at about $0.01 per minute; only course classes record, never 1-on-1 mentorship.
    - New Economy courses: `MONGODB_URI="$PROD_URI" node scripts/new-economy-catalogue.mjs --owner <admin email>` (dry run), then `--apply`. It creates one free DRAFT per WorldStreet product; add lessons and publish each from the admin course editor.
@@ -113,6 +114,14 @@ The academic structure becomes the seven schools of the institutional blueprint 
 4. **Apply** with `--apply`, plus `--allow-price-change` only if step 1 applies, and `tee` the log. Then re-run `--apply`; it must end `Total modifiedCount across matched rows: 0`.
 5. **Check:** `curl -s "$SITE/programs/<forex slug>"` shows "Foundation", "Personalized Mastery", "4 weeks", "8–12 weeks" and "Flexible schedule". A Basic test learner sees Recordings, Assignments and, after the lessons, the exam.
 6. **Rollback:** re-run the previous release's script with `--apply --allow-access-loss`. Basic learners then lose recordings, assignments and the exam. Issued certificate IDs stay valid.
+
+## Cohorts as data (Phase 12)
+
+1. **Deploy** (§4).
+2. As an admin, open `/admin/cohorts` and add Cohort 1, starting 2026-10-19 00:00 (Lagos time).
+3. Add Cohort 2 at the owner's date.
+4. **Check:** `/`, `/schools` and a program page count down to Cohort 002, and `/calendar` lists both.
+5. Then remove `NEXT_PUBLIC_COHORT_STARTS_AT` and `NEXT_PUBLIC_COHORT_NUMBER` from Coolify. They only matter while the collection is empty.
 
 ## 0. Blockers — settle these first
 

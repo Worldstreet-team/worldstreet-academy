@@ -31,6 +31,7 @@ import { POINTS, awardPoints, pointKey } from "@/lib/points"
 import { isCountryCode } from "@/lib/countries"
 import { FACULTY_ROLES, isFacultyRole, safeWebUrl } from "@/lib/faculty"
 import { facultySinceLabel } from "@/lib/faculty-credential"
+import { cohortsForEnrollments } from "@/lib/cohort-calendar"
 import { PROGRAM_KIND_FILTER, courseKindOf } from "@/lib/course-kind"
 
 // ============================================================================
@@ -145,6 +146,8 @@ export type StudentEnrollment = {
   communityUrl: string | null
   /** The program's school (`Course.school`); null when unassigned. */
   school: SchoolSlug | null
+  /** The learner's cohort ("Cohort 001"), derived from the enrolment date (D20); null off the school programs and off active/completed rows. */
+  cohortName: string | null
 }
 
 export type ResumeLesson = {
@@ -887,7 +890,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
     const enrollments = await Enrollment.find({ user: user._id })
       .populate({
         path: "course",
-        select: "slug title thumbnailUrl instructor totalLessons availableAt status packages examRequired school communityUrl",
+        select: "slug title thumbnailUrl instructor totalLessons availableAt status packages examRequired school communityUrl kind",
         populate: {
           path: "instructor",
           select: "firstName lastName avatarUrl instructorProfile.headline",
@@ -907,6 +910,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
       packages?: ICoursePackage[] | null
       examRequired?: boolean
       communityUrl?: string | null
+      kind?: CourseKind | null
       instructor: {
         _id: { toString(): string }
         firstName: string
@@ -938,6 +942,14 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
           .lean()
       : []
     const watchByLesson = new Map(watched.map((w) => [w.lesson.toString(), w]))
+
+    const cohortOf = await cohortsForEnrollments(
+      enrollments.filter(
+        (e) =>
+          (e.status === "active" || e.status === "completed") &&
+          courseKindOf(e.course as unknown as PopulatedCourse) === "program"
+      )
+    )
 
     return enrollments.map((enrollment) => {
       const course = enrollment.course as unknown as PopulatedCourse
@@ -1024,6 +1036,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
         lessonTrack: openInOrder.map((l) => completedIds.has(l._id.toString())),
         communityUrl: access ? safeWebUrl(course.communityUrl) : null,
         school: schoolSlugOf(course.school),
+        cohortName: cohortOf.get(enrollment._id.toString())?.name ?? null,
       }
     })
   } catch (error) {

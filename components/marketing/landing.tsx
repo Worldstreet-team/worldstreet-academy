@@ -6,7 +6,7 @@ import { registerUrl } from "@/lib/auth/login-url"
 import { cheapestBySchool, countProgramsBySchool } from "@/lib/schools"
 import { HeroWall } from "@/components/marketing/hero-wall"
 import { CohortBanner } from "@/components/marketing/cohort-banner"
-import { cohortIsUpcoming } from "@/lib/cohort"
+import { getCohortCalendar } from "@/lib/cohort-calendar"
 import { HowItWorks } from "@/components/marketing/how-it-works"
 import { WorldsBand } from "@/components/marketing/worlds-band"
 import { WordsMarquee } from "@/components/marketing/words-marquee"
@@ -64,7 +64,7 @@ function futureDrops(published: BrowseCourse[]): BrowseCourse[] {
  * LandingReview fields plus the true "70% default" pass-mark line.
  */
 export async function Landing() {
-  const [user, courses, reviews, faculty, previews, marketplace, newEconomy] = await Promise.all([
+  const [user, courses, reviews, faculty, previews, marketplace, newEconomy, calendar] = await Promise.all([
     getCurrentUser().catch(() => null),
     fetchBrowseCourses(),
     fetchLandingReviews(9),
@@ -72,6 +72,7 @@ export async function Landing() {
     fetchFreePreviewLessons(),
     fetchBrowseCourses({ kind: "marketplace" }),
     fetchBrowseCourses({ kind: "new-economy" }),
+    getCohortCalendar(),
   ])
 
   const signedIn = Boolean(user)
@@ -100,10 +101,10 @@ export async function Landing() {
       <ScrollProgress />
 
       {/* Hero — the still claim over a slideshow of students, the school picker and its CTAs (institutional blueprint §18) */}
-      <HeroWall counts={schoolCounts} cheapest={schoolFrom} signedIn={signedIn} registerUrl={REGISTER_URL} cohortOpen={cohortIsUpcoming()} />
+      <HeroWall counts={schoolCounts} cheapest={schoolFrom} signedIn={signedIn} registerUrl={REGISTER_URL} cohortOpen={calendar.next !== null} />
 
       {/* Live cohort — "Cohort 00N — Starts …", the countdown and Explore Programs / Join Cohort; gone once it begins */}
-      <CohortBanner variant="band" className="pt-14 md:pt-20" />
+      <CohortBanner variant="band" cohort={calendar.next} className="pt-14 md:pt-20" />
 
       {/* Who we are — the owner's framing: point A to point B, our systems, our experts */}
       <InstitutionBand />

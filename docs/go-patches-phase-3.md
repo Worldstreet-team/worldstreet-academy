@@ -322,3 +322,11 @@ Go needs no patch. All additive:
 - **`users.instructorProfile.handbook`** — `{ teachingStandardsAt, curriculumGuidelinesAt, platformTrainingAt }`, each a date or `null`.
 - **`users.instructorProfile.credential`** — `null`, or `{ id: "WMAF-XXXXXX", issuedAt }`. Unique when set (partial index `facultyCredential_unique`); written once, never changed.
 - Any whole-object write of `instructorProfile` (an approval or profile edit in Go) must carry `handbook` and `credential` across, as the web's approval does — or use dotted `$set` paths.
+
+## 18. Phase 12 — cohorts (web-only)
+
+Go needs no patch: nothing it reads changed.
+
+- **`cohorts`** is a new collection that Go doesn't read. One row per academic session (`number`, `name`, `startsAt`, `endsAt`, `note`), entered by an admin at `/admin/cohorts`.
+- **No `enrollments` field changes.** A learner's cohort is derived on the web from `purchasedAt` (or, for ESPEE, the approved proof's `createdAt` when it was submitted earlier). Nothing is stored.
+- Mobile shows no cohort until a later Go release chooses to read the collection.

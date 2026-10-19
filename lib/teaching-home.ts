@@ -7,7 +7,7 @@
 
 import { addDays, dayKey, startOfDay } from "@/lib/calendar-grid"
 import { HOST_EARLY_START_MS } from "@/lib/class-schedule"
-import { COHORT_STARTS_AT_ISO, COHORT_TIME_ZONE } from "@/lib/cohort"
+import { cohortShortParts } from "@/lib/cohort"
 
 /** A class has no stored length; the calendar file books this much. */
 export const CLASS_ICS_MINUTES = 60
@@ -23,13 +23,9 @@ export function timeLabel(iso: string): string {
 }
 
 /** "Mon 19 Oct" — the cohort's start as its home zone reads it. */
-export function cohortStartLabel(): string {
-  return new Intl.DateTimeFormat("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    timeZone: COHORT_TIME_ZONE,
-  }).format(new Date(COHORT_STARTS_AT_ISO))
+export function cohortStartLabel(iso: string): string {
+  const { weekday, day, month } = cohortShortParts(iso)
+  return `${weekday} ${day} ${month}`
 }
 
 /** The browser's zone, by IANA name and abbreviation ("Africa/Lagos", "WAT" or "GMT+1"). */

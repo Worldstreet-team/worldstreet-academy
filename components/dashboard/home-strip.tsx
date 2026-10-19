@@ -166,16 +166,16 @@ function PointsStat() {
 /** The soonest thing across the board: a live class, the next class, else the cohort start. */
 function soonest(board: ClassBoardEntry[]):
   | { kind: "live"; course: string; href: string }
-  | { kind: "next" | "cohort"; course: string; at: string; href: string }
+  | { kind: "next" | "cohort"; course: string; name: string; at: string; href: string }
   | null {
   const live = board.find((b) => b.live)
   if (live?.live) return { kind: "live", course: live.courseTitle, href: live.live.joinHref }
   const next = board
     .filter((b) => b.next)
     .sort((a, b) => (a.next as { startsAt: string }).startsAt.localeCompare((b.next as { startsAt: string }).startsAt))[0]
-  if (next?.next) return { kind: "next", course: next.courseTitle, at: next.next.startsAt, href: "/dashboard/meetings" }
+  if (next?.next) return { kind: "next", course: next.courseTitle, name: "", at: next.next.startsAt, href: "/dashboard/meetings" }
   const cohort = board.find((b) => b.cohortStartsAt)
-  if (cohort?.cohortStartsAt) return { kind: "cohort", course: cohort.courseTitle, at: cohort.cohortStartsAt, href: "/dashboard" }
+  if (cohort?.cohortStartsAt) return { kind: "cohort", course: cohort.courseTitle, name: cohort.cohortName ?? "your cohort", at: cohort.cohortStartsAt, href: "/dashboard" }
   return null
 }
 
@@ -204,7 +204,7 @@ function NextClassStat() {
     <StatCell
       icon={Calendar03Icon}
       value={<Countdown target={s.at} variant="compact" className="text-[17px]" endedLabel="Starting now" />}
-      label={s.kind === "cohort" ? "Until your cohort begins" : `Next class · ${s.course}`}
+      label={s.kind === "cohort" ? `Until ${s.name} begins` : `Next class · ${s.course}`}
       href={s.href}
     />
   )

@@ -3,13 +3,14 @@
 import { revalidatePath } from "next/cache"
 import mongoose from "mongoose"
 import connectDB from "@/lib/db"
-import { Course, Enrollment, PaymentEvent, User, type ICoursePackage, type PackageKey } from "@/lib/db/models"
+import { Course, Enrollment, PaymentEvent, User, type CourseKind, type ICoursePackage, type PackageKey } from "@/lib/db/models"
 import type { EnrollmentStatus } from "@/lib/db/models/enrollment"
 import { requireAdmin } from "@/lib/auth/admin"
 import { courseAvailability } from "@/lib/types/course"
 import type { CourseStatus } from "@/lib/types/course"
 import { PACKAGE_RANK, entitlementsFor, isPackageKey, packageFor } from "@/lib/entitlements"
 import { getCourseAccess, openPublishedLessonIds } from "@/lib/course-access"
+import { cohortsForEnrollments } from "@/lib/cohort-calendar"
 import { ensureCertificateId } from "@/lib/certificate-id"
 import { courseKindOf } from "@/lib/course-kind"
 import { masteryInputsForMany, type MasteryEnrollmentRow } from "@/lib/mastery-inputs"
@@ -55,6 +56,8 @@ export type AdminEnrollmentRow = {
   progress: number
   /** Mastery Score 0–100; null for non-programs, inactive enrollments or while it has no score. */
   mastery: number | null
+  /** The learner's cohort (D20); null off active/completed school-program rows. */
+  cohortName: string | null
 }
 
 function paymentOf(e: {
@@ -122,6 +125,13 @@ export async function adminListEnrollments(filters?: {
       filters?.course ? Course.findById(filters.course).select("title").lean() : null,
     ])
 
+    const cohortOf = await cohortsForEnrollments(
+      rows.filter((e) => {
+        const course = e.course as unknown as { kind?: CourseKind | null } | null
+        return (e.status === "active" || e.status === "completed") && course !== null && courseKindOf(course) === "program"
+      })
+    )
+
     let mapped: AdminEnrollmentRow[] = rows.map((e) => {
       const user = e.user as unknown as {
         firstName?: string
@@ -175,6 +185,7 @@ export async function adminListEnrollments(filters?: {
         completedAt: e.completedAt ? new Date(e.completedAt).toISOString() : null,
         progress: e.progress ?? 0,
         mastery: null,
+        cohortName: cohortOf.get(e._id.toString())?.name ?? null,
       }
     })
 
@@ -397,6 +408,7 @@ export async function adminExportEnrollments(filters?: {
       "Last accessed",
       "Completed at",
       "Progress %",
+      "Cohort",
     ]
     const quote = (v: string | number | null) =>
       `"${String(v ?? "").replace(/"/g, '""')}"`
@@ -417,6 +429,7 @@ export async function adminExportEnrollments(filters?: {
           r.startedAt,
           r.completedAt,
           r.progress,
+          r.cohortName,
         ]
           .map(quote)
           .join(","),

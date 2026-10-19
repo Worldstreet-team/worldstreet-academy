@@ -317,6 +317,7 @@ function HeroTitle({ enrollment: e, eyebrow }: { enrollment: StudentEnrollment; 
         <Eyebrow>{eyebrow}</Eyebrow>
         {/* A badge requires the package still to exist on the course (`explicitPackage`). */}
         {e.explicitPackage && e.packageName && <PackageChip name={e.packageName} />}
+        {e.cohortName && <PackageChip name={e.cohortName} />}
       </div>
       <h2
         title={e.courseTitle}

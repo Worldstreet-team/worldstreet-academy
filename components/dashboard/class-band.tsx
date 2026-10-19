@@ -8,7 +8,7 @@ import { Countdown } from "@/components/shared/countdown"
 import { Button } from "@/components/ui/button"
 import { CardShell, Eyebrow } from "@/components/ui/system"
 import type { BoardClass, ClassBoardEntry } from "@/lib/actions/class-board"
-import { COHORT_DATE_LABEL } from "@/lib/cohort"
+import { cohortDateLabel } from "@/lib/cohort"
 import { HOST_EARLY_START_MS } from "@/lib/class-schedule"
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import { cn } from "@/lib/utils"
@@ -218,9 +218,9 @@ export function ClassBand({ entry }: { entry: ClassBoardEntry | undefined }) {
     return (
       <BandShell>
         <div className="flex min-w-0 flex-col gap-1.5">
-          <Eyebrow>Your cohort</Eyebrow>
+          <Eyebrow>{entry.cohortName ?? "Your cohort"}</Eyebrow>
           <p className="font-display text-[18px] font-semibold leading-snug tracking-[-0.01em]">
-            Live classes begin {COHORT_DATE_LABEL}
+            Live classes begin {cohortDateLabel(entry.cohortStartsAt)}
           </p>
           <p className="text-[13px] text-muted-foreground">
             Your tutor will schedule the first class — it appears here with its own countdown.
@@ -234,7 +234,7 @@ export function ClassBand({ entry }: { entry: ClassBoardEntry | undefined }) {
         />
         <AddToCalendar
           uid={`cohort-${entry.courseId}`}
-          title={`${entry.courseTitle}: live cohort begins`}
+          title={`${entry.courseTitle}: ${entry.cohortName ?? "live cohort"} begins`}
           startsAt={entry.cohortStartsAt}
           href="/dashboard"
         />

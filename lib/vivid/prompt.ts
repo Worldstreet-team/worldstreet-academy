@@ -8,7 +8,8 @@
  */
 
 import { BRAND } from "@/lib/brand"
-import { COHORT_DATE_LABEL, cohortIsUpcoming } from "@/lib/cohort"
+import { cohortDateLabel } from "@/lib/cohort"
+import type { CohortCalendar } from "@/lib/cohort-rules"
 import { PACKAGE_LABEL } from "@/lib/entitlements"
 
 interface PromptUser {
@@ -92,7 +93,14 @@ function getPageHints(pathname: string): string {
 export function buildAcademyPrompt(
   user: PromptUser | null,
   pathname: string,
+  cohorts: Pick<CohortCalendar, "next" | "current">,
 ): string {
+  const { next, current } = cohorts
+  const cohortLine = next
+    ? `${next.name} starts ${cohortDateLabel(next.startsAt)}; pay-now prices hold until then.`
+    : current
+      ? `${current.name} began ${cohortDateLabel(current.startsAt)}.`
+      : ""
   const name = user?.firstName || "there"
   const role = user?.role || "user"
   const isInstructor = role === "instructor" || role === "admin"
@@ -149,7 +157,7 @@ ${isInstructor ? "🎓 Instructor — can manage courses, analytics.\n" : ""}${p
 
 - School first: a learner picks a school, then a program in it, then a plan, then pays. The dashboard opens only after a paid enrollment.
 - Every program has three plans: ${PACKAGE_LABEL.basic}, ${PACKAGE_LABEL.standard} and ${PACKAGE_LABEL.executive}. Each shows a struck original price and a lower pay-now price. Executive adds private 1-on-1 tutoring and mentorship. Read prices and inclusions from the program (\`getCourseDetails\`); never quote a number from memory.
-- ${cohortIsUpcoming() ? `The live cohort starts ${COHORT_DATE_LABEL}; pay-now prices hold until then.` : `The live cohort began ${COHORT_DATE_LABEL}.`} Classes are live, and recordings stay in the dashboard (watch only, no download).
+- ${cohortLine} Classes are live, and recordings stay in the dashboard (watch only, no download).
 - Payment: the WorldStreet wallet, or an ESPEE transfer — send it, upload the receipt at checkout, and an admin approves it before the enrollment opens.
 - The plan is chosen on the program page (\`/programs/{slug}#packages\`); checkout only takes \`courseId\` plus \`package\` (basic, standard or executive).
 

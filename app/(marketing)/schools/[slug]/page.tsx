@@ -17,7 +17,7 @@ import { packagePriceLabel, programPriceLabel } from "@/lib/program-price"
 import { appUrl } from "@/lib/app-url"
 import { BRAND } from "@/lib/brand"
 import { FACULTY_PUBLIC } from "@/lib/faculty"
-import { cohortIsUpcoming } from "@/lib/cohort"
+import { getCohortCalendar } from "@/lib/cohort-calendar"
 import { Faq } from "@/components/marketing/faq"
 import { CohortBanner } from "@/components/marketing/cohort-banner"
 import { PreviewProvider } from "@/components/programs/preview-player"
@@ -34,6 +34,7 @@ import { SchoolTopics } from "@/components/schools/school-topics"
 import { SchoolPath } from "@/components/schools/school-path"
 import { SchoolFreeLessons } from "@/components/schools/school-free-lessons"
 import { SchoolFaculty, type SchoolFacultyMember } from "@/components/schools/school-faculty"
+import { SchoolCohorts, schoolCohortRows } from "@/components/schools/school-cohorts"
 import { SchoolReviews } from "@/components/schools/school-reviews"
 import { OtherSchools } from "@/components/schools/other-schools"
 import { SchoolClosing } from "@/components/schools/school-closing"
@@ -91,7 +92,8 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
  *                 and the study areas (D22: each links to its published
  *                 program, or reads "Coming soon")
  *   faculty       hidden when none, and while FACULTY_PUBLIC is off
- *   (cohorts)     Phase 12 mounts "Upcoming cohorts" here
+ *   cohorts       "Upcoming cohorts": the next cohort and the plans with
+ *                 live classes; hidden with no next cohort or no such program
  *   pathways      2+ levels, beginner → advanced
  *   free lessons  the shared preview player; hidden when none
  *   reviews       combined rating + the best written reviews; hidden when none
@@ -109,10 +111,11 @@ export default async function SchoolPage({ params }: Params) {
   const school = SCHOOL_BY_SLUG[slug]
   const cover = schoolCover(school.slug)
 
-  const [catalogue, faculty, reviews] = await Promise.all([
+  const [catalogue, faculty, reviews, calendar] = await Promise.all([
     fetchBrowseCourses(),
     FACULTY_PUBLIC ? fetchFaculty() : Promise.resolve([]),
     fetchSchoolReviews(school.slug, 6),
+    getCohortCalendar(),
   ])
   const loaded = await Promise.all(
     catalogue
@@ -137,6 +140,7 @@ export default async function SchoolPage({ params }: Params) {
   )
   const hasTopics = topicMap(programs).total > 0
   const hasPath = levelsOf(programs).length > 1
+  const cohortRows = schoolCohortRows(programs)
   const hasReviews = reviews.summary !== null || reviews.reviews.length > 0
 
   const facultyMembers: SchoolFacultyMember[] = faculty.flatMap((member) => {
@@ -192,6 +196,7 @@ export default async function SchoolPage({ params }: Params) {
     hasTopics ? { id: "topics", label: "Topics" } : null,
     areas.length > 0 ? { id: "areas", label: "Study areas" } : null,
     facultyMembers.length > 0 ? { id: "faculty", label: "Faculty" } : null,
+    calendar.next && cohortRows.length > 0 ? { id: "cohorts", label: "Cohorts" } : null,
     hasPath ? { id: "path", label: "Pathways" } : null,
     previews.length > 0 ? { id: "free-lessons", label: "Free lessons" } : null,
     hasReviews ? { id: "reviews", label: "Reviews" } : null,
@@ -229,9 +234,10 @@ export default async function SchoolPage({ params }: Params) {
             programs={programs}
             cohort={
               // Checked here too: the slot's wrapper must go with the strip.
-              cohortIsUpcoming() ? (
+              calendar.next ? (
                 <CohortBanner
                   variant="strip"
+                  cohort={calendar.next}
                   note={
                     only
                       ? "Open the program, choose your package and pay now to join the live cohort."
@@ -245,7 +251,7 @@ export default async function SchoolPage({ params }: Params) {
           <SchoolTopics programs={programs} />
           <SchoolAreas areas={areas} />
           <SchoolFaculty members={facultyMembers} />
-          {/* §8 "Upcoming cohorts": Phase 12 mounts <SchoolCohorts /> (components/schools/school-cohorts.tsx) here, between Faculty and Learning pathways. */}
+          <SchoolCohorts cohort={calendar.next} rows={cohortRows} />
           <SchoolPath programs={programs} />
           <SchoolFreeLessons previews={previews} />
           <SchoolReviews data={reviews} />

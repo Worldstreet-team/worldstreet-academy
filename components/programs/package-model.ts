@@ -61,7 +61,7 @@ export function cheapestOf(packages: PublicPackage[]): PublicPackage {
  * The launch discount on a package (owner, 2026-10-03): the pre-discount
  * price to strike through and the whole percent saved, rounded down so the
  * chip never overstates it. null when the package has no list price above
- * its price. The discount holds until the live cohort starts (lib/cohort.ts);
+ * its price. The discount holds until the next cohort starts (lib/cohort-calendar.ts);
  * checkout always charges `price`.
  */
 export function discountOf(

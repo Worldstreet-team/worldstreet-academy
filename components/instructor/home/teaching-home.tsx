@@ -69,6 +69,7 @@ export function TeachingHome() {
           now={now}
           teachesProgram={home.teachesProgram}
           hasCourses={home.cohorts.some((c) => c.status === "published")}
+          nextCohort={home.nextCohort}
         />
       </Rise>
       <Rise delay={60}>
@@ -78,7 +79,7 @@ export function TeachingHome() {
         <WeekAgenda entries={home.week} now={now} />
       </Rise>
       <Rise delay={180}>
-        <CohortGrid cohorts={home.cohorts} draftCount={home.draftCount} now={now} />
+        <CohortGrid cohorts={home.cohorts} draftCount={home.draftCount} now={now} nextCohort={home.nextCohort} />
       </Rise>
       <Rise delay={240}>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

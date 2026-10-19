@@ -2,10 +2,10 @@
 
 import * as React from "react"
 import { Countdown } from "@/components/shared/countdown"
-import { COHORT_STARTS_AT_ISO } from "@/lib/cohort"
 
 /**
- * Live countdown to the next cohort (lib/cohort.ts). Unlike
+ * Live countdown to a cohort start, passed in by the caller (the next cohort
+from getCohortCalendar().next, lib/cohort-calendar.ts). Unlike
  * AvailabilityCountdown it never refreshes the page: nothing on the server
  * flips at the cohort start, so once the instant passes it shows `endedLabel`
  * (or nothing). Renders an empty placeholder until mounted, so the server and
@@ -18,12 +18,15 @@ import { COHORT_STARTS_AT_ISO } from "@/lib/cohort"
  * it — a caller never strands a label in front of nothing.
  */
 export function CohortCountdown({
+  startsAt,
   variant = "compact",
   prefix = null,
   endedLabel = null,
   className,
   blockClassName,
 }: {
+  /** ISO instant the countdown runs to. */
+  startsAt: string
   variant?: "blocks" | "compact"
   /** compact only: text printed before the time, e.g. "Offer ends in ". */
   prefix?: string | null
@@ -34,7 +37,7 @@ export function CohortCountdown({
 }) {
   return (
     <Countdown
-      target={COHORT_STARTS_AT_ISO}
+      target={startsAt}
       variant={variant}
       prefix={prefix}
       endedLabel={endedLabel}
@@ -54,11 +57,12 @@ const MAX_TIMEOUT_MS = 2_147_483_647
  * with its timer gone), so the browser removes it at the instant, and on any
  * load after it.
  */
-export function WhileCohortUpcoming({ children }: { children: React.ReactNode }) {
+export function WhileCohortUpcoming({ startsAt, children }: { startsAt: string; children: React.ReactNode }) {
   const [ended, setEnded] = React.useState(false)
 
   React.useEffect(() => {
-    const left = new Date(COHORT_STARTS_AT_ISO).getTime() - Date.now()
+    setEnded(false)
+    const left = new Date(startsAt).getTime() - Date.now()
     if (left <= 0) {
       setEnded(true)
       return
@@ -66,7 +70,7 @@ export function WhileCohortUpcoming({ children }: { children: React.ReactNode })
     if (left > MAX_TIMEOUT_MS) return
     const t = setTimeout(() => setEnded(true), left)
     return () => clearTimeout(t)
-  }, [])
+  }, [startsAt])
 
   return ended ? null : children
 }
