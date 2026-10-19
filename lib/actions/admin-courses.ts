@@ -7,7 +7,7 @@ import { Course, Review, User, type CourseKind, type CourseReviewStatus } from "
 import { requireAdmin } from "@/lib/auth/admin"
 import { notifyUser } from "@/lib/notify"
 import { courseKindOf } from "@/lib/course-kind"
-import { courseFormatOf, hasDeliverable, isFileFormat } from "@/lib/course-format"
+import { courseFormatOf, hasDeliverable, isFileFormat, type CourseFormat } from "@/lib/course-format"
 
 const PAGE_SIZE = 20
 
@@ -34,6 +34,8 @@ export type AdminCourseRow = {
   availableAt: string | null
   preEnrollEnabled: boolean
   kind: CourseKind
+  /** Marketplace listings only (lib/course-format.ts); null for programs and New Economy. */
+  format: CourseFormat | null
   /** The marketplace quality review; "none" for programs and faculty courses. */
   reviewStatus: CourseReviewStatus
   reviewSubmittedAt: string | null
@@ -103,6 +105,7 @@ export async function adminListCourses(filters?: {
           availableAt: c.availableAt ? new Date(c.availableAt).toISOString() : null,
           preEnrollEnabled: c.preEnrollEnabled ?? true,
           kind: courseKindOf(c),
+          format: courseFormatOf(c),
           reviewStatus: c.review?.status ?? "none",
           reviewSubmittedAt: c.review?.submittedAt ? new Date(c.review.submittedAt).toISOString() : null,
           reviewNote: c.review?.note ?? null,

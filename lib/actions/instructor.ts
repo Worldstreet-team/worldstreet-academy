@@ -20,6 +20,7 @@ import {
   type PackageKey,
 } from "@/lib/db/models"
 import { notifyUsers } from "@/lib/notify"
+import { REVIEW_CHECKS } from "@/lib/review-checks"
 import { uploadThumbnail, deleteFromCloudinary } from "@/lib/cloudinary"
 import type { CourseLevel, CoursePricing, CourseStatus } from "@/lib/types"
 import { getCurrentUser } from "@/lib/auth"
@@ -490,6 +491,11 @@ export async function fetchCourseForEdit(courseId: string) {
           submittedAt: course.review?.submittedAt ? course.review.submittedAt.toISOString() : null,
           reviewedAt: course.review?.reviewedAt ? course.review.reviewedAt.toISOString() : null,
           note: course.review?.note ?? null,
+          checks: REVIEW_CHECKS.map((key) => ({
+            key,
+            status: course.review?.checks?.[key]?.status ?? null,
+            note: course.review?.checks?.[key]?.note ?? null,
+          })),
         },
         share: code ? shareLink(course.slug, code) : null,
         title: course.title,

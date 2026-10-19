@@ -28,12 +28,11 @@ import {
 import Link from "next/link"
 
 import { PageHeader } from "@/components/shared/page-header"
-import { Textarea } from "@/components/ui/textarea"
 import {
   adminListCourses,
   adminSetCourseStatus,
 } from "@/lib/actions/admin-courses"
-import { adminApproveCourseReview, adminRequestCourseChanges } from "@/lib/actions/admin-course-review"
+import { FORMAT_LABEL, isFileFormat } from "@/lib/course-format"
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import {
   formatDate,
@@ -67,8 +66,6 @@ function AdminCoursesInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const review = searchParams.get("review") === "pending" ? "pending" : "all"
-  const [changesTarget, setChangesTarget] = React.useState<{ id: string; title: string } | null>(null)
-  const [changesNote, setChangesNote] = React.useState("")
   const [status, setStatus] = React.useState("all")
   const [search, setSearch] = React.useState("")
   const [debouncedSearch, setDebouncedSearch] = React.useState("")
@@ -101,28 +98,6 @@ function AdminCoursesInner() {
     },
   })
 
-  const approveReview = useMutation({
-    mutationFn: (courseId: string) => adminApproveCourseReview(courseId),
-    onSuccess: (res) => {
-      setActionError(res.success ? null : res.error)
-      queryClient.invalidateQueries({ queryKey: ["admin", "courses"] })
-    },
-  })
-
-  const requestChanges = useMutation({
-    mutationFn: ({ courseId, note }: { courseId: string; note: string }) => adminRequestCourseChanges(courseId, note),
-    onSuccess: (res) => {
-      if (!res.success) {
-        setActionError(res.error)
-        return
-      }
-      setActionError(null)
-      setChangesTarget(null)
-      setChangesNote("")
-      queryClient.invalidateQueries({ queryKey: ["admin", "courses"] })
-    },
-  })
-
   return (
     <>
       <Topbar variant="admin" />
@@ -132,7 +107,7 @@ function AdminCoursesInner() {
           title={review === "pending" ? "Review queue" : "Courses"}
           subline={
             review === "pending"
-              ? "Marketplace courses from sellers, oldest first. Approve to publish, or request changes."
+              ? "Marketplace courses from Marketplace Creators, oldest first. Open one to record its four checks."
               : data
                 ? `${data.total.toLocaleString()} courses`
                 : "Create and manage the catalogue."
@@ -244,7 +219,7 @@ function AdminCoursesInner() {
                         "coming_soon" && <StatusBadge status="coming_soon" />}
                       {c.kind !== "program" && (
                         <span className="inline-flex shrink-0 items-center rounded-full bg-ws-chip px-2 py-0.5 text-[10px] font-medium text-ws-primary">
-                          {KIND_LABEL[c.kind]}
+                          {c.format ? `${KIND_LABEL[c.kind as keyof typeof KIND_LABEL]} · ${FORMAT_LABEL[c.format]}` : KIND_LABEL[c.kind as keyof typeof KIND_LABEL]}
                         </span>
                       )}
                       {c.reviewStatus !== "none" && (
@@ -252,7 +227,7 @@ function AdminCoursesInner() {
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground truncate">
-                      {c.instructorName} · {c.totalLessons} lessons ·{" "}
+                      {c.instructorName} · {isFileFormat(c.format) ? "1 file" : `${c.totalLessons} lessons`} ·{" "}
                       <Link href={`/admin/enrollments?course=${c.id}`} className="hover:underline">
                         {c.enrolledCount} students
                       </Link>
@@ -277,25 +252,13 @@ function AdminCoursesInner() {
                     )}
                   </div>
                   {c.reviewStatus === "pending" && (
-                    <div className="hidden shrink-0 items-center gap-2 sm:flex">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setChangesNote("")
-                          setChangesTarget({ id: c.id, title: c.title })
-                        }}
-                      >
-                        Request changes
-                      </Button>
-                      <Button
-                        size="sm"
-                        disabled={approveReview.isPending}
-                        onClick={() => approveReview.mutate(c.id)}
-                      >
-                        {approveReview.isPending && approveReview.variables === c.id ? "Publishing…" : "Approve & publish"}
-                      </Button>
-                    </div>
+                    <Button
+                      size="sm"
+                      className="hidden shrink-0 sm:inline-flex"
+                      render={<Link href={`/admin/courses/${c.id}/review`} />}
+                    >
+                      Open review
+                    </Button>
                   )}
                   <DropdownMenu>
                     <DropdownMenuTrigger
@@ -313,21 +276,11 @@ function AdminCoursesInner() {
                         View enrollments
                       </DropdownMenuItem>
                       {c.reviewStatus === "pending" && (
-                        <DropdownMenuItem onClick={() => approveReview.mutate(c.id)}>
-                          Approve &amp; publish
+                        <DropdownMenuItem render={<Link href={`/admin/courses/${c.id}/review`} />}>
+                          Open review
                         </DropdownMenuItem>
                       )}
-                      {c.reviewStatus === "pending" && (
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setChangesNote("")
-                            setChangesTarget({ id: c.id, title: c.title })
-                          }}
-                        >
-                          Request changes…
-                        </DropdownMenuItem>
-                      )}
-                      {c.status !== "published" && (
+                      {c.status !== "published" && !(c.kind === "marketplace" && c.sellerOwned && c.reviewStatus !== "approved") && (
                         <DropdownMenuItem
                           onClick={() =>
                             setCourseStatus.mutate({ courseId: c.id, newStatus: "published" })
@@ -390,41 +343,6 @@ function AdminCoursesInner() {
         )}
         </div>
       </div>
-
-      {/* Request changes — the note goes to the seller by email and in the app. */}
-      <Dialog open={!!changesTarget} onOpenChange={(open) => !open && setChangesTarget(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Request changes to “{changesTarget?.title}”?</DialogTitle>
-            <DialogDescription>
-              The course stays a draft. The seller gets your note by email and in the app, makes the changes and
-              submits it again.
-            </DialogDescription>
-          </DialogHeader>
-          <Textarea
-            value={changesNote}
-            onChange={(e) => setChangesNote(e.target.value)}
-            placeholder="e.g. Lesson 3's audio is too quiet, and lesson 5 repeats lesson 4."
-            className="min-h-28"
-            maxLength={2000}
-            aria-label="What to change"
-          />
-          <DialogFooter>
-            <Button variant="outline" size="sm" onClick={() => setChangesTarget(null)}>
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              disabled={requestChanges.isPending || changesNote.trim().length < 5}
-              onClick={() => {
-                if (changesTarget) requestChanges.mutate({ courseId: changesTarget.id, note: changesNote })
-              }}
-            >
-              {requestChanges.isPending ? "Sending…" : "Send to the seller"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Archive confirm — archiving pulls a course out of the catalog, so it
           gets the same explicit confirmation as role changes and refunds. */}
