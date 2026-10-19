@@ -27,6 +27,7 @@ export const NO_ENTITLEMENTS: IPackageEntitlements = {
   certificate: false,
   mentorship: false,
   prioritySupport: false,
+  recordings: false,
 }
 
 // Optional fields: a .lean()/projected read of a legacy row predates these

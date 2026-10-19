@@ -39,7 +39,8 @@ export async function ensureCertificateTier(
   try {
     const enrollment = await Enrollment.findById(enrollmentId).lean()
     if (!enrollment || enrollment.status !== "completed") return null
-    const course = await Course.findById(enrollment.course).select("packages").lean()
+    // `format` beside `packages`: a template or guide never certifies, so it never gets a tier.
+    const course = await Course.findById(enrollment.course).select("packages format").lean()
     if (!course || !entitlementsFor(course, enrollment).certificate) return null
 
     const [facts, finalExam] = await Promise.all([

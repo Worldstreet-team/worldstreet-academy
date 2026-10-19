@@ -54,7 +54,7 @@ export async function cohortsFor(rows: SeamEnrollment[]): Promise<Map<string, Co
 export async function masteryFor(rows: SeamEnrollment[]): Promise<Map<string, MasteryResult>> {
   if (rows.length === 0) return new Map()
   const courses = await Course.find({ _id: { $in: [...new Set(rows.map((r) => r.course.toString()))] } })
-    .select("packages")
+    .select("packages format")
     .lean()
   const byId = new Map(courses.map((c) => [c._id.toString(), c]))
   const pairs = rows.flatMap((enrollment) => {

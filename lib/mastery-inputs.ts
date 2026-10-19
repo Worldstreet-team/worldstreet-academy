@@ -3,6 +3,7 @@ import { Types, isValidObjectId } from "mongoose"
 import { Assignment, Attendance, Course, Enrollment, Meeting, Submission, type ICoursePackage, type PackageKey } from "@/lib/db/models"
 import { attendancePercent, attendedSeconds, classAttended, classHeld } from "@/lib/attendance-rules"
 import { courseKindOf } from "@/lib/course-kind"
+import { isFileFormat, type CourseFormat } from "@/lib/course-format"
 import { entitlementsFor } from "@/lib/entitlements"
 import {
   MASTERY_KEYS,
@@ -34,7 +35,8 @@ export type MasteryEnrollmentRow = {
   createdAt?: Date | null
 }
 
-export type MasteryCourseRow = { _id: Id; packages?: ICoursePackage[] | null }
+// `format` is required, as in entitlementsFor: callers select it beside `packages`.
+export type MasteryCourseRow = { _id: Id; packages?: ICoursePackage[] | null; format: CourseFormat | null | undefined }
 
 const key = (id: Id): string => String(id)
 
@@ -49,7 +51,8 @@ export async function masteryInputsForMany(
   const out = new Map<string, MasteryFacts>()
   if (rows.length === 0) return out
 
-  const plans = rows.map(({ enrollment, course }) => ({
+  // A template or guide (a file product) has no Mastery Score: no facts at all.
+  const plans = rows.filter(({ course }) => !isFileFormat(course.format)).map(({ enrollment, course }) => ({
     enrollment,
     ent: entitlementsFor(course, enrollment),
     windowStart: enrollment.activatedAt ?? enrollment.purchasedAt ?? enrollment.createdAt ?? new Date(0),
@@ -182,7 +185,7 @@ export async function myMastery(userId: string): Promise<MyMastery[]> {
     .lean()
   if (enrollments.length === 0) return []
   const courses = await Course.find({ _id: { $in: enrollments.map((e) => e.course) } })
-    .select("title packages kind")
+    .select("title packages kind format")
     .lean()
   const byId = new Map(courses.map((c) => [key(c._id), c]))
   const pairs = enrollments.flatMap((enrollment) => {
