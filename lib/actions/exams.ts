@@ -356,7 +356,7 @@ export async function setCourseExamRequired(courseId: string, required: boolean)
 
 /**
  * Package gate for an assessment. A final exam belongs to the assessment &
- * certificate entitlement (Basic has neither); a knowledge check follows its
+ * certificate entitlement; a knowledge check follows its
  * lesson's tier. null = open.
  */
 async function examPackageLock(

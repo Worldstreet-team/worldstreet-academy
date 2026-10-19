@@ -1258,7 +1258,7 @@ export async function markCourseComplete(
 
     // CBT gate: when the course requires an exam, completion only happens
     // through a passing attempt (lib/actions/exams.ts) — unless the package has
-    // no assessment & certificate (Basic), which completes on its lessons.
+    // no certificate, which completes on its lessons.
     const [course, access] = await Promise.all([
       Course.findById(courseId).select("examRequired").lean(),
       getCourseAccess(user._id.toString(), courseId),
