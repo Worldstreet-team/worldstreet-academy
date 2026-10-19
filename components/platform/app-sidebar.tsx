@@ -28,7 +28,7 @@ import { useUnreadCount } from "@/lib/hooks/use-unread-count"
 import { useOngoingCall } from "@/components/providers/call-provider"
 import { useSidebarActivity } from "@/lib/hooks/use-sidebar-activity"
 import { useEnrollments } from "@/lib/hooks/queries"
-import { enrollmentHref, grantsAccess, isMentorEnrollment, pickHero } from "@/lib/dashboard-home"
+import { enrollmentHref, grantsAccess, isFileProductEnrollment, isMentorEnrollment, pickHero } from "@/lib/dashboard-home"
 import { useNow } from "@/lib/hooks/use-now"
 import { BRAND } from "@/lib/brand"
 import { BrandLockup } from "@/components/shared/brand-lockup"
@@ -421,7 +421,7 @@ export function AppSidebar() {
   }, [enrollments, now])
 
   // Only enrollments that still open the player count as "in progress".
-  const inProgressCount = enrollments.filter((e) => grantsAccess(e) && e.progress < 100).length
+  const inProgressCount = enrollments.filter((e) => grantsAccess(e) && !isFileProductEnrollment(e) && e.progress < 100).length
   const liveCount = activeMeetings.length + invites.length
   const hasMentorship = enrollments.some(isMentorEnrollment)
 

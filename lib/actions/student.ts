@@ -143,6 +143,8 @@ export type StudentEnrollment = {
   resumeLesson: ResumeLesson | null
   /** The package's open lessons in course order, true where completed — the hero's per-lesson track. */
   lessonTrack: boolean[]
+  /** The marketplace format; null for programs and New Economy courses. A template or guide is a file product. */
+  format: CourseFormat | null
   /** The class community link (`Course.communityUrl`) — only on an access-granting enrollment; it's a private group. */
   communityUrl: string | null
 }
@@ -896,7 +898,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
     const enrollments = await Enrollment.find({ user: user._id })
       .populate({
         path: "course",
-        select: "slug title thumbnailUrl instructor totalLessons availableAt status packages examRequired school communityUrl",
+        select: "slug title thumbnailUrl kind format instructor totalLessons availableAt status packages examRequired school communityUrl",
         populate: {
           path: "instructor",
           select: "firstName lastName avatarUrl instructorProfile.headline",
@@ -910,6 +912,8 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
       slug: string
       title: string
       thumbnailUrl: string
+      kind?: CourseKind | null
+      format?: CourseFormat | null
       school?: string | null
       totalLessons?: number
       availableAt?: Date | null
@@ -998,6 +1002,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
         courseId,
         courseTitle: course.title,
         courseThumbnail: programArt(course),
+        format: courseFormatOf({ kind: courseKindOf(course), format: course.format }),
         instructorName: `${course.instructor.firstName} ${course.instructor.lastName}`,
         instructorAvatarUrl: course.instructor.avatarUrl,
         progress: enrollment.progress,

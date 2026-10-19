@@ -1,6 +1,7 @@
 import type { MyAssessment } from "@/lib/actions/exams"
 import type { ResumeLesson, StudentEnrollment } from "@/lib/actions/student"
 import type { IPackageEntitlements, LessonType } from "@/lib/db/models"
+import { isFileFormat } from "@/lib/course-format"
 
 /*
  * Pure selectors over the student's enrollments (`fetchMyEnrollments`). The
@@ -14,9 +15,18 @@ export function grantsAccess(enrollment: Pick<StudentEnrollment, "status">): boo
   return enrollment.status === "active" || enrollment.status === "completed"
 }
 
-/** Access-granting rows open the player where the student left off; every other row opens the course page. */
+/**
+ * A template or guide: owned, never studied. It has no lessons, progress or
+ * certificate, so the learning surfaces skip it and My programs lists it as a
+ * download.
+ */
+export function isFileProductEnrollment(enrollment: Pick<StudentEnrollment, "format">): boolean {
+  return isFileFormat(enrollment.format)
+}
+
+/** Access-granting rows open the player where the student left off (a file product, its product home); every other row opens the course page. */
 export function enrollmentHref(enrollment: StudentEnrollment): string {
-  return grantsAccess(enrollment)
+  return grantsAccess(enrollment) && !isFileProductEnrollment(enrollment)
     ? `/dashboard/courses/${enrollment.courseId}/learn/${enrollment.resumeLessonId ?? enrollment.firstLessonId ?? "first"}`
     : `/dashboard/courses/${enrollment.courseId}`
 }
@@ -76,12 +86,12 @@ function byRecentAccess(a: StudentEnrollment, b: StudentEnrollment): number {
 
 /** Continue learning → the most recently accessed active or completed enrollment. */
 export function pickResume(enrollments: StudentEnrollment[]): StudentEnrollment | null {
-  return [...enrollments].filter(grantsAccess).sort(byRecentAccess)[0] ?? null
+  return [...enrollments].filter((e) => grantsAccess(e) && !isFileProductEnrollment(e)).sort(byRecentAccess)[0] ?? null
 }
 
 /** Current course → the most recently accessed active enrollment. */
 export function pickCurrent(enrollments: StudentEnrollment[]): StudentEnrollment | null {
-  return [...enrollments].filter((e) => e.status === "active").sort(byRecentAccess)[0] ?? null
+  return [...enrollments].filter((e) => e.status === "active" && !isFileProductEnrollment(e)).sort(byRecentAccess)[0] ?? null
 }
 
 /** "Priority support" — only a package actually bought with it, on an enrollment that still grants access. */
@@ -165,8 +175,8 @@ export function formatDateTime(iso: string): string {
  * programs and the sidebar. A just-bought program at 0% belongs here, and so
  * does one at 100% still waiting on its final exam or on Finish.
  */
-export function isInProgress(enrollment: Pick<StudentEnrollment, "status">): boolean {
-  return enrollment.status === "active"
+export function isInProgress(enrollment: Pick<StudentEnrollment, "status" | "format">): boolean {
+  return enrollment.status === "active" && !isFileProductEnrollment(enrollment)
 }
 
 /**
@@ -300,7 +310,7 @@ function lessonsToGoal(e: StudentEnrollment, left: number): string {
 }
 
 export type LearningTotals = {
-  /** Enrollments that open the player. */
+  /** Enrollments that open the player (a file product has none). */
   open: number
   inProgress: number
   completed: number
@@ -313,7 +323,7 @@ export type LearningTotals = {
 export function learningTotals(enrollments: StudentEnrollment[]): LearningTotals {
   const open = enrollments.filter(grantsAccess)
   return {
-    open: open.length,
+    open: open.filter((e) => !isFileProductEnrollment(e)).length,
     inProgress: open.filter(isInProgress).length,
     completed: open.filter(isFinished).length,
     lessonsDone: open.reduce((sum, e) => sum + e.completedOpenLessons, 0),
@@ -371,7 +381,7 @@ export function programsForTab(enrollments: StudentEnrollment[], tab: ProgramTab
   if (tab === "in_progress") return enrollments.filter(isInProgress).sort(byRecentAccess)
   if (tab === "completed") return enrollments.filter(isFinished).sort(byRecentAccess)
   const rank = (e: StudentEnrollment) =>
-    isInProgress(e) ? 0 : isComingSoon(e, now) || isSeatReady(e, now) ? 1 : isFinished(e) ? 2 : 3
+    isInProgress(e) ? 0 : isComingSoon(e, now) || isSeatReady(e, now) ? 1 : isFinished(e) || isFileProductEnrollment(e) ? 2 : 3
   return [...enrollments].sort((a, b) => rank(a) - rank(b) || byRecentAccess(a, b))
 }
 

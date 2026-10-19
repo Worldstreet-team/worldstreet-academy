@@ -1,4 +1,4 @@
-import { ArrowRightIcon, AwardIcon, HandshakeIcon, MailIcon, PlayIcon, RadioIcon, type IconComponent } from "@/components/icons"
+import { ArrowRightIcon, AwardIcon, DownloadIcon, HandshakeIcon, MailIcon, PlayIcon, RadioIcon, type IconComponent } from "@/components/icons"
 import type { Metadata } from "next"
 import Image from "next/image"
 import Link from "next/link"
@@ -11,6 +11,7 @@ import { getCheckoutConfirmation } from "@/lib/actions/enrollments"
 import { fetchProgramById } from "@/lib/actions/student"
 import { fetchProgramCurriculum } from "@/lib/actions/program-page"
 import { PACKAGE_LABEL } from "@/lib/entitlements"
+import { FORMAT_LABEL, isFileFormat } from "@/lib/course-format"
 import { SCHOOL_BY_SLUG } from "@/lib/schools"
 import { SchoolIcon } from "@/components/shared/school-icon"
 import { EnrolledSeal } from "@/components/checkout/enrolled-seal"
@@ -71,8 +72,16 @@ export default async function CheckoutSuccessPage({
   const services = access && bought ? grantedServices(access.entitlements, packageKey) : new Set<string>()
   const tierLabel = packageKey && program && program.tierCount > 1 ? PACKAGE_LABEL[packageKey] : null
 
+  const fileFormat = isFileFormat(program?.format) ? FORMAT_LABEL[program.format].toLowerCase() : null
+
   const steps: NextStep[] = [
-    start
+    fileFormat
+      ? {
+          icon: DownloadIcon,
+          title: `Your ${fileFormat} is ready`,
+          body: "Download it from your dashboard whenever you need it.",
+        }
+      : start
       ? {
           icon: PlayIcon,
           title: "Your lessons are open",
@@ -149,7 +158,7 @@ export default async function CheckoutSuccessPage({
             href={startHref}
             className="flex h-[52px] items-center justify-center gap-2 rounded-full bg-ws-brand px-6 sm:flex-1 text-[15px] font-semibold text-ws-brand-on transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-brand/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40 focus-visible:ring-offset-2 focus-visible:ring-offset-ws-page active:translate-y-px"
           >
-            {start ? "Start learning" : "Open your program"}
+            {fileFormat ? `Download your ${fileFormat}` : start ? "Start learning" : "Open your program"}
             <ArrowRightIcon size={17} aria-hidden />
           </Link>
           <Link
