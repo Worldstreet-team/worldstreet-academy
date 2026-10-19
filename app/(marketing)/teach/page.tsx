@@ -35,16 +35,23 @@ const DASHBOARD = [
   { title: "Mentorship", body: "Meet your Executive learners one to one and keep their roadmap." },
 ] as const
 
-/** From application to a tutor dashboard — what happens, and who does it. */
+/** From application to a faculty dashboard — institutional blueprint §16. */
 const STEPS = [
-  { title: "Apply", body: "Tell us what you'd like to teach and why, and upload your CV. It takes about ten minutes." },
-  { title: "Admin review", body: "Our team reads every application. You'll hear back by email and in the app." },
+  { title: "Application", body: "Tell us what you'd like to teach and why, and upload your CV. It takes about ten minutes." },
+  { title: "Academic review", body: "Our team reads every application. You'll hear back by email and in the app." },
   {
     title: "Interview",
     body: "We schedule a short call on the platform — usually a few times for you to pick from — and you join it from your dashboard.",
   },
-  { title: "Approval", body: "After the interview we decide, and tell you by email and in the app." },
-  { title: "Start teaching", body: "You get your tutor sign-in and dashboard, ready for your first cohort." },
+  {
+    title: "Teaching demonstration",
+    body: "Where appropriate, the reviewer asks you to give a teaching demonstration on the platform. You join it from your dashboard, like the interview.",
+  },
+  { title: "Approval", body: "We decide after the interview, and the demonstration if there was one, and tell you by email and in the app." },
+  {
+    title: "Onboarding",
+    body: "Accept the instructor agreement, complete your profile and signature, verify your identity for payouts, and read the teaching standards, curriculum guidelines and platform training. Then you receive your WMA Faculty credential.",
+  },
 ] as const
 
 const FAQS = [

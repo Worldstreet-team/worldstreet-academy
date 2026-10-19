@@ -126,6 +126,10 @@ export type MyApplication = {
   history: { status: string; at: string; note?: string }[]
   createdAt: string
   interview: InterviewInfo | null
+  /** A reviewer asked for a teaching demonstration (adds a tracker step). */
+  demoRequested: boolean
+  /** The demonstration room while it hasn't ended — the outcome is never exposed. */
+  demo: InterviewInfo | null
   /** Interview slots the admin proposed — the applicant picks one. */
   proposedSlots: ProposedSlotView[]
 }
@@ -307,6 +311,19 @@ export async function getMyInstructorApplication(): Promise<MyApplication | null
       }
     }
 
+    // Teaching demonstration room, read the same way.
+    let demo: InterviewInfo | null = null
+    if (app.demo?.meetingId) {
+      const demoMeeting = await Meeting.findById(app.demo.meetingId).select("scheduledAt status").lean()
+      if (demoMeeting && demoMeeting.status !== "ended") {
+        demo = {
+          meetingId: app.demo.meetingId.toString(),
+          scheduledAt: demoMeeting.scheduledAt ? new Date(demoMeeting.scheduledAt).toISOString() : null,
+          joinPath: `/dashboard/meetings?join=${app.demo.meetingId.toString()}`,
+        }
+      }
+    }
+
     return {
       id: app._id.toString(),
       status: app.status,
@@ -332,6 +349,8 @@ export async function getMyInstructorApplication(): Promise<MyApplication | null
       })),
       createdAt: app.createdAt.toISOString(),
       interview,
+      demoRequested: Boolean(app.demo?.requested),
+      demo,
       proposedSlots:
         // Slots are only actionable before an interview is locked in.
         !interview && ACTIVE_APPLICATION_STATUSES.includes(app.status)

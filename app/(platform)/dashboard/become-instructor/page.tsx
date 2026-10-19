@@ -32,6 +32,7 @@ import {
 import { getVideoUploadUrl, getDocumentUploadUrl } from "@/lib/actions/upload"
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import { BRAND } from "@/lib/brand"
+import { trackerFor } from "@/lib/application-tracker"
 import { SCHOOLS, type SchoolSlug } from "@/lib/schools"
 import type { ApplicationPassion } from "@/lib/db/models"
 
@@ -173,34 +174,11 @@ const SCHOOL_ITEMS = SCHOOLS.map((s) => ({ value: s.slug, label: s.name }))
 
 /* ── Status tracker ── */
 
-const TRACKER_STEPS = [
-  { key: "submitted", label: "Submitted" },
-  { key: "under_review", label: "Under review" },
-  { key: "interview_scheduled", label: "Interview" },
-  { key: "decision", label: "Decision" },
-] as const
-
-function statusIndex(status: string): number {
-  switch (status) {
-    case "submitted":
-      return 0
-    case "under_review":
-      return 1
-    case "interview_scheduled":
-      return 2
-    case "approved":
-    case "rejected":
-      return 3
-    default:
-      return 0
-  }
-}
-
-function StatusTracker({ status }: { status: string }) {
-  const current = statusIndex(status)
+function StatusTracker({ status, demoRequested }: { status: string; demoRequested: boolean }) {
+  const { steps, current } = trackerFor(status, demoRequested)
   return (
     <ol className="flex items-start gap-2">
-      {TRACKER_STEPS.map((step, i) => (
+      {steps.map((step, i) => (
         <React.Fragment key={step.key}>
           <li className="flex min-w-0 flex-col items-center gap-2" aria-current={i === current ? "step" : undefined}>
             <span
@@ -215,14 +193,14 @@ function StatusTracker({ status }: { status: string }) {
               {i < current ? <Glyph icon={CheckmarkCircle02Icon} className="size-4" /> : i + 1}
             </span>
             <span
-              className={`whitespace-nowrap text-[12px] ${
+              className={`text-center text-[12px] leading-tight max-sm:max-w-[4.75rem] ${
                 i <= current ? "font-medium text-foreground" : "text-muted-foreground"
               }`}
             >
               {step.label}
             </span>
           </li>
-          {i < TRACKER_STEPS.length - 1 && (
+          {i < steps.length - 1 && (
             <li aria-hidden className={`mt-4 h-px flex-1 ${i < current ? "bg-primary" : "bg-border"}`} />
           )}
         </React.Fragment>
@@ -808,7 +786,7 @@ export default function BecomeInstructorPage() {
           <Skeleton className="h-96 rounded-[20px]" />
         ) : isActive && application ? (
           <section className={`${PANEL} space-y-6 p-6 sm:p-8`}>
-            <StatusTracker status={application.status} />
+            <StatusTracker status={application.status} demoRequested={application.demoRequested} />
             <div className="rounded-[14px] bg-surface-sunken px-4 py-3.5">
               <p className="text-[14px] font-medium text-foreground">{application.answers.headline}</p>
               <p className="mt-1 text-[13px] text-muted-foreground">
@@ -818,7 +796,9 @@ export default function BecomeInstructorPage() {
                   ? "waiting for review"
                   : application.status === "under_review"
                     ? "an admin is reviewing your application"
-                    : "interview scheduled — see below"}
+                    : application.demo
+                      ? "teaching demonstration scheduled — see below"
+                      : "interview scheduled — see below"}
               </p>
             </div>
             {application.proposedSlots.length > 0 && !application.interview && (
@@ -872,6 +852,27 @@ export default function BecomeInstructorPage() {
                 </div>
                 <Button className="h-10 px-5" render={<Link href={application.interview.joinPath} />}>
                   Join interview
+                </Button>
+              </div>
+            )}
+            {application.status === "interview_scheduled" && application.demo && (
+              <div className="flex flex-wrap items-center justify-between gap-4 rounded-[14px] border border-primary/25 bg-primary/5 p-4">
+                <div className="space-y-1">
+                  <p className="text-[14px] font-semibold text-foreground">Your teaching demonstration</p>
+                  <p className="text-[13px] text-muted-foreground">
+                    {application.demo.scheduledAt
+                      ? new Date(application.demo.scheduledAt).toLocaleString("en-US", {
+                          dateStyle: "full",
+                          timeStyle: "short",
+                        })
+                      : "Time to be confirmed"}
+                  </p>
+                  <p className="text-[12.5px] text-muted-foreground">
+                    Join at the scheduled time — you&apos;ll be admitted from the waiting room.
+                  </p>
+                </div>
+                <Button className="h-10 px-5" render={<Link href={application.demo.joinPath} />}>
+                  Join teaching demonstration
                 </Button>
               </div>
             )}
