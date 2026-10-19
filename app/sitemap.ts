@@ -12,7 +12,7 @@ export const revalidate = 0
  * /sitemap.xml — the indexable public pages: home, the schools, every
  * published program (the set /programs lists), the marketplace and New
  * Economy with their published courses (whose pages are /programs/<slug>
- * too), /calendar, /sell, /teach and, while faculty exists and is public (FACULTY_PUBLIC),
+ * too), /calendar, /sell, /teach, /certification and, while faculty exists and is public (FACULTY_PUBLIC),
  * /faculty and each profile. Never /verify
  * (student names, noindex), the signed-in apps, /login, /register or the /courses redirects. No
  * lastModified: BrowseCourse carries no update time, and a guess would be false.
@@ -39,6 +39,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: appUrl("/calendar") },
     { url: appUrl("/sell") },
     { url: appUrl("/teach") },
+    { url: appUrl("/certification") },
     ...(faculty.length > 0
       ? [{ url: appUrl("/faculty") }, ...faculty.map((member) => ({ url: appUrl(facultyHref(member.username)) }))]
       : []),

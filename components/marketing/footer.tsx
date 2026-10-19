@@ -74,6 +74,11 @@ export function Footer({ showFaculty }: { showFaculty: boolean }) {
                 </li>
               )}
               <li>
+                <Link href="/certification" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  Certification
+                </Link>
+              </li>
+              <li>
                 <Link href="/#faq" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                   FAQ
                 </Link>

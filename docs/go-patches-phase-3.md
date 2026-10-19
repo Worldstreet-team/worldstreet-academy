@@ -330,3 +330,16 @@ Go needs no patch: nothing it reads changed.
 - **`cohorts`** is a new collection that Go doesn't read. One row per academic session (`number`, `name`, `startsAt`, `endsAt`, `note`), entered by an admin at `/admin/cohorts`.
 - **No `enrollments` field changes.** A learner's cohort is derived on the web from `purchasedAt` (or, for ESPEE, the approved proof's `createdAt` when it was submitted earlier). Nothing is stored.
 - Mobile shows no cohort until a later Go release chooses to read the collection.
+
+## 19. Certificate tiers (Phase 17, institutional blueprint §13)
+
+Go needs no patch to keep working: everything is additive.
+
+**R13: certificate tiers.**
+
+- **Fields.**
+  - `enrollments.certificateTier` is `"completion" | "practitioner" | "mastery" | null`. A missing value means null.
+  - `enrollments.certificateTierAt` is a date or null.
+  - Only the web writes them, and it never lowers the tier. Go must not write them. Any wholesale enrollment write must carry them, alongside R9's `certificateId` and R11's `mentorRoadmap` (use dotted paths).
+- **Rendering on mobile.** Print the tier's name: "WMA Certificate of Completion", "WMA Certified Practitioner" or "WMA Mastery Certification". When the tier is null, print "WMA Certificate of Completion". R9's ID rules are unchanged: one `WSA-` ID per enrollment, and a higher tier reprints under the same ID.
+- **Who decides.** The web computes the tier from completion, the final exam, the Mastery Score and a graded project, as published at `/certification`. A completion made through Go gets its tier the next time the learner opens their certificates on the web. Go needs no tier logic.

@@ -9,6 +9,7 @@ import { notifyUser, notifyUsers } from "@/lib/notify"
 import { getCourseAccess } from "@/lib/course-access"
 import { entitlementsFor } from "@/lib/entitlements"
 import { POINTS, awardPoints, gradePoints, pointKey } from "@/lib/points"
+import { ensureCertificateTier } from "@/lib/certificate-standing"
 import {
   generatePresignedDownloadUrl,
   generatePresignedUploadUrl,
@@ -269,7 +270,7 @@ export async function gradeSubmission(input: {
       return { success: false, error: parsed.error.issues[0]?.message ?? "Check the grade and try again" }
     }
 
-    const submission = await Submission.findById(parsed.data.submissionId).select("course user assignment").lean()
+    const submission = await Submission.findById(parsed.data.submissionId).select("course user assignment enrollment").lean()
     if (!submission) return { success: false, error: "Submission not found" }
     const course = await courseStaff(user, submission.course.toString())
     if (!course) return { success: false, error: "Submission not found" }
@@ -302,6 +303,8 @@ export async function gradeSubmission(input: {
       points: gradePoints(parsed.data.grade),
       key: pointKey.assignmentGraded(submission._id.toString()),
     })
+    // A graded project can raise the credential (D25).
+    await ensureCertificateTier(submission.enrollment)
 
     const assignment = await Assignment.findById(submission.assignment).select("title").lean()
     const assignmentId = submission.assignment.toString()

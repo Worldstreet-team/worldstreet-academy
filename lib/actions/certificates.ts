@@ -7,6 +7,8 @@ import { getCurrentUser } from "@/lib/auth"
 import { entitlementsFor } from "@/lib/entitlements"
 import { schoolFromSlug } from "@/lib/schools"
 import { ensureCertificateId, normalizeCertificateId } from "@/lib/certificate-id"
+import { ensureCertificateTier } from "@/lib/certificate-standing"
+import type { CertificateTier, NextTier } from "@/lib/certificate-tier"
 
 // ============================================================================
 // TYPES
@@ -27,6 +29,8 @@ export type CertificateData = {
   programName: string
   /** Full school name ("School of Trading & Financial Markets"); null for a course without a school. */
   schoolName: string | null
+  /** The highest credential earned; a null stored tier reads as Completion. */
+  tier: CertificateTier
 }
 
 export type StudentCertificate = {
@@ -37,6 +41,10 @@ export type StudentCertificate = {
   instructorName: string
   instructorAvatarUrl: string | null
   completedAt: string
+  /** The highest credential earned; a null stored tier reads as Completion. */
+  tier: CertificateTier
+  /** What the next rung needs; null at the top or when nothing is left to do. */
+  next: NextTier | null
 }
 
 export type InstructorCertificateStats = {
@@ -107,6 +115,7 @@ export async function fetchCertificate(courseId: string): Promise<CertificateDat
     // Completed and certifying but never stamped (a Go/mobile completion, the
     // deploy → backfill window): store the legacy ID this page already prints.
     const certificateId = enrollment.certificateId ?? (await ensureCertificateId(enrollment, false))
+    const standing = await ensureCertificateTier(enrollment._id)
 
     return {
       id: enrollment._id.toString(),
@@ -120,6 +129,7 @@ export async function fetchCertificate(courseId: string): Promise<CertificateDat
       certificateId,
       programName: course.title,
       schoolName: schoolFromSlug(course.school)?.name ?? null,
+      tier: standing?.tier ?? enrollment.certificateTier ?? "completion",
     }
   } catch (error) {
     console.error("Fetch certificate error:", error)
@@ -152,13 +162,17 @@ export async function fetchMyCertificates(): Promise<StudentCertificate[]> {
       .sort({ completedAt: -1 })
       .lean()
 
-    return enrollments
-      .filter(
-        (e) =>
-          e.course &&
-          entitlementsFor(e.course as unknown as { packages?: ICoursePackage[] | null }, e).certificate
-      )
-      .map((enrollment) => {
+    const kept = enrollments.filter(
+      (e) =>
+        e.course &&
+        entitlementsFor(e.course as unknown as { packages?: ICoursePackage[] | null }, e).certificate
+    )
+    // A learner holds few certificates; no batching.
+    const standings = await Promise.all(kept.map((e) => ensureCertificateTier(e._id)))
+
+    return kept
+      .map((enrollment, i) => {
+        const standing = standings[i]
         const course = enrollment.course as unknown as {
           _id: { toString(): string }
           title: string
@@ -178,6 +192,8 @@ export async function fetchMyCertificates(): Promise<StudentCertificate[]> {
           instructorName: `${course.instructor.firstName} ${course.instructor.lastName}`,
           instructorAvatarUrl: course.instructor.avatarUrl,
           completedAt: enrollment.completedAt!.toISOString(),
+          tier: standing?.tier ?? enrollment.certificateTier ?? "completion",
+          next: standing?.next ?? null,
         }
       })
   } catch (error) {
@@ -200,6 +216,8 @@ export type VerifiedCertificate = {
   completedAt: string
   /** "" when the instructor account no longer exists */
   instructorName: string
+  /** The stored tier, never computed here; a null stored tier reads as Completion. */
+  tier: CertificateTier
 }
 
 const VERIFY_MAX_LOOKUPS = 30
@@ -266,7 +284,7 @@ export async function verifyCertificate(
       certificateId: { $eq: id, $type: "string" },
       status: "completed",
     })
-      .select("user course completedAt packageKey certificateId")
+      .select("user course completedAt packageKey certificateId certificateTier")
       .lean()
     if (!enrollment || !enrollment.completedAt || !enrollment.certificateId) return null
 
@@ -291,6 +309,7 @@ export async function verifyCertificate(
       schoolName: schoolFromSlug(course.school)?.name ?? null,
       completedAt: enrollment.completedAt.toISOString(),
       instructorName: instructor ? `${instructor.firstName ?? ""} ${instructor.lastName ?? ""}`.trim() : "",
+      tier: enrollment.certificateTier ?? "completion",
     }
   } catch (error) {
     console.error("Verify certificate error:", error)

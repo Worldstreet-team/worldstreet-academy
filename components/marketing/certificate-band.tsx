@@ -1,6 +1,8 @@
 import Image from "next/image"
 import { BRAND } from "@/lib/brand"
-import { CheckIcon } from "@/components/icons"
+import { ArrowRightIcon, CheckIcon } from "@/components/icons"
+import Link from "next/link"
+import { CERT_TIERS, CERT_TIER_LABEL } from "@/lib/certificate-tier"
 import { Reveal, RevealGroup } from "@/components/marketing/motion/reveal"
 import { SectionLabel, SectionTitle } from "@/components/marketing/section-heading"
 
@@ -35,6 +37,16 @@ export function CertificateBand() {
               </li>
             ))}
           </ul>
+          <p className="mt-6 max-w-xl text-[14px] text-ws-muted">
+            {`Three credentials: ${CERT_TIERS.map((t) => CERT_TIER_LABEL[t]).join(" · ")}.`}
+          </p>
+          <Link
+            href="/certification"
+            className="mt-3 inline-flex items-center gap-1 text-[13px] font-medium text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:text-ws-primary"
+          >
+            See what each one requires
+            <ArrowRightIcon size={14} aria-hidden />
+          </Link>
         </RevealGroup>
 
         <Reveal y={24} duration={0.7}>

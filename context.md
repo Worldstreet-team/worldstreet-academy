@@ -189,3 +189,11 @@ Online education platform for cryptocurrency/trading courses. Instructor portal 
 - **A learner's cohort is derived, never stored** (rulings 2 and 3): the enrolment date is `purchasedAt` (or an earlier approved ESPEE proof's `createdAt`), and only active or completed school-program enrollments have one.
 - **Env fallback:** `NEXT_PUBLIC_COHORT_STARTS_AT` and `NEXT_PUBLIC_COHORT_NUMBER` apply only while the collection is empty.
 - **Go:** no patch (`docs/go-patches-phase-3.md` §18).
+
+### 2026-10-19 — Certification tiers and WMA Alumni (Phase 17)
+- **Three credentials:** WMA Certificate of Completion, WMA Certified Practitioner and WMA Mastery Certification. The tier rules are pure, in `lib/certificate-tier.ts`; the D25 thresholds (Mastery Score 70 and 85, a graded project of 70) are named constants.
+- **Stored, never lowered:** `Enrollment.certificateTier` is raised by `ensureCertificateTier` (`lib/certificate-standing.ts`) on completion, exam, grading, admin changes and when a learner opens their certificates. A conditional write means a re-grade or a falling score never takes a tier away. A null tier reads as Completion. The `WSA-` ID stays one per enrollment.
+- **`/certification`** is the public page that publishes the requirements, with the Mastery Score weights read from the constants. `/verify` prints the stored tier and never computes.
+- **WMA Alumni:** a chip on the dashboard greeting and the profile for anyone holding at least one certificate. Never on a public page.
+- **Ruling 3:** "final exam passed" is `examPassed === true`, so a program with no published final exam tops out at Completion.
+- **Ruling 4:** only the Standard and Executive plans reach Practitioner; a null `packageKey` (legacy, free) tops out at Completion. Stored tiers never go down, so widening this later is reversible.

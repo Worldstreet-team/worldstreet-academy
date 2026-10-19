@@ -123,6 +123,19 @@ The academic structure becomes the seven schools of the institutional blueprint 
 4. **Check:** `/`, `/schools` and a program page count down to Cohort 002, and `/calendar` lists both.
 5. Then remove `NEXT_PUBLIC_COHORT_STARTS_AT` and `NEXT_PUBLIC_COHORT_NUMBER` from Coolify. They only matter while the collection is empty.
 
+## Certification tiers — Phase 17 (`mastery/phase-17`)
+
+No script, no env and no index. Deploy as usual. The Go R13 release is optional: without it, mobile prints "Certificate of Completion" for every tier.
+
+1. **Smoke test after the deploy:**
+   - `/certification` is 200.
+   - `/verify/<an ID from §7>` shows "Credential · WMA Certificate of Completion".
+   - The footer links `/certification`.
+2. **Owner content:**
+   - The thresholds (70, 85, and a project of 70) live in `lib/certificate-tier.ts`, and a change needs a deploy. Raising one never takes a tier away, because stored tiers never go down.
+   - Practitioner and Mastery need a **published final exam** on the program. Catalogue programs have none yet.
+   - The `/certification` copy needs your sign-off.
+
 ## 0. Blockers — settle these first
 
 | # | Item | Who | Blocks launch? |

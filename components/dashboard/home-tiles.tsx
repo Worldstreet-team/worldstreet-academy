@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/system"
 import type { StudentEnrollment } from "@/lib/actions/student"
 import { BRAND } from "@/lib/brand"
+import { CERT_TIER_LABEL } from "@/lib/certificate-tier"
 import {
   enrollmentStatusLabel,
   formatClassWhen,
@@ -256,7 +257,7 @@ export function CertificatesTile({ now }: { now: number }) {
                   {cert.courseTitle}
                 </span>
                 <span className="truncate text-[12.5px] text-muted-foreground">
-                  Earned {formatShortDate(cert.completedAt, now)}
+                  {`${CERT_TIER_LABEL[cert.tier]} · Earned ${formatShortDate(cert.completedAt, now)}`}
                 </span>
               </span>
               <Chevron />

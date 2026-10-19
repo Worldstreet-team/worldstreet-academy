@@ -1,5 +1,6 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose"
 import type { PackageKey } from "./course"
+import type { CertificateTier } from "@/lib/certificate-tier"
 
 /**
  * pre_enrolled — enrolled before the course's availableAt, uncharged. Becomes
@@ -46,6 +47,10 @@ export interface IEnrollment extends Document {
    * null for Basic completions and for rows that aren't complete.
    */
   certificateId: string | null
+  /** Highest credential earned (institutional blueprint §13, D25). Web-written, never lowered (lib/certificate-standing.ts); null reads as Completion. Additive — Go R13. */
+  certificateTier: CertificateTier | null
+  /** When certificateTier last rose. */
+  certificateTierAt: Date | null
   // Progress tracking
   progress: number // 0-100 percentage
   completedLessons: Types.ObjectId[] // Array of completed lesson IDs
@@ -123,6 +128,8 @@ const EnrollmentSchema = new Schema<IEnrollment>(
       default: null,
     },
     certificateId: { type: String, default: null },
+    certificateTier: { type: String, enum: [null, "completion", "practitioner", "mastery"], default: null },
+    certificateTierAt: { type: Date, default: null },
     progress: {
       type: Number,
       default: 0,
