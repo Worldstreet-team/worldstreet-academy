@@ -28,7 +28,7 @@ export type SeamEnrollment = {
 export type CohortTag = { number: number; name: string }
 
 export type MasteryPartKey = "completion" | "assessment" | "assignments" | "projects" | "attendance"
-/** Phase 16's masteryScore() result (roadmap 16.3). Alias it to Phase 16's own type when filling. */
+/** Phase 16's masteryScore() result. `weight` is a whole-number percentage (MASTERY_WEIGHTS sums to 100). */
 export type MasteryResult = { score: number | null; parts: { key: MasteryPartKey; value: number | null; weight: number }[] }
 
 /**

@@ -207,7 +207,7 @@ export default async function StudentPerformancePage({ params }: { params: Promi
                     <li key={p.key} className="flex items-center justify-between gap-3 py-2 text-[13px]">
                       <span className="font-medium">{PART_LABEL[p.key]}</span>
                       <span className="tabular-nums text-muted-foreground">
-                        {p.value === null ? "—" : p.value} · weight {Math.round(p.weight * 100)}%
+                        {p.value === null ? "—" : p.value} · weight {p.weight}%
                       </span>
                     </li>
                   ))}
