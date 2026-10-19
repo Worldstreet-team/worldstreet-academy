@@ -7,6 +7,7 @@ import { appUrl } from "@/lib/app-url"
 import { EARNINGS_CLEARING_DAYS, INSTRUCTOR_REVENUE_SHARE, REFERRAL_COMMISSION_RATE } from "@/lib/db/models"
 import { sharePercent } from "@/lib/marketplace"
 import { SCHOOLS } from "@/lib/schools"
+import { APPLICATION_STEPS } from "@/lib/application-tracker"
 import { SectionLabel, SectionTitle } from "@/components/marketing/section-heading"
 
 const SHARE = sharePercent(INSTRUCTOR_REVENUE_SHARE)
@@ -33,25 +34,6 @@ const DASHBOARD = [
   { title: "Calendar", body: "Schedule your sessions; your learners see them on their dashboards." },
   { title: "Assignments", body: "Set practical work, grade it and send feedback in one place." },
   { title: "Mentorship", body: "Meet your Executive learners one to one and keep their roadmap." },
-] as const
-
-/** From application to a faculty dashboard — institutional blueprint §16. */
-const STEPS = [
-  { title: "Application", body: "Tell us what you'd like to teach and why, and upload your CV. It takes about ten minutes." },
-  { title: "Academic review", body: "Our team reads every application. You'll hear back by email and in the app." },
-  {
-    title: "Interview",
-    body: "We schedule a short call on the platform — usually a few times for you to pick from — and you join it from your dashboard.",
-  },
-  {
-    title: "Teaching demonstration",
-    body: "Where appropriate, the reviewer asks you to give a teaching demonstration on the platform. You join it from your dashboard, like the interview.",
-  },
-  { title: "Approval", body: "We decide after the interview, and the demonstration if there was one, and tell you by email and in the app." },
-  {
-    title: "Onboarding",
-    body: "Accept the instructor agreement, complete your profile and signature, verify your identity for payouts, and read the teaching standards, curriculum guidelines and platform training. Then you receive your WMA Faculty credential.",
-  },
 ] as const
 
 const FAQS = [
@@ -217,7 +199,7 @@ export default function TeachPage() {
             </p>
           </div>
           <ol className="space-y-3">
-            {STEPS.map((step, i) => (
+            {APPLICATION_STEPS.map((step, i) => (
               <li
                 key={step.title}
                 className="flex gap-4 rounded-[20px] border border-ws-hairline bg-ws-surface p-5 dark:border-transparent"

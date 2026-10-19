@@ -6,6 +6,25 @@
  * page and any future surface read the same steps.
  */
 
+/** From application to a faculty dashboard — institutional blueprint §16. */
+export const APPLICATION_STEPS = [
+  { title: "Application", body: "Tell us what you'd like to teach and why, and upload your CV. It takes about ten minutes." },
+  { title: "Academic review", body: "Our team reads every application. You'll hear back by email and in the app." },
+  {
+    title: "Interview",
+    body: "We schedule a short call on the platform — usually a few times for you to pick from — and you join it from your dashboard.",
+  },
+  {
+    title: "Teaching demonstration",
+    body: "Where appropriate, the reviewer asks you to give a teaching demonstration on the platform. You join it from your dashboard, like the interview.",
+  },
+  { title: "Approval", body: "We decide after the interview, and the demonstration if there was one, and tell you by email and in the app." },
+  {
+    title: "Onboarding",
+    body: "Accept the instructor agreement, complete your profile and signature, verify your identity for payouts, and read the teaching standards, curriculum guidelines and platform training. Then you receive your WMA Faculty credential.",
+  },
+] as const
+
 export type TrackerStep = {
   key: "submitted" | "under_review" | "interview" | "demo" | "decision"
   label: string
