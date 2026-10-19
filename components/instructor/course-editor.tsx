@@ -108,6 +108,19 @@ const KIND_ITEMS = (["program", "marketplace", "new-economy"] as const).map((val
   label: COURSE_KIND_LABEL[value],
 }))
 
+const LEVEL_ITEMS = [
+  { value: "beginner", label: "Beginner" },
+  { value: "intermediate", label: "Intermediate" },
+  { value: "advanced", label: "Advanced" },
+]
+
+const SCHOOL_ITEMS = SCHOOLS.map((s) => ({ value: s.slug, label: s.name }))
+
+const PRICING_ITEMS = [
+  { value: "free", label: "Free" },
+  { value: "paid", label: "Paid" },
+]
+
 function formatDay(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", { dateStyle: "medium" })
 }
@@ -328,6 +341,17 @@ export function CourseEditor({
   const formatItems = COURSE_FORMATS.filter(
     (value) => !course?.formatLocked || isFileFormat(value) === isFileFormat(course.format ?? "course")
   ).map((value) => ({ value, label: FORMAT_LABEL[value] }))
+  const statusItems = [
+    { value: "draft", label: "Draft" },
+    { value: "published", label: "Published" },
+    ...(adminMode
+      ? [
+          { value: "suspended", label: "Suspended" },
+          { value: "closed", label: "Closed" },
+        ]
+      : []),
+    { value: "archived", label: "Archived" },
+  ]
   const [submitForReview, setSubmitForReview] = useState(false)
   const review = course?.review ?? { status: "none" as const, submittedAt: null, reviewedAt: null, note: null }
   // Marketplace and New Economy courses sell at one price (owner, 2026-10-05):
@@ -767,7 +791,8 @@ export function CourseEditor({
             <div className="space-y-1.5">
               <Label>Level</Label>
               <Select
-                defaultValue={level}
+                items={LEVEL_ITEMS}
+                value={level}
                 onValueChange={(v) => setLevel((v ?? "beginner") as typeof level)}
               >
                 <SelectTrigger className="w-full">
@@ -784,7 +809,8 @@ export function CourseEditor({
               <div className="space-y-1.5">
                 <Label>{kind === "marketplace" ? "Topic (school)" : "School"}</Label>
                 <Select
-                  defaultValue={school}
+                  items={SCHOOL_ITEMS}
+                  value={school || null}
                   onValueChange={(v) => setSchool((v ?? "") as SchoolSlug | "")}
                 >
                   <SelectTrigger className="w-full">
@@ -805,7 +831,8 @@ export function CourseEditor({
               <div className="space-y-1.5 col-span-2">
                 <Label>Status</Label>
                 <Select
-                  defaultValue={status}
+                  items={statusItems}
+                  value={status}
                   onValueChange={(v) =>
                     setStatus((v ?? "draft") as typeof status)
                   }
@@ -900,7 +927,8 @@ export function CourseEditor({
           ) : (
           <div className="space-y-3">
             <Select
-              defaultValue={pricing}
+              items={PRICING_ITEMS}
+              value={pricing}
               onValueChange={(v) =>
                 setPricing((v ?? "free") as "free" | "paid")
               }

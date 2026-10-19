@@ -167,11 +167,11 @@ export function SelectedOffer({ fromPrice }: { fromPrice: number }) {
         />
         {choosing && fromPrice > 0 && <span className="text-[14px] font-medium text-ws-muted">to start</span>}
       </p>
-      <PackageDiscount key={quoted.key} pkg={quoted} className="ws-animate-fade mt-2.5 flex text-[14px]" />
+      <PackageDiscount key={`discount-${quoted.key}`} pkg={quoted} className="ws-animate-fade mt-2.5 flex text-[14px]" />
 
       {/* The sub-line crossfades between "what's on offer" and "what you picked". */}
       {(multiTier || singleName) && (
-        <div key={choosing ? "choose" : selected.key} className="ws-animate-fade mt-2.5 text-[13.5px] text-ws-muted">
+        <div key={choosing ? "choose" : `plan-${selected.key}`} className="ws-animate-fade mt-2.5 text-[13.5px] text-ws-muted">
           {choosing ? (
             <p>
               <span className="tabular-nums">{packages.length}</span> plans · {PACKAGE_LABEL[packages[0].key]} to{" "}

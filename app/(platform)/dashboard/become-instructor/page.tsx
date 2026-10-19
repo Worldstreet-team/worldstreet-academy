@@ -32,7 +32,7 @@ import {
 import { getVideoUploadUrl, getDocumentUploadUrl } from "@/lib/actions/upload"
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import { BRAND } from "@/lib/brand"
-import { trackerFor } from "@/lib/application-tracker"
+import { APPLICATION_STEPS, trackerFor } from "@/lib/application-tracker"
 import { SCHOOLS, type SchoolSlug } from "@/lib/schools"
 import type { ApplicationPassion } from "@/lib/db/models"
 
@@ -902,15 +902,11 @@ export default function BecomeInstructorPage() {
 
         {/* How it works */}
         {!isInstructor && (
-          <ol className="grid gap-4 sm:grid-cols-3">
-            {[
-              { step: "1", title: "Apply", body: "Tell us about your expertise and what you'll teach." },
-              { step: "2", title: "Interview", body: "Our team reviews and may invite you to a short call." },
-              { step: "3", title: "Teach & earn", body: "Publish courses and earn 85% of every sale." },
-            ].map((item) => (
-              <li key={item.step} className={`${PANEL} p-5`}>
+          <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {APPLICATION_STEPS.map((item, i) => (
+              <li key={item.title} className={`${PANEL} p-5`}>
                 <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-primary">
-                  Step {item.step}
+                  Step {i + 1}
                 </span>
                 <p className="mt-2 text-[15px] font-semibold text-foreground">{item.title}</p>
                 <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{item.body}</p>
