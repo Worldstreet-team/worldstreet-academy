@@ -38,6 +38,8 @@ export default function AdminPartnersPage() {
       a.download = `wma-partners-${new Date().toISOString().slice(0, 10)}.csv`
       a.click()
       URL.revokeObjectURL(url)
+    } catch {
+      setExportError("Failed to export partners")
     } finally {
       setExporting(false)
     }
@@ -52,7 +54,7 @@ export default function AdminPartnersPage() {
             title="WMA Partners"
             subline={
               loaded
-                ? `${loaded.rows.length.toLocaleString()} active partners · ${loaded.inactive.toLocaleString()} codes with no activity yet`
+                ? `${loaded.rows.length.toLocaleString()} active ${loaded.rows.length === 1 ? "partner" : "partners"} · ${loaded.inactive.toLocaleString()} ${loaded.inactive === 1 ? "code" : "codes"} with no activity yet`
                 : "Partner Codes, clicks, sign-ups and commission."
             }
             action={
