@@ -216,6 +216,8 @@ export type VerifiedCertificate = {
   completedAt: string
   /** "" when the instructor account no longer exists */
   instructorName: string
+  /** The stored tier, never computed here; a null stored tier reads as Completion. */
+  tier: CertificateTier
 }
 
 const VERIFY_MAX_LOOKUPS = 30
@@ -282,7 +284,7 @@ export async function verifyCertificate(
       certificateId: { $eq: id, $type: "string" },
       status: "completed",
     })
-      .select("user course completedAt packageKey certificateId")
+      .select("user course completedAt packageKey certificateId certificateTier")
       .lean()
     if (!enrollment || !enrollment.completedAt || !enrollment.certificateId) return null
 
@@ -307,6 +309,7 @@ export async function verifyCertificate(
       schoolName: schoolFromSlug(course.school)?.name ?? null,
       completedAt: enrollment.completedAt.toISOString(),
       instructorName: instructor ? `${instructor.firstName ?? ""} ${instructor.lastName ?? ""}`.trim() : "",
+      tier: enrollment.certificateTier ?? "completion",
     }
   } catch (error) {
     console.error("Verify certificate error:", error)

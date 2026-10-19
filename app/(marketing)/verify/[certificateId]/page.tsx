@@ -4,6 +4,7 @@ import Link from "next/link"
 
 import { verifyCertificate } from "@/lib/actions/certificates"
 import { BRAND } from "@/lib/brand"
+import { certificateTierLabel } from "@/lib/certificate-tier"
 
 // Certificates are issued and revoked (refunds) at any moment — never cache.
 export const revalidate = 0
@@ -93,6 +94,7 @@ export default async function VerifyCertificatePage({ params }: Params) {
             </span>
           </div>
           <dl className="mt-6 grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2">
+            <Field label="Credential" value={certificateTierLabel(certificate.tier)} />
             <Field label="Student" value={certificate.studentName} />
             <Field label="Program" value={certificate.programName} />
             {certificate.schoolName && <Field label="School" value={certificate.schoolName} />}
@@ -123,12 +125,20 @@ export default async function VerifyCertificatePage({ params }: Params) {
         </section>
       )}
 
-      <Link
-        href="/schools"
-        className="mt-10 inline-flex h-11 items-center justify-center rounded-full border border-ws-hairline px-6 text-[14px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:border-ws-brand/40 hover:text-ws-gold"
-      >
-        Explore the schools
-      </Link>
+      <div className="mt-10 flex flex-wrap gap-3">
+        <Link
+          href="/schools"
+          className="inline-flex h-11 items-center justify-center rounded-full border border-ws-hairline px-6 text-[14px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:border-ws-brand/40 hover:text-ws-gold"
+        >
+          Explore the schools
+        </Link>
+        <Link
+          href="/certification"
+          className="inline-flex h-11 items-center justify-center rounded-full border border-ws-hairline px-6 text-[14px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:border-ws-brand/40 hover:text-ws-gold"
+        >
+          How WMA credentials work
+        </Link>
+      </div>
     </div>
   )
 }
