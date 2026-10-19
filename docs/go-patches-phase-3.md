@@ -216,3 +216,33 @@ Indexes: `{ key: 1 }` unique, `{ user: 1, createdAt: -1 }`, `{ course: 1, user: 
 | `extraDocumentUrl` | string \| `null` | An optional extra PDF, uploaded like `cvUrl`. |
 
 The web requires the first five on every new application. Any wholesale application write must keep them (write dotted paths or keep the fields).
+
+## 12. Phase 16 — Mastery Score and attendance (institutional blueprint §12)
+
+**No patch.** Go needs no patch: nothing it reads changed.
+
+**`attendances`** is a new web-only collection. Go may ignore it.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `meeting` | ObjectId | The class (`meetings._id`). |
+| `course` | ObjectId | The class's course. |
+| `user` | ObjectId | The learner. |
+| `firstJoinedAt` | Date | Written once, on the first join. |
+| `lastJoinedAt` | Date | The most recent join. |
+| `openSince` | Date \| null | The start of time not yet banked. `null` when the learner is not in the class. |
+| `seconds` | number | Banked attended seconds. |
+| `createdAt`, `updatedAt` | Date | Timestamps. |
+
+The unique index is on `{ meeting, user }`. The web writes rows only for course classes (`courseId` set, no `mentorshipSessionId`), and never for the host.
+
+**Optional R-A.** Mobile joins aren't counted until Go writes the same rows:
+- on a join, bank and reopen;
+- every 60 s while in the class, add `now − openSince` when it is ≤ 150 s, else 0, and set `openSince = now`;
+- on leave or kick, bank and set `openSince` to `null`;
+- on end, bank every open row at `endedAt`;
+- filter every update on the `openSince` value read, so two writers never double-count.
+
+**`assignments.kind`** is `"assignment" | "project"` (missing means `"assignment"`), on a web-only collection.
+
+**The Mastery Score** is computed on read from enrollments, submissions, meetings and attendances. Nothing is stored. If mobile ever shows it, it must use the weights in `lib/mastery-score.ts`.
