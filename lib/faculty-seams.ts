@@ -1,11 +1,13 @@
 import "server-only"
 import type { Types } from "mongoose"
-import type { PackageKey } from "@/lib/db/models"
+import { Course, type PackageKey } from "@/lib/db/models"
+import { masteryInputsForMany } from "@/lib/mastery-inputs"
+import { masteryView, type MasteryResult } from "@/lib/mastery-score"
 
 /*
- * The faculty dashboard's two seams (institutional blueprint Phase 19). Each
- * body is ONE line marked SEAM; whoever merges Phase 12 or Phase 16 into a tree
- * that has this file replaces that line with the fill below it, plus imports.
+ * The faculty dashboard's two seams (institutional blueprint Phase 19). The
+ * Phase 16 seam (Mastery) is filled; the Phase 12 seam (cohorts) is one line
+ * marked SEAM, which whoever merges Phase 12 replaces with the fill below it.
  * While a seam returns an empty map, My Students and Student Performance hide
  * every cohort or Mastery column, filter and card.
  */
@@ -27,9 +29,7 @@ export type SeamEnrollment = {
 
 export type CohortTag = { number: number; name: string }
 
-export type MasteryPartKey = "completion" | "assessment" | "assignments" | "projects" | "attendance"
-/** Phase 16's masteryScore() result. `weight` is a whole-number percentage (MASTERY_WEIGHTS sums to 100). */
-export type MasteryResult = { score: number | null; parts: { key: MasteryPartKey; value: number | null; weight: number }[] }
+export type { MasteryResult }
 
 /**
  * Each enrollment's cohort, keyed by enrollment id.
@@ -41,12 +41,17 @@ export async function cohortsFor(rows: SeamEnrollment[]): Promise<Map<string, Co
   return new Map() // SEAM(phase-12)
 }
 
-/**
- * Each enrollment's Mastery Score and parts, keyed by enrollment id.
- * Phase 16 fill (lib/mastery-inputs.ts + lib/mastery-score.ts; masteryInputsForMany keyed by enrollment id):
- *   return new Map([...(await masteryInputsForMany(rows))].map(([id, inputs]) => [id, masteryScore(inputs)]))
- */
+/** Each enrollment's Mastery Score and parts (parts the plan excludes are nulled), keyed by enrollment id. */
 export async function masteryFor(rows: SeamEnrollment[]): Promise<Map<string, MasteryResult>> {
-  void rows // delete with the fill
-  return new Map() // SEAM(phase-16)
+  if (rows.length === 0) return new Map()
+  const courses = await Course.find({ _id: { $in: [...new Set(rows.map((r) => r.course.toString()))] } })
+    .select("packages")
+    .lean()
+  const byId = new Map(courses.map((c) => [c._id.toString(), c]))
+  const pairs = rows.flatMap((enrollment) => {
+    const course = byId.get(enrollment.course.toString())
+    return course ? [{ enrollment, course }] : []
+  })
+  const facts = await masteryInputsForMany(pairs)
+  return new Map([...facts].map(([id, f]) => [id, masteryView(f).result]))
 }
