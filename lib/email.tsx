@@ -660,22 +660,26 @@ export async function sendInterviewReminderEmail(
     scheduledAt: string
     joinUrl: string
     window: "24h" | "1h"
+    /** What the room is for; defaults to the interview. */
+    what?: "interview" | "teaching demonstration"
   }
 ) {
   const when = formatUtcDateTime(data.scheduledAt, "full")
+  const what = data.what ?? "interview"
+  const What = what.charAt(0).toUpperCase() + what.slice(1)
   try {
     const { error } = await resend.emails.send({
       from: FROM_EMAIL,
       to,
       subject:
         data.window === "1h"
-          ? "Your interview starts in about an hour"
-          : "Reminder: your interview is tomorrow",
+          ? `Your ${what} starts in about an hour`
+          : `Reminder: your ${what} is tomorrow`,
       react: React.createElement(SimplePipelineEmail, {
-        preview: `Interview with ${data.counterpartName} — ${when}`,
-        title: data.window === "1h" ? "Starting soon" : "Interview tomorrow",
-        bodyText: `${data.recipientName}, your interview with ${data.counterpartName} is scheduled for ${when}. Join a couple of minutes early — you'll be admitted from the waiting room.`,
-        ctaLabel: "Open interview room",
+        preview: `${What} with ${data.counterpartName} — ${when}`,
+        title: data.window === "1h" ? "Starting soon" : `${What} tomorrow`,
+        bodyText: `${data.recipientName}, your ${what} with ${data.counterpartName} is scheduled for ${when}. Join a couple of minutes early — you'll be admitted from the waiting room.`,
+        ctaLabel: `Open ${what} room`,
         ctaUrl: data.joinUrl,
         avatarName: data.recipientName,
       }),
@@ -850,6 +854,45 @@ export async function sendInterviewInviteEmail(to: string, data: InterviewEmailD
     return { success: true }
   } catch (err) {
     console.error("[Email] Interview invite error:", err)
+    return { success: false, error: "Failed to send email" }
+  }
+}
+
+/**
+ * Send the teaching-demonstration invitation (a second room after the interview).
+ * Pass `ics` to attach a calendar file.
+ */
+export async function sendTeachingDemoInviteEmail(to: string, data: InterviewEmailData, ics?: string) {
+  const when = formatUtcDateTime(data.scheduledAt, "full")
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to,
+      subject: "Your teaching demonstration is scheduled",
+      react: React.createElement(SimplePipelineEmail, {
+        preview: "Your teaching demonstration is scheduled",
+        title: "Teaching demonstration scheduled",
+        bodyText: `${data.applicantName}, the next step of your instructor application is a teaching demonstration with ${data.hostName} on ${when}. Join from this link at the scheduled time — you'll be admitted from the waiting room.`,
+        ctaLabel: "Join teaching demonstration",
+        ctaUrl: data.joinUrl,
+        avatarUrl: data.applicantAvatarUrl,
+        avatarName: data.applicantName,
+      }),
+      ...(ics
+        ? {
+            attachments: [
+              { filename: "teaching-demonstration.ics", content: Buffer.from(ics).toString("base64") },
+            ],
+          }
+        : {}),
+    })
+    if (error) {
+      console.error("[Email] Teaching demonstration invite failed:", error)
+      return { success: false, error: error.message }
+    }
+    return { success: true }
+  } catch (err) {
+    console.error("[Email] Teaching demonstration invite error:", err)
     return { success: false, error: "Failed to send email" }
   }
 }

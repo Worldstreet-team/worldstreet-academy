@@ -43,6 +43,7 @@ const REJECTION_REASONS: { value: RejectionReason; label: string }[] = [
 ]
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import { formatDate, formatDateTime, StatusBadge, FilterChips } from "@/components/admin/shared"
+import { TeachingDemoCard } from "@/components/admin/teaching-demo-card"
 
 function LinkRow({ label, href }: { label: string; href?: string }) {
   if (!href) return null
@@ -547,6 +548,15 @@ export default function AdminApplicationDetailPage() {
                   </div>
                 )}
 
+                {(isActive || app.demo) && (
+                  <TeachingDemoCard
+                    applicationId={applicationId}
+                    status={app.status}
+                    demo={app.demo}
+                    onChanged={invalidate}
+                  />
+                )}
+
                 <div className="rounded-lg border border-ws-hairline bg-ws-surface p-4">
                     <h2 className="text-sm font-semibold mb-2">Reviewer notes</h2>
                     <div className="space-y-2 mb-3">
@@ -743,6 +753,7 @@ export default function AdminApplicationDetailPage() {
             }
             className="text-xs min-h-20"
           />
+          {actionError && <p className="text-xs text-ws-danger">{actionError}</p>}
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setDecisionDialog(null)}>
               Cancel
