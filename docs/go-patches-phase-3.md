@@ -225,4 +225,5 @@ Go needs no patch.
 
 - The web claims it with a filtered update (`{ _id, welcomedAt: null }`) before sending the one-time "Welcome to WorldStreet Mastery Academy" email, after a learner's first paid enrollment (a wallet purchase or an ESPEE approval).
 - If Go ever sends that welcome, it must claim the same field the same way first.
+- The web also skips the welcome when the learner already had an earlier paid enrollment (the rule in `lib/welcome-email.ts`), so Go must do the same if it ever sends it.
 - Any wholesale user write must keep it.
