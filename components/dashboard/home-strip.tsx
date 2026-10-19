@@ -1,5 +1,5 @@
 "use client"
-import { Glyph, Award01Icon, BookOpen01Icon, Calendar03Icon, Certificate01Icon, PlayCircleIcon, Task01Icon, Tick02Icon, type IconComponent } from "@/components/icons"
+import { Glyph, Award01Icon, GaugeIcon, BookOpen01Icon, Calendar03Icon, Certificate01Icon, PlayCircleIcon, Task01Icon, Tick02Icon, type IconComponent } from "@/components/icons"
 
 import type * as React from "react"
 import Link from "next/link"
@@ -7,7 +7,7 @@ import { Countdown } from "@/components/shared/countdown"
 import { Skel } from "@/components/ui/system"
 import type { ClassBoardEntry } from "@/lib/actions/class-board"
 import type { LearningTotals } from "@/lib/dashboard-home"
-import { useClassBoard, useMyCertificates, useMyPoints } from "@/lib/hooks/queries"
+import { useClassBoard, useMyCertificates, useMyMastery, useMyPoints } from "@/lib/hooks/queries"
 import { cn } from "@/lib/utils"
 
 /*
@@ -86,7 +86,7 @@ function StatCell({
 /**
  * Figures from real rows only. Completed appears once there is one; lessons
  * once a package opens any; the next class only for packages with live
- * classes; certificates once one is earned (before that, points say more);
+ * classes; the Mastery Score once a program has one; certificates once one is earned (before that, points say more);
  * assignments only while some are open (the page decides, and the queries run
  * only then).
  */
@@ -95,12 +95,15 @@ export function HeroStats({
   showCertificates,
   showClasses,
   toDo = 0,
+  toDoHref = "/dashboard/assignments",
 }: {
   totals: LearningTotals
   showCertificates: boolean
   showClasses: boolean
-  /** Open assignments and exams (assessmentCounts). */
+  /** Open assignments, exams and knowledge checks (assessmentCounts). */
   toDo?: number
+  /** Where the count is listed: the assessments page when any open item is an exam or quiz, else assignments. */
+  toDoHref?: string
   now?: number
 }) {
   return (
@@ -123,11 +126,27 @@ export function HeroStats({
       )}
       {showClasses && <NextClassStat />}
       <PointsStat />
+      <MasteryStat />
       {toDo > 0 && (
-        <StatCell icon={Task01Icon} value={toDo} label={toDo === 1 ? "Assignment due" : "Assignments due"} href="/dashboard/assignments" />
+        <StatCell icon={Task01Icon} value={toDo} label="To do" href={toDoHref} />
       )}
       {showCertificates && <CertificatesStat />}
     </div>
+  )
+}
+
+/** The Mastery Score of the most recently opened program that has one; hidden until one does. */
+function MasteryStat() {
+  const { data } = useMyMastery()
+  const entry = data?.find((m) => m.result.score !== null)
+  if (!data || !entry || entry.result.score === null) return null
+  return (
+    <StatCell
+      icon={GaugeIcon}
+      value={entry.result.score}
+      label={data.length > 1 ? `Mastery · ${entry.courseTitle}` : "Mastery Score"}
+      href="/dashboard/points#mastery"
+    />
   )
 }
 

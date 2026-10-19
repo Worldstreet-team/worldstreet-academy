@@ -10,6 +10,7 @@ export const FULL_ACCESS: IPackageEntitlements = {
   certificate: true,
   mentorship: true,
   prioritySupport: true,
+  recordings: true,
 }
 
 // Optional fields: a .lean()/projected read of a legacy row predates these
@@ -31,15 +32,37 @@ export function sellsPackages(course: CourseLike): boolean {
 }
 
 /**
+ * Whether a plan includes recorded classes: the stored flag, or live classes.
+ * Plans saved before the `recordings` flag existed carry only `liveClasses`, and
+ * a live-class plan always kept its recordings, so the legacy rule stays.
+ */
+export function recordingsAllowed(
+  ent: { recordings?: boolean | null; liveClasses?: boolean | null } | null | undefined
+): boolean {
+  return Boolean(ent?.recordings || ent?.liveClasses)
+}
+
+/**
  * What an enrollment's package unlocks. The bought package is found by key
  * even if its tier has since been disabled for sale — buyers keep what they
  * paid for. A null packageKey (legacy / free / pre-enrolled), or a package no
- * longer on the course at all → FULL_ACCESS (grandfathered).
+ * longer on the course at all → FULL_ACCESS (grandfathered). Returns a fresh
+ * object; `recordings` is always the effective value (`recordingsAllowed`).
  */
 export function entitlementsFor(course: CourseLike, enrollment: EnrollmentLike): IPackageEntitlements {
   const key = enrollment?.packageKey ?? null
   const pkg = key ? (course.packages ?? []).find((p) => p.key === key) : undefined
-  return pkg ? pkg.entitlements : FULL_ACCESS
+  if (!pkg) return FULL_ACCESS
+  const stored = pkg.entitlements
+  return {
+    liveClasses: Boolean(stored.liveClasses),
+    instructorQa: Boolean(stored.instructorQa),
+    assignments: Boolean(stored.assignments),
+    certificate: Boolean(stored.certificate),
+    mentorship: Boolean(stored.mentorship),
+    prioritySupport: Boolean(stored.prioritySupport),
+    recordings: recordingsAllowed(stored),
+  }
 }
 
 /**
@@ -82,11 +105,11 @@ export function isPackageKey(value: unknown): value is PackageKey {
   return typeof value === "string" && (PACKAGE_KEYS as readonly string[]).includes(value)
 }
 
-/** Spec §6 tier labels as the program page and editor print them. */
+/** Plan names (institutional blueprint §9) as the program page and editor print them. */
 export const PACKAGE_LABEL: Record<PackageKey, string> = {
   basic: "Basic",
   standard: "Standard",
-  executive: "Executive 101",
+  executive: "Executive",
 }
 
 /** Lowest enabled tier whose package includes `flag` — the package a lock notice names. null when none does. */

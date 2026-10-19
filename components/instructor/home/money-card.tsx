@@ -43,7 +43,7 @@ export function MoneyCard({ money }: { money: TeachingMoney }) {
           <dd className="font-semibold tabular-nums">{money.salesThisMonth.toLocaleString()}</dd>
         </div>
         <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
-          <dt className="text-muted-foreground">Referral earnings</dt>
+          <dt className="text-muted-foreground">Partner commission</dt>
           <dd className="font-semibold tabular-nums">
             {money.referralMinor === null ? "—" : formatMinor(money.referralMinor)}
           </dd>
@@ -51,7 +51,7 @@ export function MoneyCard({ money }: { money: TeachingMoney }) {
       </dl>
       <div className="mt-auto flex items-center justify-between gap-3 border-t border-border/60 px-4 py-3 sm:px-5">
         <Link href="/dashboard/referrals" className={LINK}>
-          Refer &amp; earn
+          WMA Partners
           <ArrowRight size={14} strokeWidth={2} aria-hidden />
         </Link>
         <Link href="/instructor/earnings" className={LINK}>

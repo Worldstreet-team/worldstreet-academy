@@ -36,6 +36,11 @@ export function Footer({ showFaculty }: { showFaculty: boolean }) {
             <h4 className="text-sm font-semibold mb-3">Academy</h4>
             <ul className="space-y-2">
               <li>
+                <Link href="/academy" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  About the Academy
+                </Link>
+              </li>
+              <li>
                 <Link href="/schools" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                   Schools
                 </Link>

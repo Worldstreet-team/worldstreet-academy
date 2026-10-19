@@ -3,7 +3,7 @@
 import * as React from "react"
 import { AnimatePresence, motion, useIsPresent, type Variants } from "motion/react"
 import { EASE_INERTIA } from "@/components/marketing/motion/ease"
-import { BRAND } from "@/lib/brand"
+import { HERO } from "@/lib/institution"
 import { SCHOOLS, type School } from "@/lib/schools"
 import { cn } from "@/lib/utils"
 
@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils"
  * later, as a fade and a short rise.
  *
  * Nothing below moves: the cell stacks every variant it can show (the
- * default and all eight schools) invisibly in one grid area, so it is always
+ * default and all seven schools) invisibly in one grid area, so it is always
  * as tall as its tallest variant, at every width.
  *
  * The variant on screen at load plays the page's load sequence (the old
@@ -34,11 +34,8 @@ import { cn } from "@/lib/utils"
  */
 const DEFAULT_SUB = (
   <>
-    Master practical, in-demand skills through expert-led programs designed for the new and modern economy.
-    <span className="max-sm:hidden">
-      {" "}
-      Explore our schools, choose your path and start building capabilities you can apply in the real world.
-    </span>
+    {HERO.positioning}
+    <span className="mt-2 block font-medium text-ws-primary max-sm:hidden">{HERO.beats}</span>
   </>
 )
 
@@ -94,7 +91,7 @@ type Line = { text: string; className?: string }
 
 function headLines(school: School | null): Line[] {
   if (!school) {
-    return [{ text: "Learn Skills." }, { text: "Build Value." }, { text: "Own Your Future.", className: "text-ws-gold" }]
+    return [{ text: HERO.titleLines[0] }, { text: HERO.titleLines[1], className: "text-ws-gold" }]
   }
   const lead = school.name.startsWith(LEAD)
   return [
@@ -104,16 +101,16 @@ function headLines(school: School | null): Line[] {
 }
 
 function eyebrow(school: School | null): string {
-  if (!school) return BRAND.name
+  if (!school) return HERO.eyebrow
   const pad = (n: number) => String(n).padStart(2, "0")
   return `School ${pad(school.order)} of ${pad(SCHOOLS.length)}`
 }
 
 const EYEBROW = "text-[11px] font-medium uppercase tracking-[0.14em] text-ws-gold"
 /**
- * Phones scale the claim with the screen so its three beats hold three lines
- * ("Own Your Future." is ~8.15em wide: 9.6vw keeps it inside the gutters from
- * 320px up) — the clamp's 44px floor broke it over two lines below ~420px.
+ * Phones scale the claim with the screen so its two lines hold two lines
+ * ("the New Economy" is the wider one: 9.6vw keeps it inside the gutters from
+ * 320px up) — the clamp's 44px floor broke it over more lines below ~420px.
  * A school's name keeps its step below the claim (~0.83×). Both meet their
  * sm sizes at the breakpoint.
  */

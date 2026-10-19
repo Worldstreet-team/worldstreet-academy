@@ -7,7 +7,7 @@ import Link from "next/link"
 import { Chevron, DATA_CHIP, TILE_FOOT_LINK, TILE_ROW, TILE_ROWS } from "@/components/dashboard/tile-bits"
 import { CardHeader, CardShell } from "@/components/ui/system"
 import type { MyAssessment } from "@/lib/actions/exams"
-import { assessmentCounts, formatDateTime } from "@/lib/dashboard-home"
+import { assessmentCounts, assessmentKindOf, formatDateTime } from "@/lib/dashboard-home"
 import { useMyAssessments } from "@/lib/hooks/queries"
 import { cn } from "@/lib/utils"
 
@@ -22,11 +22,12 @@ export const ASSESSMENT_STATUS: Record<MyAssessment["status"], { label: string; 
   graded: { label: "Graded", className: "bg-credit-chip text-credit" },
 }
 
-/** "Final exam" · "Knowledge check" · "Assignment" (with its due date). */
+/** "Final exam" · "Knowledge check" · "Assignment" or "Project" (each with its due date). */
 export function assessmentKindLabel(assessment: MyAssessment): string {
   if (assessment.scope === "final") return "Final exam"
   if (assessment.scope === "lesson") return "Knowledge check"
-  return assessment.dueAt ? `Assignment · due ${formatDateTime(assessment.dueAt)}` : "Assignment"
+  const noun = assessment.kind === "project" ? "Project" : "Assignment"
+  return assessment.dueAt ? `${noun} · due ${formatDateTime(assessment.dueAt)}` : noun
 }
 
 const KIND_ICON: Record<MyAssessment["scope"], IconComponent> = {
@@ -40,6 +41,7 @@ const ROWS_SHOWN = 5
 /**
  * Spec §12 Assignments: the knowledge checks and final exams the student's
  * packages include (D7 lite) and practical assignments (Phase 7), with state.
+ * The title names the kinds present; the foot links to each kind's page.
  * Hidden while loading and when there is nothing — an empty tile would imply work exists.
  */
 export function AssignmentsTile() {
@@ -47,13 +49,15 @@ export function AssignmentsTile() {
   if (assessments.length === 0) return null
 
   const { toDo, done } = assessmentCounts(assessments)
+  const hasExams = assessments.some((a) => assessmentKindOf(a) === "assessments")
+  const hasTasks = assessments.some((a) => assessmentKindOf(a) === "assignments")
+  const title = hasExams && hasTasks ? "Assessments & assignments" : hasExams ? "Assessments" : "Assignments"
 
   return (
     <CardShell>
       <CardHeader
-        title="Assignments"
+        title={title}
         subtitle={`${toDo} to do · ${done} done`}
-        link={{ label: "See all", href: "/dashboard/assignments" }}
       />
       <div className={TILE_ROWS}>
         {assessments.slice(0, ROWS_SHOWN).map((a) => {
@@ -83,12 +87,20 @@ export function AssignmentsTile() {
           )
         })}
       </div>
-      {assessments.length > ROWS_SHOWN && (
-        <Link href="/dashboard/assignments" className={TILE_FOOT_LINK}>
-          {assessments.length - ROWS_SHOWN} more
-          <Chevron />
-        </Link>
-      )}
+      <div className="mt-auto flex divide-x divide-border/60">
+        {hasExams && (
+          <Link href="/dashboard/assessments" className={cn(TILE_FOOT_LINK, "flex-1")}>
+            All assessments
+            <Chevron />
+          </Link>
+        )}
+        {hasTasks && (
+          <Link href="/dashboard/assignments" className={cn(TILE_FOOT_LINK, "flex-1")}>
+            All assignments
+            <Chevron />
+          </Link>
+        )}
+      </div>
     </CardShell>
   )
 }

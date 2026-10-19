@@ -42,6 +42,7 @@ export const queryKeys = {
   courseExam: (courseId: string) => ["course-exam", courseId] as const,
   assessments: ["assessments"] as const,
   points: ["points"] as const,
+  mastery: ["mastery"] as const,
   mentorship: ["mentorship"] as const,
   mentorshipQueue: ["mentorship-queue"] as const,
   courseAssignments: (courseId: string) => ["course-assignments", courseId] as const,
@@ -55,6 +56,7 @@ export const queryKeys = {
   adminUsers: (filters?: { role?: string; search?: string; page?: number }) =>
     filters ? (["admin", "users", filters] as const) : (["admin", "users"] as const),
   adminUserDetail: (userId: string) => ["admin", "user", userId] as const,
+  adminTeam: ["admin", "team"] as const,
   adminOrders: (filters?: { status?: string; page?: number }) =>
     filters ? (["admin", "orders", filters] as const) : (["admin", "orders"] as const),
   adminOrderDetail: (orderId: string) => ["admin", "order", orderId] as const,

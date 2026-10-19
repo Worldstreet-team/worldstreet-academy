@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose"
+import type { AdminAuditAction, AdminLevel } from "@/lib/admin-levels"
 
 export type InstructorStatus = "none" | "applied" | "interview" | "approved" | "rejected"
 /** Marketplace seller pipeline (owner, 2026-10-05: approved sellers only). Sellers are not faculty — no role change. */
@@ -35,8 +36,26 @@ export interface IUser extends Document {
   referredBy: { text: string; at: Date; code?: string | null; userId?: Types.ObjectId | null } | null
   /** This person's own referral code (students and tutors alike), minted on first use. Unique when set. */
   referralCode: string | null
+  /** When the one-time welcome email was claimed (D27); null = never. Additive, web-only: Go ignores it. */
+  welcomedAt: Date | null
   /** Marketplace seller pipeline; "approved" opens the seller area. */
   sellerStatus: SellerStatus
+  /**
+   * Admin level (D32, additive). "super" runs the admin team; null is a regular
+   * admin (or not an admin). Go keeps treating `role: "ADMIN"` as admin and
+   * never writes these (go-patches R14).
+   */
+  adminLevel: AdminLevel
+  /** Every grant, revoke, promote and demote. `by: null` is the bootstrap script. */
+  adminAudit: {
+    action: AdminAuditAction
+    fromRole: "USER" | "INSTRUCTOR" | "ADMIN"
+    toRole: "USER" | "INSTRUCTOR" | "ADMIN"
+    fromLevel: AdminLevel
+    toLevel: AdminLevel
+    by: Types.ObjectId | null
+    at: Date
+  }[]
   // For instructors
   instructorProfile?: {
     headline: string | null
@@ -163,10 +182,27 @@ const UserSchema = new Schema<IUser>(
       default: null,
     },
     referralCode: { type: String, default: null, trim: true, uppercase: true },
+    welcomedAt: { type: Date, default: null },
     sellerStatus: {
       type: String,
       enum: ["none", "applied", "approved", "rejected"],
       default: "none",
+    },
+    adminLevel: { type: String, enum: [null, "super"], default: null },
+    adminAudit: {
+      type: [
+      {
+        action: { type: String, enum: ["grant", "revoke", "promote", "demote"], required: true },
+        fromRole: { type: String, enum: ["USER", "INSTRUCTOR", "ADMIN"], required: true },
+        toRole: { type: String, enum: ["USER", "INSTRUCTOR", "ADMIN"], required: true },
+        fromLevel: { type: String, enum: [null, "super"], default: null },
+        toLevel: { type: String, enum: [null, "super"], default: null },
+        by: { type: Schema.Types.ObjectId, ref: "User", default: null },
+        at: { type: Date, required: true },
+        _id: false,
+      },
+      ],
+      default: undefined,
     },
     instructorProfile: {
       headline: { type: String, default: null },

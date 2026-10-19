@@ -18,7 +18,7 @@ Source of truth for the rules: `lib/entitlements.ts` and `lib/course-access.ts` 
 | | `price` | integer, **whole USD** (same unit as `Course.price`) | Package price. |
 | | `listPrice`, `duration` | integer whole USD \| `null`; string \| `null` | Additive, display only (2026-10-03): the pre-discount price the web shows struck through, and how long the package runs ("9 weeks"). Go may ignore both; what is charged is still `price`. Missing on older rows = `null`. |
 | | `enabled` | bool | Whether the tier is on sale. |
-| | `entitlements` | `{ liveClasses, instructorQa, assignments, certificate, mentorship, prioritySupport }` booleans | What the tier includes. A missing flag means `false`. |
+| | `entitlements` | `{ liveClasses, instructorQa, assignments, certificate, mentorship, prioritySupport }` booleans, plus `recordings` (Phase 14, web-only; missing = `false`) | What the tier includes. A missing flag means `false`. |
 | `courses` | `price` / `pricing` | unchanged | Kept equal to the **cheapest enabled** package (`pricing: "free"` only when that cheapest tier is $0). |
 | `lessons` | `minPackageKey` | `null \| "basic" \| "standard" \| "executive"` | Lowest tier that can open the lesson. `null` = every tier. |
 | `enrollments` | `packageKey` | `null \| "basic" \| "standard" \| "executive"` | Tier bought. `null` = legacy, free, or pre-enrolled → full access. |
@@ -78,6 +78,8 @@ Otherwise the lesson is **locked**, and Go must:
 **R7 — Instructor Q&A.** Only if Go creates conversations. When a `USER` starts a **new** conversation with someone who teaches courses the user is enrolled in, refuse if none of those enrollments has `entitlements.instructorQa`. Existing conversations are untouched. Users with no enrollment with that instructor are unaffected.
 
 ## 3. Test matrix (mock data: Forex Trading Mastery, Basic $49 · Standard $199 · Executive 101 $999)
+
+Phase 14 (2026-10-19) changed Basic's data; §16 has its row today.
 
 | Enrollment | Lesson `minPackageKey: null` | Lesson `standard` | Lesson `executive` | Final exam | Certificate | Live class | New thread with instructor |
 |---|---|---|---|---|---|---|---|
@@ -158,6 +160,7 @@ Every student and tutor has a referral code; a marketplace course's seller keeps
 - **`earnings.kind: "referral"`** — a new value on an existing field. One row per referred person, ever: 10% of their **first** paid enrollment (`grossMinor` = the sale, `netMinor` = the commission, `feeMinor` = the rest), credited to the referrer (`instructor`, `instructorAuthUserId` — the referrer may be a plain `USER`) after the usual 7-day clearing, with `creditReference: "academy_ref_<buyer user _id>"` (unique, so a second commission for the same person cannot be written). A refund reverses it or writes an `"adjustment"` clawback, exactly like a sale row. Anything in Go that reads `earnings` must accept the new kind; anything that counts `kind: "sale"` rows as sales should keep excluding it.
 - **Seller share on `kind: "sale"` rows** — no longer always 85%: a marketplace course's seller keeps 85% through their own link and 50% otherwise; school programs keep 85%. The row's own `feeMinor`/`netMinor` are the truth; never recompute them from `INSTRUCTOR_REVENUE_SHARE`.
 - **If Go ever sells a course**, it must apply the same rules (the truth table on `splitSale` in `lib/referrals.ts`) or write `attribution: null` with the program share; it must never pay a referral commission itself.
+- **`partnerclicks`** (Phase 18, WMA Partners, 2026-10) — a new web-only collection, `{ code, day: "YYYY-MM-DD" (Africa/Lagos), count }`, unique on `{ code, day }`, incremented once per visitor per code per day. Go never reads or writes it. Nothing above changes: the "Partner Code" the UI shows is `users.referralCode`, and every commission field and rule is as before.
 
 ## 9. The Academy Marketplace and New Economy (owner, 2026-10-03 / 10-05)
 
@@ -185,7 +188,7 @@ Go needs no patch. All additive:
 
 - **`meetings.liveNotifiedAt`** — date or `null` (missing = `null`). Set on a course class when its "<course> is live now" notice goes to the class's students (when the host starts a scheduled class, or when a class is created to start now). The web claims it with a filtered update before sending, so a host rejoining never re-notifies. If Go ever starts a class, it should claim the same field before notifying, or leave it alone. Any wholesale meeting write must keep it.
 - **Course-class RealtimeKit rooms are created with `record_on_start: true`.** Mentorship rooms, interviews and ad-hoc meetings are not. If Go creates class rooms, it should pass the same flag, or those classes won't be recorded.
-- **`recordings`** — new web-only collection; Go may ignore it. One row per RealtimeKit recording of a course class: `meeting`, `course`, `host` (ObjectIds), `rtkRecordingId` (unique), `rtkStatus`, `status` (`"pending" | "stored" | "failed"`), `storageKey` (private resources bucket only, `worldstreet-academy/recordings/<courseId>/<meetingId>/<rtkRecordingId>.mp4`), `durationSeconds`, `sizeBytes`, `recordedAt`, `title`, `hidden`, `failureReason`, `attempts`, `copyStartedAt`, `storedAt`. Written by `/api/cron/recordings`. Playback is a 10-minute signed GET minted after the web re-checks that the viewer's package includes live classes (or that they are course staff). If mobile ever plays recordings, it must go through the same check and never expose `storageKey` or a public URL.
+- **`recordings`** — new web-only collection; Go may ignore it. One row per RealtimeKit recording of a course class: `meeting`, `course`, `host` (ObjectIds), `rtkRecordingId` (unique), `rtkStatus`, `status` (`"pending" | "stored" | "failed"`), `storageKey` (private resources bucket only, `worldstreet-academy/recordings/<courseId>/<meetingId>/<rtkRecordingId>.mp4`), `durationSeconds`, `sizeBytes`, `recordedAt`, `title`, `hidden`, `failureReason`, `attempts`, `copyStartedAt`, `storedAt`. Written by `/api/cron/recordings`. Playback is a 10-minute signed GET minted after the web re-checks that the viewer's plan includes recorded classes (`recordings || liveClasses`, `recordingsAllowed`) (or that they are course staff). If mobile ever plays recordings, it must go through the same check and never expose `storageKey` or a public URL.
 
 ## 11. Points and the tutor application questions (owner meeting, 2026-10-03)
 
@@ -216,3 +219,96 @@ Indexes: `{ key: 1 }` unique, `{ user: 1, createdAt: -1 }`, `{ course: 1, user: 
 | `extraDocumentUrl` | string \| `null` | An optional extra PDF, uploaded like `cvUrl`. |
 
 The web requires the first five on every new application. Any wholesale application write must keep them (write dotted paths or keep the fields).
+
+## 12. Super admins and admin levels (Phase 21, D32)
+
+**R14 — Admin levels. Go needs no patch.** Two web-only fields on `users`, both additive:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `adminLevel` | `"super" \| null` | Missing = `null`. A super admin is `role: "ADMIN"` and `adminLevel: "super"`. |
+| `adminAudit[]` | `{ action: "grant" \| "revoke" \| "promote" \| "demote", fromRole, toRole, fromLevel, toLevel, by: ObjectId \| null, at }` | One entry per change involving `ADMIN` or the level. `by: null` means the bootstrap script. |
+
+- Go keeps treating `role: "ADMIN"` as admin everywhere, including the mobile admin surfaces such as Vision. A super admin is still an `ADMIN`.
+- Go never writes `adminLevel` or `adminAudit`. Any wholesale user write must carry them (write dotted `$set`s, or keep the fields).
+- If Go has any path that sets `users.role`, it must neither set nor clear `ADMIN`. Admin access is granted and removed only on the web, by a super admin, so it is audited.
+- If Go raises roles from Clerk metadata at sign-in, it must never raise an **existing** account to `ADMIN`. The web stopped doing so in Phase 21; otherwise a removed admin whose metadata is stale gets admin back.
+
+## 13. Phase 16 — Mastery Score and attendance (institutional blueprint §12)
+
+**No patch.** Go needs no patch: nothing it reads changed.
+
+**`attendances`** is a new web-only collection. Go may ignore it.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `meeting` | ObjectId | The class (`meetings._id`). |
+| `course` | ObjectId | The class's course. |
+| `user` | ObjectId | The learner. |
+| `firstJoinedAt` | Date | Written once, on the first join. |
+| `lastJoinedAt` | Date | The most recent join. |
+| `openSince` | Date \| null | The start of time not yet banked. `null` when the learner is not in the class. |
+| `seconds` | number | Banked attended seconds. |
+| `createdAt`, `updatedAt` | Date | Timestamps. |
+
+The unique index is on `{ meeting, user }`. The web writes rows only for course classes (`courseId` set, no `mentorshipSessionId`), and never for the host.
+
+**Optional R-A.** Mobile joins aren't counted until Go writes the same rows:
+- on a join, bank and reopen;
+- every 60 s while in the class, add `now − openSince` when it is ≤ 150 s, else 0, and set `openSince = now`;
+- on leave or kick, bank and set `openSince` to `null`;
+- on end, bank every open row at `endedAt`;
+- filter every update on the `openSince` value read, so two writers never double-count.
+
+**`assignments.kind`** is `"assignment" | "project"` (missing means `"assignment"`), on a web-only collection.
+
+**The Mastery Score** is computed on read from enrollments, submissions, meetings and attendances. Nothing is stored. If mobile ever shows it, it must use the weights in `lib/mastery-score.ts`.
+
+## 14. Phase 15 — the welcome email (institutional blueprint §10, D27)
+
+Go needs no patch.
+
+**`users.welcomedAt`** is a date or `null` (missing = `null`). It is web-only, and Go may ignore it.
+
+- The web claims it with a filtered update (`{ _id, welcomedAt: null }`) before sending the one-time "Welcome to WorldStreet Mastery Academy" email, after a learner's first paid enrollment (a wallet purchase or an ESPEE approval).
+- If Go ever sends that welcome, it must claim the same field the same way first.
+- The web also skips the welcome when the learner already had an earlier paid enrollment (the rule in `lib/welcome-email.ts`), so Go must do the same if it ever sends it.
+- Any wholesale user write must keep it.
+
+## 15. Phase 13 — the seven schools (owner, 2026-10-19; D21, D22)
+
+**R12 — School slugs and labels change; ship before `scripts/migrate-schools-v2.mjs --apply` runs.**
+
+The institutional blueprint (§7) replaces the eight schools with seven. Four old schools merge into one, three are renamed, and two are new:
+
+| Old slug(s) | New slug | New `courses.category` |
+|---|---|---|
+| `trading-financial-markets` (unchanged) | `trading-financial-markets` | Trading & Financial Markets |
+| `ai-automation`, `software-app-development`, `cybersecurity`, `data-analytics` | `technology-ai` | Technology & AI |
+| `digital-business-remote-careers` | `digital-business` | Digital Business |
+| (new) | `entrepreneurship-wealth-creation` | Entrepreneurship & Wealth Creation (no programs yet) |
+| `digital-media-creative` | `creative-economy` | Creative Economy |
+| (new) | `leadership-personal-development` | Leadership & Personal Development (no programs yet) |
+| `blockchain-web3` | `emerging-technologies` | Emerging Technologies |
+
+Fields whose **values** the migration rewrites:
+- `courses.school`, and `courses.category` (on moved courses only);
+- `enrollmentintents.school`;
+- `sellerapplications.school`;
+- `instructorapplications.answers.school`.
+
+What Go does:
+- Any mobile list of school slugs, names, icons or filters switches to the seven, in §7's order (the order of the table above), in the same release.
+- Go must never write a retired slug. Until the migration has run, a read should map a retired slug through the table, as the web does (`schoolFromSlug`, `lib/schools.ts`).
+- Web `/schools/<retired>` answers 308 to the new school.
+- Nothing is added, renamed or removed: no field, model, route or enum changes. Only these string values move.
+
+## 16. Phase 14 — plans to the institutional blueprint (owner, 2026-10-19)
+
+**Go needs no patch;** only data changed.
+
+- **`courses.packages[].entitlements.recordings`** is a new web-only boolean (missing = `false`). The web treats a plan as including recorded classes when `recordings || liveClasses`. If mobile ever plays recordings, it uses the same rule and §10's signed-URL path.
+- **After the catalogue apply,** every catalogue program's Basic plan has `assignments`, `certificate` and `recordings` true, and `liveClasses`, `instructorQa`, `mentorship` and `prioritySupport` false.
+- **What R1 and R4 already do with that data:** a Basic enrollment may start the final exam; `examRequired` now holds Basic completion until it passes; and a completed Basic enrollment gets a certificate.
+- **Basic's row today:** lessons open per R3 · final exam allowed · certificate yes (on completion) · live class refused · new thread refused.
+- **Display only:** `name`, `tagline` ("Foundation" / "Mastery" / "Personalized Mastery"), `duration` ("4 weeks" / "8–12 weeks" / "Flexible schedule") and `features`. The Executive tier label is "Executive"; it is not stored.

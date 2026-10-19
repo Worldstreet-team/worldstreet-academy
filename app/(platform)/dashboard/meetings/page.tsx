@@ -210,6 +210,8 @@ export default function MeetingsPage() {
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const isHost = activeMeeting?.hostId === user.id
   const canStart = user.role !== "USER"
+  // Learners see their classes; people who can start sessions host interviews and ad-hoc meetings here.
+  const pageTitle = canStart ? "Meetings" : "My classes"
 
   const waitingRef = useRef(waitingForApproval)
   waitingRef.current = waitingForApproval
@@ -1845,7 +1847,7 @@ export default function MeetingsPage() {
           </div>
         </div>
       )}
-      <Topbar title="Meetings" />
+      <Topbar title={pageTitle} breadcrumbOverrides={{ meetings: pageTitle }} />
 
       {activeMeeting && isJoined && meetingCtx.isMinimized && (
         <ReturnToMeetingBanner
@@ -1858,7 +1860,7 @@ export default function MeetingsPage() {
       <div className="flex-1 overflow-y-auto">
         <div className="px-4 md:px-6 pt-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6 space-y-6">
           <PageHeader
-            title="Meetings"
+            title={pageTitle}
             subtitle={
               canStart
                 ? "Start a session, or join one you've been invited to."

@@ -16,9 +16,9 @@ import {
   type PackageKey,
 } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth"
-import { isSchoolSlug, type SchoolSlug } from "@/lib/schools"
+import { schoolSlugOf, storedSlugsFor, type SchoolSlug } from "@/lib/schools"
 import { programArt } from "@/lib/school-art"
-import { FULL_ACCESS, PACKAGE_RANK, canAccessLesson, effectiveLessonTier, entitlementsFor } from "@/lib/entitlements"
+import { FULL_ACCESS, PACKAGE_RANK, canAccessLesson, effectiveLessonTier, entitlementsFor, recordingsAllowed } from "@/lib/entitlements"
 import {
   getCourseAccess,
   lockedLessonIds,
@@ -143,6 +143,8 @@ export type StudentEnrollment = {
   lessonTrack: boolean[]
   /** The class community link (`Course.communityUrl`) — only on an access-granting enrollment; it's a private group. */
   communityUrl: string | null
+  /** The program's school (`Course.school`); null when unassigned. */
+  school: SchoolSlug | null
 }
 
 export type ResumeLesson = {
@@ -230,7 +232,8 @@ export async function fetchBrowseCourses(options?: {
       else if (options.pricing === "Paid") query.price = { $gt: 0 }
     }
     if (typeof options?.school === "string" && options.school) {
-      query.school = options.school
+      const current = schoolSlugOf(options.school)
+      query.school = current ? { $in: storedSlugsFor(current) } : options.school
     }
     if (typeof options?.instructorId === "string" && mongoose.Types.ObjectId.isValid(options.instructorId)) {
       query.instructor = options.instructorId
@@ -269,7 +272,7 @@ export async function fetchBrowseCourses(options?: {
         instructorAvatarUrl: instructor.avatarUrl,
         level: course.level as "beginner" | "intermediate" | "advanced",
         category: course.category || "",
-        school: isSchoolSlug(course.school) ? course.school : null,
+        school: schoolSlugOf(course.school),
         pricing: course.pricing as "free" | "paid",
         price: course.price,
         tierCount: (course.packages ?? []).filter((p) => p.enabled).length,
@@ -354,7 +357,7 @@ export async function fetchFreePreviewLessons(limit = 6): Promise<FreePreview[]>
         videoUrl: lesson.videoUrl,
         courseTitle: course.title,
         courseSlug: course.slug,
-        school: isSchoolSlug(course.school) ? course.school : null,
+        school: schoolSlugOf(course.school),
       })
       if (out.length >= limit) break
     }
@@ -530,6 +533,7 @@ const NO_ENTITLEMENTS: IPackageEntitlements = {
   certificate: false,
   mentorship: false,
   prioritySupport: false,
+  recordings: false,
 }
 
 /** Shared finder behind the program page (by slug) and checkout (by id). */
@@ -571,7 +575,7 @@ async function findProgram(filter: { slug: string } | { _id: string }): Promise<
           features: p.features ?? [],
           highlight: Boolean(p.highlight),
           ctaLabel: p.ctaLabel ?? null,
-          entitlements: { ...NO_ENTITLEMENTS, ...p.entitlements },
+          entitlements: { ...NO_ENTITLEMENTS, ...p.entitlements, recordings: recordingsAllowed(p.entitlements) },
         }))
       : [
           {
@@ -600,7 +604,7 @@ async function findProgram(filter: { slug: string } | { _id: string }): Promise<
     instructorAvatarUrl: instructor.avatarUrl,
     level: course.level as "beginner" | "intermediate" | "advanced",
     category: course.category || "",
-    school: isSchoolSlug(course.school) ? course.school : null,
+    school: schoolSlugOf(course.school),
     pricing: course.pricing as "free" | "paid",
     price: course.price,
     tierCount: enabled.length,
@@ -845,7 +849,7 @@ export async function fetchOtherCourses(excludeCourseId: string): Promise<Browse
         instructorAvatarUrl: instructor.avatarUrl,
         level: course.level as "beginner" | "intermediate" | "advanced",
         category: course.category || "",
-        school: isSchoolSlug(course.school) ? course.school : null,
+        school: schoolSlugOf(course.school),
         pricing: course.pricing as "free" | "paid",
         price: course.price,
         tierCount: (course.packages ?? []).filter((p) => p.enabled).length,
@@ -1019,6 +1023,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
           : null,
         lessonTrack: openInOrder.map((l) => completedIds.has(l._id.toString())),
         communityUrl: access ? safeWebUrl(course.communityUrl) : null,
+        school: schoolSlugOf(course.school),
       }
     })
   } catch (error) {
@@ -1258,7 +1263,7 @@ export async function markCourseComplete(
 
     // CBT gate: when the course requires an exam, completion only happens
     // through a passing attempt (lib/actions/exams.ts) — unless the package has
-    // no assessment & certificate (Basic), which completes on its lessons.
+    // no certificate, which completes on its lessons.
     const [course, access] = await Promise.all([
       Course.findById(courseId).select("examRequired").lean(),
       getCourseAccess(user._id.toString(), courseId),

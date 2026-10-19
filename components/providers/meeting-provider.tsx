@@ -14,6 +14,8 @@ import { useRouter, usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 
 import { RenderIcon } from "@/components/shared/render-icon"
+import { pingAttendance } from "@/lib/actions/attendance"
+import { ATTENDANCE_PING_MS } from "@/lib/attendance-rules"
 
 /* ═══════════════════════════════════════════════════════
    TYPES
@@ -95,6 +97,19 @@ export function MeetingProvider({ children }: { children: ReactNode }) {
   const callbacksRef = useRef<MeetingCallbacks | null>(null)
 
   const hasActiveMeeting = activeMeetingInfo !== null
+
+  // §12 attendance: bank the learner's time every minute while they are in a class. The provider
+  // wraps every authed shell, so the beat survives navigating away while the meeting is minimised;
+  // the server ignores meetings that aren't course classes.
+  const attendanceMeetingId = activeMeetingInfo?.meetingId
+  const attendanceIsHost = activeMeetingInfo?.isHost
+  useEffect(() => {
+    if (!attendanceMeetingId || attendanceIsHost) return
+    const timer = setInterval(() => {
+      void pingAttendance(attendanceMeetingId).catch(() => {})
+    }, ATTENDANCE_PING_MS)
+    return () => clearInterval(timer)
+  }, [attendanceMeetingId, attendanceIsHost])
 
   const registerMeeting = useCallback((info: ActiveMeetingInfo) => {
     setActiveMeetingInfo(info)

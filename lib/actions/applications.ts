@@ -35,7 +35,7 @@ import type {
 } from "@/lib/db/models"
 import { APP_URL } from "@/lib/app-url"
 import { BRAND } from "@/lib/brand"
-import { SCHOOL_SLUGS, isSchoolSlug, type SchoolSlug } from "@/lib/schools"
+import { SCHOOL_SLUGS, schoolSlugOf, type SchoolSlug } from "@/lib/schools"
 
 const PAGE_SIZE = 20
 
@@ -88,7 +88,7 @@ const TeachingAnswers = z.object({
 /** Bason's answers as the applicant and admin views read them — absent on older applications. */
 function teachingAnswersView(answers: IApplicationAnswers) {
   return {
-    school: isSchoolSlug(answers.school) ? answers.school : undefined,
+    school: schoolSlugOf(answers.school) ?? undefined,
     teachingTopic: answers.teachingTopic || undefined,
     passion: answers.passion ?? undefined,
     passionReason: answers.passionReason || undefined,

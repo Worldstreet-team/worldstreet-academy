@@ -65,7 +65,9 @@ function clearPick() {
  * that school's cover (the curtain comes from the side the school lies on)
  * and hands the copy to the school: its number, name, tagline (or blurb)
  * and real facts, with the gold CTA reshaping to "Explore the School of …"
- * → `/schools/<slug>`. The chosen chip's pill glides from chip to chip.
+ * → `/schools/<slug>` (by default it reads "Explore the Academy" → `/schools`;
+ * the secondary CTA is "Join the upcoming cohort" → `/#cohort` while a cohort
+ * is upcoming, else "Start learning"). The chosen chip's pill glides from chip to chip.
  * Choosing it again, or "Clear", returns the default copy and the student the
  * show was on, and resumes the slideshow. Every cell reserves its tallest
  * variant, so nothing below it ever moves (`hero-copy.tsx`).
@@ -83,11 +85,14 @@ export function HeroWall({
   cheapest,
   signedIn,
   registerUrl,
+  cohortOpen,
 }: {
   counts: Record<SchoolSlug, number>
   cheapest: Record<SchoolSlug, number | null>
   signedIn: boolean
   registerUrl: string
+  /** A cohort is upcoming: the secondary CTA points at its band. */
+  cohortOpen: boolean
 }) {
   const ok = useMotionOK()
   const heroRef = React.useRef<HTMLElement>(null)
@@ -144,7 +149,7 @@ export function HeroWall({
     [counts, cheapest]
   )
 
-  const cta = school ? `Explore the ${school.name}` : "Explore programs"
+  const cta = school ? `Explore the ${school.name}` : "Explore the Academy"
   const secondary =
     "inline-flex h-12 w-full items-center justify-center rounded-full border border-ws-hairline px-7 text-[15px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:border-ws-brand/40 hover:text-ws-gold sm:w-auto"
 
@@ -212,7 +217,7 @@ export function HeroWall({
               {school ? [school.name, factsFor(school)].filter(Boolean).join(". ") : ""}
             </p>
 
-            {/* lg+ widens the picker to 3xl so the eight chips sit in two
+            {/* lg+ widens the picker to 3xl so the seven chips sit in two
                 rows (three would push the CTA under a 768px fold). Phones
                 have no picker (owner, 2026-09-21): its height goes to a
                 bigger picture, and the sticky school bar's "Choose a
@@ -313,7 +318,7 @@ export function HeroWall({
                     rolling through; the secondary glides aside. */}
                 <MotionLink
                   layout
-                  href={school ? `/schools/${school.slug}` : "/programs"}
+                  href={school ? `/schools/${school.slug}` : "/schools"}
                   transition={{ layout: ok ? GLIDE : { duration: 0 } }}
                   style={{ borderRadius: 7 }}
                   className="relative inline-flex min-h-14 w-full items-center justify-center overflow-hidden rounded-full bg-ws-brand px-6 py-2.5 text-center text-[15px] font-semibold leading-[1.2] text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-ws-page sm:min-h-12 sm:w-auto sm:px-8"
@@ -332,7 +337,11 @@ export function HeroWall({
                     </motion.span>
                   </AnimatePresence>
                 </MotionLink>
-                {signedIn ? (
+                {cohortOpen ? (
+                  <MotionLink layout="position" transition={{ layout: ok ? GLIDE : { duration: 0 } }} href="/#cohort" className={secondary}>
+                    Join the upcoming cohort
+                  </MotionLink>
+                ) : signedIn ? (
                   <MotionLink layout="position" transition={{ layout: ok ? GLIDE : { duration: 0 } }} href="/dashboard" className={secondary}>
                     Start learning
                   </MotionLink>

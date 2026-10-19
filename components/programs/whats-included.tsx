@@ -1,19 +1,20 @@
-import { AwardIcon, CircleHelpIcon, ClipboardListIcon, CompassIcon, DownloadIcon, HandshakeIcon, ListChecksIcon, RadioIcon, SquarePlayIcon, TrendingUpIcon, UsersIcon, type IconComponent } from "@/components/icons"
+import { AwardIcon, BriefcaseIcon, CircleHelpIcon, ClipboardListIcon, CompassIcon, DownloadIcon, HandshakeIcon, ListChecksIcon, RadioIcon, SquarePlayIcon, UsersIcon, VideoReplayIcon, type IconComponent } from "@/components/icons"
 import { PROGRAM_H2 } from "@/components/programs/section-title"
 
-/** Spec §9 — the eleven inclusions, verbatim and static. */
+/** Institutional blueprint §9 — the twelve inclusions, verbatim and static. */
 const INCLUDED: ReadonlyArray<{ label: string; icon: IconComponent }> = [
-  { label: "Structured curriculum", icon: ListChecksIcon },
-  { label: "Video lessons", icon: SquarePlayIcon },
-  { label: "Live classes", icon: RadioIcon },
-  { label: "Practical assignments", icon: ClipboardListIcon },
-  { label: "Quizzes & assessments", icon: CircleHelpIcon },
-  { label: "Downloadable resources", icon: DownloadIcon },
-  { label: "Instructor guidance", icon: CompassIcon },
+  { label: "Foundation lessons", icon: SquarePlayIcon },
+  { label: "Beginner-to-advanced curriculum", icon: ListChecksIcon },
+  { label: "Recorded classes", icon: VideoReplayIcon },
+  { label: "Full live cohort", icon: RadioIcon },
+  { label: "Learning materials", icon: DownloadIcon },
+  { label: "Assignments", icon: ClipboardListIcon },
+  { label: "Assessments", icon: CircleHelpIcon },
+  { label: "Projects", icon: BriefcaseIcon },
+  { label: "Instructor interaction", icon: CompassIcon },
   { label: "Mentorship", icon: HandshakeIcon },
-  { label: "Community access", icon: UsersIcon },
-  { label: "Progress tracking", icon: TrendingUpIcon },
-  { label: "Certificate upon completion", icon: AwardIcon },
+  { label: "Student community", icon: UsersIcon },
+  { label: "Certificate of completion", icon: AwardIcon },
 ]
 
 /**
@@ -41,7 +42,7 @@ export function WhatsIncluded() {
           </li>
         ))}
       </ul>
-      <p className="mt-5 text-[13px] italic text-ws-subtle">Specific inclusions vary by program and package.</p>
+      <p className="mt-5 text-[13px] italic text-ws-subtle">Specific inclusions vary by program and plan.</p>
     </section>
   )
 }

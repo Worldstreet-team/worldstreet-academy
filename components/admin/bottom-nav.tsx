@@ -1,9 +1,11 @@
 "use client"
-import { BookOpen, ClipboardCheck, Ellipsis, House, Inbox, ReceiptText, Star, Store, Users, Wallet, type IconComponent } from "@/components/icons"
+import { BookOpen, ClipboardCheck, Ellipsis, HandshakeIcon, House, Inbox, ReceiptText, ShieldCheck, Star, Store, Users, Wallet, type IconComponent } from "@/components/icons"
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { useUser } from "@/components/providers/user-provider"
+import { isSuperAdmin } from "@/lib/admin-levels"
 
 import {
   DropdownMenu,
@@ -46,7 +48,7 @@ const navItems: BottomNavItem[] = [
   },
 ]
 
-/** ESPEE payments, Courses, Sellers, Reviews and Exams share the fifth slot behind a "More" menu. */
+/** ESPEE payments, Courses, Sellers, Partners, Reviews and Exams share the fifth slot behind a "More" menu. Team joins the menu for super admins. */
 const moreItems: BottomNavItem[] = [
   {
     title: "ESPEE payments",
@@ -67,6 +69,12 @@ const moreItems: BottomNavItem[] = [
     match: (p: string) => p.startsWith("/admin/sellers"),
   },
   {
+    title: "Partners",
+    href: "/admin/partners",
+    icon: HandshakeIcon,
+    match: (p: string) => p.startsWith("/admin/partners"),
+  },
+  {
     title: "Reviews",
     href: "/admin/reviews",
     icon: Star,
@@ -80,9 +88,19 @@ const moreItems: BottomNavItem[] = [
   },
 ]
 
+/** Super admins only; first in the More menu. */
+const teamItem: BottomNavItem = {
+  title: "Team",
+  href: "/admin/team",
+  icon: ShieldCheck,
+  match: (p: string) => p.startsWith("/admin/team"),
+}
+
 export function AdminBottomNav() {
   const pathname = usePathname()
-  const moreActive = moreItems.some((item) => item.match?.(pathname) ?? pathname === item.href)
+  const user = useUser()
+  const shownMore = isSuperAdmin(user) ? [teamItem, ...moreItems] : moreItems
+  const moreActive = shownMore.some((item) => item.match?.(pathname) ?? pathname === item.href)
 
   return (
     <nav className="fixed bottom-0 inset-x-0 z-50 border-t border-ws-hairline bg-ws-surface md:hidden safe-area-bottom">
@@ -125,7 +143,7 @@ export function AdminBottomNav() {
             <span>More</span>
           </DropdownMenuTrigger>
           <DropdownMenuContent side="top" align="end" sideOffset={8} className="w-44">
-            {moreItems.map((item) => {
+            {shownMore.map((item) => {
               const active = item.match?.(pathname) ?? pathname === item.href
               const Icon = item.icon
               return (

@@ -39,8 +39,11 @@ function getPageContext(pathname: string): string {
   if (pathname.startsWith("/dashboard/checkout")) return "checkout — paying for a program plan"
   if (pathname === "/dashboard/recordings") return "their class recordings"
   if (pathname === "/dashboard/assignments") return "their assignments"
+  if (pathname === "/dashboard/assessments") return "their assessments — knowledge checks and final exams"
+  if (pathname === "/dashboard/communities") return "their program, school and Academy communities"
+  if (pathname === "/dashboard/notifications") return "their inbox"
   if (pathname === "/dashboard/mentorship") return "their Executive mentorship"
-  if (pathname === "/dashboard/referrals") return "their referral code and earnings"
+  if (pathname === "/dashboard/referrals") return "their WMA Partners dashboard — Partner Code, partner link, clicks and commission"
   if (pathname === "/dashboard/points") return "their points and leaderboard"
   if (pathname.startsWith("/instructor")) return "the instructor panel — managing courses/analytics"
   return `a page at ${pathname}`
@@ -160,7 +163,7 @@ ${isInstructor ? "🎓 Instructor — can manage courses, analytics.\n" : ""}${p
 /dashboard/meetings — meetings | /dashboard/meetings?meetingId={meetingId} — join
 /dashboard/profile | /dashboard/settings | /dashboard/checkout?courseId={courseId}&package={basic|standard|executive}
 /dashboard/certificates | /dashboard/bookmarks | /dashboard/help | /dashboard/wallet
-/dashboard/recordings | /dashboard/assignments | /dashboard/mentorship | /dashboard/referrals | /dashboard/points
+/dashboard/recordings | /dashboard/assignments | /dashboard/assessments | /dashboard/communities | /dashboard/notifications — inbox | /dashboard/mentorship | /dashboard/referrals | /dashboard/points
 /schools — pick a school | /programs/{slug} — program page with the three plans
 /instructor | /instructor/courses | /instructor/analytics
 

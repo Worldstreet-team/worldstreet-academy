@@ -1,6 +1,7 @@
 import { cache } from "react"
 import { auth, currentUser } from "@clerk/nextjs/server"
 import connectDB from "@/lib/db"
+import { adminLevelOf } from "@/lib/admin-levels"
 import { User } from "@/lib/db/models"
 import type { LocalUser } from "./sync"
 import { syncUserToLocal } from "./sync"
@@ -39,6 +40,7 @@ export const getCachedUser = cache(async (): Promise<LocalUser | null> => {
         avatarUrl: (user.avatarUrl as string) ?? "",
         signatureUrl: (user.signatureUrl as string) ?? null,
         role: user.role as "USER" | "INSTRUCTOR" | "ADMIN",
+        adminLevel: adminLevelOf(user.adminLevel),
         instructorStatus: (user.instructorStatus as "none" | "applied" | "interview" | "approved" | "rejected") ?? "none",
         verified: user.verified as boolean,
         walletBalance: (user.walletBalance as number) ?? 0,

@@ -7,7 +7,7 @@ import connectDB from "@/lib/db"
 import { Enrollment, EnrollmentIntent, type PackageKey } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth"
 import { fetchProgramById } from "@/lib/actions/student"
-import { SCHOOL_SLUGS, isSchoolSlug, type SchoolSlug } from "@/lib/schools"
+import { SCHOOL_SLUGS, schoolSlugOf, type SchoolSlug } from "@/lib/schools"
 
 const SaveSchema = z.object({
   school: z.enum(SCHOOL_SLUGS),
@@ -62,7 +62,7 @@ export async function saveEnrollmentIntent(input: SaveEnrollmentIntentInput): Pr
 
     const existing = await EnrollmentIntent.findOne({ user: user.id }).select("school course").lean()
     const changed =
-      !existing || existing.school !== school || String(existing.course ?? "") !== (courseId ?? "")
+      !existing || schoolSlugOf(existing.school) !== school || String(existing.course ?? "") !== (courseId ?? "")
 
     await EnrollmentIntent.updateOne(
       { user: user.id },
@@ -111,8 +111,8 @@ export async function getMyEnrollmentIntent(): Promise<MyEnrollmentIntent | null
     if (!user) return null
 
     const intent = await EnrollmentIntent.findOne({ user: user.id, status: "open" }).lean()
-    if (!intent || !isSchoolSlug(intent.school)) return null
-    const school = intent.school
+    const school = schoolSlugOf(intent?.school)
+    if (!intent || !school) return null
     const courseId = intent.course ? String(intent.course) : null
     const schoolOnly: MyEnrollmentIntent = {
       school, courseId: null, courseTitle: null, packageName: null, price: null, fromPrice: false,

@@ -1,4 +1,4 @@
-import { AwardIcon, ClipboardCheckIcon, HandshakeIcon, MessagesSquareIcon, RadioIcon, type IconComponent } from "@/components/icons"
+import { AwardIcon, ClipboardCheckIcon, HandshakeIcon, MessagesSquareIcon, RadioIcon, VideoReplayIcon, type IconComponent } from "@/components/icons"
 
 import type { ProgramDetail, PublicPackage } from "@/lib/actions/student"
 import type { IPackageEntitlements, PackageKey } from "@/lib/db/models"
@@ -62,6 +62,7 @@ export type Service = { key: keyof IPackageEntitlements; label: string; icon: Ic
 /** The services a package can grant, in the order a buyer climbs them. */
 const SERVICES: readonly Service[] = [
   { key: "liveClasses", label: "Live classes", icon: RadioIcon },
+  { key: "recordings", label: "Recorded classes", icon: VideoReplayIcon },
   { key: "instructorQa", label: "Instructor Q&A", icon: MessagesSquareIcon },
   { key: "assignments", label: "Graded assignments", icon: ClipboardCheckIcon },
   { key: "certificate", label: "Certificate of completion", icon: AwardIcon },

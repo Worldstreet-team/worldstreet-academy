@@ -85,6 +85,7 @@ const teachItems: NavItem[] = [
     icon: ChartLine,
     match: (p) => p === "/instructor/analytics",
   },
+  { title: "WMA Partners", href: "/dashboard/referrals", icon: Gift, match: (p) => p.startsWith("/dashboard/referrals") },
 ]
 
 const connectItems: NavItem[] = [
@@ -282,15 +283,8 @@ export function InstructorSidebar({ seller = false }: { seller?: boolean }) {
                 }
                 active={false}
               />
-              {/* Referrals live in the student shell; instructors share the same page. */}
-              <NavRow
-                item={{
-                  title: "Refer & earn",
-                  href: "/dashboard/referrals",
-                  icon: Gift,
-                }}
-                active={false}
-              />
+              {/* Marketplace Creators reach WMA Partners here; faculty have it in their main rail (institutional blueprint §16) */}
+              {seller && <NavRow item={{ title: "WMA Partners", href: "/dashboard/referrals", icon: Gift }} active={false} />}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

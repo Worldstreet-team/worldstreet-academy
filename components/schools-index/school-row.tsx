@@ -19,7 +19,7 @@ const OPEN = "inset(0% 0% 0% 0% round 20px)"
  * One school on `/schools`: its cover large, its number, its name and line,
  * and its actual programs as direct links (title, level, packages, price →
  * `/programs/<slug>`), then the way into the school itself. Rows alternate
- * sides from lg so eight equal schools read as a sequence of spreads rather
+ * sides from lg so seven equal schools read as a sequence of spreads rather
  * than a grid of tiles; below lg the cover sits on top.
  *
  * Motion, once per row: the cover unveils from its outer edge (a clip-path

@@ -35,7 +35,7 @@ export async function vividMarkCourseComplete(p: { courseId: string }) {
         message: "All lessons are done. Pass the final exam to complete the course.",
       }
     }
-    // Only packages that include a certificate get one (Basic completes without).
+    // Only packages that include a certificate get one.
     const access = await getCourseAccess(currentUser.id, p.courseId)
     const hasCertificate = access ? access.entitlements.certificate : true
     return {

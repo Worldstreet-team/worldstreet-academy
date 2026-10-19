@@ -27,6 +27,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   return [
     { url: appUrl("/") },
+    { url: appUrl("/academy") },
     { url: appUrl("/schools") },
     ...SCHOOLS.map((school) => ({ url: appUrl(`/schools/${school.slug}`) })),
     { url: appUrl("/programs") },

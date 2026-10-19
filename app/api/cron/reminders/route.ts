@@ -21,7 +21,7 @@ import { entitlementsFor, includesMentorship } from "@/lib/entitlements"
 import { getCourseAccess } from "@/lib/course-access"
 import { APP_URL } from "@/lib/app-url"
 import { fetchProgramById } from "@/lib/actions/student"
-import { SCHOOL_BY_SLUG, isSchoolSlug } from "@/lib/schools"
+import { schoolFromSlug } from "@/lib/schools"
 
 /**
  * Where a class reminder sends its host: the instructor page, which starts the
@@ -264,7 +264,8 @@ export async function POST(request: NextRequest) {
 
   for (const intent of due) {
     try {
-      if (!intent.course || !isSchoolSlug(intent.school)) continue
+      const school = schoolFromSlug(intent.school)
+      if (!intent.course || !school) continue
       const courseId = intent.course.toString()
 
       if (await Enrollment.exists({ user: intent.user, course: intent.course })) {
@@ -302,7 +303,7 @@ export async function POST(request: NextRequest) {
         to: learner.email,
         firstName: learner.firstName ?? "",
         courseTitle: program.title,
-        schoolName: SCHOOL_BY_SLUG[intent.school].name,
+        schoolName: school.name,
         checkoutPath: `/dashboard/checkout?courseId=${courseId}${chosen ? `&package=${chosen.key}` : ""}`,
         price: chosen ? chosen.price : program.price,
         fromPrice: !chosen && program.tierCount > 1,

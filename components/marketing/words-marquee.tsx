@@ -4,16 +4,18 @@ import * as React from "react"
 import { useScroll, useSpring, useVelocity } from "motion/react"
 import { addFrame, useMotionOK } from "@/components/marketing/motion/bus"
 
-/** The eight schools' vocabulary. Words, not claims. */
+/** The seven schools' vocabulary. Words, not claims. */
 const WORDS = [
   "Trading",
-  "Blockchain",
   "Artificial intelligence",
   "Software",
-  "Cybersecurity",
   "Data",
-  "Creative media",
+  "Cybersecurity",
   "Digital business",
+  "Entrepreneurship",
+  "Creative economy",
+  "Leadership",
+  "Blockchain",
   "Mentorship",
   "Certification",
 ] as const

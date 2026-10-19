@@ -58,11 +58,12 @@ export function PackageRow({
                 {line.label}
               </span>
             )}
+            {line.label && pkg.tagline && <span className="text-[13px] font-medium normal-case tracking-normal text-ws-muted">— {pkg.tagline}</span>}
             {pkg.highlight && line.label && <span className="text-[12px] font-medium text-ws-muted">Most popular</span>}
           </p>
         )}
         <p className={cn("font-semibold text-ws-primary", compact ? "mt-1.5 text-[15px]" : "mt-2 text-[17px]")}>{line.name}</p>
-        {pkg.tagline && (
+        {pkg.tagline && !line.label && (
           <p className={cn("mt-0.5 leading-snug text-ws-muted", compact ? "text-[13px]" : "text-[14px]")}>{pkg.tagline}</p>
         )}
       </div>

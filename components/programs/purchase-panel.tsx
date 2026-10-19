@@ -1,4 +1,4 @@
-import { AwardIcon, CircleCheckIcon, ClipboardCheckIcon, HandshakeIcon, ListVideoIcon, MessagesSquareIcon, MonitorPlayIcon, PlayIcon, RadioIcon, SquarePlayIcon, type IconComponent } from "@/components/icons"
+import { AwardIcon, CircleCheckIcon, ClipboardCheckIcon, HandshakeIcon, ListVideoIcon, MessagesSquareIcon, MonitorPlayIcon, PlayIcon, RadioIcon, SquarePlayIcon, VideoReplayIcon, type IconComponent } from "@/components/icons"
 import Link from "next/link"
 import Image from "next/image"
 
@@ -39,6 +39,7 @@ export type IncludedItem = {
  */
 const SERVICES: ReadonlyArray<{ key: keyof IPackageEntitlements; label: string; icon: IconComponent }> = [
   { key: "liveClasses", label: "Live classes", icon: RadioIcon },
+  { key: "recordings", label: "Recorded classes", icon: VideoReplayIcon },
   { key: "instructorQa", label: "Instructor Q&A", icon: MessagesSquareIcon },
   { key: "assignments", label: "Graded assignments", icon: ClipboardCheckIcon },
   { key: "certificate", label: "Certificate of completion", icon: AwardIcon },

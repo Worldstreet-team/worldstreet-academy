@@ -34,7 +34,7 @@ From the 2026-10-03 meeting: three plans on every program, ESPEE proof-of-paymen
 3. **Catalogue** (§6). Every program becomes Basic $49 (was $300), Standard $199 (was $1,000, 9 weeks) and Executive $999 (was $10,000, 9 weeks), so the dry run shows a price change on every program. Apply with `--allow-price-change`.
    - Existing slugs are kept. `--rename-slugs` would break every shared `/programs/<slug>` link.
    - Two production programs are outside the 12 titles and keep a single price: "Cryptocurrency Trading Masterclass Beginner to Advanced" and "DIGITALMARKETING MASTERCLASS".
-4. **Admins.** Grant each new admin with `MONGODB_URI="$PROD_URI" node scripts/grant-admin.mjs <email>`. It also writes the role to Clerk with `.env.local`'s `CLERK_SECRET_KEY`. Every admin account needs a real email address: each new ESPEE proof is emailed to all admins.
+4. **Admins.** Grant each new admin with `MONGODB_URI="$PROD_URI" CLERK_SECRET_KEY="$CLERK_KEY" node scripts/grant-admin.mjs <email>`. It writes the role to Clerk only when `CLERK_SECRET_KEY="$CLERK_KEY"` is also on the command line; without it the script prints `skipped Clerk mirror`. Every admin account needs a real email address: each new ESPEE proof is emailed to all admins. From Phase 21 on, super admins grant admins at /admin/team — see "Admin levels" below.
 5. **Smoke test** on production with a test account that has no enrollment:
    - `/dashboard` sends it to `/schools`.
    - Submit an ESPEE proof. `/dashboard` then shows "Payment received — under review".
@@ -42,6 +42,7 @@ From the 2026-10-03 meeting: three plans on every program, ESPEE proof-of-paymen
    - Then reject a second proof and check that the reason shows at checkout.
 6. **Sales export.** On `/admin/users`, use "Export interested learners".
 7. **Go team.** Point them at `docs/go-patches-phase-3.md` §7–§11: ESPEE orders have no wallet charge; referral earnings and seller shares (§8); course `kind` — Go must hide marketplace and New Economy courses wherever it lists programs (§9); recordings and the go-live notice (§10); points and the new application answers (§11).
+   - Phase 14: §16 (Basic certifies; `recordings` is web-only).
 8. **Marketplace, referrals, teaching (2026-10-05, same release).**
    - Recordings need the same `R2_RESOURCES_BUCKET_NAME` and the new hourly `academy-recordings` task (§5). RealtimeKit bills recording at about $0.01 per minute; only course classes record, never 1-on-1 mentorship.
    - New Economy courses: `MONGODB_URI="$PROD_URI" node scripts/new-economy-catalogue.mjs --owner <admin email>` (dry run), then `--apply`. It creates one free DRAFT per WorldStreet product; add lessons and publish each from the admin course editor.
@@ -49,6 +50,69 @@ From the 2026-10-03 meeting: three plans on every program, ESPEE proof-of-paymen
    - Smoke test: open `/?ref=<your code>` from `/dashboard/referrals` in a private window, buy as a fresh account, and check `/dashboard/referrals` shows the pending 10%.
 
 **Rollback:** set `FACULTY_PUBLIC` in `lib/faculty.ts` back to `true` to show faculty again. Reverting the `feat/cohort-launch` merge restores the old gate and wallet-only checkout. Approved ESPEE enrollments stay valid, and their Orders carry `paymentMethod: "espee"`.
+
+## Admin levels — 2026-10-19 (Phase 21, `feat/institutional`)
+
+Super admins run the admin team; regular admins keep every other admin power (owner, 2026-10-19).
+
+1. **First super admins, before anything else.** Pick the owner and one other trusted person; two, so neither is ever "the last". Each must have signed in to the Academy once. For each, run `MONGODB_URI="$PROD_URI" node scripts/grant-admin.mjs <email> --super`. This is safe before or after the deploy, because older code ignores `adminLevel`. Until it runs, nobody can grant admin access from the web. **Check:** the script prints `… → ADMIN/super`.
+2. **Deploy** (§4). Every existing admin stays an admin, at the regular level.
+3. **Check:**
+   - As a super admin, the admin sidebar shows Team, the eyebrow reads "Super admin", and `/admin/team` lists every admin.
+   - As a regular admin, `/admin/team` is a 404 and `/admin/users` offers no Admin role.
+4. **From now on:** grant admins at `/admin/team` → "Add an admin".
+   - `grant-admin.mjs` without `--super` still makes a regular admin.
+   - `--revoke` removes admin access and restores the earlier role. It refuses the last super admin.
+   - Every change is in Team's audit trail.
+5. **Go team:** `docs/go-patches-phase-3.md` §12 (R14). No Go change, unless Go writes `users.role`.
+
+## WMA Partners — Phase 18 (institutional blueprint §15)
+
+Nothing to configure. The `partnerclicks` collection and its unique index are created on first use, and clicks count from the deploy on, with no history before it. Commission rules are unchanged.
+
+1. **Smoke test.** Signed in, open `/dashboard/referrals` and copy your partner link. Open it in a private window and reload once. Back in your own session, Clicks reads 1 more, not 2. Opening your own link while signed in adds nothing (a signed-out visit by you does count).
+2. **Admin.** `/admin/partners` lists you. "Export CSV" opens cleanly in a spreadsheet.
+
+## Seven schools — Phase 13 (D21, D22)
+
+The academic structure becomes the seven schools of the institutional blueprint (§7). Stored school slugs move with `scripts/migrate-schools-v2.mjs`. Until it runs, the web already shows a retired slug under its new school, so the order of deploy and migration cannot strand a program. Run these steps in order:
+
+1. **Go.** R12 is live (`docs/go-patches-phase-3.md` §15).
+2. **Backup** (§1).
+3. **Deploy** the web app (§4). From here, the site already shows retired slugs under their new school.
+4. **Dry run:**
+
+   ```bash
+   MONGODB_URI="$PROD_URI" node scripts/migrate-schools-v2.mjs | tee "schools-v2-dryrun-$(date +%Y%m%d-%H%M).log"
+   ```
+
+   Review the per-mapping counts. Every `LEFTOVER` line must be explained before applying; none is expected.
+5. **Apply, the same day:** the same command with `--apply`, tee'd to `schools-v2-apply-…log`.
+6. **Check:**
+   - Re-running `--apply` prints `moved 0`.
+   - `curl -s -o /dev/null -w "%{http_code} %{redirect_url}\n" "$SITE/schools/cybersecurity"` prints `308 $SITE/schools/technology-ai`.
+   - `$SITE/schools/entrepreneurship-wealth-creation` returns `200`.
+7. **Catalogue dry run (§6), from a Phase 13 checkout.** Every MATCH prints `school: X -> X`. **Never run `mastery-catalogue.mjs` from an older checkout after this step.** It would move the 12 programs back to retired slugs.
+8. **Rollback.** The apply log lists every `MOVED` document, old → new. The mapping is many-to-one, so restore the four fields from the backup (`mongorestore` of those collections) or reverse the logged lines by hand. Reverting only the web deploy leaves programs under schools the old code doesn't know.
+9. **Owed by product:** sign off each school's copy in `lib/schools.ts` (entries marked `DRAFT: owner sign-off pending`), and the two placeholder covers.
+
+## Plans to the blueprint — Phase 14 (2026-10-19)
+
+1. **Before.** The Phase 10 catalogue apply has run. If it never ran, this single run does both, so follow §6 and expect its price changes (`--allow-price-change`).
+2. **Count the Basic learners this will certify without the exam** (read-only; expected `0`; otherwise decide before applying):
+
+   ```bash
+   mongosh "$PROD_URI" --quiet --eval 'const ids = db.courses.distinct("_id", { examRequired: true }); print("basic completed without exam " + db.enrollments.countDocuments({ course: { $in: ids }, packageKey: "basic", status: "completed", examPassed: { $ne: true } }))'
+   ```
+
+3. **Dry run**, then review it:
+   - Run `MONGODB_URI="$PROD_URI" node scripts/mastery-catalogue.mjs | tee "plans-dryrun-$(date +%Y%m%d-%H%M).log"`.
+   - Each MATCH has three `plan …:` lines. Basic gains `+assignments +certificate +recordings`; Standard and Executive gain `+recordings`.
+   - No line carries a `-flag`.
+   - If one does, a learner on that plan would lose that service. Stop and take it to the owner: `--allow-access-loss` is for a written go only.
+4. **Apply** with `--apply`, plus `--allow-price-change` only if step 1 applies, and `tee` the log. Then re-run `--apply`; it must end `Total modifiedCount across matched rows: 0`.
+5. **Check:** `curl -s "$SITE/programs/<forex slug>"` shows "Foundation", "Personalized Mastery", "4 weeks", "8–12 weeks" and "Flexible schedule". A Basic test learner sees Recordings, Assignments and, after the lessons, the exam.
+6. **Rollback:** re-run the previous release's script with `--apply --allow-access-loss`. Basic learners then lose recordings, assignments and the exam. Issued certificate IDs stay valid.
 
 ## 0. Blockers — settle these first
 
@@ -87,8 +151,11 @@ Coolify → the academy application → Environment Variables. Names only here; 
 | `WALLET_BASE_URL`, `WALLET_SERVICE_TOKEN` | Yes | Runtime | Missing either → purchases fail closed and `/api/cron/earnings` answers `503 wallet_disabled`. |
 | `SITE_URL` | Yes | Runtime | `https://academy.worldstreetgold.com`, no trailing slash. `lib/app-url.ts` builds email links, canonical URLs, the sitemap, share-card URLs and certificate verify URLs from it. |
 | `NEXT_PUBLIC_APP_URL` | Optional | Runtime (server) | If set, it wins over `SITE_URL` — make it the same public origin. A localhost value is ignored in production. |
-| `NEXT_PUBLIC_COMMUNITY_URL` | Optional | **Build** | The dashboard's Community tile reads it in the browser, so Next bakes it in during the build: tick "Build Variable" and redeploy after any change. Unset → the tile is hidden. |
+| `NEXT_PUBLIC_COMMUNITY_URL` | Optional | **Build** | The Academy community, shown to every learner with an open program, on `/dashboard/communities` and the dashboard's Help & community tile. Inlined at build: tick "Build Variable" and redeploy after any change. Unset → no Academy row. |
+| `NEXT_PUBLIC_EXECUTIVE_COMMUNITY_URL` | Optional | **Build** | The Executive community, shown only to learners on an Executive plan. Build variable, as above. Unset → hidden. |
 | `CRON_SECRET` | Yes | Runtime | A long random value (`openssl rand -hex 32`). The four scheduled tasks (§5) send it as a bearer token. |
+
+School community links are code (`communityUrl` on each school in `lib/schools.ts`). Product supplies them, and a deploy ships them.
 
 Also confirm these existing names are present (don't change working values): `MONGODB_URI`, `CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `NEXT_PUBLIC_WALLET_FUNDING_URL`, `NEXT_PUBLIC_WALLET_WITHDRAW_URL`, `RESEND_API_KEY`, `EMAIL_FROM`, `ABLY_API_KEY`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_REALTIME_ORG_ID`, `CLOUDFLARE_REALTIME_API_KEY`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_RESOURCES_BUCKET_NAME` (that bucket must have no public access; assignment uploads and submission downloads fail closed without it — B6; students' browsers upload straight to it, so its CORS allows PUT with `Content-Type` from the academy origin (`https://academy.worldstreetgold.com`)), `R2_PUBLIC_URL`, `OPENAI_API_KEY`.
 
@@ -315,3 +382,13 @@ Expect `acknowledged: true`, and note `modifiedCount` in your run log. **Those s
 | Replaced submission files | A resubmission replaces a submission's file list, but nothing is deleted: the files it drops, and uploads never submitted, stay in the private bucket under `worldstreet-academy/submissions/<assignmentId>/<userId>/`. | Leave them, or now and then delete objects under that prefix that no `submissions.files.key` references. |
 | RealtimeKit rooms from double confirms | When two confirms of one mentorship request race, both create a RealtimeKit room; the losing confirm deletes only its `meetings` row, so its remote room stays in the organization with no Academy record. | Leave them, or end them from the RealtimeKit dashboard (rooms named `Mentorship: <student name>` with no matching `meetings.meetingId`). |
 | Product debt | School intros, program curricula, thumbnails and instructor bios (Phase 2); the Academy signatory name and signature file (D9); a surface for §13's "LEARN. COMPLETE. GET RECOGNIZED." (Phase 6); real RealtimeKit scheduling run on staging (Phase 4). | Schedule with product. |
+
+---
+
+## Institutional blueprint phases — owner steps
+
+### Phase 16 — Mastery Score and attendance
+
+- No script, no env and no data migration. The `attendances` index builds itself at boot.
+- Smoke test after deploy: as a Standard learner, join a live class on the web for over two minutes and leave. Then check that `db.attendances.find({ user: <id> })` shows `seconds` > 0 and `openSince: null`.
+- Classes joined in the mobile app don't count until Go writes attendance rows (Go doc §13, R-A).

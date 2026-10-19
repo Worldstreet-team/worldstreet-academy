@@ -1,5 +1,5 @@
 "use client"
-import { ArrowRightIcon, AwardIcon, CheckIcon, ChevronDownIcon, ClipboardCheckIcon, HandshakeIcon, LayersIcon, LifeBuoyIcon, ListVideoIcon, MessagesSquareIcon, RadioIcon, ShieldCheckIcon, StarIcon, type IconComponent } from "@/components/icons"
+import { ArrowRightIcon, AwardIcon, CheckIcon, ChevronDownIcon, ClipboardCheckIcon, HandshakeIcon, LayersIcon, LifeBuoyIcon, ListVideoIcon, MessagesSquareIcon, RadioIcon, ShieldCheckIcon, StarIcon, VideoReplayIcon, type IconComponent } from "@/components/icons"
 
 import * as React from "react"
 import { motion } from "motion/react"
@@ -36,6 +36,7 @@ const SERVICE_ICON: Record<ServiceKey, IconComponent> = {
   certificate: AwardIcon,
   mentorship: HandshakeIcon,
   prioritySupport: LifeBuoyIcon,
+  recordings: VideoReplayIcon,
 }
 
 const GOLD_CTA =
@@ -161,7 +162,7 @@ function Chooser({ comingSoon, lessons }: { comingSoon: boolean; lessons: Lesson
 }
 
 /**
- * One tier as a radio: label, "Most popular", name, tagline, price. The
+ * One tier as a radio: label with its tagline beside it, "Most popular", name, price. The
  * selected card is raised with a gold ring (gold = active state); that fill
  * is one element that glides to whichever card is chosen.
  */
@@ -219,6 +220,7 @@ function OptionCard({ pkg, selected, onSelect }: { pkg: PublicPackage; selected:
           >
             {PACKAGE_LABEL[pkg.key]}
           </span>
+          {pkg.tagline && <span className={cn("text-[13px] font-medium normal-case tracking-normal", selected ? "text-ws-primary" : "text-ws-muted")}>— {pkg.tagline}</span>}
           {pkg.highlight && (
             <span className="inline-flex items-center gap-1 rounded-full bg-ws-brand/[0.12] px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-ws-gold">
               <StarIcon size={10} fill="currentColor" aria-hidden />
@@ -235,9 +237,6 @@ function OptionCard({ pkg, selected, onSelect }: { pkg: PublicPackage; selected:
           </span>
         </span>
         <PackageDiscount pkg={pkg} className="mt-2 flex justify-end text-[13px]" />
-        {pkg.tagline && (
-          <span className="mt-1.5 block text-pretty text-[13.5px] leading-relaxed text-ws-muted">{pkg.tagline}</span>
-        )}
       </span>
     </label>
   )
@@ -269,8 +268,11 @@ function Breakdown({
         <Stack selectedKey={selected.key} packages={packages}>
           {(pkg) => (
             <>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ws-muted">
-                {PACKAGE_LABEL[pkg.key]} package
+              <p className="flex flex-wrap items-baseline gap-x-2">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ws-muted">
+                  {PACKAGE_LABEL[pkg.key]} plan
+                </span>
+                {pkg.tagline && <span className="text-[13px] font-medium normal-case tracking-normal text-ws-muted">— {pkg.tagline}</span>}
               </p>
               <h3 className="mt-2 font-display text-[26px] font-semibold leading-tight tracking-[-0.02em] text-ws-primary">
                 {pkg.name}
@@ -467,7 +469,7 @@ function Inherited({
 /**
  * The services a tier promises, as a strip of icon chips. Multi-tier: a
  * service this tier lacks says which tier of THIS program has it ("With
- * Executive 101"); services no tier offers are left out. Single-price: only
+ * Executive"); services no tier offers are left out. Single-price: only
  * what the one tier carries.
  */
 function ServiceGrid({

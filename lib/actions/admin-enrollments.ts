@@ -11,6 +11,9 @@ import type { CourseStatus } from "@/lib/types/course"
 import { PACKAGE_RANK, entitlementsFor, isPackageKey, packageFor } from "@/lib/entitlements"
 import { getCourseAccess, openPublishedLessonIds } from "@/lib/course-access"
 import { ensureCertificateId } from "@/lib/certificate-id"
+import { courseKindOf } from "@/lib/course-kind"
+import { masteryInputsForMany, type MasteryEnrollmentRow } from "@/lib/mastery-inputs"
+import { masteryView } from "@/lib/mastery-score"
 
 const PAGE_SIZE = 20
 
@@ -50,6 +53,8 @@ export type AdminEnrollmentRow = {
   startedAt: string | null
   completedAt: string | null
   progress: number
+  /** Mastery Score 0–100; null for non-programs, inactive enrollments or while it has no score. */
+  mastery: number | null
 }
 
 function paymentOf(e: {
@@ -111,7 +116,7 @@ export async function adminListEnrollments(filters?: {
         .skip((page - 1) * PAGE_SIZE)
         .limit(PAGE_SIZE * 3) // payment filter happens post-query; over-fetch, trim below
         .populate("user", "firstName lastName email username")
-        .populate("course", "title pricing status availableAt packages")
+        .populate("course", "title pricing status availableAt packages kind")
         .lean(),
       Enrollment.countDocuments(query),
       filters?.course ? Course.findById(filters.course).select("title").lean() : null,
@@ -169,6 +174,7 @@ export async function adminListEnrollments(filters?: {
         startedAt: e.lastAccessedAt ? new Date(e.lastAccessedAt).toISOString() : null,
         completedAt: e.completedAt ? new Date(e.completedAt).toISOString() : null,
         progress: e.progress ?? 0,
+        mastery: null,
       }
     })
 
@@ -176,6 +182,33 @@ export async function adminListEnrollments(filters?: {
       mapped = mapped.filter((m) => m.payment === filters.payment)
     }
     mapped = mapped.slice(0, PAGE_SIZE)
+
+    // Mastery Score for the page's program rows, in one bulk read.
+    const rowById = new Map(rows.map((r) => [r._id.toString(), r]))
+    const pairs: { enrollment: MasteryEnrollmentRow; course: { _id: string; packages: ICoursePackage[] | null } }[] = []
+    for (const m of mapped) {
+      const r = rowById.get(m.id)
+      const user = r?.user as unknown as { _id?: unknown } | null
+      const course = r?.course as unknown as { _id?: unknown; kind?: Parameters<typeof courseKindOf>[0]["kind"]; packages?: ICoursePackage[] | null } | null
+      if (!r || !user?._id || !course?._id) continue
+      if (courseKindOf(course) !== "program" || (r.status !== "active" && r.status !== "completed")) continue
+      pairs.push({
+        enrollment: { ...r, user: String(user._id), course: String(course._id) },
+        course: { _id: String(course._id), packages: course.packages ?? null },
+      })
+    }
+    // A Mastery Score failure leaves every row listed with no score, never an empty table.
+    try {
+      const facts = await masteryInputsForMany(pairs)
+      const scores = new Map<string, number | null>()
+      for (const m of mapped) {
+        const f = facts.get(m.id)
+        if (f) scores.set(m.id, masteryView(f).result.score)
+      }
+      for (const m of mapped) m.mastery = scores.get(m.id) ?? null
+    } catch (masteryError) {
+      console.error("Admin enrollments mastery error:", masteryError)
+    }
 
     return {
       enrollments: mapped,

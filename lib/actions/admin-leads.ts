@@ -4,7 +4,7 @@ import connectDB from "@/lib/db"
 import { Bookmark, Course, Enrollment, EnrollmentIntent, ManualPayment, Order, User } from "@/lib/db/models"
 import { requireAdmin } from "@/lib/auth/admin"
 import { countryName } from "@/lib/countries"
-import { SCHOOL_BY_SLUG, type SchoolSlug } from "@/lib/schools"
+import { schoolFromSlug } from "@/lib/schools"
 
 export interface LeadCounts {
   total: number
@@ -128,7 +128,7 @@ export async function exportInterestedLearnersCsv(): Promise<
       note(m.user, label, m.createdAt, { course: m.course, plan: m.packageKey })
     }
 
-    const schoolName = (slug: string) => SCHOOL_BY_SLUG[slug as SchoolSlug]?.name ?? slug
+    const schoolName = (slug: string) => schoolFromSlug(slug)?.name ?? slug
     const ORDER = ["Saved a school", "Wishlist", "Pre-enrolled"]
     const rank = (l: string) => {
       const i = ORDER.indexOf(l)
@@ -172,7 +172,7 @@ export async function exportInterestedLearnersCsv(): Promise<
         countryName(u.country) ?? "",
         new Date(u.createdAt).toISOString().slice(0, 10),
         interest,
-        [...lead.schools].map(schoolName).join("; "),
+        [...new Set([...lead.schools].map(schoolName))].join("; "),
         [...lead.programs].join("; "),
         lead.plan?.key ?? "",
         u.referredBy?.text ?? "",

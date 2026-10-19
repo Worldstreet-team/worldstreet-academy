@@ -59,7 +59,7 @@ export { Exam, type IExam, type IExamSettings, type ExamStatus, type ExamScope }
 export { Question, type IQuestion, type IQuestionOption, type QuestionType } from "./question"
 export { ExamAttempt, type IExamAttempt, type IAttemptAnswer, type AttemptStatus } from "./exam-attempt"
 export { MentorshipSession, type IMentorshipSession, type MentorshipSessionStatus } from "./mentorship-session"
-export { Assignment, type IAssignment, type AssignmentStatus } from "./assignment"
+export { Assignment, type IAssignment, type AssignmentStatus, type AssignmentKind } from "./assignment"
 export { Submission, type ISubmission, type ISubmissionFile, type SubmissionStatus } from "./submission"
 export {
   EnrollmentIntent,
@@ -81,3 +81,5 @@ export {
 } from "./seller-application"
 export { Recording, type IRecording, type RecordingStatus } from "./recording"
 export { PointEvent, type IPointEvent, type PointEventKind } from "./point-event"
+export { PartnerClick, type IPartnerClick } from "./partner-click"
+export { Attendance, type IAttendance } from "./attendance"

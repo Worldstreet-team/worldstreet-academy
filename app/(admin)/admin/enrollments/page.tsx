@@ -270,6 +270,7 @@ function AdminEnrollmentsInner() {
                       <TableHead>Payment</TableHead>
                       <TableHead>Enrolled</TableHead>
                       <TableHead>Progress</TableHead>
+                      <TableHead>Mastery</TableHead>
                       <TableHead aria-label="Actions" />
                     </TableRow>
                   </TableHeader>
@@ -323,6 +324,13 @@ function AdminEnrollmentsInner() {
                             <RadialProgress value={e.progress} size={22} strokeWidth={3} />
                             <span className="text-xs text-muted-foreground">{e.progress}%</span>
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          {e.mastery !== null ? (
+                            <span className="text-xs tabular-nums">{e.mastery}</span>
+                          ) : (
+                            <span className="text-xs tabular-nums text-muted-foreground">—</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <DropdownMenu>

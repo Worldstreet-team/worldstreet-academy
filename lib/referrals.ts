@@ -5,6 +5,7 @@ import { Types } from "mongoose"
 import {
   Earning,
   Order,
+  PartnerClick,
   User,
   INSTRUCTOR_REVENUE_SHARE,
   MARKETPLACE_SHARE_ACADEMY,
@@ -14,6 +15,7 @@ import {
 } from "@/lib/db/models"
 import { REFERRAL_COOKIE, SELLER_LINK_COOKIE, normalizeReferralCode, sellerLinkCodeFor } from "@/lib/referral-link"
 import { maskedName } from "@/lib/masked-name"
+import { PARTNER_CLICK_WINDOW_DAYS, partnerDay, recentDays, type PartnerClickDay } from "@/lib/partner-clicks"
 
 /**
  * Server half of referrals (owner, 2026-10-05): minting a person's code, who
@@ -241,6 +243,10 @@ export type ReferralSummary = {
   pendingMinor: number
   /** Commissions credited to the wallet, less any clawed back after a refund. */
   clearedMinor: number
+  /** Visits to this code's partner link: all time, and per Lagos day for the last 30 (newest first, empty days 0). */
+  clicks: { total: number; last30: PartnerClickDay[] }
+  /** What learners paid for purchases credited to this code as a referral: paid or enrolled orders, wallet and ESPEE; not refunds, not a creator's own link. */
+  revenueMinor: number
   /** Newest first. */
   people: ReferralPerson[]
 }
@@ -250,10 +256,19 @@ export async function referralSummary(userId: string, limit = 25): Promise<Refer
   const code = await ensureReferralCode(userId)
   const me = new Types.ObjectId(userId)
 
-  const [referred, commissions] = await Promise.all([
+  const days = recentDays(partnerDay(new Date()), PARTNER_CLICK_WINDOW_DAYS)
+
+  const [referred, commissions, clickTotals, clickRows, revenue] = await Promise.all([
     User.find({ "referredBy.userId": me }).select("_id firstName lastName createdAt").sort({ createdAt: -1 }).lean(),
     Earning.find({ instructor: me, kind: "referral" }).select("_id student netMinor status availableAt").lean(),
+    PartnerClick.aggregate<{ total: number }>([{ $match: { code } }, { $group: { _id: null, total: { $sum: "$count" } } }]),
+    PartnerClick.find({ code, day: { $gte: days[days.length - 1] } }).select("day count").lean(),
+    Order.aggregate<{ total: number }>([
+      { $match: { "attribution.userId": me, "attribution.kind": "referral", status: { $in: ["paid", "enrolled"] } } },
+      { $group: { _id: null, total: { $sum: "$amountMinor" } } },
+    ]),
   ])
+  const countByDay = new Map(clickRows.map((r) => [r.day, r.count]))
   const [clawbacks, paidUserIds] = await Promise.all([
     // refundEnrollment keys a post-clearing clawback on the earning it reverses.
     commissions.length
@@ -293,6 +308,11 @@ export async function referralSummary(userId: string, limit = 25): Promise<Refer
     paidCount: referred.filter((u) => paid.has(u._id.toString())).length,
     pendingMinor,
     clearedMinor,
+    clicks: {
+      total: clickTotals[0]?.total ?? 0,
+      last30: days.map((d) => ({ day: d, count: countByDay.get(d) ?? 0 })),
+    },
+    revenueMinor: revenue[0]?.total ?? 0,
     people: referred.slice(0, limit).map((u) => ({
       id: u._id.toString(),
       name: maskedName(u.firstName, u.lastName),
@@ -301,4 +321,110 @@ export async function referralSummary(userId: string, limit = 25): Promise<Refer
       commission: byStudent.get(u._id.toString()) ?? null,
     })),
   }
+}
+
+/* ═══════════════════ the admin partners table ═══════════════════ */
+
+export type PartnerRow = {
+  userId: string
+  code: string
+  firstName: string
+  lastName: string
+  email: string
+  role: "USER" | "INSTRUCTOR" | "ADMIN"
+  clicks: number
+  signUps: number
+  enrolled: number
+  revenueMinor: number
+  commissionPendingMinor: number
+  commissionPaidMinor: number
+}
+
+/**
+ * Every Partner Code holder with any activity, best first; `inactive` counts the
+ * holders with none. A fixed number of queries, whatever the number of partners;
+ * the commission arithmetic mirrors `referralSummary`.
+ */
+export async function partnerRows(): Promise<{ rows: PartnerRow[]; inactive: number }> {
+  const holders = await User.find({ referralCode: { $type: "string" } })
+    .select("_id firstName lastName email role referralCode")
+    .lean()
+
+  const [clickTotals, referredUsers, revenue, commissions] = await Promise.all([
+    PartnerClick.aggregate<{ _id: string; total: number }>([{ $group: { _id: "$code", total: { $sum: "$count" } } }]),
+    User.find({ "referredBy.userId": { $type: "objectId" } })
+      .select("_id referredBy.userId")
+      .lean(),
+    Order.aggregate<{ _id: Types.ObjectId; total: number }>([
+      { $match: { "attribution.kind": "referral", status: { $in: ["paid", "enrolled"] } } },
+      { $group: { _id: "$attribution.userId", total: { $sum: "$amountMinor" } } },
+    ]),
+    Earning.find({ kind: "referral" }).select("_id instructor netMinor status").lean(),
+  ])
+
+  const [paidUserIds, clawbacks] = await Promise.all([
+    referredUsers.length
+      ? Order.distinct("user", { user: { $in: referredUsers.map((u) => u._id) }, status: { $in: ["paid", "enrolled"] } })
+      : Promise.resolve([]),
+    commissions.length
+      ? Earning.find({
+          kind: "adjustment",
+          creditReference: { $in: commissions.map((c) => `academy_clawback_${c._id.toString()}`) },
+          status: { $ne: "reversed" },
+        })
+          .select("instructor netMinor")
+          .lean()
+      : Promise.resolve([]),
+  ])
+
+  const clicksByCode = new Map(clickTotals.map((c) => [c._id, c.total]))
+  const revenueByUser = new Map(revenue.map((r) => [String(r._id), r.total]))
+  const paid = new Set(paidUserIds.map((id) => String(id)))
+  const signUps = new Map<string, number>()
+  const enrolled = new Map<string, number>()
+  for (const u of referredUsers) {
+    const owner = String(u.referredBy?.userId)
+    signUps.set(owner, (signUps.get(owner) ?? 0) + 1)
+    if (paid.has(u._id.toString())) enrolled.set(owner, (enrolled.get(owner) ?? 0) + 1)
+  }
+  const pending = new Map<string, number>()
+  const cleared = new Map<string, number>()
+  for (const c of commissions) {
+    const owner = String(c.instructor)
+    if (c.status === "pending") pending.set(owner, (pending.get(owner) ?? 0) + c.netMinor)
+    if (c.status === "cleared") cleared.set(owner, (cleared.get(owner) ?? 0) + c.netMinor)
+  }
+  for (const c of clawbacks) {
+    const owner = String(c.instructor)
+    cleared.set(owner, (cleared.get(owner) ?? 0) + c.netMinor)
+  }
+
+  const all = holders.map((h): PartnerRow => {
+    const id = h._id.toString()
+    return {
+      userId: id,
+      code: h.referralCode as string,
+      firstName: h.firstName,
+      lastName: h.lastName,
+      email: h.email,
+      role: h.role,
+      clicks: clicksByCode.get(h.referralCode as string) ?? 0,
+      signUps: signUps.get(id) ?? 0,
+      enrolled: enrolled.get(id) ?? 0,
+      revenueMinor: revenueByUser.get(id) ?? 0,
+      commissionPendingMinor: pending.get(id) ?? 0,
+      commissionPaidMinor: cleared.get(id) ?? 0,
+    }
+  })
+
+  const rows = all
+    .filter((r) => r.clicks > 0 || r.signUps > 0 || r.revenueMinor > 0 || r.commissionPendingMinor !== 0 || r.commissionPaidMinor !== 0)
+    .sort(
+      (a, b) =>
+        b.revenueMinor - a.revenueMinor ||
+        b.commissionPendingMinor + b.commissionPaidMinor - (a.commissionPendingMinor + a.commissionPaidMinor) ||
+        b.clicks - a.clicks ||
+        a.code.localeCompare(b.code),
+    )
+  return { rows, inactive: all.length - rows.length }
 }
