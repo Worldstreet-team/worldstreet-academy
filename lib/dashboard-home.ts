@@ -129,23 +129,6 @@ export function instructorRows(enrollments: StudentEnrollment[]): InstructorRow[
   return [...rows.values()]
 }
 
-export type ClassCommunity = { courseId: string; courseTitle: string; url: string }
-
-/**
- * One row per distinct class community link across the student's
- * access-granting enrollments (the server only sends the link for those; the
- * check is repeated so a stale row never shows one). Two programs sharing a
- * group list it once.
- */
-export function classCommunities(enrollments: StudentEnrollment[]): ClassCommunity[] {
-  const byUrl = new Map<string, ClassCommunity>()
-  for (const e of enrollments) {
-    if (!grantsAccess(e) || !e.communityUrl || byUrl.has(e.communityUrl)) continue
-    byUrl.set(e.communityUrl, { courseId: e.courseId, courseTitle: e.courseTitle, url: e.communityUrl })
-  }
-  return [...byUrl.values()]
-}
-
 /** Whether any access-granting enrollment's package includes `flag` — tiles that can't be backed stay hidden. */
 export function includesAny(enrollments: StudentEnrollment[], flag: keyof IPackageEntitlements): boolean {
   return enrollments.some((e) => grantsAccess(e) && e.entitlements[flag])
