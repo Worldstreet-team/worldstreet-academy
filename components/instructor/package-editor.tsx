@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import type { ICoursePackage, IPackageEntitlements, PackageKey } from "@/lib/db/models"
-import { PACKAGE_KEYS, PACKAGE_LABEL } from "@/lib/entitlements"
+import { PACKAGE_KEYS, PACKAGE_LABEL, recordingsAllowed } from "@/lib/entitlements"
 
 
 /**
@@ -54,6 +54,7 @@ const TIER_ITEMS = PACKAGE_KEYS.map((k) => ({ value: k, label: PACKAGE_LABEL[k] 
 
 const ENTITLEMENT_LABELS: ReadonlyArray<{ key: keyof IPackageEntitlements; label: string }> = [
   { key: "liveClasses", label: "Live classes" },
+  { key: "recordings", label: "Recorded classes" },
   { key: "instructorQa", label: "Instructor Q&A" },
   { key: "assignments", label: "Practical assignments" },
   { key: "certificate", label: "Certificate" },
@@ -75,7 +76,7 @@ export function toEditorPackage(p: ICoursePackage): EditorPackage {
     highlight: Boolean(p.highlight),
     ctaLabel: p.ctaLabel ?? "",
     enabled: p.enabled !== false,
-    entitlements: { ...NO_ENTITLEMENTS, ...p.entitlements },
+    entitlements: { ...NO_ENTITLEMENTS, ...p.entitlements, recordings: recordingsAllowed(p.entitlements) },
   }
 }
 
@@ -107,7 +108,7 @@ export function toCoursePackage(p: EditorPackage): PackagePayload {
     highlight: p.highlight,
     ctaLabel: ctaLabel === "" ? null : ctaLabel,
     enabled: p.enabled,
-    entitlements: { ...p.entitlements },
+    entitlements: { ...p.entitlements, recordings: recordingsAllowed(p.entitlements) },
   }
 }
 
@@ -164,15 +165,20 @@ export function PackageEditor({
   }
   function setEntitlement(uid: string, key: keyof IPackageEntitlements, on: boolean) {
     onChange(
-      value.map((p) => (p.uid === uid ? { ...p, entitlements: { ...p.entitlements, [key]: on } } : p))
+      value.map((p) => {
+        if (p.uid !== uid) return p
+        // Live classes always carry their recordings, so ticking them ticks recordings too.
+        const recordings = key === "liveClasses" && on ? { recordings: true } : {}
+        return { ...p, entitlements: { ...p.entitlements, [key]: on, ...recordings } }
+      })
     )
   }
 
   return (
     <div className="space-y-3">
       <p className="text-[10px] text-muted-foreground">
-        Up to three tiers — Basic, Standard and Executive 101. While any tier is enabled the
-        course sells from the cheapest enabled tier and the Pricing section below follows it.
+        Up to three plans — Basic, Standard and Executive. While any plan is enabled the
+        course sells from the cheapest enabled plan and the Pricing section below follows it.
       </p>
 
       {value.map((pkg) => (
@@ -266,7 +272,7 @@ export function PackageEditor({
               </Label>
               <Input
                 id={`pkg-duration-${pkg.uid}`}
-                placeholder="9 weeks"
+                placeholder="4 weeks"
                 maxLength={40}
                 value={pkg.duration}
                 onChange={(e) => patch(pkg.uid, { duration: e.target.value })}
@@ -278,11 +284,14 @@ export function PackageEditor({
             <Label htmlFor={`pkg-tagline-${pkg.uid}`}>Tagline</Label>
             <Input
               id={`pkg-tagline-${pkg.uid}`}
-              placeholder="Perfect for beginners"
+              placeholder="Foundation"
               maxLength={120}
               value={pkg.tagline}
               onChange={(e) => patch(pkg.uid, { tagline: e.target.value })}
             />
+            <p className="text-[10px] text-muted-foreground">
+              A word or two shown beside the plan&apos;s name, e.g. Foundation.
+            </p>
           </div>
 
           <div className="space-y-1.5">
@@ -332,10 +341,16 @@ export function PackageEditor({
               {ENTITLEMENT_LABELS.map(({ key, label }) => (
                 <label key={key} className="flex cursor-pointer items-center gap-2">
                   <Checkbox
-                    checked={pkg.entitlements[key]}
+                    checked={key === "recordings" ? recordingsAllowed(pkg.entitlements) : pkg.entitlements[key]}
+                    disabled={key === "recordings" && pkg.entitlements.liveClasses}
                     onCheckedChange={(v) => setEntitlement(pkg.uid, key, Boolean(v))}
                   />
-                  <span className="text-[12px]">{label}</span>
+                  <span className="text-[12px]">
+                    {label}
+                    {key === "recordings" && pkg.entitlements.liveClasses && (
+                      <span className="text-muted-foreground"> · with live classes</span>
+                    )}
+                  </span>
                 </label>
               ))}
             </div>
