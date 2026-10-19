@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { HANDBOOK_PAGES } from "@/lib/faculty-handbook"
 import {
   getInstructorOnboarding,
   acceptInstructorAgreement,
@@ -71,9 +72,10 @@ export function OnboardingChecklist() {
     <Card className="border-primary/25 bg-primary/[0.03]">
       <CardContent className="p-4">
         <h2 className="text-sm font-semibold">Finish setting up your instructor account</h2>
-        <p className="text-[11px] text-muted-foreground mb-2">
+        <p className="text-[11px] text-muted-foreground">
           Complete these once — they unlock payouts and boost student trust.
         </p>
+        <p className="text-[11px] text-muted-foreground mb-2">Finish them all to receive your WMA Faculty credential.</p>
         <div className="divide-y divide-border/40">
           <Item
             done={data.agreementAccepted}
@@ -106,6 +108,14 @@ export function OnboardingChecklist() {
               href="/dashboard/wallet"
             />
           )}
+          {HANDBOOK_PAGES.map((page) => (
+            <Item
+              key={page.key}
+              done={data.handbook[page.key]}
+              label={page.checklistLabel}
+              href={`/instructor/handbook/${page.slug}`}
+            />
+          ))}
           <Item
             done={data.hasCourse}
             label="Create your first course"

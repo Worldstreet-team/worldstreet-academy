@@ -1238,7 +1238,8 @@ export async function adminDecideApplication(
       const newRole = user.role === "USER" ? "INSTRUCTOR" : user.role
       // Spec §10 "Professional experience" starts as the application's answer
       // but never replaces one already on the profile. This $set rewrites the
-      // whole instructorProfile, so the Phase 5 fields are carried across.
+      // whole instructorProfile, so the Phase 5 fields, the handbook acknowledgements
+      // and the faculty credential are carried across.
       const currentExperience = user.instructorProfile?.experience ?? null
       await User.updateOne(
         { _id: user._id },
@@ -1261,6 +1262,8 @@ export async function adminDecideApplication(
               totalStudents: user.instructorProfile?.totalStudents ?? 0,
               totalCourses: user.instructorProfile?.totalCourses ?? 0,
               totalEarnings: user.instructorProfile?.totalEarnings ?? 0,
+              handbook: user.instructorProfile?.handbook ?? { teachingStandardsAt: null, curriculumGuidelinesAt: null, platformTrainingAt: null },
+              credential: user.instructorProfile?.credential ?? null,
             },
           },
         }
