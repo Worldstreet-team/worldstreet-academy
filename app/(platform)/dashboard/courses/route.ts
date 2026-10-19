@@ -14,8 +14,10 @@ import { schoolSlugOf } from "@/lib/schools"
  */
 export function GET(request: NextRequest) {
   const target = schoolSlugOf(request.nextUrl.searchParams.get("school"))
-  const url = request.nextUrl.clone()
-  url.pathname = target ? `/schools/${target}` : "/programs"
-  url.search = ""
-  return NextResponse.redirect(url, 307)
+  // A relative Location: behind the Coolify proxy the request's own host can be
+  // the container's (0.0.0.0:3000), so an absolute URL built from it would leak.
+  return new NextResponse(null, {
+    status: 307,
+    headers: { Location: target ? `/schools/${target}` : "/programs" },
+  })
 }
