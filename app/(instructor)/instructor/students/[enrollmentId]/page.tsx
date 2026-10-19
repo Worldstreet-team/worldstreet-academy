@@ -84,7 +84,7 @@ export default async function StudentPerformancePage({ params }: { params: Promi
                 {d.cohort && <span className={CHIP}>{d.cohort.name}</span>}
               </div>
               <p className="text-[13px] text-muted-foreground">
-                Enrolled {shortDate(d.enrolledAt)} · Last active {d.lastActiveAt ? shortDate(d.lastActiveAt) : "Never"}
+                Enrolled {d.enrolledAt ? shortDate(d.enrolledAt) : "—"} · Last active {d.lastActiveAt ? shortDate(d.lastActiveAt) : "Never"}
               </p>
               <div className="flex items-center gap-2">
                 <span className="h-1 w-40 max-w-full overflow-hidden rounded-full bg-ws-chip" aria-hidden>

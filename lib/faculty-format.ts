@@ -47,3 +47,14 @@ export function fileSizeLabel(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
+
+/**
+ * An ISO string, or null for a missing or invalid date. Lean reads skip schema
+ * defaults and the Go API writes these collections, so a date may be absent;
+ * `new Date(undefined).toISOString()` would throw.
+ */
+export function isoOrNull(value: Date | string | number | null | undefined): string | null {
+  if (value === null || value === undefined) return null
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? null : d.toISOString()
+}

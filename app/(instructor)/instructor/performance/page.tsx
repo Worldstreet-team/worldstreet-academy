@@ -52,7 +52,7 @@ export default async function InstructorPerformancePage({
               />
               <p className="text-[13px] text-muted-foreground">
                 <span className="tabular-nums">{result.data.total} learners</span>
-                {result.data.truncated && <> · Based on the 500 most recently active.</>}
+                {result.data.truncated && <> · Every learner counts in the summaries; the lists show the first 500.</>}
               </p>
               {result.data.summaries.length === 0 ? (
                 <CardShell>

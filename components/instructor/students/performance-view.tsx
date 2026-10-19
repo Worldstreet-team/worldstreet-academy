@@ -129,8 +129,8 @@ export function PerformanceLists({ view }: { view: PerformanceOverview }) {
           title="Needs attention"
           subtitle={NEEDS_ATTENTION_RULE}
           badge={
-            <span className={`${CHIP} tabular-nums ${view.attention.length ? "bg-ws-warning/10 text-ws-warning" : "bg-ws-chip text-muted-foreground"}`}>
-              {view.attention.length}
+            <span className={`${CHIP} tabular-nums ${view.attentionTotal ? "bg-ws-warning/10 text-ws-warning" : "bg-ws-chip text-muted-foreground"}`}>
+              {view.attentionTotal}
             </span>
           }
         />

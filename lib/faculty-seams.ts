@@ -28,7 +28,8 @@ export type SeamEnrollment = {
   createdAt: Date
 }
 
-export type CohortTag = { number: number; name: string }
+/** A learner's cohort; `startsAt` (ISO) lets Student Performance start its clock at the cohort's start. */
+export type CohortTag = { number: number; name: string; startsAt: string }
 
 export type { MasteryResult }
 
@@ -46,7 +47,7 @@ export async function cohortsFor(rows: SeamEnrollment[]): Promise<Map<string, Co
   const programIds = new Set(programs.map((c) => c._id.toString()))
   const placed = await cohortsForEnrollments(live.filter((r) => programIds.has(r.course.toString())))
   return new Map(
-    [...placed].flatMap(([id, c]) => (c ? [[id, { number: c.number, name: c.name }] as [string, CohortTag]] : []))
+    [...placed].flatMap(([id, c]) => (c ? [[id, { number: c.number, name: c.name, startsAt: c.startsAt }] as [string, CohortTag]] : []))
   )
 }
 

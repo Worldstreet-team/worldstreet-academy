@@ -64,9 +64,12 @@ export const ENROLLMENT_STATUS_LABEL: Record<EnrollmentStatus, string> = {
 const DAY_MS = 24 * 60 * 60 * 1000
 
 /**
- * When an active learner "needs attention": any one of these. Low progress
- * counts only once the learner has had `progressAfterDays` to make some, so a
- * new enrolment isn't flagged on day one. Completed learners never are.
+ * When an active learner "needs attention": any one of these. Days count from
+ * the later of enrolment and the learner's cohort start, so a learner waiting
+ * for their cohort isn't flagged, and low progress counts only once the
+ * learner has had `progressAfterDays` to make some. Completed learners never
+ * are. Student Performance leaves file products (templates, guides) out: they
+ * have no lessons or activity to measure.
  */
 export const NEEDS_ATTENTION = { inactiveDays: 14, progressBelow: 25, progressAfterDays: 14 } as const
 
@@ -86,20 +89,36 @@ export type PerformanceRow = {
   program: { id: string; title: string }
   status: "active" | "completed"
   progress: number
-  enrolledAt: string
+  /** Null when the row carries no usable date. */
+  enrolledAt: string | null
   lastActiveAt: string | null
+  /** The learner's cohort, when they have one; its start delays the clock. */
+  cohort: { startsAt?: string | null } | null
   bestExam: { percent: number; passed: boolean } | null
   attendance: number | null
   mastery: number | null
 }
 
+/** The latest valid instant among these ISO strings; null when none is valid. */
+function latest(...values: (string | number | null | undefined)[]): number | null {
+  const times = values
+    .map((v) => (typeof v === "number" ? v : v ? Date.parse(v) : NaN))
+    .filter((t) => !Number.isNaN(t))
+  return times.length ? Math.max(...times) : null
+}
+
 export function attentionReasons(r: PerformanceRow, nowMs: number): AttentionReason[] {
   if (r.status === "completed") return []
   const reasons: AttentionReason[] = []
-  const enrolled = Date.parse(r.enrolledAt)
-  const lastSeen = r.lastActiveAt ? Date.parse(r.lastActiveAt) : enrolled
-  if (nowMs - lastSeen > NEEDS_ATTENTION.inactiveDays * DAY_MS) reasons.push("inactive")
-  if (r.progress < NEEDS_ATTENTION.progressBelow && nowMs - enrolled > NEEDS_ATTENTION.progressAfterDays * DAY_MS) {
+  // A row with no usable date skips the time-based checks rather than guessing.
+  const from = latest(r.enrolledAt, r.cohort?.startsAt)
+  const lastSeen = latest(from, r.lastActiveAt)
+  if (lastSeen !== null && nowMs - lastSeen > NEEDS_ATTENTION.inactiveDays * DAY_MS) reasons.push("inactive")
+  if (
+    from !== null &&
+    r.progress < NEEDS_ATTENTION.progressBelow &&
+    nowMs - from > NEEDS_ATTENTION.progressAfterDays * DAY_MS
+  ) {
     reasons.push("low_progress")
   }
   if (r.bestExam && !r.bestExam.passed) reasons.push("failed_exam")
@@ -165,4 +184,34 @@ export function programSummaries(rows: PerformanceRow[]): ProgramSummary[] {
       }
     })
     .sort((a, b) => a.title.localeCompare(b.title))
+}
+
+/**
+ * Student Performance's whole view: summaries and the ranking over every row,
+ * and only then the cap, on what is rendered (needs-attention first). Capping
+ * first would cut exactly the inactive learners, who sort last by activity.
+ */
+export function performanceOverview<T extends PerformanceRow>(
+  rows: T[],
+  nowMs: number,
+  masteryReady: boolean,
+  maxRows: number
+): {
+  summaries: ProgramSummary[]
+  attention: (T & { reasons: AttentionReason[] })[]
+  rest: T[]
+  attentionTotal: number
+  total: number
+  truncated: boolean
+} {
+  const { attention, rest } = rankForAttention(rows, nowMs, masteryReady)
+  const shownAttention = attention.slice(0, maxRows)
+  return {
+    summaries: programSummaries(rows),
+    attention: shownAttention,
+    rest: rest.slice(0, Math.max(0, maxRows - shownAttention.length)),
+    attentionTotal: attention.length,
+    total: rows.length,
+    truncated: rows.length > maxRows,
+  }
 }
