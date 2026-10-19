@@ -124,6 +124,13 @@ Online education platform for cryptocurrency/trading courses. Instructor portal 
 - DropdownMenu = `@base-ui/react/menu` (Menu.Root, Trigger, Portal, Positioner, Popup, Item)
 - Components with hooks (Badge uses `useRender`) are client components internally
 
+### 2026-10-19 — Phase 11: the institution's voice
+- **Tagline:** the site now reads "the Academy of the New Economy" (one home in `lib/institution.ts`, with the brand constants); the landing hero is the institutional blueprint's "Welcome to WMA" claim.
+- **New `/academy`:** the big idea, vision, mission, the journey and the three worlds. Reached from "The Academy" in the navbar (before Programs, first in the mobile sheet) and "About the Academy" in the footer.
+- **Plans, not packages:** new user-facing copy says plan; identifiers, routes and field names keep `package`. (The wider vocabulary rename, Tasks 6-7, runs last, after all tracks merge.)
+- **§4 replaces "Who we are":** the blueprint's section 4 text supersedes the 2026-10-03 "point A to point B" framing on the landing.
+- **Cohort band:** names its cohort ("Cohort 00N — Starts …"), with Explore Programs / Join Cohort; it and the hero's "Join the upcoming cohort" render only while a cohort is upcoming (`cohortIsUpcoming()`).
+
 ## Decision Log
 
 ### 2026-09-14 — Launch prep (Mastery Academy Phase 8)

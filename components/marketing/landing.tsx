@@ -102,7 +102,7 @@ export async function Landing() {
       {/* Hero — the still claim over a slideshow of students, the school picker and its CTAs (institutional blueprint §18) */}
       <HeroWall counts={schoolCounts} cheapest={schoolFrom} signedIn={signedIn} registerUrl={REGISTER_URL} cohortOpen={cohortIsUpcoming()} />
 
-      {/* Live cohort — the date, the countdown and "Choose your school" (owner 2026-10-03); gone once it begins */}
+      {/* Live cohort — "Cohort 00N — Starts …", the countdown and Explore Programs / Join Cohort; gone once it begins */}
       <CohortBanner variant="band" className="pt-14 md:pt-20" />
 
       {/* Who we are — the owner's framing: point A to point B, our systems, our experts */}

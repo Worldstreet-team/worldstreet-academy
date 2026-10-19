@@ -58,6 +58,7 @@ export async function Navbar({ showFaculty }: { showFaculty: boolean }) {
   // Below lg every destination lives in the sheet (in journey order, spec
   // §17); "How it works" is a landing anchor, so it lives only there.
   const sheetLinks: MarketingNavLink[] = [
+    { href: "/academy", label: "The Academy" },
     { href: "/schools", label: "All schools" },
     { href: "/programs", label: "All programs" },
     { href: "/marketplace", label: "Marketplace" },
@@ -95,6 +96,9 @@ export async function Navbar({ showFaculty }: { showFaculty: boolean }) {
             two extra links — wait for xl (Faculty for 2xl beside both of
             them). Below lg they are all in the sheet, with New Economy. */}
         <nav aria-label="Site" className="hidden items-center lg:flex">
+          <Link href="/academy" className={barLinkClass}>
+            The Academy
+          </Link>
           <Link href="/programs" className={barLinkClass}>
             Programs
           </Link>
