@@ -141,7 +141,7 @@ export async function getMyInstructorEarnings(): Promise<InstructorEarnings | nu
       (await Course.find({ _id: { $in: courseGroups.map((g) => g._id) } }).select("title").lean()).map((c) => [String(c._id), c.title])
     )
     const byCourse = courseGroups
-      .map((g) => ({ courseId: String(g._id), courseTitle: titles.get(String(g._id)) ?? "Program", netMinor: g.netMinor, sales: g.sales }))
+      .map((g) => ({ courseId: String(g._id), courseTitle: titles.get(String(g._id)) ?? "Deleted program", netMinor: g.netMinor, sales: g.sales }))
       .sort((a, b) => b.netMinor - a.netMinor)
 
     let pendingMinor = 0
@@ -165,7 +165,7 @@ export async function getMyInstructorEarnings(): Promise<InstructorEarnings | nu
         const student = r.student as unknown as { firstName?: string; lastName?: string } | null
         return {
         id: r._id.toString(),
-        courseTitle: (r.course as unknown as { title?: string })?.title ?? "Course",
+        courseTitle: (r.course as unknown as { title?: string } | null)?.title ?? "Deleted program",
         courseId: String((r.course as { _id?: unknown })?._id ?? r.course),
         learnerName: student ? maskedName(student.firstName, student.lastName) : null,
         kind: r.kind,

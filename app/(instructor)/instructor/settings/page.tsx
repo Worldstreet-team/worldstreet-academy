@@ -62,7 +62,7 @@ export default async function InstructorSettingsPage() {
               rel="noopener noreferrer"
               className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-full border border-ws-hairline bg-transparent px-3 text-sm font-medium text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-raised"
             >
-              Withdraw on the Worldstreet dashboard →
+              Withdraw from your wallet →
             </a>
           </div>
         </div>
