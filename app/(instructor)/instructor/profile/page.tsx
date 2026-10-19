@@ -3,15 +3,18 @@ import { PageHeader } from "@/components/shared/page-header"
 import { getCurrentUser } from "@/lib/auth"
 import { getMySignature } from "@/lib/actions/signature"
 import { getMyFacultyProfile } from "@/lib/actions/profile"
+import { getMyFacultyCredential } from "@/lib/actions/instructor-onboarding"
+import { FacultyCredentialCard } from "@/components/instructor/faculty-credential-card"
 import { countryOptions } from "@/lib/countries"
 import { InstructorProfileClient } from "./instructor-profile-client"
 import { FacultyProfileCard } from "./faculty-profile-card"
 
 export default async function InstructorProfilePage() {
-  const [currentUser, currentSignature, faculty] = await Promise.all([
+  const [currentUser, currentSignature, faculty, credential] = await Promise.all([
     getCurrentUser(),
     getMySignature(),
     getMyFacultyProfile(),
+    getMyFacultyCredential(),
   ])
 
   return (
@@ -23,6 +26,8 @@ export default async function InstructorProfilePage() {
             title="My Profile"
             subline="Manage your instructor profile, faculty page and signature."
           />
+
+          <FacultyCredentialCard credential={credential} />
 
           <InstructorProfileClient
             user={currentUser}
