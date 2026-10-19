@@ -1,5 +1,5 @@
 "use client"
-import { BookOpen, ClipboardCheck, Ellipsis, House, Inbox, ReceiptText, Star, Store, Users, Wallet, type IconComponent } from "@/components/icons"
+import { BookOpen, CalendarDays, ClipboardCheck, Ellipsis, House, Inbox, ReceiptText, Star, Store, Users, Wallet, type IconComponent } from "@/components/icons"
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -46,7 +46,7 @@ const navItems: BottomNavItem[] = [
   },
 ]
 
-/** ESPEE payments, Courses, Sellers, Reviews and Exams share the fifth slot behind a "More" menu. */
+/** ESPEE payments, Courses, Cohorts, Sellers, Reviews and Exams share the fifth slot behind a "More" menu. */
 const moreItems: BottomNavItem[] = [
   {
     title: "ESPEE payments",
@@ -59,6 +59,12 @@ const moreItems: BottomNavItem[] = [
     href: "/admin/courses",
     icon: BookOpen,
     match: (p: string) => p.startsWith("/admin/courses"),
+  },
+  {
+    title: "Cohorts",
+    href: "/admin/cohorts",
+    icon: CalendarDays,
+    match: (p: string) => p.startsWith("/admin/cohorts"),
   },
   {
     title: "Sellers",
