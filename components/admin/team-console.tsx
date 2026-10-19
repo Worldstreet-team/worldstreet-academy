@@ -140,6 +140,8 @@ export function TeamConsole() {
       const res = await superFindAccount(email)
       if (res.success) setFound(res.data)
       else setFindError(res.error)
+    } catch {
+      setFindError("Couldn't look that account up. Try again.")
     } finally {
       setFinding(false)
     }
@@ -202,7 +204,7 @@ export function TeamConsole() {
 
           <section className={SECTION}>
             <h2 className="text-sm font-semibold">
-              Admins · <span className="tabular-nums">{members.length}</span>
+              Admins · <span className="tabular-nums">{data?.success ? members.length : "—"}</span>
             </h2>
             <div className="mt-3 divide-y divide-ws-hairline">
               {isLoading ? (

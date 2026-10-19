@@ -147,6 +147,11 @@ if (from.role === to.role) {
   const secret = EXPLICIT_CLERK_KEY
   if (!secret) {
     console.log("skipped Clerk mirror (pass CLERK_SECRET_KEY on the command line to mirror)")
+    if (revoke) {
+      console.warn(
+        "⚠ Clerk publicMetadata.role is still \"admin\", and the hub may honour it. Re-run with CLERK_SECRET_KEY on the command line, or clear the role in Clerk."
+      )
+    }
   } else if (user.authUserId?.startsWith("user_")) {
     const res = await fetch(`https://api.clerk.com/v1/users/${user.authUserId}/metadata`, {
       method: "PATCH",
