@@ -23,7 +23,7 @@ export default async function InstructorSettingsPage() {
         <div className="mx-auto w-full max-w-2xl space-y-8">
           <PageHeader
             title={seller ? "Settings" : "Instructor Settings"}
-            subline={seller ? "Your seller profile and earnings." : "Update your instructor profile and preferences."}
+            subline={seller ? "Your Marketplace Creator profile and earnings." : "Update your instructor profile and preferences."}
           />
 
           <InstructorProfileClient

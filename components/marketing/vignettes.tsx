@@ -161,7 +161,7 @@ export function ClassroomVignette() {
         </motion.ul>
         <div className="shrink-0 border-t border-ws-hairline px-4 py-3">
           <div className="flex items-center justify-between text-[11px] text-ws-muted">
-            <span>Course progress</span>
+            <span>Program progress</span>
             <span className="text-ws-subtle">autosaves</span>
           </div>
           <div className="mt-2 h-1 overflow-hidden rounded-full bg-ws-track">

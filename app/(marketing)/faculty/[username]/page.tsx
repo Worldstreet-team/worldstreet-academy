@@ -166,7 +166,7 @@ export default async function FacultyProfilePage({ params }: Params) {
         <section className="mt-16 border-t border-ws-hairline pt-10" aria-labelledby="courses-heading">
           <div className="flex flex-wrap items-baseline justify-between gap-3">
             <h2 id="courses-heading" className="font-display text-2xl font-semibold tracking-[-0.015em] text-ws-primary">
-              Courses taught
+              Programs taught
             </h2>
             <span className="text-[13px] tabular-nums text-ws-subtle">
               {courses.length === 1 ? "1 program" : `${courses.length} programs`}

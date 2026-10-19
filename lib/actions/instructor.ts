@@ -589,7 +589,7 @@ function courseHome(kind: CourseKind, school: string): { school: SchoolSlug | nu
 function sellerOf(user: { _id: { toString(): string }; firstName?: string | null; lastName?: string | null; avatarUrl?: string | null }) {
   return {
     id: user._id.toString(),
-    name: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "A seller",
+    name: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "A Marketplace Creator",
     avatarUrl: user.avatarUrl ?? null,
   }
 }

@@ -69,7 +69,7 @@ const moreItems: BottomNavItem[] = [
     match: (p: string) => p.startsWith("/admin/cohorts"),
   },
   {
-    title: "Sellers",
+    title: "Marketplace Creators",
     href: "/admin/sellers",
     icon: Store,
     match: (p: string) => p.startsWith("/admin/sellers"),

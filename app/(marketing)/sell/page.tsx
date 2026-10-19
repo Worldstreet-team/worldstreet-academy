@@ -62,7 +62,7 @@ export default function SellPage() {
           </h1>
           <p className="mt-5 max-w-2xl text-[16px] leading-relaxed text-ws-muted md:text-[18px]">
             Turn your know-how into a pre-recorded course on the {BRAND.name} marketplace. We review it, publish it
-            beside the Academy&rsquo;s own courses and sell it with you.
+            beside the Academy&rsquo;s own programs and sell it with you.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-4">
             <Link href={APPLY_HREF} className={GOLD_CTA}>

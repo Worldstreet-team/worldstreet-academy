@@ -242,7 +242,7 @@ function AdminCoursesInner() {
                       {c.pricing === "free" ? "Free" : `$${c.price ?? 0}`} · created{" "}
                       {formatDate(c.createdAt)}
                       {c.availableAt ? ` · available ${formatDateTime(c.availableAt)}` : ""}
-                      {c.sellerOwned ? " · seller" : ""}
+                      {c.sellerOwned ? " · Marketplace Creator" : ""}
                       {c.reviewStatus === "pending" && c.reviewSubmittedAt
                         ? ` · submitted ${formatDateTime(c.reviewSubmittedAt)}`
                         : ""}

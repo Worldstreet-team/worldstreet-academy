@@ -23,7 +23,7 @@ import { BRAND } from "@/lib/brand"
 const FAQS = [
   {
     q: `Who can join ${BRAND.name}?`,
-    a: "Anyone who wants to develop practical knowledge and skills can explore our programs, subject to the requirements of individual courses.",
+    a: "Anyone who wants to develop practical knowledge and skills can explore our programs, subject to the requirements of individual programs.",
   },
   {
     q: "Do I need previous experience?",
@@ -34,7 +34,7 @@ const FAQS = [
     a: `Programs can be delivered through the ${BRAND.name} LMS using the format specified on each program page.`,
   },
   {
-    q: "Can I learn more than one course?",
+    q: "Can I learn more than one program?",
     a: "Yes. Students can enrol in multiple programs where available.",
   },
   {
@@ -47,7 +47,7 @@ const FAQS = [
   },
   {
     q: "What happens after payment?",
-    a: "Your enrollment is confirmed and your course access becomes available according to the program's delivery schedule.",
+    a: "Your enrollment is confirmed and your program access becomes available according to the program's delivery schedule.",
   },
 ] as const
 

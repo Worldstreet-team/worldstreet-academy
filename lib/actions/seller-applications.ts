@@ -181,7 +181,7 @@ export async function submitSellerApplication(input: SellerApplicationInput): Pr
     const schoolName = SCHOOL_BY_SLUG[answers.school].name
     void notifyAdmins({
       type: "application",
-      title: "New seller application",
+      title: "New Marketplace Creator application",
       body: `${answers.fullName} wants to sell “${answers.topic}” (${SCHOOL_BY_SLUG[answers.school].short}).`.slice(0, 500),
       href: "/admin/sellers",
     })
@@ -378,7 +378,7 @@ export async function adminRejectSellerApplication(applicationId: string, reason
 
     void notifyUser(application.user.toString(), {
       type: "application",
-      title: "Your seller application wasn't approved",
+      title: "Your Marketplace Creator application wasn't approved",
       body: parsed.data.reason.slice(0, 500),
       href: "/dashboard/sell/apply",
     })

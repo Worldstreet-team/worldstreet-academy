@@ -55,7 +55,7 @@ const labelMap: Record<string, string> = {
   payments: "Payments",
   espee: "ESPEE",
   reviews: "Reviews",
-  "become-instructor": "Become an Instructor",
+  "become-instructor": "Become a WMA Instructor",
   wallet: "Wallet",
   deposit: "Deposit",
   withdraw: "Withdraw",

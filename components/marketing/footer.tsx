@@ -95,7 +95,7 @@ export function Footer({ showFaculty }: { showFaculty: boolean }) {
             <ul className="space-y-2">
               <li>
                 <Link href="/teach" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                  Become an Instructor
+                  Become a WMA Instructor
                 </Link>
               </li>
               <li>

@@ -34,7 +34,7 @@ const faqs: Faq[] = [
   {
     question: "How do I become an instructor?",
     answer:
-      "Apply from the Become an Instructor page in the sidebar. Tell us about your expertise and the courses you want to teach; our team reviews every application and you'll get a notification with the decision.",
+      "Apply from the Become a WMA Instructor page in the sidebar. Tell us about your expertise and the courses you want to teach; our team reviews every application and you'll get a notification with the decision.",
   },
   {
     question: "Can I get a refund on a course?",
@@ -68,7 +68,7 @@ const quickLinks: QuickLink[] = [
     icon: "certificates",
   },
   {
-    title: "Become an instructor",
+    title: "Become a WMA Instructor",
     description: "Apply to teach on the Academy.",
     href: "/dashboard/become-instructor",
     icon: "instructor",
