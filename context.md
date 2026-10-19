@@ -132,3 +132,9 @@ Online education platform for cryptocurrency/trading courses. Instructor portal 
 - **Removed** `link-tmp.cjs` and `link-mobile-identity.cjs` (one-off Clerk-id linking; `lib/auth/sync.ts` links by email).
 - **Launch:** env, crons, catalogue, certificate backfill, §17 QA and rollback live in `docs/launch-runbook.md`.
 - The sections above predate the Mastery rebuild (`/courses` routes, Hugeicons, `#44A08E`) — `CLAUDE.md` and `design-system/` are current.
+
+### 2026-10-19 — WMA Partners (Phase 18)
+- The referral program is renamed **WMA Partners** (the route stays `/dashboard/referrals`); every account's code is its **Partner Code**. Commission is unchanged: 10% of a referred learner's first paid purchase, wallet only.
+- **Clicks** are counted in `partnerclicks` (web-only, one row per code per Lagos day): once per visitor per code per day, through the `wsa_ref_seen` cookie. Bots, unknown codes and the partner's own signed-in visits are ignored.
+- **Revenue** is everything credited to the code as a referral: paid or enrolled orders, wallet and ESPEE; not refunds, not a creator's own link. A learner whose first purchase is paid by ESPEE, or credited to another code, earns the referrer no commission, and the page says so.
+- **`/admin/partners`** lists every partner with any activity and exports a CSV (`wma-partners-YYYY-MM-DD.csv`); it also counts the codes with no activity yet.
