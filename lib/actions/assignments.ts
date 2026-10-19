@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { z } from "zod/v4"
 import connectDB from "@/lib/db"
-import { Assignment, Course, Enrollment, Submission, User } from "@/lib/db/models"
+import { Assignment, Course, Enrollment, Submission, User, type AssignmentKind } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth/actions"
 import { notifyUser, notifyUsers } from "@/lib/notify"
 import { getCourseAccess } from "@/lib/course-access"
@@ -70,6 +70,7 @@ export type InstructorAssignment = {
   instructions: string
   dueAt: string | null
   status: "draft" | "published"
+  kind: AssignmentKind
   submissions: InstructorSubmission[]
 }
 
@@ -121,6 +122,7 @@ export async function getCourseAssignments(courseId: string): Promise<CourseAssi
         instructions: a.instructions ?? "",
         dueAt: a.dueAt ? a.dueAt.toISOString() : null,
         status: a.status,
+        kind: a.kind ?? "assignment",
         submissions: byAssignment.get(a._id.toString()) ?? [],
       })),
     }
@@ -141,6 +143,7 @@ const AssignmentInput = z.object({
     .max(5000, "Keep instructions under 5,000 characters"),
   dueAt: z.string().nullable(),
   published: z.boolean(),
+  kind: z.enum(["assignment", "project"]),
 })
 
 /** Create (assignmentId null) or edit an assignment; `published` controls student visibility. */
@@ -151,6 +154,7 @@ export async function saveAssignment(input: {
   instructions: string
   dueAt: string | null
   published: boolean
+  kind: AssignmentKind
 }): Promise<{ success: true; data: { assignmentId: string } } | { success: false; error: string }> {
   try {
     await connectDB()
@@ -174,6 +178,7 @@ export async function saveAssignment(input: {
       instructions: parsed.data.instructions,
       dueAt,
       status: parsed.data.published ? ("published" as const) : ("draft" as const),
+      kind: parsed.data.kind,
     }
 
     let assignmentId: string
@@ -392,6 +397,7 @@ export type StudentAssignment = {
   title: string
   instructions: string
   dueAt: string | null
+  kind: AssignmentKind
   submission: {
     id: string
     text: string
@@ -440,6 +446,7 @@ export async function getAssignmentForStudent(
         title: gate.assignment.title,
         instructions: gate.assignment.instructions ?? "",
         dueAt: gate.assignment.dueAt ? gate.assignment.dueAt.toISOString() : null,
+        kind: gate.assignment.kind ?? "assignment",
         submission: submission
           ? {
               id: submission._id.toString(),

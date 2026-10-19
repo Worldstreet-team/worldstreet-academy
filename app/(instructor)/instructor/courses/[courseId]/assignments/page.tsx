@@ -43,6 +43,7 @@ function AssignmentForm({
   const [instructions, setInstructions] = React.useState(initial?.instructions ?? "")
   const [dueLocal, setDueLocal] = React.useState(() => isoToLocalInput(initial?.dueAt))
   const [published, setPublished] = React.useState(initial ? initial.status === "published" : true)
+  const [isProject, setIsProject] = React.useState(initial?.kind === "project")
   const [error, setError] = React.useState<string | null>(null)
   const [pending, startTransition] = React.useTransition()
   const idBase = initial?.id ?? "new"
@@ -61,6 +62,7 @@ function AssignmentForm({
             instructions,
             dueAt: dueLocal ? localInputToIso(dueLocal) : null,
             published,
+            kind: isProject ? "project" : "assignment",
           })
           if (res.success) onSaved()
           else setError(res.error)
@@ -105,6 +107,15 @@ function AssignmentForm({
           Published — students whose package includes assignments see it
         </label>
       </div>
+      <label className="flex cursor-pointer items-center gap-2 text-[13px] text-ws-primary">
+        <input
+          type="checkbox"
+          checked={isProject}
+          onChange={(e) => setIsProject(e.target.checked)}
+          className="h-4 w-4 accent-ws-brand"
+        />
+        Project — its grade counts toward the Projects part of the Mastery Score
+      </label>
       {error && <p className="text-xs text-ws-danger">{error}</p>}
       <div className="flex flex-wrap gap-2">
         <Button type="submit" variant="outline" disabled={pending}>
@@ -248,6 +259,11 @@ function AssignmentCard({
             >
               {assignment.status === "published" ? "Published" : "Draft"}
             </span>
+            {assignment.kind === "project" && (
+              <span className="shrink-0 rounded-full bg-ws-chip px-2 py-0.5 text-[10px] font-semibold text-ws-primary">
+                Project
+              </span>
+            )}
           </div>
           <p className="mt-1 text-[12px] tabular-nums text-ws-muted">
             {assignment.dueAt ? `Due ${formatDateTime(assignment.dueAt)} · ` : ""}

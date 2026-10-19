@@ -230,6 +230,9 @@ export default function AssignmentPage() {
                 <p className="truncate text-[11px] font-medium uppercase tracking-[0.08em] text-ws-muted">
                   {assignment.courseTitle}
                 </p>
+                {assignment.kind === "project" && (
+                  <span className="inline-flex rounded-full bg-ws-chip px-2 py-0.5 text-[10px] font-semibold text-ws-primary">Project</span>
+                )}
                 <h1 className="break-words font-display text-[28px] font-semibold tracking-[-0.02em] text-ws-primary">
                   {assignment.title}
                 </h1>
