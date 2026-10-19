@@ -185,12 +185,12 @@ export function compareGroups(programs: SchoolProgram[]): CompareGroup[] {
       cells: programs.map(({ program }) => ({ kind: "text", text: programPriceLabel(program) })),
     },
     {
-      label: "Packages",
+      label: "Plans",
       cells: programs.map(({ program }) =>
         program.tierCount > 1
           ? {
               kind: "text",
-              text: plural(program.packages.length, "package"),
+              text: plural(program.packages.length, "plan"),
               sub: `${PACKAGE_LABEL[program.packages[0].key]} to ${PACKAGE_LABEL[program.packages[program.packages.length - 1].key]}`,
             }
           : { kind: "text", text: "One price" }
@@ -252,7 +252,7 @@ export function compareGroups(programs: SchoolProgram[]): CompareGroup[] {
   return [
     { title: "At a glance", rows: kept(basics) },
     { title: "What’s inside today", rows: kept(inside) },
-    { title: "Which package adds each service", rows: kept(services) },
+    { title: "Which plan adds each service", rows: kept(services) },
     { title: FACULTY_PUBLIC ? "Learners and faculty" : "What learners say", rows: kept(people) },
   ].filter((group) => group.rows.length > 0)
 }

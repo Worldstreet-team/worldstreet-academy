@@ -166,7 +166,7 @@ export function PurchasePanel({
               <PackageDiscount pkg={cheapestOf(program.packages)} className="mt-2.5 flex text-[14px]" />
               {multiTier && (
                 <p className="mt-2.5 text-[13.5px] text-ws-muted">
-                  <span className="tabular-nums">{program.packages.length}</span> packages ·{" "}
+                  <span className="tabular-nums">{program.packages.length}</span> plans ·{" "}
                   {PACKAGE_LABEL[program.packages[0].key]} to{" "}
                   {PACKAGE_LABEL[program.packages[program.packages.length - 1].key]}
                 </p>
@@ -226,7 +226,7 @@ export function PurchasePanel({
                     <span className="shrink-0 rounded-full border border-ws-hairline px-2 py-0.5 text-[11.5px] font-medium text-ws-muted">
                       <span className="sr-only">with the </span>
                       {PACKAGE_LABEL[tier]}
-                      <span className="sr-only"> package</span>
+                      <span className="sr-only"> plan</span>
                     </span>
                   )}
                 </li>

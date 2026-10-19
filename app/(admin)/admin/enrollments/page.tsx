@@ -78,8 +78,8 @@ const PAYMENT_FILTERS = [
 ]
 
 const PACKAGE_FILTERS = [
-  { value: "all", label: "Any package" },
-  { value: "none", label: "No package" },
+  { value: "all", label: "Any plan" },
+  { value: "none", label: "No plan" },
   ...PACKAGE_KEYS.map((key) => ({ value: key, label: PACKAGE_LABEL[key] })),
 ]
 
@@ -265,7 +265,7 @@ function AdminEnrollmentsInner() {
                     <TableRow>
                       <TableHead>Customer</TableHead>
                       <TableHead>Course</TableHead>
-                      <TableHead>Package</TableHead>
+                      <TableHead>Plan</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Payment</TableHead>
                       <TableHead>Enrolled</TableHead>
@@ -432,9 +432,9 @@ function AdminEnrollmentsInner() {
       <Dialog open={!!packageTarget} onOpenChange={(open) => !open && setPackageTarget(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Change {packageTarget?.name}&rsquo;s package</DialogTitle>
+            <DialogTitle>Change {packageTarget?.name}&rsquo;s plan</DialogTitle>
             <DialogDescription>
-              Moves this enrollment&rsquo;s access to another package. No money moves — charges and
+              Moves this enrollment&rsquo;s access to another plan. No money moves — charges and
               refunds live in Payments. The change is recorded in the payment log.
             </DialogDescription>
           </DialogHeader>
@@ -446,8 +446,8 @@ function AdminEnrollmentsInner() {
             value={packageChoice}
             onValueChange={(v) => setPackageChoice((v as PackageKey | null) ?? null)}
           >
-            <SelectTrigger className="w-full" aria-label="Package">
-              <SelectValue placeholder="Choose a package" />
+            <SelectTrigger className="w-full" aria-label="Plan">
+              <SelectValue placeholder="Choose a plan" />
             </SelectTrigger>
             <SelectContent>
               {(packageTarget?.options ?? []).map((o) => (
@@ -459,7 +459,7 @@ function AdminEnrollmentsInner() {
           </Select>
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setPackageTarget(null)}>
-              Keep package
+              Keep plan
             </Button>
             <Button
               size="sm"
@@ -472,7 +472,7 @@ function AdminEnrollmentsInner() {
                 }
               }}
             >
-              {setEnrollmentPackage.isPending ? "Saving…" : "Change package"}
+              {setEnrollmentPackage.isPending ? "Saving…" : "Change plan"}
             </Button>
           </DialogFooter>
         </DialogContent>

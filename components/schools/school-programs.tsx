@@ -46,9 +46,9 @@ export function SchoolPrograms({
         title="Available programs"
         lede={
           count > 1
-            ? "Each program's page has its full curriculum and the packages to choose from."
+            ? "Each program's page has its full curriculum and the plans to choose from."
             : count === 1
-              ? "Its page has the full curriculum and the packages to choose from."
+              ? "Its page has the full curriculum and the plans to choose from."
               : undefined
         }
         aside={
@@ -132,7 +132,7 @@ function ProgramCard({ item, variant }: { item: SchoolProgram; variant: "feature
             {program.level}
           </span>
           {program.tierCount > 1 && (
-            <span className="text-[13px] tabular-nums text-ws-muted">{plural(program.tierCount, "package")}</span>
+            <span className="text-[13px] tabular-nums text-ws-muted">{plural(program.tierCount, "plan")}</span>
           )}
         </div>
 
@@ -170,7 +170,7 @@ function ProgramCard({ item, variant }: { item: SchoolProgram; variant: "feature
                       <span className="ml-2 whitespace-nowrap rounded-full border border-ws-hairline px-2 py-0.5 text-[11.5px] font-medium text-ws-muted">
                         <span className="sr-only">with the </span>
                         {PACKAGE_LABEL[tier]}
-                        <span className="sr-only"> package</span>
+                        <span className="sr-only"> plan</span>
                       </span>
                     )}
                   </span>

@@ -172,7 +172,7 @@ export default async function LessonPage({
               <div className="w-full border-b border-ws-hairline bg-ws-sunken">
                 <div className="mx-auto max-w-xl px-6 py-12 md:py-16">
                   <PackageLockNotice
-                    title="This lesson isn't in your package"
+                    title="This lesson isn't in your plan"
                     requiredLabel={currentLesson.requiredPackage ? PACKAGE_LABEL[currentLesson.requiredPackage] : null}
                   />
                 </div>
@@ -340,7 +340,7 @@ export default async function LessonPage({
                   <MessageInstructorButton instructorId={course.instructorId} />
                 ) : (
                   <p className="max-w-40 text-right text-[11px] leading-snug text-ws-muted">
-                    Instructor Q&amp;A isn&apos;t in your package
+                    Instructor Q&amp;A isn&apos;t in your plan
                   </p>
                 )}
               </div>

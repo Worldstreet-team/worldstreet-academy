@@ -145,7 +145,7 @@ async function quoteProgram(
   }
   const packaged = sellsPackages(course)
   const pkg = packaged ? packageFor(course, packageKey ?? null) : null
-  if (packaged && !pkg) return { ok: false, error: "Choose a package to continue", code: "package_required" }
+  if (packaged && !pkg) return { ok: false, error: "Choose a plan to continue", code: "package_required" }
   const price = pkg ? pkg.price : course.pricing === "paid" ? course.price ?? 0 : 0
   return {
     ok: true,

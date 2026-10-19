@@ -631,7 +631,7 @@ export function CheckoutView({
                       href={changeHref}
                       className="mt-5 inline-flex items-center gap-1 text-[13px] font-medium text-ws-muted underline-offset-4 transition-colors duration-[var(--ws-motion-fast)] hover:text-ws-primary hover:underline"
                     >
-                      Compare packages
+                      Compare plans
                     </Link>
                   )}
                 </Disclosure>

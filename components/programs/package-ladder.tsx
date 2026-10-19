@@ -92,7 +92,7 @@ export function PackageLadder({
       </h2>
       {multiTier && (
         <p className="mt-2 max-w-xl text-[15px] text-ws-muted">
-          Every package opens the full curriculum. What changes is how much of the
+          Every plan opens the full curriculum. What changes is how much of the
           faculty&apos;s time and assessment comes with it.
         </p>
       )}
@@ -167,12 +167,12 @@ export function PackageLadder({
       {multiTier && (rows.length > 0 || hasDuration) && (
         <div className="mt-10">
           <h3 className="font-display text-base font-semibold tracking-[-0.01em] text-ws-primary">
-            What changes between packages
+            What changes between plans
           </h3>
           <div className="mt-4 overflow-x-auto">
             <table className="w-full min-w-[520px] border-collapse text-left">
               <caption className="sr-only">
-                How long each package of this program runs and the services it includes
+                How long each plan of this program runs and the services it includes
               </caption>
               <thead>
                 <tr className="border-b border-ws-hairline">

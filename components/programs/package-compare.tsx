@@ -41,7 +41,7 @@ export function PackageCompare({ lessons }: { lessons: LessonAccess | null }) {
       >
         <span className="min-w-0">
           <span className="block font-display text-[17px] font-semibold tracking-[-0.01em] text-ws-primary">
-            Compare packages
+            Compare plans
           </span>
           <span className="mt-0.5 block text-[14px] text-ws-muted">
             Everything in {joined}, side by side.
@@ -74,7 +74,7 @@ export function PackageCompare({ lessons }: { lessons: LessonAccess | null }) {
       >
         <div className="overflow-x-auto border-t border-ws-hairline">
           <table className="w-full min-w-[19rem] table-fixed border-collapse text-left">
-            <caption className="sr-only">What each package of this program includes</caption>
+            <caption className="sr-only">What each plan of this program includes</caption>
             <colgroup>
               <col className="w-[38%] sm:w-[40%]" />
               {packages.map((pkg) => (
@@ -120,7 +120,7 @@ export function PackageCompare({ lessons }: { lessons: LessonAccess | null }) {
                           chip="compact"
                           className="mt-1.5 flex flex-col gap-y-1 text-[11.5px] font-normal"
                         />
-                        <span className="sr-only">{active ? " (selected)" : " — select this package"}</span>
+                        <span className="sr-only">{active ? " (selected)" : " — select this plan"}</span>
                       </button>
                     </th>
                   )

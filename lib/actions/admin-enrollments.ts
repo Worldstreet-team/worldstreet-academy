@@ -297,7 +297,7 @@ export async function adminSetEnrollmentPackage(
     const admin = await requireAdmin()
 
     if (!mongoose.isValidObjectId(enrollmentId)) return { success: false, error: "Enrollment not found" }
-    if (!isPackageKey(packageKey)) return { success: false, error: "Unknown package" }
+    if (!isPackageKey(packageKey)) return { success: false, error: "Unknown plan" }
 
     const enrollment = await Enrollment.findById(enrollmentId)
     if (!enrollment) return { success: false, error: "Enrollment not found" }
@@ -305,12 +305,12 @@ export async function adminSetEnrollmentPackage(
     // Payment decides the tier of a reservation or a refunded row; only live
     // enrollments can be moved, so the audit trail never goes stale.
     if (enrollment.status !== "active" && enrollment.status !== "completed") {
-      return { success: false, error: "Only active or completed enrollments can change package" }
+      return { success: false, error: "Only active or completed enrollments can change plan" }
     }
 
     const course = await Course.findById(enrollment.course).select("packages examRequired").lean()
     const pkg = course ? packageFor(course, packageKey) : null
-    if (!pkg) return { success: false, error: "This course doesn't sell that package" }
+    if (!pkg) return { success: false, error: "This course doesn't sell that plan" }
 
     const from = enrollment.packageKey ?? null
     if (from === pkg.key) return { success: true }
@@ -373,7 +373,7 @@ export async function adminSetEnrollmentPackage(
     return { success: true }
   } catch (error) {
     console.error("Admin set enrollment package error:", error)
-    return { success: false, error: "Failed to change the package" }
+    return { success: false, error: "Failed to change the plan" }
   }
 }
 
@@ -403,7 +403,7 @@ export async function adminExportEnrollments(filters?: {
       "Email",
       "Enrollment status",
       "Payment status",
-      "Package",
+      "Plan",
       "Price paid",
       "Enrolled at",
       "Pre-enrolled at",

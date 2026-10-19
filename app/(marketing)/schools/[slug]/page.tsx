@@ -178,12 +178,12 @@ export default async function SchoolPage({ params }: Params) {
       : only
         ? {
             title: `Begin with ${only.title}`,
-            body: `The ${school.short} program, ${programPriceLabel(only).toLowerCase()}. Its page has the full curriculum and the packages to choose from.`,
+            body: `The ${school.short} program, ${programPriceLabel(only).toLowerCase()}. Its page has the full curriculum and the plans to choose from.`,
             cta: { href: `/programs/${only.slug}`, label: `Explore ${only.title}` },
           }
         : {
             title: "Find your program",
-            body: `${plural(programs.length, "program")} in the ${school.name}${fromText ? `, ${fromText}` : ""}. Open one to see its curriculum and choose a package.`,
+            body: `${plural(programs.length, "program")} in the ${school.name}${fromText ? `, ${fromText}` : ""}. Open one to see its curriculum and choose a plan.`,
             cta: { href: "#programs", label: "View programs" },
           }
 
@@ -240,8 +240,8 @@ export default async function SchoolPage({ params }: Params) {
                   cohort={calendar.next}
                   note={
                     only
-                      ? "Open the program, choose your package and pay now to join the live cohort."
-                      : "Choose your program below, then your package, and pay now to join the live cohort."
+                      ? "Open the program, choose your plan and pay now to join the live cohort."
+                      : "Choose your program below, then your plan, and pay now to join the live cohort."
                   }
                 />
               ) : null

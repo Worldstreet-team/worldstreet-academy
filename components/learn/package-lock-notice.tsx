@@ -32,8 +32,8 @@ export function PackageLockNotice({
       <div className={cn("space-y-1", compact && "min-w-0 flex-1")}>
         <p className="text-sm font-semibold text-ws-primary">{title}</p>
         <p className="text-xs leading-relaxed text-ws-muted">
-          {requiredLabel ? `Included from the ${requiredLabel} package.` : "Not included in your package."} To
-          change your package, contact support.
+          {requiredLabel ? `Included from the ${requiredLabel} plan.` : "Not included in your plan."} To
+          change your plan, contact support.
         </p>
       </div>
       <Button variant="outline" size="sm" render={<Link href="/dashboard/help" />}>

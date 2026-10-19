@@ -104,7 +104,7 @@ function AssignmentForm({
             onChange={(e) => setPublished(e.target.checked)}
             className="h-4 w-4 accent-ws-brand"
           />
-          Published — students whose package includes assignments see it
+          Published — students whose plan includes assignments see it
         </label>
       </div>
       <label className="flex cursor-pointer items-center gap-2 text-[13px] text-ws-primary">
@@ -321,7 +321,7 @@ export default function InstructorAssignmentsPage() {
           </Link>
           <PageHeader
             title="Assignments"
-            subline={data ? `${data.courseTitle} · practical work for packages that include assignments` : undefined}
+            subline={data ? `${data.courseTitle} · practical work for plans that include assignments` : undefined}
             action={
               data && !creating ? (
                 <Button onClick={() => setCreating(true)}>
@@ -355,7 +355,7 @@ export default function InstructorAssignmentsPage() {
                 <div className="rounded-lg bg-ws-surface px-6 py-8">
                   <p className="text-[15px] font-semibold text-ws-primary">No assignments yet</p>
                   <p className="mt-1 text-[13px] text-ws-muted">
-                    Published assignments appear on the dashboard of students whose package includes assignments.
+                    Published assignments appear on the dashboard of students whose plan includes assignments.
                   </p>
                 </div>
               ) : (

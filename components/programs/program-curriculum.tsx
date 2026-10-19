@@ -201,7 +201,7 @@ function LessonRows({ lessons }: { lessons: ProgramCurriculumLesson[] }) {
                   <LockIcon size={10} aria-hidden />
                   <span className="sr-only">Opens with the </span>
                   {PACKAGE_LABEL[lesson.tier]}
-                  <span className="sr-only"> package</span>
+                  <span className="sr-only"> plan</span>
                 </span>
               ) : null}
             </div>

@@ -81,7 +81,7 @@ export function PackageRow({
             href={changeHref}
             className="mt-2 rounded-full text-[13px] font-medium text-ws-muted underline-offset-4 transition-colors duration-[var(--ws-motion-fast)] hover:text-ws-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40"
           >
-            Change<span className="sr-only"> package</span>
+            Change<span className="sr-only"> plan</span>
           </Link>
         )}
       </div>

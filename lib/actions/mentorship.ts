@@ -251,7 +251,7 @@ export async function requestMentorshipSession(input: {
 
     const access = await getCourseAccess(user.id, parsed.data.courseId)
     if (!access || !includesMentorship(access.course, access)) {
-      return { success: false, error: "Private mentorship isn't included in your package" }
+      return { success: false, error: "Private mentorship isn't included in your plan" }
     }
 
     let sessionId: string
@@ -533,7 +533,7 @@ export async function confirmMentorshipSession(
     // The student must still hold Executive mentorship (a refund or package change closes the door).
     const access = await getCourseAccess(session.student.toString(), session.course.toString())
     if (!access || !includesMentorship(access.course, access)) {
-      return { success: false, error: "This student's package no longer includes mentorship" }
+      return { success: false, error: "This student's plan no longer includes mentorship" }
     }
 
     const [student, course] = await Promise.all([
@@ -654,7 +654,7 @@ export async function saveMentorRoadmap(
     const course = await Course.findById(enrollment.course).select("instructor packages title").lean()
     if (!course || course.instructor.toString() !== user.id) return { success: false, error: "Student not found" }
     if ((enrollment.status !== "active" && enrollment.status !== "completed") || !includesMentorship(course, enrollment)) {
-      return { success: false, error: "This student's package doesn't include mentorship" }
+      return { success: false, error: "This student's plan doesn't include mentorship" }
     }
 
     const roadmap = parsed.data.text

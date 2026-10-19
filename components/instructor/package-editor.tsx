@@ -191,7 +191,7 @@ export function PackageEditor({
                 if (v) patch(pkg.uid, { key: v as PackageKey })
               }}
             >
-              <SelectTrigger className="w-[9.5rem]" aria-label="Package tier">
+              <SelectTrigger className="w-[9.5rem]" aria-label="Plan tier">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -206,7 +206,7 @@ export function PackageEditor({
               <Switch
                 checked={pkg.enabled}
                 onCheckedChange={(v) => patch(pkg.uid, { enabled: Boolean(v) })}
-                aria-label="Package enabled"
+                aria-label="Plan enabled"
               />
               {pkg.enabled ? "Enabled" : "Disabled"}
             </label>
@@ -215,7 +215,7 @@ export function PackageEditor({
               variant="ghost"
               size="sm"
               className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-              aria-label={`Remove ${PACKAGE_LABEL[pkg.key]} package`}
+              aria-label={`Remove ${PACKAGE_LABEL[pkg.key]} plan`}
               onClick={() => onChange(value.filter((p) => p.uid !== pkg.uid))}
             >
               <Trash2Icon size={14} />
@@ -244,7 +244,7 @@ export function PackageEditor({
                 value={pkg.price}
                 onChange={(e) => patch(pkg.uid, { price: e.target.value })}
               />
-              <p className="text-[10px] text-muted-foreground">Required. Enter 0 only when this is the program&apos;s single package.</p>
+              <p className="text-[10px] text-muted-foreground">Required. Enter 0 only when this is the program&apos;s single plan.</p>
             </div>
           </div>
 
@@ -368,7 +368,7 @@ export function PackageEditor({
         }}
       >
         <PlusIcon size={14} />
-        {nextKey ? `Add ${PACKAGE_LABEL[nextKey]} package` : "All three tiers added"}
+        {nextKey ? `Add ${PACKAGE_LABEL[nextKey]} plan` : "All three tiers added"}
       </Button>
       {error && <p className="text-xs text-destructive">{error}</p>}
     </div>

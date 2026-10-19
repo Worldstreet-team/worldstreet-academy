@@ -93,7 +93,7 @@ export function ProgramStickyBar({ title, fromPrice }: { title: string; fromPric
           </div>
           {choosing ? (
             <a href="#packages" onClick={jumpToPackages} className={CTA}>
-              Choose your package
+              Choose your plan
             </a>
           ) : (
             <CheckoutLink className={CTA}>{text}</CheckoutLink>

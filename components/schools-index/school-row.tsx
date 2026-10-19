@@ -238,7 +238,7 @@ export function ProgramLink({ program, tokens }: { program: IndexProgram; tokens
           <Highlight text={program.title} tokens={tokens} />
         </span>
         <span className="mt-0.5 block text-[13px] text-ws-muted">
-          {[LEVEL_LABEL[program.level], program.packages >= 2 ? plural(program.packages, "package") : null, program.opens]
+          {[LEVEL_LABEL[program.level], program.packages >= 2 ? plural(program.packages, "plan") : null, program.opens]
             .filter(Boolean)
             .join(" · ")}
         </span>

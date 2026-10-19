@@ -612,7 +612,7 @@ export function CourseEditor({
               </Select>
               <p className="text-[10px] text-muted-foreground">
                 {kind === "program"
-                  ? "A school program: live cohorts and packages, listed in its school."
+                  ? "A school program: live cohorts and plans, listed in its school."
                   : kind === "marketplace"
                     ? "A pre-recorded course on the marketplace, at one price. Faculty courses publish directly."
                     : "A free course on how to use a WorldStreet product, listed on New Economy."}
@@ -865,23 +865,23 @@ export function CourseEditor({
             )}
           </div>
 
-          <SectionDivider label="Packages" />
+          <SectionDivider label="Plans" />
 
           {ladderActive ? (
             <PackageEditor value={packages} onChange={setPackages} error={state.fieldErrors.packages} />
           ) : (
             <p className="rounded-md border p-3 text-[11px] text-muted-foreground">
-              {kind === "marketplace" ? "Marketplace" : "New Economy"} courses sell at one price — no packages.
+              {kind === "marketplace" ? "Marketplace" : "New Economy"} courses sell at one price — no plans.
               {packages.length > 0 && (
                 <span className="mt-1 block text-ws-warning">
-                  Saving removes this course&apos;s {packages.length === 1 ? "package" : `${packages.length} packages`}.
+                  Saving removes this course&apos;s {packages.length === 1 ? "plan" : `${packages.length} plans`}.
                 </span>
               )}
             </p>
           )}
           {ladderActive && orphanedTierLessons > 0 && (
             <p className="text-[11px] text-ws-warning">
-              {orphanedTierLessons === 1 ? "1 lesson requires" : `${orphanedTierLessons} lessons require`} a package
+              {orphanedTierLessons === 1 ? "1 lesson requires" : `${orphanedTierLessons} lessons require`} a plan
               this course no longer sells. Saving opens {orphanedTierLessons === 1 ? "it" : "them"} to every enrolment.
             </p>
           )}
@@ -894,7 +894,7 @@ export function CourseEditor({
             </p>
           ) : derivedPrice !== null ? (
             <p className="rounded-md border p-3 text-[11px] text-muted-foreground">
-              Set by packages: this course sells {derivedPrice > 0 ? `from $${derivedPrice}` : "free"} — the
+              Set by plans: this course sells {derivedPrice > 0 ? `from $${derivedPrice}` : "free"} — the
               cheapest enabled tier. Disable every tier to price the course directly.
             </p>
           ) : (
@@ -1129,7 +1129,7 @@ export function CourseEditor({
                           {/* Minimum package (spec §6 ladder gating) — only tiers the course sells */}
                           {soldTiers.length > 0 && (
                             <div className="space-y-1.5">
-                              <Label>Minimum package</Label>
+                              <Label>Minimum plan</Label>
                               <Select
                                 items={tierItems}
                                 value={lesson.minPackageKey && soldTiers.includes(lesson.minPackageKey) ? lesson.minPackageKey : "everyone"}

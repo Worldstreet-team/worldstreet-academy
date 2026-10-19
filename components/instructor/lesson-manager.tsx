@@ -104,7 +104,7 @@ function LessonTierSelect({
           })
         }}
       >
-        <SelectTrigger className="h-7 w-[9rem] text-xs" aria-label="Minimum package">
+        <SelectTrigger className="h-7 w-[9rem] text-xs" aria-label="Minimum plan">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -354,7 +354,7 @@ export function LessonManager({
 
             {tiers.length > 0 && (
               <div className="space-y-1.5">
-                <Label>Minimum package</Label>
+                <Label>Minimum plan</Label>
                 <Select name="minPackageKey" defaultValue="everyone" items={items}>
                   <SelectTrigger className="w-full">
                     <SelectValue />

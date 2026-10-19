@@ -33,7 +33,7 @@ export function SchoolCompare({ programs, schoolName }: { programs: SchoolProgra
       <SectionHead
         id="compare-heading"
         title="Compare programs"
-        lede="What each program costs, what it holds today, and which package adds each service."
+        lede="What each program costs, what it holds today, and which plan adds each service."
       />
 
       <div className="mt-10 overflow-hidden rounded-[20px] border border-ws-hairline bg-ws-surface dark:border-transparent">
@@ -159,7 +159,7 @@ function Cell({ cell }: { cell: CompareCell }) {
         <span className="block leading-snug">
           <span className="text-ws-muted">With </span>
           {PACKAGE_LABEL[cell.tier]}
-          <span className="sr-only"> package</span>
+          <span className="sr-only"> plan</span>
         </span>
       )
     case "rating":

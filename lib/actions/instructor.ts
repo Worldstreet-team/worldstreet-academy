@@ -82,8 +82,8 @@ const PackageSchema = z
 const PackagesSchema = z
   .array(PackageSchema)
   .max(3)
-  .refine((arr) => new Set(arr.map((p) => p.key)).size === arr.length, "Package keys must be unique")
-  .refine((arr) => arr.filter((p) => p.highlight).length <= 1, "Only one package can be highlighted")
+  .refine((arr) => new Set(arr.map((p) => p.key)).size === arr.length, "Plan keys must be unique")
+  .refine((arr) => arr.filter((p) => p.highlight).length <= 1, "Only one plan can be highlighted")
   .superRefine((arr, ctx) => {
     // A $0 tier only works alone: next to paid tiers it turns Course.pricing
     // "free", which the mobile app reads as "enrol without paying".
@@ -93,7 +93,7 @@ const PackagesSchema = z
         ctx.addIssue({
           code: "custom",
           path: [i, "price"],
-          message: "A free tier only works as a program's single package — set a price or disable the other tiers",
+          message: "A free tier only works as a program's single plan — set a price or disable the other tiers",
         })
       }
     })
@@ -115,7 +115,7 @@ function parsePackages(
   try {
     parsed = JSON.parse(raw)
   } catch {
-    fieldErrors.packages = "Packages could not be read"
+    fieldErrors.packages = "Plans could not be read"
     return null
   }
 
@@ -124,8 +124,8 @@ function parsePackages(
     const issue = result.error.issues[0]
     const index = typeof issue?.path[0] === "number" ? issue.path[0] : null
     const row = index !== null && Array.isArray(parsed) ? (parsed[index] as { key?: unknown } | undefined) : undefined
-    const tier = row && isPackageKey(row.key) ? `${PACKAGE_LABEL[row.key]} package: ` : ""
-    fieldErrors.packages = `${tier}${issue?.message ?? "Invalid packages"}`
+    const tier = row && isPackageKey(row.key) ? `${PACKAGE_LABEL[row.key]} plan: ` : ""
+    fieldErrors.packages = `${tier}${issue?.message ?? "Invalid plans"}`
     return null
   }
 
@@ -1209,7 +1209,7 @@ export async function setLessonMinPackage(
 
     // Only a tier the course sells may gate a lesson; null opens it to every enrolment.
     if (minPackageKey !== null && !(isPackageKey(minPackageKey) && soldTierKeys(course.packages).has(minPackageKey))) {
-      return { success: false, error: "This course doesn't sell that package" }
+      return { success: false, error: "This course doesn't sell that plan" }
     }
 
     const lesson = await Lesson.findOneAndUpdate(

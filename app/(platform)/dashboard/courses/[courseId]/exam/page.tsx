@@ -454,7 +454,7 @@ function CourseExamPageInner() {
 
                 {status.packageLock ? (
                   <PackageLockNotice
-                    title="Not included in your package"
+                    title="Not included in your plan"
                     requiredLabel={status.packageLock.requiredLabel}
                   />
                 ) : !status.eligible ? (

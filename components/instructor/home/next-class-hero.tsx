@@ -172,7 +172,7 @@ function EmptyHero({
         </h2>
         <p className="max-w-md text-[14px] text-muted-foreground">
           {hasCourses
-            ? "Schedule your next class and every student whose package includes live classes is emailed straight away."
+            ? "Schedule your next class and every student whose plan includes live classes is emailed straight away."
             : "Live classes run on your published courses. Publish one to schedule its first class."}
         </p>
       </div>

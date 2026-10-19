@@ -133,7 +133,7 @@ function Chooser({ comingSoon, lessons }: { comingSoon: boolean; lessons: Lesson
     <div className="mt-8 grid items-start gap-5 lg:mt-10 lg:grid-cols-[minmax(0,25rem)_minmax(0,1fr)] lg:gap-6">
       <div ref={optionsRef} className="lg:sticky lg:top-[8.5rem]">
         <fieldset>
-          <legend className="sr-only">Choose a package</legend>
+          <legend className="sr-only">Choose a plan</legend>
           <div className="space-y-3">
             {packages.map((pkg) => (
               <OptionCard

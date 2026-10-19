@@ -819,8 +819,8 @@ export async function startExamAttempt(
         success: false,
         code: "package_locked",
         error: lessonId
-          ? "This knowledge check belongs to a lesson outside your package"
-          : "Your package doesn't include the assessment and certificate",
+          ? "This knowledge check belongs to a lesson outside your plan"
+          : "Your plan doesn't include the assessment and certificate",
       }
     }
     if (!lessonId && (enrollment.progress ?? 0) < 100) {
