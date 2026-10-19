@@ -312,11 +312,16 @@ function parseExtras(
 function resolveProduct(input: {
   kind: CourseKind
   extras: { format: CourseFormat | null; productFile: ProductFileValue | null }
-  existing: { format?: CourseFormat | null; publishedAt?: Date | null; productFile?: ICourseProductFile | null } | null
+  existing: { kind?: CourseKind | null; format?: CourseFormat | null; publishedAt?: Date | null; productFile?: ICourseProductFile | null } | null
   actingUserId: string
   sentProductFile: boolean
 }): { format: CourseFormat | null; productFile: ICourseProductFile | null } | { field: string; error: string } {
   const { kind, extras, existing, actingUserId, sentProductFile } = input
+  // A published template or guide stays a marketplace file product: leaving the
+  // kind would null its format and file and strand the buyers who hold it.
+  if (kind !== "marketplace" && existing?.publishedAt && existing.kind === "marketplace" && isFileFormat(existing.format)) {
+    return { field: "kind", error: "A published template or guide can't change kind — its buyers hold the file" }
+  }
   if (kind !== "marketplace") return { format: null, productFile: null }
 
   const format: CourseFormat = extras.format ?? courseFormatOf({ kind, format: existing?.format }) ?? "course"

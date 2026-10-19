@@ -71,7 +71,7 @@ export function formatCount(n: number, format: CourseFormat): string {
 }
 
 export function productTypeLabel(mimeType: string): string {
-  return PRODUCT_MIME[mimeType] ?? "File"
+  return Object.hasOwn(PRODUCT_MIME, mimeType) ? PRODUCT_MIME[mimeType] : "File"
 }
 
 /** "" for 0, whole KB (at least 1) under 1 MB, one-decimal MB from there. */
