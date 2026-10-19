@@ -145,3 +145,10 @@ Online education platform for cryptocurrency/trading courses. Instructor portal 
 - **Clicks** are counted in `partnerclicks` (web-only, one row per code per Lagos day): once per visitor per code per day, through the `wsa_ref_seen` cookie. Bots, unknown codes and the partner's own signed-in visits are ignored.
 - **Revenue** is everything credited to the code as a referral: paid or enrolled orders, wallet and ESPEE; not refunds, not a creator's own link. A learner whose first purchase is paid by ESPEE, or credited to another code, earns the referrer no commission, and the page says so.
 - **`/admin/partners`** lists every partner with any activity and exports a CSV (`wma-partners-YYYY-MM-DD.csv`); it also counts the codes with no activity yet.
+
+### 2026-10-19 — Admin levels (Phase 21)
+- **Data:** `User.adminLevel` (`"super"` or null, Mongo only, never read from or written to Clerk) and `adminAudit[]`. A super admin is `role: "ADMIN"` plus `adminLevel: "super"`; Go still sees `ADMIN`. Every grant, revoke, promote and demote is audited.
+- **Super-only grants:** `/admin/team` (a 404 for regular admins) and the Admin option on `/admin/users`. All role changes go through `applyRoleChange` in `lib/auth/admin.ts`; actions use `requireSuperAdmin()`. Self-changes and demoting the last super admin are refused.
+- **Clerk:** metadata can no longer make an existing account an admin; it raises a `USER` to `INSTRUCTOR` only. A brand-new account still takes its claimed role (open risk, noted for the owner).
+- **Removal** restores the role held at grant time (the latest grant entry's `fromRole`). Granting `ADMIN` no longer sets `instructorStatus: "approved"`.
+- **Bootstrap:** `MONGODB_URI=<uri> node scripts/grant-admin.mjs <email> --super` (the explicit URI is required). `--revoke` refuses the last super admin.

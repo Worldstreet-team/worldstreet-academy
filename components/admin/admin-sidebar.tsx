@@ -1,5 +1,5 @@
 "use client"
-import { BookOpen, ClipboardCheck, GraduationCap, HandshakeIcon, House, Inbox, LayoutDashboard, LogOut, ReceiptText, Star, Store, Users, Wallet, type IconComponent } from "@/components/icons"
+import { BookOpen, ClipboardCheck, GraduationCap, HandshakeIcon, House, Inbox, LayoutDashboard, LogOut, ReceiptText, ShieldCheck, Star, Store, Users, Wallet, type IconComponent } from "@/components/icons"
 
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
@@ -25,6 +25,7 @@ import { useUser } from "@/components/providers/user-provider"
 import { LogoutConfirmDialog } from "@/components/shared/logout-confirm-dialog"
 import { BRAND } from "@/lib/brand"
 import { BrandLockup } from "@/components/shared/brand-lockup"
+import { isSuperAdmin } from "@/lib/admin-levels"
 
 /**
  * Admin rail — mirrors the platform sidebar recipe (app-sidebar.tsx): 40px
@@ -107,6 +108,14 @@ const manageItems: NavItem[] = [
   },
 ]
 
+/** Super admins only; spliced in after Users at render time. */
+const teamItem: NavItem = {
+  title: "Team",
+  href: "/admin/team",
+  icon: ShieldCheck,
+  match: (p) => p.startsWith("/admin/team"),
+}
+
 function isActive(item: NavItem, pathname: string) {
   if (item.match) return item.match(pathname)
   return pathname === item.href
@@ -143,10 +152,15 @@ export function AdminSidebar() {
   const userInitials =
     `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`.toUpperCase() || "A"
 
+  const superAdmin = isSuperAdmin(user)
+  const items = superAdmin
+    ? manageItems.flatMap((item) => (item.href === "/admin/users" ? [item, teamItem] : [item]))
+    : manageItems
+
   // Prefetch all navigation routes on mount for faster transitions
   useEffect(() => {
-    manageItems.forEach((item) => router.prefetch(item.href))
-  }, [router])
+    items.forEach((item) => router.prefetch(item.href))
+  }, [router, items])
 
   return (
     <Sidebar collapsible="icon">
@@ -160,7 +174,7 @@ export function AdminSidebar() {
             >
               {/* Unified ecosystem lockup (05-screens): gold wsa-mark 26px +
                   "WorldStreet" Manrope SemiBold 15 + gold app eyebrow. */}
-              <BrandLockup truncate eyebrow="Admin" alt={BRAND.name} />
+              <BrandLockup truncate eyebrow={superAdmin ? "Super admin" : "Admin"} alt={BRAND.name} />
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -171,7 +185,7 @@ export function AdminSidebar() {
           <SidebarGroupLabel>Manage</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {manageItems.map((item) => (
+              {items.map((item) => (
                 <NavRow key={item.title} item={item} active={isActive(item, pathname)} />
               ))}
             </SidebarMenu>

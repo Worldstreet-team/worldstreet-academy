@@ -2,6 +2,7 @@
 import { DownloadIcon, UserRoundPenIcon, UsersIcon } from "@/components/icons"
 
 import * as React from "react"
+import Link from "next/link"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Topbar } from "@/components/platform/topbar"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -43,6 +44,7 @@ import {
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import { formatDate, StatusBadge, FilterChips, Pagination } from "@/components/admin/shared"
 import { useUser } from "@/components/providers/user-provider"
+import { isSuperAdmin } from "@/lib/admin-levels"
 import { FacultyProfileDialog } from "@/components/admin/faculty-profile-dialog"
 
 import { exportInterestedLearnersCsv, type LeadCounts } from "@/lib/actions/admin-leads"
@@ -52,6 +54,7 @@ type Role = "USER" | "INSTRUCTOR" | "ADMIN"
 
 export default function AdminUsersPage() {
   const me = useUser()
+  const superMe = isSuperAdmin(me)
   const queryClient = useQueryClient()
   const [role, setRole] = React.useState<RoleFilter>("all")
   const [search, setSearch] = React.useState("")
@@ -120,7 +123,7 @@ export default function AdminUsersPage() {
         setPendingRole(null)
         // Only reflect the new role locally once the server confirmed it.
         setSelected((prev) =>
-          prev && prev.id === vars.userId ? { ...prev, role: vars.newRole } : prev
+          prev && prev.id === vars.userId ? { ...prev, role: vars.newRole, adminLevel: vars.newRole === "ADMIN" ? prev.adminLevel : null } : prev
         )
         queryClient.invalidateQueries({ queryKey: ["admin", "users"] })
         queryClient.invalidateQueries({ queryKey: queryKeys.adminUserDetail(vars.userId) })
@@ -235,7 +238,12 @@ export default function AdminUsersPage() {
                         {u.email}
                       </TableCell>
                       <TableCell>
-                        <StatusBadge status={u.role} />
+                        <span className="inline-flex items-center gap-1.5">
+                          <StatusBadge status={u.role} />
+                          {u.adminLevel === "super" && (
+                            <Badge variant="outline" className="text-[10px]">Super admin</Badge>
+                          )}
+                        </span>
                       </TableCell>
                       <TableCell className="hidden sm:table-cell">
                         {u.instructorStatus !== "none" ? (
@@ -285,6 +293,9 @@ export default function AdminUsersPage() {
               <div className="px-4 pb-6 space-y-4">
                 <div className="flex items-center gap-2">
                   <StatusBadge status={selected.role} />
+                  {selected.adminLevel === "super" && (
+                    <Badge variant="outline" className="text-[10px]">Super admin</Badge>
+                  )}
                   {selected.instructorStatus !== "none" && (
                     <Badge variant="outline" className="text-[10px]">
                       application: {selected.instructorStatus}
@@ -323,9 +334,13 @@ export default function AdminUsersPage() {
                     <p className="text-[11px] text-ws-muted">
                       You can&apos;t change your own role.
                     </p>
+                  ) : !superMe && selected.role === "ADMIN" ? (
+                    <p className="text-[11px] text-ws-muted">
+                      Only a super admin can change an admin&apos;s role.
+                    </p>
                   ) : (
                     <div className="flex items-center gap-2">
-                      {(["USER", "INSTRUCTOR", "ADMIN"] as Role[]).map((r) => (
+                      {((superMe ? ["USER", "INSTRUCTOR", "ADMIN"] : ["USER", "INSTRUCTOR"]) as Role[]).map((r) => (
                         <Button
                           key={r}
                           size="sm"
@@ -341,6 +356,14 @@ export default function AdminUsersPage() {
                         </Button>
                       ))}
                     </div>
+                  )}
+                  {superMe && selected.role === "ADMIN" && selected.id !== me.id && (
+                    <Link
+                      href="/admin/team"
+                      className="block text-[11px] text-ws-muted underline-offset-4 hover:underline"
+                    >
+                      Admin levels are on Team
+                    </Link>
                   )}
                   {actionError && <p className="text-xs text-ws-danger">{actionError}</p>}
                 </div>
