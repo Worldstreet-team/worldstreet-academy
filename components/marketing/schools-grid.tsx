@@ -100,7 +100,7 @@ const HEAD_LAG = 0.92
  *
  * lg+ with motion: a pinned horizontal showcase. The section is tall; a
  * sticky stage under the navbar holds still while vertical scroll slides a
- * row of eight large panels (`SchoolPanel`) across it. On the first frame
+ * row of seven large panels (`SchoolPanel`) across it. On the first frame
  * the heading sits at the stage's left with the first panel beside it and
  * the second peeking; as the row moves, the heading leads it out — a step
  * slower, fading — and is gone before panel 01 could reach it, so no panel
@@ -111,7 +111,7 @@ const HEAD_LAG = 0.92
  *
  * Below lg, held upright, with motion: the same run, composed for a narrow
  * screen. The heading reads first and scrolls away; the row's box pins under
- * the navbar with one card on stage and the next peeking, slides the eight
+ * the navbar with one card on stage and the next peeking, slides the seven
  * across, then lets go. The counter and rule sit under the card, clear of
  * the sticky school bar.
  *

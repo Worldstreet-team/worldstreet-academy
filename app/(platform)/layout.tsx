@@ -30,7 +30,7 @@ export default async function PlatformLayout({
   // No dashboard without paying (owner meeting, 2026-10-03): a learner without
   // an active or completed enrollment is sent away — to the pending page while
   // an ESPEE proof of theirs waits on an admin, else to the schools (the one
-  // the landing's `wsa_school` cookie names, else all eight) to choose a
+  // the landing's `wsa_school` cookie names, else all seven) to choose a
   // program and a package there. A saved school no longer opens the dashboard.
   // Fails OPEN — a gate that cannot read its state must never lock anyone out.
   // `redirect()` throws by design, so it stays outside the catch.

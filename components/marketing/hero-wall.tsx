@@ -212,7 +212,7 @@ export function HeroWall({
               {school ? [school.name, factsFor(school)].filter(Boolean).join(". ") : ""}
             </p>
 
-            {/* lg+ widens the picker to 3xl so the eight chips sit in two
+            {/* lg+ widens the picker to 3xl so the seven chips sit in two
                 rows (three would push the CTA under a 768px fold). Phones
                 have no picker (owner, 2026-09-21): its height goes to a
                 bigger picture, and the sticky school bar's "Choose a
