@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils"
 export type SchoolCounts = Record<SchoolSlug, number> | null
 
 function programCountLabel(count: number): string {
-  if (count === 0) return "Coming soon"
+  if (count === 0) return "Programs coming soon"
   return count === 1 ? "1 program" : `${count} programs`
 }
 
