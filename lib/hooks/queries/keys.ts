@@ -42,6 +42,7 @@ export const queryKeys = {
   courseExam: (courseId: string) => ["course-exam", courseId] as const,
   assessments: ["assessments"] as const,
   points: ["points"] as const,
+  mastery: ["mastery"] as const,
   mentorship: ["mentorship"] as const,
   mentorshipQueue: ["mentorship-queue"] as const,
   courseAssignments: (courseId: string) => ["course-assignments", courseId] as const,

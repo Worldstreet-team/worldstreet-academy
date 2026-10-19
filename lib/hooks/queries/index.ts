@@ -22,3 +22,4 @@ export {
 export { useMyCertificates } from "./use-certificates"
 export { useMyAssessments } from "./use-assessments"
 export { useMyPoints } from "./use-points"
+export { useMyMastery } from "./use-mastery"
