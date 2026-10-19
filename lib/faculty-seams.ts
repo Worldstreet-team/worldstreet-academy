@@ -50,14 +50,20 @@ export async function cohortsFor(rows: SeamEnrollment[]): Promise<Map<string, Co
   )
 }
 
-/** Each enrollment's Mastery Score and parts (parts the plan excludes are nulled), keyed by enrollment id. */
+/**
+ * Each enrollment's Mastery Score and parts (parts the plan excludes are
+ * nulled), keyed by enrollment id. Like cohorts, only active or completed
+ * school-program rows have one: marketplace, refunded and cancelled rows get
+ * no score.
+ */
 export async function masteryFor(rows: SeamEnrollment[]): Promise<Map<string, MasteryResult>> {
-  if (rows.length === 0) return new Map()
-  const courses = await Course.find({ _id: { $in: [...new Set(rows.map((r) => r.course.toString()))] } })
+  const live = rows.filter((r) => r.status === "active" || r.status === "completed")
+  if (live.length === 0) return new Map()
+  const courses = await Course.find({ _id: { $in: [...new Set(live.map((r) => r.course.toString()))] }, ...PROGRAM_KIND_FILTER })
     .select("packages format")
     .lean()
   const byId = new Map(courses.map((c) => [c._id.toString(), c]))
-  const pairs = rows.flatMap((enrollment) => {
+  const pairs = live.flatMap((enrollment) => {
     const course = byId.get(enrollment.course.toString())
     return course ? [{ enrollment, course }] : []
   })
