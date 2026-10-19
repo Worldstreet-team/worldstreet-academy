@@ -202,7 +202,7 @@ export function SchoolsVignette() {
           Choose the school that matches your goals.
         </p>
       </div>
-      {/* Phones: a 2×2 of the first four schools — eight tiles (the old count) at two columns
+      {/* Phones: a 2×2 of the first four schools — all seven tiles at two columns
           cannot fit the frame and were squashing to blank boxes. sm+: all seven. */}
       <motion.ul
         className="grid min-h-0 flex-1 grid-cols-2 gap-2.5 overflow-hidden p-4 sm:grid-cols-4 sm:gap-3 sm:p-5 [&>li:nth-child(n+5)]:hidden sm:[&>li:nth-child(n+5)]:flex"

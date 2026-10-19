@@ -52,7 +52,7 @@ export async function Navbar({ showFaculty }: { showFaculty: boolean }) {
   )
 
   // fetchBrowseCourses swallows its errors into []: an empty catalogue shows
-  // no counts at all rather than eight "Coming soon"s that may be false.
+  // no counts at all rather than seven "Coming soon"s that may be false.
   const counts: SchoolCounts = published.length > 0 ? countProgramsBySchool(published) : null
 
   // Below lg every destination lives in the sheet (in journey order, spec
