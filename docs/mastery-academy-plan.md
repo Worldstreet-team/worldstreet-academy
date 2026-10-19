@@ -21,6 +21,23 @@
 
 Total ≈ 25–34 dev-days sequential; ≈ 18–24 with the parallel tracks in §0.5.
 
+**Phases 10–20 — the Institutional Blueprint (owner document, 2026-10-12; spec `docs/institutional-blueprint.md`).** The plan, the coverage table and decisions D16–D31 are in `docs/institutional-blueprint-plan.md`. ⛔ = waits for an owner decision.
+
+| Phase | Name | Est. | Status |
+|---|---|---|---|
+| 10 | Release the cohort build (`feat/cohort-launch` → production) | 0.5 d + owner | planned — owner-run |
+| 11 | The institution's voice — hero, `/academy`, vocabulary | 2–3 d | planned — task plan `docs/plans/mastery-phase-11.md` |
+| 12 | Cohorts as data + Academic Calendar | 3–4 d | planned |
+| 13 | Schools v2 — seven schools, the full school page | 4–5 d | planned (D21, D22 answered yes, 2026-10-19) |
+| 14 | Plans to the blueprint | 2 d | planned (D23 answered yes) |
+| 15 | Student portal, welcome email, communities | 2–3 d | planned |
+| 16 | Mastery Score and attendance | 3 d | planned |
+| 17 | Certification tiers and Alumni | 2–3 d | planned (D25 defaults; after 14, 16) |
+| 18 | WMA Partners | 2–3 d | planned |
+| 19 | Faculty system | 4–5 d | planned |
+| 20 | Marketplace formats and quality control | 3 d | planned (templates and guides included — owner, 2026-10-19) |
+| 21 | Super admin and admin levels | 1–2 d | planned (first — owner "asap") |
+
 ---
 
 ## 0. Ground truth and decisions
@@ -521,7 +538,7 @@ Brand: "WorldStreet Academy" appears in 43 code locations; the lockup (mark + "W
 **Depends on:** Phases 0–8 and the chrome-less `(checkout)` route group. Task plan: `docs/plans/mastery-phase-9.md`.
 
 ### Decisions
-- **D11 — "Pay for the school" = pay for a program inside it.** Schools have no price. Five of eight schools hold one program, so the picker skips straight to its packages; the other three add one step. A true school pass is the Phase 10 candidate and needs owner prices first.
+- **D11 — "Pay for the school" = pay for a program inside it.** Schools have no price. Five of eight schools hold one program, so the picker skips straight to its packages; the other three add one step. A true school pass is the Phase 10 candidate and needs owner prices first. *(Retired 2026-10-19: the Institutional Blueprint sells a program's plan, never a school; Phase 10 is now the cohort release — `docs/institutional-blueprint-plan.md` §2.)*
 - **D12 — "Bookmark the school" is a new `EnrollmentIntent` collection** (one row per user), never `Bookmark` (`{ user, course }`, read by Go). The money path does not write it; it converts lazily.
 - **D13 — The school-first gate lives in `(platform)/layout.tsx` and fails open.** Gated: `USER`, not an applicant, no enrollment, no intent.
 - **D14 — Colour comes from imagery, not tokens.** Eight code-owned school covers; a program without a thumbnail shows its school's cover (student read models only — instructors still see "No thumbnail").
