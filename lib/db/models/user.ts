@@ -178,7 +178,8 @@ const UserSchema = new Schema<IUser>(
       default: "none",
     },
     adminLevel: { type: String, enum: [null, "super"], default: null },
-    adminAudit: [
+    adminAudit: {
+      type: [
       {
         action: { type: String, enum: ["grant", "revoke", "promote", "demote"], required: true },
         fromRole: { type: String, enum: ["USER", "INSTRUCTOR", "ADMIN"], required: true },
@@ -189,7 +190,9 @@ const UserSchema = new Schema<IUser>(
         at: { type: Date, required: true },
         _id: false,
       },
-    ],
+      ],
+      default: undefined,
+    },
     instructorProfile: {
       headline: { type: String, default: null },
       specialization: { type: String, default: null },

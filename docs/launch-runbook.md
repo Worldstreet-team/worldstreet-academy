@@ -34,7 +34,7 @@ From the 2026-10-03 meeting: three plans on every program, ESPEE proof-of-paymen
 3. **Catalogue** (§6). Every program becomes Basic $49 (was $300), Standard $199 (was $1,000, 9 weeks) and Executive $999 (was $10,000, 9 weeks), so the dry run shows a price change on every program. Apply with `--allow-price-change`.
    - Existing slugs are kept. `--rename-slugs` would break every shared `/programs/<slug>` link.
    - Two production programs are outside the 12 titles and keep a single price: "Cryptocurrency Trading Masterclass Beginner to Advanced" and "DIGITALMARKETING MASTERCLASS".
-4. **Admins.** Grant each new admin with `MONGODB_URI="$PROD_URI" node scripts/grant-admin.mjs <email>`. It also writes the role to Clerk with `.env.local`'s `CLERK_SECRET_KEY`. Every admin account needs a real email address: each new ESPEE proof is emailed to all admins. From Phase 21 on, super admins grant admins at /admin/team — see "Admin levels" below.
+4. **Admins.** Grant each new admin with `MONGODB_URI="$PROD_URI" CLERK_SECRET_KEY="$CLERK_KEY" node scripts/grant-admin.mjs <email>`. It writes the role to Clerk only when `CLERK_SECRET_KEY="$CLERK_KEY"` is also on the command line; without it the script prints `skipped Clerk mirror`. Every admin account needs a real email address: each new ESPEE proof is emailed to all admins. From Phase 21 on, super admins grant admins at /admin/team — see "Admin levels" below.
 5. **Smoke test** on production with a test account that has no enrollment:
    - `/dashboard` sends it to `/schools`.
    - Submit an ESPEE proof. `/dashboard` then shows "Payment received — under review".

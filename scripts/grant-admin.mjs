@@ -22,7 +22,9 @@ import { config } from "dotenv"
 
 // Captured BEFORE .env.local loads: that file's MONGODB_URI is production.
 const EXPLICIT_URI = process.env.MONGODB_URI
-config({ path: ".env.local" }) // still needed for CLERK_SECRET_KEY
+// Captured BEFORE .env.local loads too: the Clerk mirror runs only with an explicit key.
+const EXPLICIT_CLERK_KEY = process.env.CLERK_SECRET_KEY
+config({ path: ".env.local" })
 config()
 
 const USAGE = "Usage: MONGODB_URI=<uri> node scripts/grant-admin.mjs <email> [--super | --revoke]"
@@ -142,8 +144,10 @@ if (from.role === to.role) {
   console.log("• Clerk: role unchanged — nothing to mirror.")
 } else {
   const clerkRole = to.role.toLowerCase()
-  const secret = process.env.CLERK_SECRET_KEY
-  if (secret && user.authUserId?.startsWith("user_")) {
+  const secret = EXPLICIT_CLERK_KEY
+  if (!secret) {
+    console.log("skipped Clerk mirror (pass CLERK_SECRET_KEY on the command line to mirror)")
+  } else if (user.authUserId?.startsWith("user_")) {
     const res = await fetch(`https://api.clerk.com/v1/users/${user.authUserId}/metadata`, {
       method: "PATCH",
       headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
@@ -155,7 +159,7 @@ if (from.role === to.role) {
       console.warn(`⚠ Clerk metadata update failed (HTTP ${res.status}) — Mongo role still applies`)
     }
   } else {
-    console.warn("⚠ Skipped Clerk mirror (no CLERK_SECRET_KEY or non-Clerk authUserId)")
+    console.warn("⚠ Skipped Clerk mirror (non-Clerk authUserId)")
   }
 }
 
