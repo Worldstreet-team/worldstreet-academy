@@ -45,11 +45,11 @@ export function WorldsBand({ className }: { className?: string }) {
                   </span>
                 </Link>
               ) : (
-                <div className="flex w-full flex-col rounded-[20px] border border-dashed border-ws-hairline p-6 text-ws-muted">
-                  <span className="font-display text-[19px] font-semibold tracking-[-0.01em] text-ws-muted">
+                <div className="flex w-full flex-col rounded-[20px] border border-dashed border-ws-hairline p-6">
+                  <span className="font-display text-[19px] font-semibold tracking-[-0.01em] text-ws-primary">
                     {world.name}
                   </span>
-                  <span className="mt-4 inline-flex w-fit items-center rounded-full border border-ws-hairline px-3 py-1 text-[12px] font-semibold text-ws-muted">
+                  <span className="mt-4 inline-flex w-fit items-center rounded-full border border-ws-hairline px-3 py-1 text-[12px] font-semibold text-ws-primary">
                     Coming soon
                   </span>
                 </div>

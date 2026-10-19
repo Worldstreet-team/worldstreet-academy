@@ -31,7 +31,7 @@ export default async function InstructorEarningsPage() {
                   rel="noreferrer"
                   className="inline-flex items-center rounded-full border border-border px-4 py-2 text-[13px] font-semibold text-foreground transition-colors hover:bg-foreground/[0.05]"
                 >
-                  Withdraw on the WorldStreet dashboard
+                  Withdraw from your wallet
                 </a>
               ) : undefined
             }
@@ -63,7 +63,7 @@ export default async function InstructorEarningsPage() {
                     <li key={c.courseId} className="flex items-center justify-between gap-4 px-5 py-3">
                       <div className="min-w-0">
                         <p className="truncate text-[14px] font-medium">{c.courseTitle}</p>
-                        <p className="text-[12px] text-muted-foreground tabular-nums">{c.sales} sales</p>
+                        <p className="text-[12px] text-muted-foreground tabular-nums">{c.sales === 1 ? "1 sale" : `${c.sales} sales`}</p>
                       </div>
                       <span className="shrink-0 text-[14px] font-semibold tabular-nums">{formatMinor(c.netMinor)}</span>
                     </li>

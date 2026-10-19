@@ -29,9 +29,10 @@ export async function adminExportPartnersCsv(): Promise<
     const { rows } = await partnerRows()
 
     // Names are typed by learners: a leading = + - @ would run as a formula
-    // when the file is opened in a spreadsheet.
-    const quote = (v: string | number | null) => {
-      const text = String(v ?? "")
+    // when the file is opened in a spreadsheet. Only text cells are guarded;
+    // numbers (a negative money figure) are written raw.
+    const quote = (v: string | null) => {
+      const text = v ?? ""
       return `"${(/^[=+\-@]/.test(text) ? `'${text}` : text).replace(/"/g, '""')}"`
     }
     const usd = (minor: number) => (minor / 100).toFixed(2)
@@ -50,20 +51,18 @@ export async function adminExportPartnersCsv(): Promise<
     ]
     const lines = rows.map((r) =>
       [
-        r.code,
-        r.firstName,
-        r.lastName,
-        r.email,
-        ROLE_LABEL[r.role],
+        quote(r.code),
+        quote(r.firstName),
+        quote(r.lastName),
+        quote(r.email),
+        quote(ROLE_LABEL[r.role]),
         r.clicks,
         r.signUps,
         r.enrolled,
         usd(r.revenueMinor),
         usd(r.commissionPendingMinor),
         usd(r.commissionPaidMinor),
-      ]
-        .map(quote)
-        .join(","),
+      ].join(","),
     )
     return { success: true, data: { csv: [header.map(quote).join(","), ...lines].join("\n"), count: rows.length } }
   } catch (error) {

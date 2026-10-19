@@ -32,7 +32,8 @@ type Props = (
  *          link to /schools; its copy shortens on small screens so it stays
  *          one line at 360px
  *   band   the landing's section right after the hero: headline, pitch, the
- *          block countdown and the gold "Choose your school"
+ *          block countdown, Explore Programs and the gold
+ *          "Join Cohort"
  *   strip  a compact card for the schools and program pages, beside the
  *          choice it asks for (the school list, a school's programs, the
  *          packages); no action of its own, since the choice is right there

@@ -7,6 +7,7 @@ import { SectionLabel, SectionTitle } from "@/components/marketing/section-headi
 import { WorldsBand } from "@/components/marketing/worlds-band"
 import { appUrl } from "@/lib/app-url"
 import { BRAND } from "@/lib/brand"
+import { cn } from "@/lib/utils"
 import {
   ACADEMY_LINE,
   BIGGER_VISION,
@@ -148,9 +149,9 @@ export default function AcademyPage() {
               The 5-stage Mastery Journey
             </SectionTitle>
           </RevealGroup>
-          <ol className="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-5">
+          <ol className="mt-10 grid gap-5 md:grid-cols-6 lg:grid-cols-5">
             {JOURNEY.map((stage, i) => (
-              <Reveal as="li" key={stage.name} delay={i * 0.05} y={16} className={CARD}>
+              <Reveal as="li" key={stage.name} delay={i * 0.05} y={16} className={cn(CARD, "md:col-span-2 lg:col-span-1", i === 3 && "md:col-start-2 lg:col-start-auto")}>
                 <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-ws-muted">
                   Stage {i + 1} — {stage.name}
                 </p>
@@ -161,8 +162,8 @@ export default function AcademyPage() {
           <div className="mt-10 space-y-6">
             {JOURNEY_EXAMPLES.map((steps, i) => (
               <Reveal key={i}>
-                <p className="mb-3 text-[12px] font-semibold uppercase tracking-[0.08em] text-ws-muted">Example</p>
-                <Chain steps={steps} label="Example" />
+                <p className="mb-3 text-[12px] font-semibold uppercase tracking-[0.08em] text-ws-muted">Example {i + 1}</p>
+                <Chain steps={steps} label={`Example ${i + 1}`} />
               </Reveal>
             ))}
           </div>

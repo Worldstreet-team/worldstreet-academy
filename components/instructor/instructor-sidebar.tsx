@@ -264,7 +264,7 @@ export function InstructorSidebar({ seller = false }: { seller?: boolean }) {
                 active={false}
               />
               {/* Marketplace Creators reach WMA Partners here; faculty have it in their main rail (institutional blueprint §16) */}
-              {seller && <NavRow item={{ title: "WMA Partners", href: "/dashboard/referrals", icon: Gift }} active={false} />}
+              {seller && <NavRow item={partners} active={isActive(partners, pathname)} />}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

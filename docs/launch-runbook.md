@@ -94,7 +94,7 @@ The academic structure becomes the seven schools of the institutional blueprint 
    - `curl -s -o /dev/null -w "%{http_code} %{redirect_url}\n" "$SITE/schools/cybersecurity"` prints `308 $SITE/schools/technology-ai`.
    - `$SITE/schools/entrepreneurship-wealth-creation` returns `200`.
 7. **Catalogue dry run (§6), from a Phase 13 checkout.** Every MATCH prints `school: X -> X`. **Never run `mastery-catalogue.mjs` from an older checkout after this step.** It would move the 12 programs back to retired slugs.
-8. **Rollback.** The apply log lists every `MOVED` document, old → new. The mapping is many-to-one, so restore the four fields from the backup (`mongorestore` of those collections) or reverse the logged lines by hand. Reverting only the web deploy leaves programs under schools the old code doesn't know.
+8. **Rollback.** The apply log lists every `MOVED` document, old → new. The mapping is many-to-one, so reverse it from the pre-migration export, restoring only the fields the script rewrote: `school` and `category` on `courses`, `school` on `enrollmentintents`, and (also rewritten) `school` on `sellerapplications` and `answers.school` on `instructorapplications`. Do not `mongorestore` whole collections: that would also revert unrelated writes made since the backup. Or reverse the logged lines by hand. Reverting only the web deploy leaves programs under schools the old code doesn't know.
 9. **Owed by product:** sign off each school's copy in `lib/schools.ts` (entries marked `DRAFT: owner sign-off pending`), and the two placeholder covers.
 
 ## Plans to the blueprint — Phase 14 (2026-10-19)
@@ -113,7 +113,7 @@ The academic structure becomes the seven schools of the institutional blueprint 
    - If one does, a learner on that plan would lose that service. Stop and take it to the owner: `--allow-access-loss` is for a written go only.
 4. **Apply** with `--apply`, plus `--allow-price-change` only if step 1 applies, and `tee` the log. Then re-run `--apply`; it must end `Total modifiedCount across matched rows: 0`.
 5. **Check:** `curl -s "$SITE/programs/<forex slug>"` shows "Foundation", "Personalized Mastery", "4 weeks", "8–12 weeks" and "Flexible schedule". A Basic test learner sees Recordings, Assignments and, after the lessons, the exam.
-6. **Rollback:** re-run the previous release's script with `--apply --allow-access-loss`. Basic learners then lose recordings, assignments and the exam. Issued certificate IDs stay valid.
+6. **Rollback:** re-run the previous release's script with `--apply` (that script has no `--allow-access-loss` flag; the flag exists only in this release's script). Basic learners then lose recordings, assignments and the exam. Issued certificate IDs stay valid.
 
 ## Cohorts as data (Phase 12)
 

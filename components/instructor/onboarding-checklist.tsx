@@ -75,7 +75,7 @@ export function OnboardingChecklist() {
         <p className="text-[11px] text-muted-foreground">
           Complete these once — they unlock payouts and boost student trust.
         </p>
-        <p className="text-[11px] text-muted-foreground mb-2">Finish them all to receive your WMA Faculty credential.</p>
+        <p className="text-[11px] text-muted-foreground mb-2">Finish every step except your first course to receive your WMA Faculty credential.</p>
         <div className="divide-y divide-border/40">
           <Item
             done={data.agreementAccepted}

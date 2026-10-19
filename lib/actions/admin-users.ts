@@ -149,6 +149,11 @@ export async function adminGetUserDetail(userId: string): Promise<AdminUserDetai
   }
 }
 
+const RoleChangeInput = z.object({
+  userId: z.string().regex(/^[a-f0-9]{24}$/, "User not found"),
+  role: z.enum(["USER", "INSTRUCTOR", "ADMIN"], "Choose a valid role"),
+})
+
 /**
  * Change a user's role. Goes through applyRoleChange (D32): only super admins
  * may involve ADMIN; regular admins move accounts between student and
@@ -157,11 +162,6 @@ export async function adminGetUserDetail(userId: string): Promise<AdminUserDetai
  * NOTE: granting ADMIN also unlocks admin surfaces in the mobile app
  * (e.g. Vision admin) — the UI warns before confirming.
  */
-const RoleChangeInput = z.object({
-  userId: z.string().regex(/^[a-f0-9]{24}$/, "User not found"),
-  role: z.enum(["USER", "INSTRUCTOR", "ADMIN"], "Choose a valid role"),
-})
-
 export async function adminUpdateUserRole(
   userId: string,
   role: "USER" | "INSTRUCTOR" | "ADMIN"

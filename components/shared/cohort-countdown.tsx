@@ -5,7 +5,7 @@ import { Countdown } from "@/components/shared/countdown"
 
 /**
  * Live countdown to a cohort start, passed in by the caller (the next cohort
-from getCohortCalendar().next, lib/cohort-calendar.ts). Unlike
+ * from getCohortCalendar().next, lib/cohort-calendar.ts). Unlike
  * AvailabilityCountdown it never refreshes the page: nothing on the server
  * flips at the cohort start, so once the instant passes it shows `endedLabel`
  * (or nothing). Renders an empty placeholder until mounted, so the server and

@@ -89,13 +89,13 @@ export function AssignmentsTile() {
       </div>
       <div className="mt-auto flex divide-x divide-border/60">
         {hasExams && (
-          <Link href="/dashboard/assessments" className={cn(TILE_FOOT_LINK, "flex-1")}>
+          <Link href="/dashboard/assessments" className={cn(TILE_FOOT_LINK, "mt-0 flex-1")}>
             All assessments
             <Chevron />
           </Link>
         )}
         {hasTasks && (
-          <Link href="/dashboard/assignments" className={cn(TILE_FOOT_LINK, "flex-1")}>
+          <Link href="/dashboard/assignments" className={cn(TILE_FOOT_LINK, "mt-0 flex-1")}>
             All assignments
             <Chevron />
           </Link>
