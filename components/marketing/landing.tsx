@@ -106,7 +106,7 @@ export async function Landing() {
       {/* Live cohort — "Cohort 00N — Starts …", the countdown and Explore Programs / Join Cohort; gone once it begins */}
       <CohortBanner variant="band" cohort={calendar.next} className="pt-14 md:pt-20" />
 
-      {/* Who we are — the owner's framing: point A to point B, our systems, our experts */}
+      {/* Our mission — the mission and the three gaps it closes (blueprint §4) */}
       <InstitutionBand />
 
       {/* The band of words — the eight schools' vocabulary */}

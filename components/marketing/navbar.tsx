@@ -21,7 +21,7 @@ const LOGIN_URL = isLocalDev ? "/login" : "https://worldstreetgold.com/login"
 const REGISTER_URL = isLocalDev ? "/register" : "https://worldstreetgold.com/register"
 
 const barLinkClass =
-  "inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-full px-3 text-sm font-medium text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-chip hover:text-ws-primary"
+  "inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-full px-2 text-sm font-medium xl:px-3 text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-chip hover:text-ws-primary"
 
 /**
  * The bar's one gold button: "Get started" for guests, "Go to dashboard" once
@@ -90,11 +90,14 @@ export async function Navbar({ showFaculty }: { showFaculty: boolean }) {
       <NavSearch className="hidden min-w-0 max-w-md flex-1 md:block" />
 
       <div className="flex shrink-0 items-center gap-1 sm:gap-1.5 md:ml-auto">
-        {/* Text links from lg: Programs and the Marketplace (the Academy's
-            two halves, owner 2026-10-03). Measured at 1024: with Faculty too
-            the search drops under ~200px, so Faculty — and a signed-in user's
-            two extra links — wait for xl (Faculty for 2xl beside both of
-            them). Below lg they are all in the sheet, with New Economy. */}
+        {/* Text links from lg: The Academy, Programs and the Marketplace (the
+            Academy's two halves, owner 2026-10-03). Measured at 1024: the
+            links take px-2 until xl (px-3 after) so the three fit on one
+            line with the search still ~90px wide, no wrap and no overflow;
+            with Faculty too the search would vanish, so Faculty — and a
+            signed-in user's two extra links — wait for xl (Faculty for 2xl
+            beside both of them). Below lg they are all in the sheet, with
+            New Economy. */}
         <nav aria-label="Site" className="hidden items-center lg:flex">
           <Link href="/academy" className={barLinkClass}>
             The Academy

@@ -46,8 +46,7 @@ function clearPick() {
  * soft travelling curtain (see `hero-stage.tsx`). Owner request, 2026-09-18
  * — the one auto-advancing loop in the app; on 2026-09-21 the school covers
  * left the rotation and the students replaced them — and, by the owner's
- * later call the same day, with no
- * visible control row. What stays for WCAG 2.2.2 (`hero-controls.tsx`): one
+ * later call the same day, with no visible control row. What stays for WCAG 2.2.2 (`hero-controls.tsx`): one
  * pause/play button, clipped out of sight until it takes keyboard focus, and
  * the show holds still while the pointer rests on the chips or the CTAs,
  * while keyboard focus is inside the hero, while the hero is off screen and

@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils"
 /**
  * A sequence of stops (Wealth Liquefaction, the core transformation, the
  * journey examples). Static server markup: two columns on phones, one wrapping
- * line with hairline connectors from `sm`. The last stop is the outcome and the
+ * line with hairline connectors from `sm`. A connector trails its stop, so a wrapped row never starts with one. The last stop is the outcome and the
  * only word that takes gold.
  */
 export function Chain({
@@ -24,7 +24,6 @@ export function Chain({
         const last = i === steps.length - 1
         return (
           <li key={step} className="flex items-center">
-            {i > 0 && <span aria-hidden className="mx-4 hidden h-px w-8 bg-ws-hairline sm:block md:w-12" />}
             <span className="flex items-center gap-2.5">
               <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", last ? "bg-ws-brand" : "bg-ws-subtle")} />
               <span
@@ -36,6 +35,7 @@ export function Chain({
                 {step}
               </span>
             </span>
+            {!last && <span aria-hidden className="mx-4 hidden h-px w-8 bg-ws-hairline sm:block md:w-12" />}
           </li>
         )
       })}
