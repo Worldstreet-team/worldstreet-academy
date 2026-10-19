@@ -183,3 +183,12 @@ Online education platform for cryptocurrency/trading courses. Instructor portal 
 - **`recordings` entitlement:** a plan includes recorded classes when `recordings || liveClasses` (`recordingsAllowed`), so plans saved before the flag keep their recordings. Basic now has recordings, assignments and the certificate; live classes and instructor Q&A stay off.
 - **"Recorded classes"** joins every list of what a plan includes (chooser, ladder, purchase panel, checkout lines).
 - **Executive's label** is "Executive" (was "Executive 101"); the stored plan name is unchanged.
+
+### 2026-10-19 — Certification tiers and WMA Alumni (Phase 17)
+- **Three credentials:** WMA Certificate of Completion, WMA Certified Practitioner and WMA Mastery Certification. The tier rules are pure, in `lib/certificate-tier.ts`; the D25 thresholds (Mastery Score 70 and 85, a graded project of 70) are named constants.
+- **Stored, never lowered:** `Enrollment.certificateTier` is raised by `ensureCertificateTier` (`lib/certificate-standing.ts`) on completion, exam, grading, admin changes and when a learner opens their certificates. A conditional write means a re-grade or a falling score never takes a tier away. A null tier reads as Completion. The `WSA-` ID stays one per enrollment.
+- **`/certification`** is the public page that publishes the requirements, with the Mastery Score weights read from the constants. `/verify` prints the stored tier and never computes.
+- **WMA Alumni:** a chip on the dashboard greeting and the profile for anyone holding at least one certificate. Never on a public page.
+- **Ruling 3:** "final exam passed" is `examPassed === true`, so a program with no published final exam tops out at Completion.
+- **Ruling 4:** only the Standard and Executive plans reach Practitioner; a null `packageKey` (legacy, free) tops out at Completion. Stored tiers never go down, so widening this later is reversible.
+

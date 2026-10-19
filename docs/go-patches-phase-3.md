@@ -312,3 +312,17 @@ What Go does:
 - **What R1 and R4 already do with that data:** a Basic enrollment may start the final exam; `examRequired` now holds Basic completion until it passes; and a completed Basic enrollment gets a certificate.
 - **Basic's row today:** lessons open per R3 · final exam allowed · certificate yes (on completion) · live class refused · new thread refused.
 - **Display only:** `name`, `tagline` ("Foundation" / "Mastery" / "Personalized Mastery"), `duration` ("4 weeks" / "8–12 weeks" / "Flexible schedule") and `features`. The Executive tier label is "Executive"; it is not stored.
+
+## 19. Certificate tiers (Phase 17, institutional blueprint §13)
+
+Go needs no patch to keep working: everything is additive.
+
+**R13: certificate tiers.**
+
+- **Fields.**
+  - `enrollments.certificateTier` is `"completion" | "practitioner" | "mastery" | null`. A missing value means null.
+  - `enrollments.certificateTierAt` is a date or null.
+  - Only the web writes them, and it never lowers the tier. Go must not write them. Any wholesale enrollment write must carry them, alongside R9's `certificateId` and R11's `mentorRoadmap` (use dotted paths).
+- **Rendering on mobile.** Print the tier's name: "WMA Certificate of Completion", "WMA Certified Practitioner" or "WMA Mastery Certification". When the tier is null, print "WMA Certificate of Completion". R9's ID rules are unchanged: one `WSA-` ID per enrollment, and a higher tier reprints under the same ID.
+- **Who decides.** The web computes the tier from completion, the final exam, the Mastery Score and a graded project, as published at `/certification`. A completion made through Go gets its tier the next time the learner opens their certificates on the web. Go needs no tier logic.
+
