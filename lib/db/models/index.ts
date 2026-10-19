@@ -8,6 +8,7 @@ export {
   type PackageKey,
   type IPackageEntitlements,
   type ICoursePackage,
+  type ICourseProductFile,
   type CourseKind,
   type CourseReviewStatus,
 } from "./course"

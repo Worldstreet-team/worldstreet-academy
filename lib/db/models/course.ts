@@ -1,5 +1,6 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose"
 import type { SchoolSlug } from "@/lib/schools"
+import { COURSE_FORMATS, type CourseFormat } from "@/lib/course-format"
 
 export type CourseLevel = "beginner" | "intermediate" | "advanced"
 export type CoursePricing = "free" | "paid"
@@ -38,6 +39,15 @@ export interface IPackageEntitlements {
   certificate: boolean
   mentorship: boolean
   prioritySupport: boolean
+}
+
+/** Templates and guides: the one file buyers download. A key into the private bucket, never a URL. */
+export interface ICourseProductFile {
+  key: string
+  filename: string
+  mimeType: string
+  sizeBytes: number
+  uploadedAt: Date
 }
 
 /**
@@ -132,6 +142,10 @@ export interface ICourse extends Document {
   }
   /** The class community for this course (WhatsApp, Telegram, Discord, Social…); null = none. */
   communityUrl: string | null
+  /** Marketplace only (lib/course-format.ts): null on programs and New Economy; null on a marketplace course reads "course". Read through courseFormatOf. */
+  format: CourseFormat | null
+  /** Templates and guides: their one file, in the PRIVATE resources bucket. A key, never a URL. */
+  productFile: ICourseProductFile | null
   createdAt: Date
   updatedAt: Date
 }
@@ -286,6 +300,20 @@ const CourseSchema = new Schema<ICourse>(
       note: { type: String, default: null, maxlength: 2000 },
     },
     communityUrl: { type: String, default: null, trim: true, maxlength: 500 },
+    format: { type: String, enum: [null, ...COURSE_FORMATS], default: null },
+    productFile: {
+      type: new Schema<ICourseProductFile>(
+        {
+          key: { type: String, required: true, maxlength: 300 },
+          filename: { type: String, required: true, trim: true, maxlength: 200 },
+          mimeType: { type: String, required: true, maxlength: 200 },
+          sizeBytes: { type: Number, required: true, min: 1 },
+          uploadedAt: { type: Date, required: true },
+        },
+        { _id: false }
+      ),
+      default: null,
+    },
     publishedAt: {
       type: Date,
       default: null,
