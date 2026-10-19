@@ -18,7 +18,7 @@ import { Reveal, RevealGroup } from "@/components/marketing/motion/reveal"
 import { useMediaQuery, useMotionOK } from "@/components/marketing/motion/bus"
 import { SectionLabel, SectionTitle } from "@/components/marketing/section-heading"
 import type { LandingReview } from "@/lib/actions/reviews"
-import { ACADEMY_LINE, BIGGER_VISION } from "@/lib/institution"
+import { ACADEMY_LINE, BIGGER_VISION, CLOSING_BANNER } from "@/lib/institution"
 
 /** From this many reviews up, two rows slide past each other. */
 const ROWS_FROM = 6
@@ -297,7 +297,8 @@ function ReviewRow({
 
 /**
  * FINALE (spec §16). The closing band: hairline top border, the headline,
- * the two spec paragraphs, and the two CTAs.
+ * the two spec paragraphs, the two CTAs, and the institutional blueprint's
+ * §23 closing banner.
  *
  * The headline is set by scroll: from the section's top at the viewport's
  * bottom edge to its top at 25%, it scales 0.88 → 1 and its two lines rise
@@ -437,6 +438,16 @@ export function FinaleCta({
                 Enrol now
               </a>
             )}
+          </Reveal>
+          {/* §23's closing banner signs the page off, in the eyebrow register:
+              the band already holds its gold (the second line, the CTA). */}
+          <Reveal
+            as="p"
+            amount={0.2}
+            delay={0.24}
+            className="mx-auto mt-12 max-w-xl text-balance text-[12px] font-semibold uppercase tracking-[0.14em] text-ws-muted md:text-[13px]"
+          >
+            {CLOSING_BANNER}
           </Reveal>
         </motion.div>
       </div>

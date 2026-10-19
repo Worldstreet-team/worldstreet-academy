@@ -92,3 +92,5 @@ export const BIGGER_VISION = {
   contrast: "Most learning platforms answer: “What course do you want to buy?”",
   question: "Who do you want to become, what do you need to master, and how can that mastery create value in the new economy?",
 } as const
+/** §23's closing line, built from the brand (D1). Surfaces set it in capitals with CSS. */
+export const CLOSING_BANNER = `${BRAND.name} — ${BRAND.tagline}`
