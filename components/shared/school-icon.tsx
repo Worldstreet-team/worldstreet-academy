@@ -1,4 +1,4 @@
-import { BlocksIcon, BotIcon, BriefcaseIcon, ChartColumnIcon, ClapperboardIcon, CodeIcon, GraduationCapIcon, LandmarkIcon, ShieldCheckIcon, type IconComponent, type IconProps } from "@/components/icons"
+import { BlocksIcon, BotIcon, BriefcaseIcon, ChartColumnIcon, ClapperboardIcon, CodeIcon, GraduationCapIcon, LandmarkIcon, LightbulbIcon, PaletteIcon, ShieldCheckIcon, UsersIcon, type IconComponent, type IconProps } from "@/components/icons"
 import { RenderIcon } from "@/components/shared/render-icon"
 
 /**
@@ -16,6 +16,9 @@ const SCHOOL_ICONS: Record<string, IconComponent> = {
   "chart-column": ChartColumnIcon,
   clapperboard: ClapperboardIcon,
   briefcase: BriefcaseIcon,
+  lightbulb: LightbulbIcon,
+  palette: PaletteIcon,
+  users: UsersIcon,
 }
 
 export function SchoolIcon({ name, ...props }: IconProps & { name: string }) {
