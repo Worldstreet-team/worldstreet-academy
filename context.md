@@ -132,3 +132,10 @@ Online education platform for cryptocurrency/trading courses. Instructor portal 
 - **Removed** `link-tmp.cjs` and `link-mobile-identity.cjs` (one-off Clerk-id linking; `lib/auth/sync.ts` links by email).
 - **Launch:** env, crons, catalogue, certificate backfill, §17 QA and rollback live in `docs/launch-runbook.md`.
 - The sections above predate the Mastery rebuild (`/courses` routes, Hugeicons, `#44A08E`) — `CLAUDE.md` and `design-system/` are current.
+
+### 2026-10-19 — Admin levels (Phase 21)
+- **Data:** `User.adminLevel` (`"super"` or null, Mongo only, never read from or written to Clerk) and `adminAudit[]`. A super admin is `role: "ADMIN"` plus `adminLevel: "super"`; Go still sees `ADMIN`. Every grant, revoke, promote and demote is audited.
+- **Super-only grants:** `/admin/team` (a 404 for regular admins) and the Admin option on `/admin/users`. All role changes go through `applyRoleChange` in `lib/auth/admin.ts`; actions use `requireSuperAdmin()`. Self-changes and demoting the last super admin are refused.
+- **Clerk:** metadata can no longer make an existing account an admin; it raises a `USER` to `INSTRUCTOR` only. A brand-new account still takes its claimed role (open risk, noted for the owner).
+- **Removal** restores the role held at grant time (the latest grant entry's `fromRole`). Granting `ADMIN` no longer sets `instructorStatus: "approved"`.
+- **Bootstrap:** `MONGODB_URI=<uri> node scripts/grant-admin.mjs <email> --super` (the explicit URI is required). `--revoke` refuses the last super admin.
