@@ -26,7 +26,7 @@ export async function courseReviewFingerprint(courseId: string): Promise<string 
       .select("title description type videoUrl content videoDuration isFree sectionTitle")
       .lean(),
     Resource.find({ course: courseId })
-      .sort({ order: 1, title: 1 })
+      .sort({ order: 1, title: 1, _id: 1 })
       .select("title kind storageKey externalUrl filename sizeBytes isFree lesson")
       .lean(),
   ])
