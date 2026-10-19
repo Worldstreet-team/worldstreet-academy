@@ -5,6 +5,7 @@ import { Types } from "mongoose"
 import {
   Earning,
   Order,
+  PartnerClick,
   User,
   INSTRUCTOR_REVENUE_SHARE,
   MARKETPLACE_SHARE_ACADEMY,
@@ -14,6 +15,7 @@ import {
 } from "@/lib/db/models"
 import { REFERRAL_COOKIE, SELLER_LINK_COOKIE, normalizeReferralCode, sellerLinkCodeFor } from "@/lib/referral-link"
 import { maskedName } from "@/lib/masked-name"
+import { PARTNER_CLICK_WINDOW_DAYS, partnerDay, recentDays, type PartnerClickDay } from "@/lib/partner-clicks"
 
 /**
  * Server half of referrals (owner, 2026-10-05): minting a person's code, who
@@ -241,6 +243,10 @@ export type ReferralSummary = {
   pendingMinor: number
   /** Commissions credited to the wallet, less any clawed back after a refund. */
   clearedMinor: number
+  /** Visits to this code's partner link: all time, and per Lagos day for the last 30 (newest first, empty days 0). */
+  clicks: { total: number; last30: PartnerClickDay[] }
+  /** What learners paid for purchases credited to this code as a referral: paid or enrolled orders, wallet and ESPEE; not refunds, not a creator's own link. */
+  revenueMinor: number
   /** Newest first. */
   people: ReferralPerson[]
 }
@@ -250,10 +256,19 @@ export async function referralSummary(userId: string, limit = 25): Promise<Refer
   const code = await ensureReferralCode(userId)
   const me = new Types.ObjectId(userId)
 
-  const [referred, commissions] = await Promise.all([
+  const days = recentDays(partnerDay(new Date()), PARTNER_CLICK_WINDOW_DAYS)
+
+  const [referred, commissions, clickTotals, clickRows, revenue] = await Promise.all([
     User.find({ "referredBy.userId": me }).select("_id firstName lastName createdAt").sort({ createdAt: -1 }).lean(),
     Earning.find({ instructor: me, kind: "referral" }).select("_id student netMinor status availableAt").lean(),
+    PartnerClick.aggregate<{ total: number }>([{ $match: { code } }, { $group: { _id: null, total: { $sum: "$count" } } }]),
+    PartnerClick.find({ code, day: { $gte: days[days.length - 1] } }).select("day count").lean(),
+    Order.aggregate<{ total: number }>([
+      { $match: { "attribution.userId": me, "attribution.kind": "referral", status: { $in: ["paid", "enrolled"] } } },
+      { $group: { _id: null, total: { $sum: "$amountMinor" } } },
+    ]),
   ])
+  const countByDay = new Map(clickRows.map((r) => [r.day, r.count]))
   const [clawbacks, paidUserIds] = await Promise.all([
     // refundEnrollment keys a post-clearing clawback on the earning it reverses.
     commissions.length
@@ -293,6 +308,11 @@ export async function referralSummary(userId: string, limit = 25): Promise<Refer
     paidCount: referred.filter((u) => paid.has(u._id.toString())).length,
     pendingMinor,
     clearedMinor,
+    clicks: {
+      total: clickTotals[0]?.total ?? 0,
+      last30: days.map((d) => ({ day: d, count: countByDay.get(d) ?? 0 })),
+    },
+    revenueMinor: revenue[0]?.total ?? 0,
     people: referred.slice(0, limit).map((u) => ({
       id: u._id.toString(),
       name: maskedName(u.firstName, u.lastName),

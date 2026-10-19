@@ -11,12 +11,19 @@ import { appUrl } from "@/lib/app-url"
 import { cn } from "@/lib/utils"
 
 export const metadata: Metadata = {
-  title: "Refer & earn",
+  title: "WMA Partners",
   robots: { index: false, follow: false },
 }
 
 const RATE = `${Math.round(REFERRAL_COMMISSION_RATE * 100)}%`
-const RULE = `You earn ${RATE} of a friend's first purchase, paid to your WorldStreet wallet after ${EARNINGS_CLEARING_DAYS} days.`
+const SUBTITLE = `Share your Partner Code and earn ${RATE} of the first purchase of every learner you refer.`
+const RULES = [
+  `You earn ${RATE} of the first purchase each learner you refer pays for, once per learner.`,
+  "It counts when that first purchase is paid from their WorldStreet wallet and credited to your code. A first purchase paid by ESPEE transfer, or credited to another code, earns you no commission.",
+  `Commission clears to your WorldStreet wallet ${EARNINGS_CLEARING_DAYS} days after the purchase. If the purchase is refunded, the commission is reversed.`,
+  "Your own purchases never earn commission.",
+] as const
+const STATS_NOTE = "Clicks count each visitor once a day. Revenue is what learners paid for purchases credited to your code."
 
 function usd(minor: number): string {
   return (minor / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })
@@ -53,17 +60,20 @@ export default async function ReferralsPage() {
     console.error("Referrals page error:", error)
   }
 
+  const clickDays = summary ? summary.clicks.last30.filter((d) => d.count > 0) : []
+  const maxClicks = Math.max(1, ...clickDays.map((d) => d.count))
+
   return (
     <>
-      <Topbar title="Refer & earn" breadcrumbOverrides={{ referrals: "Refer & earn" }} />
+      <Topbar title="WMA Partners" breadcrumbOverrides={{ referrals: "WMA Partners" }} />
       <div className="flex-1 px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-8 sm:px-6 md:px-8 md:pb-12 lg:px-12">
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-          <PageHeader title="Refer & earn" subtitle={RULE} />
+          <PageHeader title="WMA Partners" subtitle={SUBTITLE} />
 
           {!summary ? (
             <CardShell>
               <EmptyState
-                title="Your referral link didn't load"
+                title="Your partner dashboard didn't load"
                 description="Refresh the page to try again."
               />
             </CardShell>
@@ -74,12 +84,42 @@ export default async function ReferralsPage() {
               </Rise>
 
               <Rise delay={60}>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <Stat label="Referred" value={String(summary.referredCount)} />
-                  <Stat label="Paid" value={String(summary.paidCount)} />
-                  <Stat label="Pending" value={usd(summary.pendingMinor)} />
-                  <Stat label="In your wallet" value={usd(summary.clearedMinor)} />
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  <Stat label="Clicks" value={String(summary.clicks.total)} />
+                  <Stat label="Sign-ups" value={String(summary.referredCount)} />
+                  <Stat label="Enrolled" value={String(summary.paidCount)} />
+                  <Stat label="Revenue" value={usd(summary.revenueMinor)} />
+                  <Stat label="Commission pending" value={usd(summary.pendingMinor)} />
+                  <Stat label="Commission paid" value={usd(summary.clearedMinor)} />
                 </div>
+                <p className="mt-3 text-[12.5px] text-muted-foreground">{STATS_NOTE}</p>
+              </Rise>
+
+              <Rise delay={90}>
+                <CardShell>
+                  <CardHeader title="Clicks in the last 30 days" subtitle="One per visitor per day" />
+                  {clickDays.length === 0 ? (
+                    <EmptyState
+                      title="No clicks yet"
+                      description="When someone opens your partner link, the visit shows here."
+                    />
+                  ) : (
+                    <ul className="divide-y divide-border border-t border-border">
+                      {clickDays.map((d) => (
+                        <li key={d.day} className="flex items-center gap-3 px-5 py-3">
+                          <span className="w-28 shrink-0 text-[13.5px]">{day(`${d.day}T00:00:00.000Z`)}</span>
+                          <span className="h-2 min-w-0 flex-1 rounded-full bg-foreground/[0.06]" aria-hidden>
+                            <span
+                              className="block h-full rounded-full bg-foreground/30"
+                              style={{ width: `${(d.count / maxClicks) * 100}%` }}
+                            />
+                          </span>
+                          <span className="w-10 shrink-0 text-right text-[13.5px] font-semibold tabular-nums">{d.count}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </CardShell>
               </Rise>
 
               <Rise delay={120}>
@@ -114,6 +154,17 @@ export default async function ReferralsPage() {
                       ))}
                     </ul>
                   )}
+                </CardShell>
+              </Rise>
+
+              <Rise delay={150}>
+                <CardShell>
+                  <CardHeader title="How commission works" />
+                  <ul className="flex list-disc flex-col gap-2 border-t border-border px-5 py-4 pl-9 text-[13.5px] leading-relaxed">
+                    {RULES.map((r) => (
+                      <li key={r}>{r}</li>
+                    ))}
+                  </ul>
                 </CardShell>
               </Rise>
             </>
