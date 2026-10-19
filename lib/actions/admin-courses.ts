@@ -7,6 +7,7 @@ import { Course, Review, User, type CourseKind, type CourseReviewStatus } from "
 import { requireAdmin } from "@/lib/auth/admin"
 import { notifyUser } from "@/lib/notify"
 import { courseKindOf } from "@/lib/course-kind"
+import { courseFormatOf, hasDeliverable, isFileFormat } from "@/lib/course-format"
 
 const PAGE_SIZE = 20
 
@@ -135,8 +136,21 @@ export async function adminSetCourseStatus(
     if (!course) return { success: false, error: "Course not found" }
     if (course.status === status) return { success: true }
 
-    if (status === "published" && (course.totalLessons ?? 0) === 0) {
-      return { success: false, error: "Can't publish a course with no lessons" }
+    if (status === "published") {
+      const format = courseFormatOf(course)
+      if (!hasDeliverable({ format, totalLessons: course.totalLessons ?? 0, productFile: course.productFile ?? null })) {
+        return {
+          success: false,
+          error: isFileFormat(format) ? "Can't publish a template or guide without its file" : "Can't publish a course with no lessons",
+        }
+      }
+      // No way around the four checks: a Marketplace Creator's course is published from its review page.
+      if (courseKindOf(course) === "marketplace" && course.review?.status !== "approved") {
+        const owner = await User.findById(course.instructor).select("role").lean()
+        if (owner?.role === "USER") {
+          return { success: false, error: "A Marketplace Creator's course is published from its review page, once all four checks pass." }
+        }
+      }
     }
 
     course.status = status

@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose"
 import type { SchoolSlug } from "@/lib/schools"
 import { COURSE_FORMATS, type CourseFormat } from "@/lib/course-format"
+import { REVIEW_CHECK_STATUSES, type ReviewCheckKey, type ReviewCheckStatus } from "@/lib/review-checks"
 
 export type CourseLevel = "beginner" | "intermediate" | "advanced"
 export type CoursePricing = "free" | "paid"
@@ -75,6 +76,25 @@ export interface ICoursePackage {
   entitlements: IPackageEntitlements
 }
 
+/** One recorded quality check: who, when, the note, and the content fingerprint it was recorded on. */
+export interface IReviewCheck {
+  status: ReviewCheckStatus | null
+  by: Types.ObjectId | null
+  at: Date | null
+  note: string | null
+  contentHash: string | null
+}
+
+function reviewCheckPaths() {
+  return {
+    status: { type: String, enum: [null, ...REVIEW_CHECK_STATUSES], default: null },
+    by: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    at: { type: Date, default: null },
+    note: { type: String, default: null, maxlength: 2000 },
+    contentHash: { type: String, default: null },
+  }
+}
+
 export interface ICourse extends Document {
   _id: Types.ObjectId
   title: string
@@ -139,6 +159,8 @@ export interface ICourse extends Document {
     reviewedAt: Date | null
     reviewedBy: Types.ObjectId | null
     note: string | null
+    /** The four recorded quality checks (lib/review-checks.ts); missing on legacy rows. */
+    checks?: Partial<Record<ReviewCheckKey, IReviewCheck>>
   }
   /** The class community for this course (WhatsApp, Telegram, Discord, Social…); null = none. */
   communityUrl: string | null
@@ -298,6 +320,12 @@ const CourseSchema = new Schema<ICourse>(
       reviewedAt: { type: Date, default: null },
       reviewedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
       note: { type: String, default: null, maxlength: 2000 },
+      checks: {
+        content: reviewCheckPaths(),
+        quality: reviewCheckPaths(),
+        accuracy: reviewCheckPaths(),
+        technical: reviewCheckPaths(),
+      },
     },
     communityUrl: { type: String, default: null, trim: true, maxlength: 500 },
     format: { type: String, enum: [null, ...COURSE_FORMATS], default: null },

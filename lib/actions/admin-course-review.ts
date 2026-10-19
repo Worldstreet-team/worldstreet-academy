@@ -8,6 +8,9 @@ import { requireAdmin } from "@/lib/auth/admin"
 import { notifyUser } from "@/lib/notify"
 import { sendCourseReviewDecisionEmail } from "@/lib/email"
 import { appUrl } from "@/lib/app-url"
+import { courseFormatOf, hasDeliverable, isFileFormat } from "@/lib/course-format"
+import { courseReviewFingerprint } from "@/lib/course-review"
+import { REVIEW_CHECK_DETAILS, outstandingChecks } from "@/lib/review-checks"
 
 /**
  * The marketplace quality review, admin side (owner, 2026-10-05). A seller
@@ -44,10 +47,25 @@ export async function adminApproveCourseReview(courseId: string): Promise<Result
     if (!id.success) return { success: false, error: "Invalid course" }
 
     const course = await Course.findOne({ _id: id.data, kind: "marketplace", "review.status": "pending" })
-      .select("title slug instructor publishedAt totalLessons")
+      .select("title slug instructor publishedAt totalLessons kind format productFile review.checks")
       .lean()
     if (!course) return { success: false, error: "This course isn't waiting for review" }
-    if ((course.totalLessons ?? 0) === 0) return { success: false, error: "Can't publish a course with no lessons" }
+    const format = courseFormatOf(course)
+    if (!hasDeliverable({ format, totalLessons: course.totalLessons ?? 0, productFile: course.productFile ?? null })) {
+      return {
+        success: false,
+        error: isFileFormat(format) ? "Can't publish a template or guide without its file" : "Can't publish a course with no lessons",
+      }
+    }
+    // Approval waits for all four checks, recorded on the content as it is now (ruling 7).
+    const fingerprint = await courseReviewFingerprint(id.data)
+    const outstanding = fingerprint ? outstandingChecks(course.review?.checks, fingerprint) : null
+    if (!outstanding || outstanding.length > 0) {
+      return {
+        success: false,
+        error: `Every check must pass first. Still to do: ${(outstanding ?? ["content", "quality", "accuracy", "technical"] as const).map((k) => REVIEW_CHECK_DETAILS[k].title).join(", ")}`,
+      }
+    }
 
     const now = new Date()
     // Targeted write, guarded on "pending" so a double click approves once.

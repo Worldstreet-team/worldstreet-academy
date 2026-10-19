@@ -852,6 +852,26 @@ export async function updateCourse(
     })
     if ("field" in product) return { success: false, error: null, fieldErrors: { [product.field]: product.error } }
     const submitting = seller && extras.submitForReview && status !== "published"
+    // No way around the four checks: an admin can't publish a Marketplace
+    // Creator's unapproved course from the editor either (ruling 9).
+    if (
+      !seller &&
+      instructor.role === "ADMIN" &&
+      existingCourse.instructor.toString() !== instructor._id.toString() &&
+      kind === "marketplace" &&
+      status === "published" &&
+      existingCourse.status !== "published" &&
+      existingCourse.review?.status !== "approved"
+    ) {
+      const owner = await User.findById(existingCourse.instructor).select("role").lean()
+      if (owner?.role === "USER") {
+        return {
+          success: false,
+          error: "A Marketplace Creator's course is published from its review page, once all four checks pass.",
+          fieldErrors: {},
+        }
+      }
+    }
     if (isFileFormat(product.format)) {
       if ((sentLessons ?? 0) > 0) {
         return { success: false, error: null, fieldErrors: { lessons: "A template or guide is one file — it has no lessons" } }
