@@ -37,20 +37,21 @@ export function ReferralShare({ code, link }: { code: string; link: string }) {
 
   return (
     <CardShell className="p-5">
-      <Eyebrow>Your code</Eyebrow>
+      <Eyebrow>Your Partner Code</Eyebrow>
       <div className="mt-1.5 flex items-center gap-2">
         <span className="font-display text-[26px] font-semibold tracking-[0.04em] tabular-nums">{code}</span>
         <button
           type="button"
           onClick={() => copy("code", code)}
-          aria-label="Copy your code"
+          aria-label="Copy your Partner Code"
           className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors duration-[var(--ws-motion-fast)] hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
         >
           <Glyph icon={copied === "code" ? Tick02Icon : Copy01Icon} className="size-[18px]" />
         </button>
       </div>
 
-      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+      <Eyebrow className="mt-4">Your partner link</Eyebrow>
+      <div className="mt-1.5 flex flex-col gap-2 sm:flex-row sm:items-center">
         <span
           className="flex h-11 min-w-0 flex-1 items-center rounded-full bg-surface-sunken px-4 text-[13.5px] text-muted-foreground"
           title={link}
@@ -75,7 +76,7 @@ export function ReferralShare({ code, link }: { code: string; link: string }) {
         {failed
           ? "Couldn't copy — select the link and copy it yourself."
           : copied === "code"
-            ? "Code copied."
+            ? "Partner Code copied."
             : "Share it anywhere. Anyone who opens it and joins within 30 days is linked to you."}
       </p>
     </CardShell>

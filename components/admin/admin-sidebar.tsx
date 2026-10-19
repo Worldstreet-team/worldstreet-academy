@@ -1,5 +1,5 @@
 "use client"
-import { BookOpen, ClipboardCheck, GraduationCap, House, Inbox, LayoutDashboard, LogOut, ReceiptText, Star, Store, Users, Wallet, type IconComponent } from "@/components/icons"
+import { BookOpen, ClipboardCheck, GraduationCap, HandshakeIcon, House, Inbox, LayoutDashboard, LogOut, ReceiptText, Star, Store, Users, Wallet, type IconComponent } from "@/components/icons"
 
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
@@ -80,6 +80,12 @@ const manageItems: NavItem[] = [
     href: "/admin/sellers",
     icon: Store,
     match: (p) => p.startsWith("/admin/sellers"),
+  },
+  {
+    title: "Partners",
+    href: "/admin/partners",
+    icon: HandshakeIcon,
+    match: (p) => p.startsWith("/admin/partners"),
   },
   {
     title: "Enrollments",

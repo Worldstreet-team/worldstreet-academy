@@ -50,6 +50,13 @@ From the 2026-10-03 meeting: three plans on every program, ESPEE proof-of-paymen
 
 **Rollback:** set `FACULTY_PUBLIC` in `lib/faculty.ts` back to `true` to show faculty again. Reverting the `feat/cohort-launch` merge restores the old gate and wallet-only checkout. Approved ESPEE enrollments stay valid, and their Orders carry `paymentMethod: "espee"`.
 
+## WMA Partners — Phase 18 (institutional blueprint §15)
+
+Nothing to configure. The `partnerclicks` collection and its unique index are created on first use, and clicks count from the deploy on, with no history before it. Commission rules are unchanged.
+
+1. **Smoke test.** Signed in, open `/dashboard/referrals` and copy your partner link. Open it in a private window and reload once. Back in your own session, Clicks reads 1 more, not 2. Opening your own link while signed in adds nothing (a signed-out visit by you does count).
+2. **Admin.** `/admin/partners` lists you. "Export CSV" opens cleanly in a spreadsheet.
+
 ## 0. Blockers — settle these first
 
 | # | Item | Who | Blocks launch? |

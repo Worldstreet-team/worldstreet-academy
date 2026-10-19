@@ -40,7 +40,7 @@ function getPageContext(pathname: string): string {
   if (pathname === "/dashboard/recordings") return "their class recordings"
   if (pathname === "/dashboard/assignments") return "their assignments"
   if (pathname === "/dashboard/mentorship") return "their Executive mentorship"
-  if (pathname === "/dashboard/referrals") return "their referral code and earnings"
+  if (pathname === "/dashboard/referrals") return "their WMA Partners dashboard — Partner Code, partner link, clicks and commission"
   if (pathname === "/dashboard/points") return "their points and leaderboard"
   if (pathname.startsWith("/instructor")) return "the instructor panel — managing courses/analytics"
   return `a page at ${pathname}`

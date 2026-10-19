@@ -3,6 +3,7 @@ import { Footer } from "@/components/marketing/footer"
 import { CohortBanner } from "@/components/marketing/cohort-banner"
 import { fetchFacultyCount } from "@/lib/actions/student"
 import { FACULTY_PUBLIC } from "@/lib/faculty"
+import { PartnerVisit } from "@/components/marketing/partner-visit"
 
 export default async function MarketingLayout({
   children,
@@ -25,6 +26,8 @@ export default async function MarketingLayout({
       {/* The navbar is sticky and opaque, so pages simply start below it. */}
       <main className="flex-1">{children}</main>
       <Footer showFaculty={showFaculty} />
+      {/* WMA Partners: counts a `?ref=` visit (once per visitor per code per day) */}
+      <PartnerVisit />
     </div>
   )
 }

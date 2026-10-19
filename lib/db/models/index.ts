@@ -79,3 +79,4 @@ export {
 } from "./seller-application"
 export { Recording, type IRecording, type RecordingStatus } from "./recording"
 export { PointEvent, type IPointEvent, type PointEventKind } from "./point-event"
+export { PartnerClick, type IPartnerClick } from "./partner-click"

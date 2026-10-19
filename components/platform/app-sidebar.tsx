@@ -130,7 +130,7 @@ const connectItems: NavItem[] = [
 const accountItems: NavItem[] = [
   { title: "Wallet", href: "/dashboard/wallet", icon: Wallet01Icon, match: (p) => p.startsWith("/dashboard/wallet") },
   {
-    title: "Refer & earn",
+    title: "WMA Partners",
     href: "/dashboard/referrals",
     icon: GiftIcon,
     match: (p) => p.startsWith("/dashboard/referrals"),
