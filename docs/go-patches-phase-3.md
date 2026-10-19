@@ -18,7 +18,7 @@ Source of truth for the rules: `lib/entitlements.ts` and `lib/course-access.ts` 
 | | `price` | integer, **whole USD** (same unit as `Course.price`) | Package price. |
 | | `listPrice`, `duration` | integer whole USD \| `null`; string \| `null` | Additive, display only (2026-10-03): the pre-discount price the web shows struck through, and how long the package runs ("9 weeks"). Go may ignore both; what is charged is still `price`. Missing on older rows = `null`. |
 | | `enabled` | bool | Whether the tier is on sale. |
-| | `entitlements` | `{ liveClasses, instructorQa, assignments, certificate, mentorship, prioritySupport }` booleans | What the tier includes. A missing flag means `false`. |
+| | `entitlements` | `{ liveClasses, instructorQa, assignments, certificate, mentorship, prioritySupport }` booleans, plus `recordings` (Phase 14, web-only; missing = `false`) | What the tier includes. A missing flag means `false`. |
 | `courses` | `price` / `pricing` | unchanged | Kept equal to the **cheapest enabled** package (`pricing: "free"` only when that cheapest tier is $0). |
 | `lessons` | `minPackageKey` | `null \| "basic" \| "standard" \| "executive"` | Lowest tier that can open the lesson. `null` = every tier. |
 | `enrollments` | `packageKey` | `null \| "basic" \| "standard" \| "executive"` | Tier bought. `null` = legacy, free, or pre-enrolled → full access. |
@@ -78,6 +78,8 @@ Otherwise the lesson is **locked**, and Go must:
 **R7 — Instructor Q&A.** Only if Go creates conversations. When a `USER` starts a **new** conversation with someone who teaches courses the user is enrolled in, refuse if none of those enrollments has `entitlements.instructorQa`. Existing conversations are untouched. Users with no enrollment with that instructor are unaffected.
 
 ## 3. Test matrix (mock data: Forex Trading Mastery, Basic $49 · Standard $199 · Executive 101 $999)
+
+Phase 14 (2026-10-19) changed Basic's data; §12 has its row today.
 
 | Enrollment | Lesson `minPackageKey: null` | Lesson `standard` | Lesson `executive` | Final exam | Certificate | Live class | New thread with instructor |
 |---|---|---|---|---|---|---|---|
@@ -185,7 +187,7 @@ Go needs no patch. All additive:
 
 - **`meetings.liveNotifiedAt`** — date or `null` (missing = `null`). Set on a course class when its "<course> is live now" notice goes to the class's students (when the host starts a scheduled class, or when a class is created to start now). The web claims it with a filtered update before sending, so a host rejoining never re-notifies. If Go ever starts a class, it should claim the same field before notifying, or leave it alone. Any wholesale meeting write must keep it.
 - **Course-class RealtimeKit rooms are created with `record_on_start: true`.** Mentorship rooms, interviews and ad-hoc meetings are not. If Go creates class rooms, it should pass the same flag, or those classes won't be recorded.
-- **`recordings`** — new web-only collection; Go may ignore it. One row per RealtimeKit recording of a course class: `meeting`, `course`, `host` (ObjectIds), `rtkRecordingId` (unique), `rtkStatus`, `status` (`"pending" | "stored" | "failed"`), `storageKey` (private resources bucket only, `worldstreet-academy/recordings/<courseId>/<meetingId>/<rtkRecordingId>.mp4`), `durationSeconds`, `sizeBytes`, `recordedAt`, `title`, `hidden`, `failureReason`, `attempts`, `copyStartedAt`, `storedAt`. Written by `/api/cron/recordings`. Playback is a 10-minute signed GET minted after the web re-checks that the viewer's package includes live classes (or that they are course staff). If mobile ever plays recordings, it must go through the same check and never expose `storageKey` or a public URL.
+- **`recordings`** — new web-only collection; Go may ignore it. One row per RealtimeKit recording of a course class: `meeting`, `course`, `host` (ObjectIds), `rtkRecordingId` (unique), `rtkStatus`, `status` (`"pending" | "stored" | "failed"`), `storageKey` (private resources bucket only, `worldstreet-academy/recordings/<courseId>/<meetingId>/<rtkRecordingId>.mp4`), `durationSeconds`, `sizeBytes`, `recordedAt`, `title`, `hidden`, `failureReason`, `attempts`, `copyStartedAt`, `storedAt`. Written by `/api/cron/recordings`. Playback is a 10-minute signed GET minted after the web re-checks that the viewer's plan includes recorded classes (`recordings || liveClasses`, `recordingsAllowed`) (or that they are course staff). If mobile ever plays recordings, it must go through the same check and never expose `storageKey` or a public URL.
 
 ## 11. Points and the tutor application questions (owner meeting, 2026-10-03)
 
@@ -216,3 +218,13 @@ Indexes: `{ key: 1 }` unique, `{ user: 1, createdAt: -1 }`, `{ course: 1, user: 
 | `extraDocumentUrl` | string \| `null` | An optional extra PDF, uploaded like `cvUrl`. |
 
 The web requires the first five on every new application. Any wholesale application write must keep them (write dotted paths or keep the fields).
+
+## 12. Phase 14 — plans to the institutional blueprint (owner, 2026-10-19)
+
+**Go needs no patch;** only data changed.
+
+- **`courses.packages[].entitlements.recordings`** is a new web-only boolean (missing = `false`). The web treats a plan as including recorded classes when `recordings || liveClasses`. If mobile ever plays recordings, it uses the same rule and §10's signed-URL path.
+- **After the catalogue apply,** every catalogue program's Basic plan has `assignments`, `certificate` and `recordings` true, and `liveClasses`, `instructorQa`, `mentorship` and `prioritySupport` false.
+- **What R1 and R4 already do with that data:** a Basic enrollment may start the final exam; `examRequired` now holds Basic completion until it passes; and a completed Basic enrollment gets a certificate.
+- **Basic's row today:** lessons open per R3 · final exam allowed · certificate yes (on completion) · live class refused · new thread refused.
+- **Display only:** `name`, `tagline` ("Foundation" / "Mastery" / "Personalized Mastery"), `duration` ("4 weeks" / "8–12 weeks" / "Flexible schedule") and `features`. The Executive tier label is "Executive"; it is not stored.

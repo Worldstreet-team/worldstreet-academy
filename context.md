@@ -132,3 +132,9 @@ Online education platform for cryptocurrency/trading courses. Instructor portal 
 - **Removed** `link-tmp.cjs` and `link-mobile-identity.cjs` (one-off Clerk-id linking; `lib/auth/sync.ts` links by email).
 - **Launch:** env, crons, catalogue, certificate backfill, §17 QA and rollback live in `docs/launch-runbook.md`.
 - The sections above predate the Mastery rebuild (`/courses` routes, Hugeicons, `#44A08E`) — `CLAUDE.md` and `design-system/` are current.
+
+### 2026-10-19 — Plans to the blueprint (Phase 14)
+- **Labels:** Basic — Foundation, Standard — Mastery, Executive — Personalized Mastery. The tagline sits beside the tier label; plan names stay program-specific.
+- **`recordings` entitlement:** a plan includes recorded classes when `recordings || liveClasses` (`recordingsAllowed`), so plans saved before the flag keep their recordings. Basic now has recordings, assignments and the certificate; live classes and instructor Q&A stay off.
+- **"Recorded classes"** joins every list of what a plan includes (chooser, ladder, purchase panel, checkout lines).
+- **Executive's label** is "Executive" (was "Executive 101"); the stored plan name is unchanged.

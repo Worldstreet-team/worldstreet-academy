@@ -42,6 +42,7 @@ From the 2026-10-03 meeting: three plans on every program, ESPEE proof-of-paymen
    - Then reject a second proof and check that the reason shows at checkout.
 6. **Sales export.** On `/admin/users`, use "Export interested learners".
 7. **Go team.** Point them at `docs/go-patches-phase-3.md` §7–§11: ESPEE orders have no wallet charge; referral earnings and seller shares (§8); course `kind` — Go must hide marketplace and New Economy courses wherever it lists programs (§9); recordings and the go-live notice (§10); points and the new application answers (§11).
+   - Phase 14: §12 (Basic certifies; `recordings` is web-only).
 8. **Marketplace, referrals, teaching (2026-10-05, same release).**
    - Recordings need the same `R2_RESOURCES_BUCKET_NAME` and the new hourly `academy-recordings` task (§5). RealtimeKit bills recording at about $0.01 per minute; only course classes record, never 1-on-1 mentorship.
    - New Economy courses: `MONGODB_URI="$PROD_URI" node scripts/new-economy-catalogue.mjs --owner <admin email>` (dry run), then `--apply`. It creates one free DRAFT per WorldStreet product; add lessons and publish each from the admin course editor.
@@ -49,6 +50,24 @@ From the 2026-10-03 meeting: three plans on every program, ESPEE proof-of-paymen
    - Smoke test: open `/?ref=<your code>` from `/dashboard/referrals` in a private window, buy as a fresh account, and check `/dashboard/referrals` shows the pending 10%.
 
 **Rollback:** set `FACULTY_PUBLIC` in `lib/faculty.ts` back to `true` to show faculty again. Reverting the `feat/cohort-launch` merge restores the old gate and wallet-only checkout. Approved ESPEE enrollments stay valid, and their Orders carry `paymentMethod: "espee"`.
+
+## Plans to the blueprint — Phase 14 (2026-10-19)
+
+1. **Before.** The Phase 10 catalogue apply has run. If it never ran, this single run does both, so follow §6 and expect its price changes (`--allow-price-change`).
+2. **Count the Basic learners this will certify without the exam** (read-only; expected `0`; otherwise decide before applying):
+
+   ```bash
+   mongosh "$PROD_URI" --quiet --eval 'const ids = db.courses.distinct("_id", { examRequired: true }); print("basic completed without exam " + db.enrollments.countDocuments({ course: { $in: ids }, packageKey: "basic", status: "completed", examPassed: { $ne: true } }))'
+   ```
+
+3. **Dry run**, then review it:
+   - Run `MONGODB_URI="$PROD_URI" node scripts/mastery-catalogue.mjs | tee "plans-dryrun-$(date +%Y%m%d-%H%M).log"`.
+   - Each MATCH has three `plan …:` lines. Basic gains `+assignments +certificate +recordings`; Standard and Executive gain `+recordings`.
+   - No line carries a `-flag`.
+   - If one does, a learner on that plan would lose that service. Stop and take it to the owner: `--allow-access-loss` is for a written go only.
+4. **Apply** with `--apply`, plus `--allow-price-change` only if step 1 applies, and `tee` the log. Then re-run `--apply`; it must end `Total modifiedCount across matched rows: 0`.
+5. **Check:** `curl -s "$SITE/programs/<forex slug>"` shows "Foundation", "Personalized Mastery", "4 weeks", "8–12 weeks" and "Flexible schedule". A Basic test learner sees Recordings, Assignments and, after the lessons, the exam.
+6. **Rollback:** re-run the previous release's script with `--apply --allow-access-loss`. Basic learners then lose recordings, assignments and the exam. Issued certificate IDs stay valid.
 
 ## 0. Blockers — settle these first
 
