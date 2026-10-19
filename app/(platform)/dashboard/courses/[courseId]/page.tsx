@@ -427,7 +427,7 @@ export default async function CourseDetailPage({
                 can see what the course comes with. */}
             <CourseResources courseId={course.id} />
 
-            {/* Recordings of past live classes — only when the package includes live classes (checked server-side). */}
+            {/* Recordings of past live classes — only when the plan includes recorded classes (checked server-side). */}
             {(isEnrolled || isStaff) && <RecordingsList courseId={course.id} />}
 
             {/* About Instructor */}

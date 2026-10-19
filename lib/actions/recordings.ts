@@ -7,14 +7,14 @@ import connectDB from "@/lib/db"
 import { Course, Enrollment, Recording, User } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth/actions"
 import { getCourseAccess } from "@/lib/course-access"
-import { entitlementsFor } from "@/lib/entitlements"
+import { entitlementsFor, recordingsAllowed } from "@/lib/entitlements"
 import { generatePresignedDownloadUrl, hasPrivateResourceBucket } from "@/lib/r2"
 import { programArt } from "@/lib/school-art"
 
 /*
  * Class recordings (owner, 2026-10-03): every course class is recorded and
- * copied to the private bucket (/api/cron/recordings). Students whose package
- * includes live classes watch them in their dashboard; they can't download
+ * copied to the private bucket (/api/cron/recordings). Students whose plan
+ * includes recorded classes (`recordingsAllowed`) watch them in their dashboard; they can't download
  * them. Course staff (the instructor, the class host, admins) see them too and
  * may rename or hide one. Playback is a 10-minute signed GET minted only after
  * access is re-checked here.
@@ -51,7 +51,7 @@ export type InstructorRecordingView = RecordingView & {
 
 const recordingIdSchema = z.string().regex(OBJECT_ID, "Recording not found")
 
-/** "staff" (admin, course instructor, class host), "student" (package includes live classes), or no access. */
+/** "staff" (admin, course instructor, class host), "student" (plan includes recorded classes: `recordingsAllowed`), or no access. */
 async function recordingAccess(
   user: Viewer,
   rec: { course: Types.ObjectId; host: Types.ObjectId }
@@ -60,10 +60,10 @@ async function recordingAccess(
   const course = await Course.findById(rec.course).select("instructor").lean()
   if (course?.instructor?.toString() === user.id) return "staff"
   const access = await getCourseAccess(user.id, rec.course.toString())
-  return access?.entitlements.liveClasses ? "student" : null
+  return access && recordingsAllowed(access.entitlements) ? "student" : null
 }
 
-/** Courses whose stored recordings this viewer may list: live-class enrollments + courses they teach. Null = all (admin). */
+/** Courses whose stored recordings this viewer may list: enrollments whose plan includes recorded classes (`recordingsAllowed`) + courses they teach. Null = all (admin). */
 async function listableCourseIds(user: Viewer): Promise<Types.ObjectId[] | null> {
   if (user.role === "ADMIN") return null
   const userId = new Types.ObjectId(user.id)
@@ -80,7 +80,7 @@ async function listableCourseIds(user: Viewer): Promise<Types.ObjectId[] | null>
   const ids = new Map<string, Types.ObjectId>()
   for (const e of enrollments) {
     const course = byId.get(e.course.toString())
-    if (course && entitlementsFor(course, e).liveClasses) ids.set(e.course.toString(), e.course)
+    if (course && recordingsAllowed(entitlementsFor(course, e))) ids.set(e.course.toString(), e.course)
   }
   for (const c of taught) ids.set(c._id.toString(), c._id)
   return [...ids.values()]
@@ -148,7 +148,7 @@ export async function listMyRecordings(input: { courseId?: string } = {}): Promi
       const staff = user.role === "ADMIN" || course.instructor?.toString() === user.id
       if (!staff) {
         const access = await getCourseAccess(user.id, parsed.data.courseId)
-        if (!access?.entitlements.liveClasses) return { success: true, data: [] }
+        if (!access || !recordingsAllowed(access.entitlements)) return { success: true, data: [] }
       }
       filter = { course: courseId }
     } else {
@@ -189,7 +189,7 @@ export async function getRecordingPlayback(
     if (!rec) return { success: false, error: "Recording not found" }
     const access = await recordingAccess(user, rec)
     if (!access || (rec.hidden && access !== "staff")) {
-      return { success: false, error: "Recordings are for students whose package includes live classes" }
+      return { success: false, error: "Recordings are for students whose plan includes recorded classes" }
     }
     if (rec.status !== "stored" || !rec.storageKey) {
       return { success: false, error: "This recording is still being processed" }
