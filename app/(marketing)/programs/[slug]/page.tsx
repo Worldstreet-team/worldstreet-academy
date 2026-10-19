@@ -228,6 +228,7 @@ export default async function ProgramPage({
         tierCount={program.tierCount}
         initialKey={initialKey}
         signedIn={signedIn}
+        offerEndsAt={calendar.next?.startsAt ?? null}
       >
         <article>
           <div className="mx-auto grid max-w-7xl grid-cols-1 grid-rows-[auto_3rem_auto_auto] px-6 lg:grid-cols-[minmax(0,1fr)_23.5rem] lg:gap-x-14">

@@ -551,11 +551,12 @@ function OfferAction({ pkg, single, comingSoon }: { pkg: PublicPackage; single: 
  * be bought, "Offer ends in …". Nothing for a tier without a launch discount.
  */
 function OfferTerms({ pkg, comingSoon, className }: { pkg: PublicPackage; comingSoon: boolean; className?: string }) {
+  const { offerEndsAt } = usePackageSelection()
   if (!discountOf(pkg)) return null
   return (
     <div key={pkg.key} className={cn("ws-animate-fade flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[13.5px]", className)}>
       <PackageDiscount pkg={pkg} />
-      {!comingSoon && <OfferEnds pkg={pkg} />}
+      {!comingSoon && <OfferEnds pkg={pkg} endsAt={offerEndsAt} />}
     </div>
   )
 }
@@ -579,7 +580,7 @@ function SingleOffer({
   comingSoon: boolean
   lessons: LessonAccess | null
 }) {
-  const { packages, tierCount, selected: pkg } = usePackageSelection()
+  const { packages, tierCount, selected: pkg, offerEndsAt } = usePackageSelection()
   const features = tierCount > 0 ? pkg.features.filter((line) => line.trim()) : []
   const lessonsText = lessonLine(lessons, pkg.key)
   const hasServices = SERVICES.some((s) => servicesOf(pkg, tierCount)[s.key])
@@ -606,7 +607,7 @@ function SingleOffer({
   const action = (
     <>
       <OfferAction pkg={pkg} single comingSoon={comingSoon} />
-      {!comingSoon && <OfferEnds pkg={pkg} className="mt-3 block" />}
+      {!comingSoon && <OfferEnds pkg={pkg} endsAt={offerEndsAt} className="mt-3 block" />}
       {!comingSoon && pkg.price > 0 && (
         <p className="mt-3 flex items-center gap-2 text-[13px] text-ws-muted">
           <ShieldCheckIcon size={15} className="shrink-0 text-ws-subtle" aria-hidden />

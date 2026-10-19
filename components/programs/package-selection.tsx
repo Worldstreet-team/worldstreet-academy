@@ -31,6 +31,8 @@ type Selection = {
   /** Checkout for the selected tier. */
   href: string
   signedIn: boolean
+  /** The next cohort's start, which ends the launch offer; null when none is set. */
+  offerEndsAt: string | null
 }
 
 const SelectionContext = React.createContext<Selection | null>(null)
@@ -55,6 +57,7 @@ export function PackageSelectionProvider({
   tierCount,
   initialKey,
   signedIn,
+  offerEndsAt,
   children,
 }: {
   courseId: string
@@ -63,6 +66,7 @@ export function PackageSelectionProvider({
   /** A valid `?package=` from the URL, else null (→ "most popular", else the first). */
   initialKey: PackageKey | null
   signedIn: boolean
+  offerEndsAt: string | null
   children: React.ReactNode
 }) {
   const multiTier = packages.length > 1
@@ -91,8 +95,9 @@ export function PackageSelectionProvider({
       engage,
       href: checkoutHref(courseId, selected, tierCount),
       signedIn,
+      offerEndsAt,
     }),
-    [courseId, packages, tierCount, multiTier, selected, engaged, select, engage, signedIn]
+    [courseId, packages, tierCount, multiTier, selected, engaged, select, engage, signedIn, offerEndsAt]
   )
 
   return <SelectionContext.Provider value={value}>{children}</SelectionContext.Provider>
@@ -143,7 +148,7 @@ const GOLD_CTA =
  * checkout. A single-price program always shows its one offer.
  */
 export function SelectedOffer({ fromPrice }: { fromPrice: number }) {
-  const { packages, tierCount, multiTier, selected, engaged } = usePackageSelection()
+  const { packages, tierCount, multiTier, selected, engaged, offerEndsAt } = usePackageSelection()
   const choosing = multiTier && !engaged
   const price = choosing ? fromPrice : selected.price
   // The tier whose price is quoted: the entry tier while choosing, else the pick.
@@ -204,7 +209,7 @@ export function SelectedOffer({ fromPrice }: { fromPrice: number }) {
             <ArrowRightIcon size={16} aria-hidden className="-mr-1" />
           </CheckoutLink>
         )}
-        <OfferEnds pkg={quoted} className="mt-3 block text-center" />
+        <OfferEnds pkg={quoted} endsAt={offerEndsAt} className="mt-3 block text-center" />
       </div>
     </>
   )

@@ -30,7 +30,7 @@ const CTA =
  * end. Rendered only while there is something to buy (access "open").
  */
 export function ProgramStickyBar({ title, fromPrice }: { title: string; fromPrice: number }) {
-  const { packages, multiTier, selected, engaged } = usePackageSelection()
+  const { packages, multiTier, selected, engaged, offerEndsAt } = usePackageSelection()
   const [show, setShow] = React.useState(false)
   const choosing = multiTier && !engaged
   // The tier whose price is quoted: the entry tier while choosing, else the pick.
@@ -65,7 +65,7 @@ export function ProgramStickyBar({ title, fromPrice }: { title: string; fromPric
         {/* From md the title sits on the left, with the offer's countdown under it. */}
         <div className="hidden min-w-0 md:block">
           <p className="truncate font-display text-[15px] font-semibold text-ws-primary">{title}</p>
-          <OfferEnds pkg={quoted} className="mt-1 block truncate text-[12.5px]" />
+          <OfferEnds pkg={quoted} endsAt={offerEndsAt} className="mt-1 block truncate text-[12.5px]" />
         </div>
         <div className="flex w-full min-w-0 items-center justify-between gap-4 md:w-auto md:justify-end md:gap-6">
           <div className="min-w-0 leading-none">

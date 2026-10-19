@@ -61,11 +61,14 @@ export function PackageLadder({
   courseId,
   packages,
   access,
+  offerEndsAt,
   className,
 }: {
   courseId: string
   packages: PublicPackage[]
   access: ProgramAccess
+  /** The next cohort's start, which ends the launch offer; null when none is set. */
+  offerEndsAt: string | null
   className?: string
 }) {
   const multiTier = packages.length > 1
@@ -94,7 +97,7 @@ export function PackageLadder({
       )}
 
       {!multiTier && packages[0] ? (
-        <SinglePackage courseId={courseId} pkg={packages[0]} access={access} />
+        <SinglePackage courseId={courseId} pkg={packages[0]} access={access} offerEndsAt={offerEndsAt} />
       ) : (
         <ul className={cn("mt-8 grid items-start gap-4", GRID[packages.length] ?? "md:grid-cols-3")}>
           {packages.map((pkg) => (
@@ -135,7 +138,7 @@ export function PackageLadder({
                       access={access}
                       primary={pkg.highlight || !multiTier}
                     />
-                    {access.kind === "open" && <OfferEnds pkg={pkg} className="mt-3 block text-center" />}
+                    {access.kind === "open" && <OfferEnds pkg={pkg} endsAt={offerEndsAt} className="mt-3 block text-center" />}
                   </div>
                 )}
 
@@ -261,10 +264,12 @@ function SinglePackage({
   courseId,
   pkg,
   access,
+  offerEndsAt,
 }: {
   courseId: string
   pkg: PublicPackage
   access: ProgramAccess
+  offerEndsAt: string | null
 }) {
   const features = pkg.features.length > 0
   return (
@@ -285,7 +290,7 @@ function SinglePackage({
         {access.kind !== "enrolled" && (
           <div className="mt-6 md:mt-auto md:pt-8">
             <PackageCta courseId={courseId} pkg={pkg} access={access} primary />
-            {access.kind === "open" && <OfferEnds pkg={pkg} className="mt-3 block text-center" />}
+            {access.kind === "open" && <OfferEnds pkg={pkg} endsAt={offerEndsAt} className="mt-3 block text-center" />}
           </div>
         )}
       </div>

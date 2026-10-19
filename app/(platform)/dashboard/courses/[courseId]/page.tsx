@@ -31,6 +31,7 @@ import { CourseReviews } from "@/components/courses/course-reviews"
 import { CourseCarousel } from "@/components/learn/course-carousel"
 
 import { programRail, programStats } from "@/lib/program-rail"
+import { getCohortCalendar } from "@/lib/cohort-calendar"
 import { PackageLadder } from "@/components/programs/package-ladder"
 import type { ProgramAccess } from "@/components/programs/access"
 import { CardShell } from "@/components/ui/system"
@@ -77,11 +78,12 @@ export default async function CourseDetailPage({
   const waiting = isEnrolled && !start
 
   // Fetch instructor courses + recommendations in parallel
-  const [instructorCourses, enrolledFromInstructor, otherCourses, program] = await Promise.all([
+  const [instructorCourses, enrolledFromInstructor, otherCourses, program, calendar] = await Promise.all([
     fetchInstructorPublicCourses(course.instructorId),
     fetchEnrolledCoursesFromInstructor(course.instructorId).catch(() => []),
     fetchOtherCourses(courseId),
     fetchProgramById(courseId),
+    getCohortCalendar(),
   ])
 
   // Q&A follows the package; visitors without an enrollment keep today's behaviour.
@@ -390,7 +392,7 @@ export default async function CourseDetailPage({
 
           {/* Package ladder — full page width; the rail above ends before it so
              three tiers get comfortable room instead of the 940px main column. */}
-          {showLadder && <PackageLadder courseId={course.id} packages={packages} access={ladderAccess} />}
+          {showLadder && <PackageLadder courseId={course.id} packages={packages} access={ladderAccess} offerEndsAt={calendar.next?.startsAt ?? null} />}
 
           <div className={showLadder ? "mt-10 space-y-6" : "space-y-6"}>
             {/* Reviews */}
