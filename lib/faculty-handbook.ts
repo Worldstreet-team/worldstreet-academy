@@ -172,7 +172,7 @@ export function handbookSections(key: HandbookKey, figures: HandbookFigures): Ha
               item(
                 "You set the pass mark (70% unless you change it), the time limit (30 minutes by default) and the number of attempts (3 by default; 0 means unlimited)."
               ),
-              item("When a program requires its final exam, a learner completes the program, and receives a certificate, only by passing it."),
+              item("On a plan that includes the certificate, a program that requires its final exam completes, and certifies, only when the learner passes it."),
               item("Lesson quizzes are practice. They never block completion.")
             ),
           ],
@@ -232,7 +232,7 @@ export function handbookSections(key: HandbookKey, figures: HandbookFigures): Ha
               item(`Schedule a class in Calendar. You can start it up to ${early} before its time.`),
               item("When you start a class, learners whose plan includes live classes are told it is live and join from their dashboard."),
               item(
-                "Every class is recorded. The recording appears for those learners once it has been processed; they can watch it but not download it. You can rename or hide a recording."
+                "Every class is recorded. The recording appears for those learners once it has been processed; the player has no download button. You can rename or hide a recording."
               )
             ),
           ],
