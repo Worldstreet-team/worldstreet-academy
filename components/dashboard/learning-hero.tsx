@@ -7,6 +7,7 @@ import Link from "next/link"
 import { useQueryClient } from "@tanstack/react-query"
 import { AvailabilityCountdown } from "@/components/shared/availability-countdown"
 import { PackageChip, ProgramCover, ProgressTrack } from "@/components/platform/program-bits"
+import { AlumniChip } from "@/components/dashboard/alumni-chip"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Balance, CardShell, Eyebrow, Segmented, Skel, illustrations } from "@/components/ui/system"
@@ -61,29 +62,42 @@ const DATE_PLACEHOLDER = "Wednesday, September 30"
 export function HomeGreeting({
   firstName,
   welcome,
+  alumni,
   summary,
 }: {
   firstName: string
   /** Arrived from checkout (`?welcome=1`). */
   welcome: boolean
+  /** Holds a certificate: the eyebrow carries the WMA Alumni chip (D19). */
+  alumni: boolean
   summary: React.ReactNode
 }) {
   const now = useClientNow()
   const date = now === null ? null : new Date(now)
   const name = firstName ? `, ${firstName}` : ""
+  const eyebrow = (
+    <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+      WMA Campus ·{" "}
+      {date ? (
+        date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
+      ) : (
+        <span aria-hidden className="invisible">
+          {DATE_PLACEHOLDER}
+        </span>
+      )}
+    </p>
+  )
   return (
     <header className="flex flex-col gap-1">
       {/* D19: the dashboard is the Campus. Eyebrow only; the nav keeps "Dashboard". */}
-      <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-        WMA Campus ·{" "}
-        {date ? (
-          date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
-        ) : (
-          <span aria-hidden className="invisible">
-            {DATE_PLACEHOLDER}
-          </span>
-        )}
-      </p>
+      {alumni ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {eyebrow}
+          <AlumniChip />
+        </div>
+      ) : (
+        eyebrow
+      )}
       <h1 className="font-display text-[26px] font-semibold leading-[1.15] tracking-[-0.02em] sm:text-[28px]">
         {welcome ? (
           `Welcome to ${BRAND.name}`

@@ -202,6 +202,7 @@ export default function DashboardPage() {
                 <HomeGreeting
                   firstName={user.firstName}
                   welcome={welcome}
+                  alumni={certificates.length > 0}
                   summary={
                     <HomeSummary
                       enrollments={enrollments}

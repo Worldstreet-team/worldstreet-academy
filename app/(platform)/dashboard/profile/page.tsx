@@ -2,6 +2,7 @@
 import { CameraIcon, CheckIcon, PencilLineIcon } from "@/components/icons"
 
 import { useRef, useState, useTransition } from "react"
+import { AlumniChip } from "@/components/dashboard/alumni-chip"
 import { Topbar } from "@/components/platform/topbar"
 import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -15,6 +16,7 @@ import { SignatureCanvas } from "@/components/shared/signature-canvas"
 import { CountryCard } from "@/components/platform/country-card"
 import { updateAvatar, updateProfile } from "@/lib/actions/profile"
 import { getImageUploadUrl } from "@/lib/actions/upload"
+import { useMyCertificates } from "@/lib/hooks/queries"
 import { cn } from "@/lib/utils"
 
 
@@ -38,6 +40,7 @@ export default function ProfilePage() {
     `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`.toUpperCase() ||
     user.email?.[0]?.toUpperCase() ||
     "U"
+  const { data: certificates = [] } = useMyCertificates()
   const fullName =
     `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "User"
   const memberSince = user.createdAt
@@ -159,7 +162,10 @@ export default function ProfilePage() {
               </button>
 
               <div className="space-y-0.5">
-                <h2 className="text-lg font-semibold">{fullName}</h2>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-lg font-semibold">{fullName}</h2>
+                  {certificates.length > 0 && <AlumniChip />}
+                </div>
                 <p className="break-all text-sm text-muted-foreground">{user.email}</p>
                 <p className="text-xs text-muted-foreground capitalize">
                   {user.role.toLowerCase()} &middot; Since {memberSince}
