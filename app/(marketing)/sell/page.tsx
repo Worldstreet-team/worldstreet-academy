@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 
 import { BRAND } from "@/lib/brand"
+import { SCHOOLS } from "@/lib/schools"
 import { appUrl } from "@/lib/app-url"
 import { EARNINGS_CLEARING_DAYS, MARKETPLACE_SHARE_ACADEMY, MARKETPLACE_SHARE_OWN_LINK } from "@/lib/db/models"
 import { QUALITY_CRITERIA, sharePercent } from "@/lib/marketplace"
@@ -171,7 +172,7 @@ export default function SellPage() {
             </h2>
             <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-ws-muted">
               Apply today. You&rsquo;ll need a WorldStreet account, a sample of your teaching and a topic that fits one
-              of the eight schools.
+              of the {SCHOOLS.length} schools.
             </p>
           </div>
           <Link href={APPLY_HREF} className={GOLD_CTA}>

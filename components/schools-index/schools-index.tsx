@@ -4,7 +4,7 @@ import { ArrowRightIcon, PlayIcon, SearchXIcon } from "@/components/icons"
 import * as React from "react"
 import Link from "next/link"
 
-import type { SchoolSlug } from "@/lib/schools"
+import { SCHOOLS, type SchoolSlug } from "@/lib/schools"
 import { BRAND } from "@/lib/brand"
 import { Segmented } from "@/components/ui/system"
 import { Reveal } from "@/components/marketing/motion/reveal"
@@ -26,7 +26,7 @@ import {
 
 export type IndexStats = {
   schools: number
-  /** Programs across the eight schools. */
+  /** Programs across the seven schools. */
   programs: number
   /** Cheapest way into any school's program, whole USD; null when none is priced. */
   from: number | null
@@ -38,7 +38,7 @@ export type IndexStats = {
 /**
  * `/schools` below the navbar and above the closing section: the header
  * (headline, real totals, the search, the cover wall), the follow-along bar,
- * and the eight schools as editorial rows — all driven by one query, typed
+ * and the seven schools as editorial rows — all driven by one query, typed
  * into either search field, plus a level filter that appears only when the
  * catalogue really spans more than one level.
  *
@@ -331,7 +331,7 @@ export function SchoolsIndex({
               {result.hits.length > 0 ? "More programs" : "Programs"}
             </h2>
             <p className="mt-1.5 text-[14px] text-ws-muted">
-              {result.others.length === 1 ? "A program" : "Programs"} not yet part of one of the eight schools.
+              {result.others.length === 1 ? "A program" : "Programs"} not yet part of one of the {SCHOOLS.length} schools.
             </p>
             <ul className="mt-5 grid gap-3 md:grid-cols-2">
               {result.others.map((program) => (
@@ -358,7 +358,7 @@ function summaryOf(schools: number, programs: number): string {
   return parts.filter(Boolean).join(" · ") || "No matches"
 }
 
-/** "8 schools · 10 programs · from $49 · 1 instructor" — only what is real and not zero. */
+/** "7 schools · 10 programs · from $49 · 1 instructor" — only what is real and not zero. */
 function Totals({ stats }: { stats: IndexStats }) {
   const bits: React.ReactNode[] = [
     <>
@@ -414,7 +414,7 @@ function Totals({ stats }: { stats: IndexStats }) {
   )
 }
 
-/** Nothing matched: say so plainly, then offer the eight schools and the full list as the way on. */
+/** Nothing matched: say so plainly, then offer the seven schools and the full list as the way on. */
 function NoMatch({
   query,
   level,
@@ -440,7 +440,7 @@ function NoMatch({
         {query && level !== "all" && <> at {LEVEL_LABEL[level].toLowerCase()} level</>}
       </h2>
       <p className="mx-auto mt-2 max-w-md text-pretty text-[15px] leading-relaxed text-ws-muted">
-        Try a shorter or broader word, or start from one of the eight schools.
+        Try a shorter or broader word, or start from one of the {SCHOOLS.length} schools.
       </p>
       <ul className="mx-auto mt-7 flex max-w-3xl flex-wrap justify-center gap-2">
         {schools.map((school) => (

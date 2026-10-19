@@ -39,7 +39,7 @@ export type IndexProgram = {
 
 export type IndexSchool = {
   slug: SchoolSlug
-  /** "01" … "08" — the spec's order (§4). */
+  /** "01" … "07" — the spec's order (§4). */
   number: string
   /** Full name, e.g. "School of Cybersecurity" — the heading's accessible text. */
   name: string
@@ -144,7 +144,16 @@ export function buildSchoolsIndex(courses: readonly BrowseCourse[]): SchoolsInde
       cover: schoolCover(school.slug),
       programs,
       from: priced.length ? Math.min(...priced) : null,
-      terms: wordsOf([school.name, school.short, school.blurb, school.tagline ?? "", school.intro ?? ""].join(" ")),
+      terms: wordsOf(
+        [
+          school.name,
+          school.short,
+          school.blurb,
+          school.tagline ?? "",
+          school.intro ?? "",
+          ...school.areas.map((a) => a.name),
+        ].join(" ")
+      ),
     }
   })
 

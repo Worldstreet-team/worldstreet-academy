@@ -16,7 +16,7 @@ const FOUR_ACROSS_SIZES = "(min-width: 1024px) 300px, (min-width: 640px) 50vw, 1
  * has an empty box.
  *
  * Motion: the `ws-school` class plus `data-school` pick up that school's own
- * hover gesture — eight of them, one per subject, defined under "School
+ * hover gesture — seven of them, one per subject, defined under "School
  * cards — one signature motion per school" in app/globals.css. The card
  * never scales; only the glyph and the cover move, and nothing moves under
  * reduced motion.
@@ -59,7 +59,7 @@ export function SchoolCard({
 }) {
   const Heading = headingLevel
   const cover = schoolCover(school.slug)
-  const programs = count === 1 ? "1 program" : `${count} programs`
+  const programs = count === 0 ? "Programs coming soon" : count === 1 ? "1 program" : `${count} programs`
   const price = fromPrice === null ? null : fromPrice === 0 ? "Free" : `$${fromPrice.toLocaleString("en-US")}`
 
   return (
