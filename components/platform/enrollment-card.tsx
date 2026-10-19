@@ -23,6 +23,7 @@ export function EnrollmentCard({ enrollment }: { enrollment: StudentEnrollment }
       completed={isFinished(enrollment)}
       // A badge requires the package still to exist on the course.
       packageName={enrollment.explicitPackage ? enrollment.packageName : null}
+      cohortName={enrollment.cohortName}
       statusLabel={enrollmentStatusLabel(enrollment, now)}
       comingSoonAt={isComingSoon(enrollment, now) ? enrollment.courseAvailableAt : null}
     />

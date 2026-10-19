@@ -6,7 +6,7 @@ import { Course, Enrollment, Meeting, Recording, User } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth/actions"
 import { entitlementsFor } from "@/lib/entitlements"
 import { courseKindOf } from "@/lib/course-kind"
-import { COHORT_STARTS_AT_ISO, cohortIsUpcoming } from "@/lib/cohort"
+import { cohortsForEnrollments } from "@/lib/cohort-calendar"
 
 /**
  * The student dashboard's live-class board (owner meeting 2026-10-03; Owen,
@@ -43,7 +43,9 @@ export type ClassBoardEntry = {
   /** The next scheduled class (may be up to 2 h late if the host hasn't started it). */
   next: BoardClass | null
   latestRecording: BoardRecording | null
-  /** ISO cohort start, only for a school program with no class scheduled while the cohort is still ahead. */
+  /** The learner's cohort for this program, started or not (D20); null for a non-program course. */
+  cohortName: string | null
+  /** ISO start of that cohort, set only while it is still ahead and no class is live or scheduled. */
   cohortStartsAt: string | null
 }
 
@@ -63,7 +65,7 @@ export async function getMyClassBoard(): Promise<ClassBoardEntry[]> {
       user: new Types.ObjectId(user.id),
       status: { $in: ["active", "completed"] },
     })
-      .select("course packageKey")
+      .select("course packageKey purchasedAt createdAt")
       .lean()
     if (enrollments.length === 0) return []
 
@@ -77,6 +79,12 @@ export async function getMyClassBoard(): Promise<ClassBoardEntry[]> {
     })
     if (entitled.length === 0) return []
     const courseIds = entitled.map((e) => e.course)
+    const cohortOf = await cohortsForEnrollments(
+      entitled.filter((e) => {
+        const course = courseById.get(e.course.toString())
+        return course ? courseKindOf(course) === "program" : false
+      })
+    )
 
     const [liveRooms, scheduled, recordings] = await Promise.all([
       Meeting.find({
@@ -125,13 +133,13 @@ export async function getMyClassBoard(): Promise<ClassBoardEntry[]> {
       if (!recordingBy.has(key)) recordingBy.set(key, r)
     }
 
-    const cohortAhead = cohortIsUpcoming()
     return entitled.map((e) => {
       const id = e.course.toString()
       const course = courseById.get(id)
       const live = liveBy.get(id)
       const next = nextBy.get(id)
       const rec = recordingBy.get(id)
+      const cohort = cohortOf.get(String(e._id)) ?? null
       const asClass = (m: NonNullable<typeof live>, startsAt: Date): BoardClass => ({
         id: m._id.toString(),
         title: m.title,
@@ -147,8 +155,9 @@ export async function getMyClassBoard(): Promise<ClassBoardEntry[]> {
         latestRecording: rec
           ? { id: rec._id.toString(), title: rec.title, recordedAt: rec.recordedAt.toISOString(), href: "/dashboard/recordings" }
           : null,
+        cohortName: cohort?.name ?? null,
         cohortStartsAt:
-          !next && !live && cohortAhead && course && courseKindOf(course) === "program" ? COHORT_STARTS_AT_ISO : null,
+          !next && !live && cohort && Date.parse(cohort.startsAt) > Date.now() ? cohort.startsAt : null,
       }
     })
   } catch (error) {

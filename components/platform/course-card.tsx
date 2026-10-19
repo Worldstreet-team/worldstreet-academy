@@ -66,6 +66,8 @@ type CourseCardProps = {
   comingSoonAt?: string | null
   /** Enrolled cards: the package bought, as a chip under the title. */
   packageName?: string | null
+  /** Enrolled program cards: the learner's cohort, a second chip beside the plan. */
+  cohortName?: string | null
   /** Enrolled cards whose status doesn't open the player ("Refunded", "Suspended"…): a neutral cover chip and a "View" footer. */
   statusLabel?: string | null
 }
@@ -92,6 +94,7 @@ export function CourseCard({
   onToggleBookmark,
   comingSoonAt,
   packageName,
+  cohortName,
   statusLabel,
 }: CourseCardProps) {
   const showProgress = typeof progress === "number" && !comingSoonAt
@@ -175,7 +178,12 @@ export function CourseCard({
             {title}
           </h3>
 
-          {packageName && <PackageChip name={packageName} className="mt-2 self-start" />}
+          {(packageName || cohortName) && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {packageName && <PackageChip name={packageName} />}
+              {cohortName && <PackageChip name={cohortName} />}
+            </div>
+          )}
 
           {/* Footer */}
           <div className="mt-auto pt-4">
