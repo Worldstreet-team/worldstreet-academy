@@ -32,6 +32,7 @@ import {
   sendEspeePaymentRejectedEmail,
   sendEspeeProofReceivedEmail,
 } from "@/lib/email"
+import { sendWelcomeOnce } from "@/lib/welcome-email"
 import {
   generatePaymentProofKey,
   generatePresignedDownloadUrl,
@@ -958,6 +959,8 @@ export async function adminApproveEspeePayment(paymentId: string): Promise<Espee
       price,
       packageName: packageFields.packageName,
     })
+    // D27: one welcome on the learner's first paid enrollment — after the confirmation, never awaited.
+    void sendWelcomeOnce(learnerId, enrollmentId)
 
     revalidatePath("/admin/payments/espee")
     revalidatePath("/dashboard/my-courses")
