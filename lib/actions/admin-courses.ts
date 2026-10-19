@@ -8,6 +8,7 @@ import { requireAdmin } from "@/lib/auth/admin"
 import { notifyUser } from "@/lib/notify"
 import { courseKindOf } from "@/lib/course-kind"
 import { courseFormatOf, hasDeliverable, isFileFormat, type CourseFormat } from "@/lib/course-format"
+import { creatorPublishRefusal } from "@/lib/course-review"
 
 const PAGE_SIZE = 20
 
@@ -147,12 +148,11 @@ export async function adminSetCourseStatus(
           error: isFileFormat(format) ? "Can't publish a template or guide without its file" : "Can't publish a course with no lessons",
         }
       }
-      // No way around the four checks: a Marketplace Creator's course is published from its review page.
-      if (courseKindOf(course) === "marketplace" && course.review?.status !== "approved") {
-        const owner = await User.findById(course.instructor).select("role").lean()
-        if (owner?.role === "USER") {
-          return { success: false, error: "A Marketplace Creator's course is published from its review page, once all four checks pass." }
-        }
+      // No way around the four checks: a Marketplace Creator's course is published
+      // from its review page, or republished here only on content its checks cover.
+      if (courseKindOf(course) === "marketplace") {
+        const refusal = await creatorPublishRefusal(course)
+        if (refusal) return { success: false, error: refusal }
       }
     }
 

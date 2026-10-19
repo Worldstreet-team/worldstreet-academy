@@ -42,7 +42,7 @@ import { appUrl } from "@/lib/app-url"
 import { referralPath } from "@/lib/referral-link"
 import { ensureReferralCode } from "@/lib/referrals"
 import { sellerSplitNote } from "@/lib/marketplace"
-import { requestCourseReview, requestLiveCourseReview } from "@/lib/course-review"
+import { creatorPublishRefusal, requestCourseReview, requestLiveCourseReview } from "@/lib/course-review"
 
 const PackageSchema = z
   .object({
@@ -866,7 +866,8 @@ export async function updateCourse(
     if ("field" in product) return { success: false, error: null, fieldErrors: { [product.field]: product.error } }
     const submitting = seller && extras.submitForReview && status !== "published"
     // No way around the four checks: an admin can't publish a Marketplace
-    // Creator's unapproved course from the editor either (ruling 9).
+    // Creator's course from the editor unless it is approved and its checks
+    // cover the content as it is now (ruling 9).
     if (
       !seller &&
       instructor.role === "ADMIN" &&
@@ -874,17 +875,10 @@ export async function updateCourse(
       // The stored kind counts too: a posted kind must not slip a marketplace course past the gate.
       (kind === "marketplace" || courseKindOf(existingCourse) === "marketplace") &&
       status === "published" &&
-      existingCourse.status !== "published" &&
-      existingCourse.review?.status !== "approved"
+      existingCourse.status !== "published"
     ) {
-      const owner = await User.findById(existingCourse.instructor).select("role").lean()
-      if (owner?.role === "USER") {
-        return {
-          success: false,
-          error: "A Marketplace Creator's course is published from its review page, once all four checks pass.",
-          fieldErrors: {},
-        }
-      }
+      const refusal = await creatorPublishRefusal(existingCourse)
+      if (refusal) return { success: false, error: refusal, fieldErrors: {} }
     }
     if (isFileFormat(product.format)) {
       if ((sentLessons ?? 0) > 0) {
@@ -923,6 +917,9 @@ export async function updateCourse(
         fieldErrors: {},
       }
     }
+    // A seller taking a live course back to draft gives up its approval: it goes
+    // live again only through a new review, never on the old one.
+    const sellerUnpublish = seller && existingCourse.status === "published" && status === "draft"
 
     // Update course
     await Course.findByIdAndUpdate(courseId, {
@@ -945,9 +942,15 @@ export async function updateCourse(
       ...(status === "published" && !existingCourse.publishedAt
         ? { publishedAt: new Date() }
         : {}),
+      ...(sellerUnpublish
+        ? {
+            "review.status": "changes_requested",
+            "review.note": "Taken back to draft by its creator. It needs a new review before it goes live again.",
+          }
+        : {}),
       ...pricingFields,
     })
-    
+
     // Update lessons if provided
     if (lessonsJson) {
       try {

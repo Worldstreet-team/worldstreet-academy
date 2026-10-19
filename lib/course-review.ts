@@ -60,6 +60,31 @@ export async function courseReviewFingerprint(courseId: string): Promise<string 
 }
 
 /**
+ * Why a course can't be published outside its review page, or null when it
+ * may be (ruling 9). Only a Marketplace Creator's course (owner role `USER`) is
+ * gated: its approval must stand AND all four checks must be cleared on the
+ * content as it is now, so a course taken back to draft and edited can't go
+ * live on its old approval. Faculty-owned courses publish directly. Callers
+ * have run connectDB() and only ask about marketplace courses.
+ */
+export async function creatorPublishRefusal(course: {
+  _id: { toString(): string }
+  instructor: { toString(): string }
+  review?: { status?: string | null; checks?: Parameters<typeof outstandingChecks>[0] } | null
+}): Promise<string | null> {
+  const owner = await User.findById(course.instructor).select("role").lean()
+  if (owner?.role !== "USER") return null
+  if (course.review?.status !== "approved") {
+    return "A Marketplace Creator's course is published from its review page, once all four checks pass."
+  }
+  const fingerprint = await courseReviewFingerprint(course._id.toString())
+  if (!fingerprint || outstandingChecks(course.review.checks, fingerprint).length > 0) {
+    return "This course changed since its review and needs re-checking. The Marketplace Creator submits it for review again, and it is published from its review page."
+  }
+  return null
+}
+
+/**
  * The checks a (re-)submission resets: every one that isn't cleared on the
  * current content (ruling 7). A cleared check on an unchanged fingerprint
  * stays. Returns the `$set` entries that blank them.
