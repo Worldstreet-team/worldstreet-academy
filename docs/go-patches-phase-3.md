@@ -182,18 +182,23 @@ The Academy now has two halves: **school programs** (live cohorts, three plans) 
 - **`sellerapplications`** — web-only; Go may ignore it. `{ user, status: "submitted" | "approved" | "rejected", fullName, school, topic, experience, sampleUrl, pitch, agreedAt, reviewedBy, reviewedAt, reason }`, one `submitted` row per user (partial unique index). Approval mirrors into `users.sellerStatus`.
 - Any wholesale course write must carry `kind`, `review` and `communityUrl`, and any wholesale user write `sellerStatus` (write dotted paths or keep the fields).
 
-**Phase 20 — formats, templates and guides, staged review (2026-10-19).** All additive; Go needs no patch to keep working.
+**Phase 20 — formats, templates and guides, staged review (2026-10-19).** The fields are all additive, but Go needs one patch: **R15 (below) is REQUIRED** and must be live before any template or guide is approved or published.
 - **`courses.format`**: `"course" | "masterclass" | "workshop" | "template" | "guide"` or `null`, marketplace only. `null` or missing on a marketplace course means `"course"`. Programs and New Economy courses always have `null`.
 - **`courses.productFile`**: `{ key, filename, mimeType, sizeBytes, uploadedAt }` or `null`. Templates and guides only; the key is in the private resources bucket under `worldstreet-academy/products/<uploader user id>/`.
 - **`courses.review.checks`**: `{ content, quality, accuracy, technical }`, each `{ status: "passed" | "changes" | "n/a" | null, by, at, note, contentHash }`. Only `accuracy` may be `"n/a"`.
 - **The rules:**
   - Templates and guides are marketplace kinds, so they stay out of every program list (the `$nin` filter above).
   - **Go must never return `productFile.key`, a public URL or a signed URL for the file.** The web mints 5-minute signed downloads after checking an access-granting enrollment.
-  - **A template or guide enrollment grants NO services.** Go must not apply its null-`packageKey` = full access rule to courses whose `format` is `template` or `guide`, or mobile buyers would get live classes, Q&A and a certificate.
+  - **A template or guide enrollment grants NO services.** This is R15, a required patch (below).
   - A template or guide has no lessons. Its enrollment stays `active`, never completes and earns no certificate. Mobile should show it as "Download on the web", or leave it out of the learner's course list.
   - It is bought exactly like a marketplace course. If Go ever sells it, the rules above apply.
   - Approval now needs four recorded checks on the current content. Go must never set `review.status: "approved"` or publish a course whose owner is a `USER`.
   - Wholesale course writes must keep `format`, `productFile` and `review.checks`.
+
+**R15 — Templates and guides grant nothing. REQUIRED: live before any template or guide is approved or published (`docs/launch-runbook.md` §12).**
+- **The rule.** Before R1, read the course's `format`. When it is `"template"` or `"guide"`, every entitlement flag is `false` (`liveClasses`, `instructorQa`, `assignments`, `certificate`, `mentorship`, `prioritySupport`, `recordings`), whatever the enrollment's `packageKey`. R1's null-`packageKey` = full access rule never applies to these courses. Web: `NO_ENTITLEMENTS` in `lib/entitlements.ts`.
+- **Why it can't wait.** Every template or guide enrollment has `packageKey: null`. Without this patch, R1 reads a mobile buyer as full access: R4 lets them start the final exam and get a certificate, R6 lets them join the creator's live classes, and R7 lets them open Q&A threads.
+- **Every read that feeds R1 must select `format` beside `packages`.** A read that drops it grants full access again.
 
 ## 10. Live teaching: go-live notices and class recordings (owner, 2026-10-03 / 2026-10-05)
 

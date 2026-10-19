@@ -44,6 +44,7 @@ From the 2026-10-03 meeting: three plans on every program, ESPEE proof-of-paymen
 7. **Go team.** Point them at `docs/go-patches-phase-3.md` §7–§11: ESPEE orders have no wallet charge; referral earnings and seller shares (§8); course `kind` — Go must hide marketplace and New Economy courses wherever it lists programs (§9); recordings and the go-live notice (§10); points and the new application answers (§11).
    - Phase 14: §16 (Basic certifies; `recordings` is web-only).
    - Phase 12: §18 (no patch; `cohorts` is a web-only collection).
+   - Phase 20: §9's R15 (required: no template or guide is approved until it is live; see §12).
 8. **Marketplace, referrals, teaching (2026-10-05, same release).**
    - Recordings need the same `R2_RESOURCES_BUCKET_NAME` and the new hourly `academy-recordings` task (§5). RealtimeKit bills recording at about $0.01 per minute; only course classes record, never 1-on-1 mentorship.
    - New Economy courses: `MONGODB_URI="$PROD_URI" node scripts/new-economy-catalogue.mjs --owner <admin email>` (dry run), then `--apply`. It creates one free DRAFT per WorldStreet product; add lessons and publish each from the admin course editor.
@@ -426,8 +427,8 @@ Expect `acknowledged: true`, and note `modifiedCount` in your run log. **Those s
 
 - **No migration.** Courses already in the review queue keep their place, and an admin records their four checks on `/admin/courses/<id>/review`.
 - **The private bucket.** It needs `R2_RESOURCES_BUCKET_NAME` and its CORS `PUT` rule from §3. Templates and guides upload straight to it from the browser. Without it, their uploads and downloads refuse, and lesson courses are unaffected.
-- **Order.** Ship the Go release carrying the §9 note (`docs/go-patches-phase-3.md`) first, or accept in writing that mobile shows templates as courses with no lessons.
-- **Staging check, from the academy origin** (`https://academy.worldstreetgold.com`, as in B7; an upload from any other origin doesn't prove the bucket's CORS):
+- **Order: Go's R15 first, no exceptions.** The Go release carrying R15 (`docs/go-patches-phase-3.md` §9) is a hard prerequisite. Without it, mobile reads a template or guide buyer as full access, with live classes, Q&A and a certificate. **Until that release is live in production, no admin approves or publishes a template or guide.** Leave every one in the review queue. Lesson-format marketplace courses (course, masterclass, workshop) are unaffected and may be approved as usual.
+- **Staging check, once R15 is live in production, from the academy origin** (`https://academy.worldstreetgold.com`, as in B7; an upload from any other origin doesn't prove the bucket's CORS):
   1. A Marketplace Creator uploads a PDF template and submits it.
   2. An admin downloads it on the review page, records the four checks and approves it.
   3. A buyer buys it and downloads it.
