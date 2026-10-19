@@ -1,5 +1,6 @@
 "use server"
 
+import type { CourseFormat } from "@/lib/course-format"
 import { headers } from "next/headers"
 import connectDB from "@/lib/db"
 import { Enrollment, Course, User, type ICoursePackage } from "@/lib/db/models"
@@ -156,7 +157,7 @@ export async function fetchMyCertificates(): Promise<StudentCertificate[]> {
       .filter(
         (e) =>
           e.course &&
-          entitlementsFor(e.course as unknown as { packages?: ICoursePackage[] | null }, e).certificate
+          entitlementsFor(e.course as unknown as { packages?: ICoursePackage[] | null; format: CourseFormat | null }, e).certificate
       )
       .map((enrollment) => {
         const course = enrollment.course as unknown as {

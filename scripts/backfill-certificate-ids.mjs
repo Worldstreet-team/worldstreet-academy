@@ -71,13 +71,17 @@ const candidates = await enrollments
 
 const courseIds = [...new Map(candidates.map((e) => [e.course.toString(), e.course])).values()]
 const courseById = new Map(
-  (await db.collection("courses").find({ _id: { $in: courseIds } }, { projection: { packages: 1 } }).toArray()).map(
+  (await db.collection("courses").find({ _id: { $in: courseIds } }, { projection: { packages: 1, format: 1 } }).toArray()).map(
     (c) => [c._id.toString(), c]
   )
 )
 
-/** lib/entitlements.ts entitlementsFor(course, enrollment).certificate, literally. */
+/**
+ * Mirrors lib/entitlements.ts entitlementsFor(course, enrollment).certificate,
+ * including its file-product rule (a template or guide grants no services).
+ */
 function certifies(course, packageKey) {
+  if (course.format === "template" || course.format === "guide") return false
   if (!packageKey) return true
   const pkg = (course.packages ?? []).find((p) => p.key === packageKey)
   return pkg ? Boolean(pkg.entitlements?.certificate) : true

@@ -28,7 +28,7 @@ export type CourseAccess = {
   packageKey: PackageKey | null
   packageName: string | null
   entitlements: IPackageEntitlements
-  course: { id: string; slug: string; instructorId: string; packages: ICoursePackage[] }
+  course: { id: string; slug: string; instructorId: string; packages: ICoursePackage[]; format: CourseFormat | null }
 }
 
 /** Enrollment statuses `getCourseAccess` reads as access-granting (its own `$in` filter). */
@@ -47,7 +47,7 @@ type CourseAccessRow = {
   instructor: { toString(): string } | string
   packages?: ICoursePackage[] | null
   /** A file product (template or guide) grants no services; see entitlementsFor. */
-  format?: CourseFormat | null
+  format: CourseFormat | null | undefined
 }
 
 /**
@@ -75,6 +75,7 @@ export function courseAccessFromRows(
       slug: course.slug,
       instructorId: course.instructor.toString(),
       packages,
+      format: course.format ?? null,
     },
   }
 }

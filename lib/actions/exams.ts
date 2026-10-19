@@ -361,7 +361,7 @@ export async function setCourseExamRequired(courseId: string, required: boolean)
  * lesson's tier. null = open.
  */
 async function examPackageLock(
-  course: { packages?: ICoursePackage[] | null; format?: CourseFormat | null },
+  course: { packages?: ICoursePackage[] | null; format: CourseFormat | null | undefined },
   enrollment: { packageKey?: PackageKey | null },
   lessonId: string | null | undefined
 ): Promise<{ requiredLabel: string | null } | null> {
