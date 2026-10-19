@@ -383,6 +383,53 @@ export function assessmentCounts(assessments: MyAssessment[]): { toDo: number; d
   return { toDo: assessments.length - done, done }
 }
 
+export type AssessmentKind = "assessments" | "assignments"
+
+/** Which page a row belongs to: practical assignments, or exams (finals and knowledge checks). */
+export function assessmentKindOf(a: Pick<MyAssessment, "scope">): AssessmentKind {
+  return a.scope === "assignment" ? "assignments" : "assessments"
+}
+
+/** The row's next action, or null when there is none. */
+export function assessmentAction(a: MyAssessment): string | null {
+  if (a.scope === "assignment") {
+    if (a.status === "not_started") return "Submit"
+    if (a.status === "in_progress") return "Resume"
+    if (a.status === "graded") return "View grade"
+    return null
+  }
+  switch (a.status) {
+    case "not_started":
+      return "Start"
+    case "in_progress":
+      return "Resume"
+    case "failed": {
+      const max = a.maxAttempts ?? 0
+      return max === 0 || (a.attemptsUsed ?? 0) < max ? "Retake" : "View result"
+    }
+    case "passed":
+      return "View result"
+    default:
+      return null
+  }
+}
+
+/** The exam meta line: attempts · best score · pass mark. Null for assignments. */
+export function assessmentMeta(a: MyAssessment): string | null {
+  if (a.scope === "assignment") return null
+  const parts: string[] = []
+  const used = a.attemptsUsed ?? 0
+  const max = a.maxAttempts
+  if (max != null) {
+    if (max > 0) parts.push(`${used} of ${max} ${max === 1 ? "attempt" : "attempts"}`)
+    else if (used === 0) parts.push("Unlimited attempts")
+    else parts.push(`${used} ${used === 1 ? "attempt" : "attempts"} · unlimited`)
+  }
+  if (a.bestScorePercent !== null) parts.push(`Best ${a.bestScorePercent}%`)
+  if (a.passMarkPercent !== null) parts.push(`Pass mark ${a.passMarkPercent}%`)
+  return parts.length > 0 ? parts.join(" · ") : null
+}
+
 /** A class past its start time that the host hasn't started — listed as "Waiting for your instructor". */
 export function isClassLate(scheduledAt: string, now: number): boolean {
   return new Date(scheduledAt).getTime() <= now
