@@ -30,7 +30,11 @@ export type CourseKind = "program" | "marketplace" | "new-economy"
 export type CourseReviewStatus = "none" | "pending" | "approved" | "changes_requested"
 
 
-/** What a package unlocks beyond the lessons themselves (spec §6 ladder). */
+/**
+ * What a package unlocks beyond the lessons themselves (spec §6 ladder).
+ * `recordings` (institutional blueprint §9, 2026-10-19): recorded classes; read it
+ * through `recordingsAllowed`, since plans saved before it carry only `liveClasses`.
+ */
 export interface IPackageEntitlements {
   liveClasses: boolean
   instructorQa: boolean
@@ -38,6 +42,7 @@ export interface IPackageEntitlements {
   certificate: boolean
   mentorship: boolean
   prioritySupport: boolean
+  recordings: boolean
 }
 
 /**
@@ -265,6 +270,7 @@ const CourseSchema = new Schema<ICourse>(
               certificate: { type: Boolean, default: false },
               mentorship: { type: Boolean, default: false },
               prioritySupport: { type: Boolean, default: false },
+              recordings: { type: Boolean, default: false },
             },
           },
           { _id: false }

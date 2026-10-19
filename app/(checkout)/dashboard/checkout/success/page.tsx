@@ -1,4 +1,4 @@
-import { ArrowRightIcon, AwardIcon, HandshakeIcon, MailIcon, PlayIcon, RadioIcon, type IconComponent } from "@/components/icons"
+import { ArrowRightIcon, AwardIcon, HandshakeIcon, MailIcon, PlayIcon, RadioIcon, VideoReplayIcon, type IconComponent } from "@/components/icons"
 import type { Metadata } from "next"
 import Image from "next/image"
 import Link from "next/link"
@@ -103,6 +103,13 @@ export default async function CheckoutSuccessPage({
       icon: RadioIcon,
       title: "Live classes",
       body: "When your instructor schedules one, it appears in your dashboard.",
+    })
+  }
+  if (services.has("recordings") && !services.has("liveClasses")) {
+    steps.push({
+      icon: VideoReplayIcon,
+      title: "Recorded classes",
+      body: "Your program's class recordings play under Recordings in your dashboard.",
     })
   }
   if (services.has("certificate")) {

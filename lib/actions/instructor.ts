@@ -60,6 +60,7 @@ const PackageSchema = z
     entitlements: z.object({
       liveClasses: z.boolean(), instructorQa: z.boolean(), assignments: z.boolean(),
       certificate: z.boolean(), mentorship: z.boolean(), prioritySupport: z.boolean(),
+      recordings: z.boolean().default(false),
     }),
   })
   .refine((p) => p.listPrice === null || p.listPrice > p.price, {
@@ -426,6 +427,7 @@ export async function fetchCourseForEdit(courseId: string) {
               certificate: Boolean(p.entitlements?.certificate),
               mentorship: Boolean(p.entitlements?.mentorship),
               prioritySupport: Boolean(p.entitlements?.prioritySupport),
+              recordings: Boolean(p.entitlements?.recordings),
             },
           })
         ),

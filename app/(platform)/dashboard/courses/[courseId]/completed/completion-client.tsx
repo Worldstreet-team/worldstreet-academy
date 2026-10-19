@@ -11,7 +11,7 @@ import type { CourseRatingSummary } from "@/lib/actions/reviews"
 interface CourseCompletionClientProps {
   courseTitle: string
   courseId: string
-  /** False when the package has no certificate (Basic) — no certificate actions. */
+  /** False when the plan has no certificate — no certificate actions. */
   hasCertificate: boolean
   ratingSummary: CourseRatingSummary | null
   /** The learner's own review, when they've left one. */

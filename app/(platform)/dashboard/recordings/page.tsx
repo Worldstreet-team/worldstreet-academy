@@ -4,7 +4,7 @@ import { RecordingsList } from "@/components/recordings/recordings-list"
 
 export const metadata = { title: "Recordings" }
 
-/** Recordings of past live classes, for programs whose package includes live classes. */
+/** Recordings of past live classes, for programs whose plan includes recorded classes. */
 export default function RecordingsPage() {
   return (
     <>

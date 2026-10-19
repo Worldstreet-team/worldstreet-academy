@@ -90,7 +90,7 @@ export async function fetchCertificate(courseId: string): Promise<CertificateDat
 
     if (!course) return null
 
-    // Packages without assessment & certificate (Basic) complete, but never certify.
+    // Plans without the certificate complete, but never certify.
     if (!entitlementsFor(course, enrollment).certificate) return null
 
     // null when the instructor account no longer exists — the certificate still

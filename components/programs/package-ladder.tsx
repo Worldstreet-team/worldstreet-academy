@@ -25,12 +25,13 @@ const GRID: Record<number, string> = {
 }
 
 /**
- * The six services a tier can carry, in the order a buyer climbs them. Used
+ * The seven services a tier can carry, in the order a buyer climbs them. Used
  * for the comparison table only — the per-card feature lists stay the
  * instructor's own copy.
  */
 const COMPARED: ReadonlyArray<{ key: keyof IPackageEntitlements; label: string }> = [
   { key: "liveClasses", label: "Live classes" },
+  { key: "recordings", label: "Recorded classes" },
   { key: "instructorQa", label: "Instructor Q&A" },
   { key: "assignments", label: "Graded assignments" },
   { key: "certificate", label: "Certificate of completion" },
@@ -42,10 +43,10 @@ const COMPARED: ReadonlyArray<{ key: keyof IPackageEntitlements; label: string }
  * Spec §6 "Choose your learning experience": 1–3 tier cards side by side
  * (stacked on phones). The highlighted tier gets a raised surface, a gold
  * ring and a "Most popular" cap — never a gold background. Tier key labels
- * (BASIC / STANDARD / EXECUTIVE 101) only make sense against siblings, so a
+ * (BASIC / STANDARD / EXECUTIVE) only make sense against siblings, so a
  * single-tier program shows none.
  *
- * Below the cards, multi-tier programs get a comparison table of the six
+ * Below the cards, multi-tier programs get a comparison table of the seven
  * entitlements. The cards sell each tier in the instructor's words; the table
  * answers the question the cards can't — what actually differs — without
  * making the visitor diff three bullet lists by eye.
@@ -115,8 +116,11 @@ export function PackageLadder({
               )}
               <div className="flex flex-1 flex-col p-6">
                 {multiTier && (
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ws-subtle">
-                    {PACKAGE_LABEL[pkg.key]}
+                  <p className="flex flex-wrap items-baseline gap-x-2">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ws-subtle">
+                      {PACKAGE_LABEL[pkg.key]}
+                    </span>
+                    {pkg.tagline && <span className="text-[13px] font-medium normal-case tracking-normal text-ws-muted">— {pkg.tagline}</span>}
                   </p>
                 )}
                 <p className="mt-3 font-display text-[40px] font-light leading-none tabular-nums tracking-[-0.02em] text-ws-primary">
@@ -124,7 +128,6 @@ export function PackageLadder({
                 </p>
                 <PackageDiscount pkg={pkg} className="mt-2.5 flex text-[14px]" />
                 <h3 className="mt-3 font-display text-xl font-semibold text-ws-primary">{pkg.name}</h3>
-                {pkg.tagline && <p className="mt-1.5 text-[14px] leading-relaxed text-ws-muted">{pkg.tagline}</p>}
                 <PackageDuration duration={pkg.duration} className="mt-3" />
 
                 {access.kind !== "enrolled" && (

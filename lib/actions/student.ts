@@ -18,7 +18,7 @@ import {
 import { getCurrentUser } from "@/lib/auth"
 import { schoolSlugOf, storedSlugsFor, type SchoolSlug } from "@/lib/schools"
 import { programArt } from "@/lib/school-art"
-import { FULL_ACCESS, PACKAGE_RANK, canAccessLesson, effectiveLessonTier, entitlementsFor } from "@/lib/entitlements"
+import { FULL_ACCESS, PACKAGE_RANK, canAccessLesson, effectiveLessonTier, entitlementsFor, recordingsAllowed } from "@/lib/entitlements"
 import {
   getCourseAccess,
   lockedLessonIds,
@@ -532,6 +532,7 @@ const NO_ENTITLEMENTS: IPackageEntitlements = {
   certificate: false,
   mentorship: false,
   prioritySupport: false,
+  recordings: false,
 }
 
 /** Shared finder behind the program page (by slug) and checkout (by id). */
@@ -573,7 +574,7 @@ async function findProgram(filter: { slug: string } | { _id: string }): Promise<
           features: p.features ?? [],
           highlight: Boolean(p.highlight),
           ctaLabel: p.ctaLabel ?? null,
-          entitlements: { ...NO_ENTITLEMENTS, ...p.entitlements },
+          entitlements: { ...NO_ENTITLEMENTS, ...p.entitlements, recordings: recordingsAllowed(p.entitlements) },
         }))
       : [
           {
@@ -1261,7 +1262,7 @@ export async function markCourseComplete(
 
     // CBT gate: when the course requires an exam, completion only happens
     // through a passing attempt (lib/actions/exams.ts) — unless the package has
-    // no assessment & certificate (Basic), which completes on its lessons.
+    // no certificate, which completes on its lessons.
     const [course, access] = await Promise.all([
       Course.findById(courseId).select("examRequired").lean(),
       getCourseAccess(user._id.toString(), courseId),

@@ -177,3 +177,9 @@ Online education platform for cryptocurrency/trading courses. Instructor portal 
 - **Drafted copy awaits sign-off.** `learn`, `audience`, `careers` of all seven schools, and the blurb and intro of the six new or renamed ones, are drafted from §7 and marked `// DRAFT: owner sign-off pending` in `lib/schools.ts`. Trading's blurb, tagline and intro are the 2026-09-14 text.
 - **Page order (§8):** hero, learn, audience, careers, programs (compare, topics), study areas, faculty, a commented slot for Phase 12's upcoming cohorts, learning pathways, free lessons, reviews, FAQ, other schools. `SchoolTopics` is now `#topics`.
 - **Owner steps** are in `docs/launch-runbook.md` "Seven schools — Phase 13". Never run a pre-Phase 13 `mastery-catalogue.mjs` after the migration: it files the programs under retired slugs again.
+
+### 2026-10-19 — Plans to the blueprint (Phase 14)
+- **Labels:** Basic — Foundation, Standard — Mastery, Executive — Personalized Mastery. The tagline sits beside the tier label; plan names stay program-specific.
+- **`recordings` entitlement:** a plan includes recorded classes when `recordings || liveClasses` (`recordingsAllowed`), so plans saved before the flag keep their recordings. Basic now has recordings, assignments and the certificate; live classes and instructor Q&A stay off.
+- **"Recorded classes"** joins every list of what a plan includes (chooser, ladder, purchase panel, checkout lines).
+- **Executive's label** is "Executive" (was "Executive 101"); the stored plan name is unchanged.

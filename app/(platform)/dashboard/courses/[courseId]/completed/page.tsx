@@ -30,7 +30,7 @@ export default async function CourseCompletedPage({
     redirect(`/dashboard/courses/${courseId}`)
   }
 
-  // Packages without a certificate (Basic) complete but never certify — don't
+  // Plans without a certificate complete but never certify — don't
   // offer a certificate page that would 404.
   const [access, ratingSummary, review] = await Promise.all([
     getCourseAccess(currentUser.id, courseId),

@@ -30,24 +30,27 @@
  *   "Artificial Intelligence & AI Automation"    -> "AI & AI Automation"
  *
  * On MATCH this $sets title, school, category, packages, price and pricing
- * unconditionally, plus shortDescription/description/whatYouWillLearn only
+ * unconditionally — `packages` is replaced wholesale, so every plan's name,
+ * tagline, duration, features and entitlements are rewritten, not only prices
+ * (the dry run prints a `plan <key>: …` diff line per plan) — plus shortDescription/description/whatYouWillLearn only
  * for the 3 programs the spec gives copy for (Forex, Crypto, AI & AI
  * Automation) — every other program's existing copy is left untouched. It
  * never touches thumbnailUrl, status, instructor, enrolledCount or rating on
  * an existing row, and never deletes or archives anything.
  *
- * Plans (owner meeting, 2026-10-03): every one of the 12 programs sells the
- * same three plans — Basic $49 (was $300), Standard $199 (was $1,000, the
- * highlighted "most popular") and Executive $999 (was $10,000: private
- * one-on-one teaching with a personal tutor, lifetime mentorship, the signal
- * group). `price` is what checkout charges; `listPrice` is the original,
- * shown struck through until the live cohort starts (lib/cohort.ts).
- * Durations: Standard and Executive "9 weeks"; Basic null until the owner
- * confirms it. Entitlements follow the Forex ladder (Basic NONE, Standard
- * STANDARD_TIER, Executive FULL). Forex and Crypto keep their spec feature
- * lists; the other 10 get one generic list per plan, named after the
- * program's subject. Every Executive plan lists the owner's three promises
- * (EXECUTIVE_PROMISE).
+ * Plans (institutional blueprint §9, decision D23; prices from the owner
+ * meeting, 2026-10-03): every one of the 12 programs sells the same three
+ * plans — Basic "Foundation" $49 (was $300, 4 weeks), Standard "Mastery" $199
+ * (was $1,000, 8–12 weeks, the highlighted "most popular") and Executive
+ * "Personalized Mastery" $999 (was $10,000, Flexible schedule). `price` is
+ * what checkout charges; `listPrice` is the original, shown struck through
+ * until the live cohort starts (lib/cohort.ts). Basic = recorded classes,
+ * assignments, assessments and the certificate (BASIC_TIER) — no live classes
+ * and no instructor Q&A; Standard is STANDARD_TIER; Executive is FULL. Every
+ * program gets the one §9 feature list per plan (BASIC_FEATURES,
+ * STANDARD_FEATURES, EXECUTIVE_FEATURES); Executive keeps the owner's two
+ * extra promises, "Lifetime mentorship access" and "Access to the signal
+ * group". Plan names stay program-specific ("Forex Foundation").
  *
  * Price: every program's scalar `price` and `pricing` are DERIVED from its
  * plans — `price` = the cheapest *enabled* plan (49, Basic), `pricing` =
@@ -73,8 +76,8 @@
  *
  * - PRICE: applying this changes what existing programs charge and what
  *   each price buys — e.g. a single-package program at 99 (full access)
- *   becomes Basic 49 (no live classes, Q&A, assignments or certificate),
- *   Standard 199 and Executive 999 (full access) — see the boxed WARNING printed
+ *   becomes Basic 49 (recorded classes, assignments, assessments and the
+ *   certificate, but no live classes or Q&A), Standard 199 and Executive 999 (full access) — see the boxed WARNING printed
  *   at the top of every run, which lists each program's scalar price and
  *   enabled plan prices, current -> new. Any --apply that would change an
  *   *existing* row's scalar price OR its enabled plan prices (mock DBs
@@ -96,6 +99,12 @@
  *   like `forex-trading-mastery-j7g0ta` are already shared, and an old slug
  *   has no redirect). `--rename-slugs` restores the clean-slug rewrite.
  *
+ * - ACCESS: the plan diff lines (`plan <key>: …`) show every change per plan.
+ *   An --apply that would turn OFF a flag an existing plan has on (for
+ *   example access an admin granted by hand in the editor) prints the
+ *   affected programs and exits 1 before any write, unless
+ *   --allow-access-loss is passed. Use it only on the owner's written go.
+ *
  *   node scripts/mastery-catalogue.mjs --apply --allow-price-change
  * ---------------------------------------------------------------------
  */
@@ -107,6 +116,7 @@ config()
 const APPLY = process.argv.includes("--apply")
 const ALLOW_PRICE_CHANGE = process.argv.includes("--allow-price-change")
 const RENAME_SLUGS = process.argv.includes("--rename-slugs")
+const ALLOW_ACCESS_LOSS = process.argv.includes("--allow-access-loss")
 
 if (!process.env.MONGODB_URI) {
   console.error("MONGODB_URI is not set — refusing to run.")
@@ -150,10 +160,11 @@ const SCHOOLS = {
 }
 
 // ---- duplicated from lib/db/models/course.ts (ICoursePackage / IPackageEntitlements) ----
-const FULL = { liveClasses: true, instructorQa: true, assignments: true, certificate: true, mentorship: true, prioritySupport: true }
-const NONE = { liveClasses: false, instructorQa: false, assignments: false, certificate: false, mentorship: false, prioritySupport: false }
-// Standard-tier ladder rung: live classes + Q&A + assignments + certificate, no mentorship/priority support.
-const STANDARD_TIER = { liveClasses: true, instructorQa: true, assignments: true, certificate: true, mentorship: false, prioritySupport: false }
+const FULL = { liveClasses: true, instructorQa: true, assignments: true, certificate: true, mentorship: true, prioritySupport: true, recordings: true }
+// Basic (institutional blueprint §9, D23): recorded classes, assignments, assessments and the certificate — no live classes, no instructor Q&A.
+const BASIC_TIER = { liveClasses: false, instructorQa: false, assignments: true, certificate: true, mentorship: false, prioritySupport: false, recordings: true }
+// Standard-tier ladder rung: live classes + recordings + Q&A + assignments + certificate, no mentorship/priority support.
+const STANDARD_TIER = { liveClasses: true, instructorQa: true, assignments: true, certificate: true, mentorship: false, prioritySupport: false, recordings: true }
 
 function pkg(key, name, tagline, price, features, entitlements, { highlight = false, ctaLabel = null, enabled = true, listPrice = null, duration = null } = {}) {
   return { key, name, tagline, price, listPrice, duration, features, highlight, ctaLabel, enabled, entitlements }
@@ -178,31 +189,43 @@ function ladderPrices(packages) {
 }
 
 // ---------------------------------------------------------------------------
-// The three plans every program sells (owner meeting, 2026-10-03). `price`
-// is the launch "pay now" price checkout charges; `listPrice` the original,
-// struck through on the program page until the live cohort starts.
-// Basic's duration is null until the owner confirms it.
+// The three plans every program sells. Prices are the owner's (2026-10-03):
+// `price` is the launch "pay now" price checkout charges; `listPrice` the
+// original, struck through on the program page until the live cohort starts.
+// Everything else is institutional blueprint §9 and decision D23: Foundation
+// (4 weeks), Mastery (8–12 weeks), Personalized Mastery (Flexible schedule).
+// Basic = recorded classes, assignments, assessments and the certificate, with
+// no live classes and no instructor Q&A. Every program gets the same §9 feature
+// list per plan (the program's subject lives on in whatYouWillLearn); Executive
+// keeps the owner's two extra promises, "Lifetime mentorship access" and
+// "Access to the signal group".
 // ---------------------------------------------------------------------------
 
-const PLAN = {
-  basic: { label: "Basic", price: 49, listPrice: 300, duration: null, entitlements: NONE, highlight: false, ctaLabel: null },
-  standard: { label: "Standard", price: 199, listPrice: 1000, duration: "9 weeks", entitlements: STANDARD_TIER, highlight: true, ctaLabel: null },
-  executive: { label: "Executive", price: 999, listPrice: 10000, duration: "9 weeks", entitlements: FULL, highlight: false, ctaLabel: "Apply / Enrol for $999" },
-}
-
-/** What the owner promises on every Executive plan. */
-const EXECUTIVE_PROMISE = [
-  "Private one-on-one classes with a personal tutor",
-  "Lifetime mentorship access",
-  "Access to the signal group",
+const BASIC_FEATURES = [
+  "Foundation lessons", "Core concepts", "Selected recorded classes", "Learning materials", "Student community",
+  "Basic assignments", "Basic assessments", "Student dashboard", "Certificate of completion where applicable",
+]
+const STANDARD_FEATURES = [
+  "Everything in Basic", "Beginner-to-advanced curriculum", "Full live cohort", "Practical assignments", "Projects",
+  "Instructor interaction", "Assessments", "Mentorship in your live cohort", "Advanced resources and community",
+]
+const EXECUTIVE_FEATURES = [
+  "Everything in Standard", "Dedicated/private tutor", "One-on-one sessions", "Personalized learning plan",
+  "Flexible scheduling", "Individual feedback", "Private mentorship", "Progress reviews", "Personalized projects",
+  "Executive community", "Premium support", "Lifetime mentorship access", "Access to the signal group",
 ]
 
-/** A program's three plans from its copy: `{ basic, standard, executive }`, each `{ name, tagline, features }`. */
-function ladder(copy) {
+const PLAN = {
+  basic: { label: "Basic", tagline: "Foundation", price: 49, listPrice: 300, duration: "4 weeks", entitlements: BASIC_TIER, features: BASIC_FEATURES, highlight: false, ctaLabel: null },
+  standard: { label: "Standard", tagline: "Mastery", price: 199, listPrice: 1000, duration: "8–12 weeks", entitlements: STANDARD_TIER, features: STANDARD_FEATURES, highlight: true, ctaLabel: null },
+  executive: { label: "Executive", tagline: "Personalized Mastery", price: 999, listPrice: 10000, duration: "Flexible schedule", entitlements: FULL, features: EXECUTIVE_FEATURES, highlight: false, ctaLabel: "Apply / Enrol for $999" },
+}
+
+/** A program's three plans from its plan names: `{ basic, standard, executive }`; everything else comes from PLAN. */
+function ladder(names) {
   return ["basic", "standard", "executive"].map((key) => {
     const plan = PLAN[key]
-    const { name, tagline, features } = copy[key]
-    return pkg(key, name, tagline, plan.price, features, plan.entitlements, {
+    return pkg(key, names[key], plan.tagline, plan.price, plan.features, plan.entitlements, {
       highlight: plan.highlight,
       ctaLabel: plan.ctaLabel,
       listPrice: plan.listPrice,
@@ -211,35 +234,9 @@ function ladder(copy) {
   })
 }
 
-/** Plan copy for a program the spec gives none for — one generic list per plan, named after its subject. */
+/** Plan names for a program the spec names none for, from its subject. */
 function genericLadder(subject) {
-  return ladder({
-    basic: {
-      name: `${subject} Foundation`,
-      tagline: "Perfect for beginners",
-      features: [
-        `${subject} fundamentals`, "Core concepts & terminology", "Self-paced video lessons",
-        "Practical examples", "Learning materials", "Community access where applicable",
-      ],
-    },
-    standard: {
-      name: `${subject} Mastery`,
-      tagline: "Designed for learners who want a comprehensive, guided learning pathway.",
-      features: [
-        "Everything in Basic", "The complete program curriculum", "Advanced concepts & techniques",
-        "Real-world application", "Practical assignments", "Live classes where scheduled", "Instructor Q&A",
-        "Assessment & certificate",
-      ],
-    },
-    executive: {
-      name: `Private ${subject} Mentorship`,
-      tagline: "A premium one-on-one learning experience.",
-      features: [
-        "Everything in Standard", ...EXECUTIVE_PROMISE, "Personalized learning roadmap",
-        "Individual progress assessment", "Personalized feedback", "Priority support",
-      ],
-    },
-  })
+  return ladder({ basic: `${subject} Foundation`, standard: `${subject} Mastery`, executive: `Private ${subject} Mentorship` })
 }
 
 const slugify = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "")
@@ -254,47 +251,14 @@ const FOREX_WYL = [
   "Trading psychology", "Trade planning", "Market analysis", "Position sizing",
   "Trading discipline", "Practical application",
 ]
-const FOREX_BASIC_FEATURES = [
-  "Forex fundamentals", "Currency pairs", "Market terminology", "Charts & candlesticks",
-  "Introduction to technical analysis", "Market structure fundamentals", "Risk-management foundations",
-  "Trading psychology fundamentals", "Learning materials", "Community access where applicable",
-]
-const FOREX_STANDARD_FEATURES = [
-  "Everything in Basic", "Advanced technical analysis", "Fundamental analysis", "Trading strategy frameworks",
-  "Trade planning", "Execution principles", "Advanced risk management", "Trading psychology",
-  "Practical assignments", "Live classes where scheduled", "Instructor Q&A",
-  "Mentorship/community support where included", "Educational market-analysis sessions where scheduled",
-  "Assessment & certificate",
-]
-// The owner's three Executive promises lead the list; the first replaces the
-// spec's "Private 1-on-1 coaching", which says the same thing.
-const FOREX_EXECUTIVE_FEATURES = [
-  "Everything in Standard", ...EXECUTIVE_PROMISE, "Personalized learning roadmap", "Private expert sessions",
-  "Individual strategy review", "Personalized trading-plan development", "Private Q&A", "Direct mentorship",
-  "Individual progress assessment", "Personalized feedback", "Priority support",
-]
-const forexPackages = ladder({
-  basic: { name: "Forex Foundation", tagline: "Perfect for beginners", features: FOREX_BASIC_FEATURES },
-  standard: { name: "Forex Mastery", tagline: "Designed for learners who want a comprehensive Forex education pathway.", features: FOREX_STANDARD_FEATURES },
-  executive: { name: "Private Forex Mentorship", tagline: "A premium one-on-one learning experience.", features: FOREX_EXECUTIVE_FEATURES },
-})
+const forexPackages = ladder({ basic: "Forex Foundation", standard: "Forex Mastery", executive: "Private Forex Mentorship" })
 
 const CRYPTO_WYL = [
   "Cryptocurrency fundamentals", "Bitcoin & digital assets", "Blockchain fundamentals", "Exchanges & wallets",
   "Market structure", "Technical analysis", "Fundamental analysis", "Trading strategies", "Risk management",
   "Trading psychology", "Portfolio principles", "Crypto security", "Practical market analysis",
 ]
-const CRYPTO_BASIC_FEATURES = [
-  "Cryptocurrency fundamentals", "Bitcoin & digital assets", "Blockchain fundamentals", "Exchanges & wallets",
-  "Market structure", "Introduction to technical analysis", "Risk-management foundations", "Crypto security",
-  "Learning materials", "Community access where applicable",
-]
-const cryptoPackages = ladder({
-  basic: { name: "Crypto Foundation", tagline: "Perfect for beginners", features: CRYPTO_BASIC_FEATURES },
-  // Standard/executive share Forex's features & entitlements verbatim (brief: "identical to Forex Standard/Executive").
-  standard: { name: "Crypto Mastery", tagline: "Designed for learners who want a comprehensive crypto education pathway.", features: FOREX_STANDARD_FEATURES },
-  executive: { name: "Private 1-on-1 Crypto Mentorship", tagline: "A premium one-on-one learning experience.", features: FOREX_EXECUTIVE_FEATURES },
-})
+const cryptoPackages = ladder({ basic: "Crypto Foundation", standard: "Crypto Mastery", executive: "Private 1-on-1 Crypto Mentorship" })
 
 const AI_WYL = [
   "AI fundamentals", "Prompt engineering", "AI productivity tools", "Content automation",
@@ -442,6 +406,46 @@ async function resolveExisting(program) {
 }
 
 // ---------------------------------------------------------------------------
+// Plan diff: what a MATCH row's plans would change, field by field (price and
+// list price excluded — the price gate and the WARNING block cover those).
+// `losses` lists every flag an existing plan has on that the new plan turns off.
+// ---------------------------------------------------------------------------
+
+const quoted = (v) => (v == null ? "none" : `"${v}"`)
+
+function diffPlans(current, next) {
+  const lines = []
+  const losses = []
+  for (const plan of next) {
+    const cur = current.find((c) => c.key === plan.key)
+    if (!cur) {
+      lines.push(`plan ${plan.key}: new`)
+      continue
+    }
+    const parts = []
+    if (cur.name !== plan.name) parts.push(`name "${cur.name}" -> "${plan.name}"`)
+    if (cur.tagline !== plan.tagline) parts.push(`tagline "${cur.tagline}" -> "${plan.tagline}"`)
+    if ((cur.duration ?? null) !== (plan.duration ?? null)) parts.push(`duration ${quoted(cur.duration)} -> ${quoted(plan.duration)}`)
+    if (Boolean(cur.enabled) !== Boolean(plan.enabled)) parts.push(`enabled ${Boolean(cur.enabled)} -> ${Boolean(plan.enabled)}`)
+    const flags = []
+    for (const flag of Object.keys(FULL)) {
+      const was = Boolean(cur.entitlements?.[flag])
+      const now = Boolean(plan.entitlements[flag])
+      if (was === now) continue
+      flags.push(`${now ? "+" : "-"}${flag}`)
+      if (was && !now) losses.push(`${plan.key}.${flag}`)
+    }
+    if (flags.length > 0) parts.push(flags.join(" "))
+    const curFeatures = cur.features ?? []
+    if (JSON.stringify(curFeatures) !== JSON.stringify(plan.features)) {
+      parts.push(`features rewritten (${curFeatures.length} -> ${plan.features.length} lines)`)
+    }
+    lines.push(`plan ${plan.key}: ${parts.length > 0 ? parts.join(" · ") : "unchanged"}`)
+  }
+  return { lines, losses }
+}
+
+// ---------------------------------------------------------------------------
 // Pass 1 (read-only): resolve every program's plan before printing or
 // writing anything, so the WARNING block and the price-change gate below
 // can see the whole run up front.
@@ -478,6 +482,7 @@ for (const program of PROGRAMS) {
     const newLadder = ladderPrices(packages)
     const priceLine = `${derivedPrice} (derived: min enabled package price; existing scalar was ${existing.price})`
     const ladderLine = `${currentLadder} -> ${newLadder}`
+    const planDiff = diffPlans(existing.packages ?? [], packages)
     if (program.spec) {
       setDoc.shortDescription = program.spec.shortDescription
       setDoc.description = program.spec.description
@@ -493,7 +498,7 @@ for (const program of PROGRAMS) {
 
     plans.push({
       program, kind: "match", existing, matchedOnTitle, isRename, adopted, ownerEmail: email,
-      setDoc, slugResult, priceLine, ladderLine, derivedPrice, currentLadder, newLadder,
+      setDoc, slugResult, priceLine, ladderLine, derivedPrice, currentLadder, newLadder, planDiff,
     })
     continue
   }
@@ -578,8 +583,8 @@ console.log(
       "Every program is set to the owner's three plans (2026-10-03):",
       `  ${["basic", "standard", "executive"].map((k) => `${PLAN[k].label} ${usd(PLAN[k].price)} (was ${usd(PLAN[k].listPrice)})`).join(" · ")}`,
       "and its scalar price is derived from them (the cheapest enabled plan).",
-      "Programs that sold one full-access package now start at Basic, which has",
-      "no live classes, Q&A, assignments or certificate (full access = Executive).",
+      "Basic now includes recorded classes, assignments, assessments and the",
+      "certificate, but no live classes or instructor Q&A (full access = Executive).",
       "Production runs follow docs/launch-runbook.md §6 (owner-executed).",
       "",
       "Per program: scalar price current -> derived · enabled plan prices current -> new",
@@ -607,6 +612,24 @@ if (APPLY && priceChanges.length > 0 && !ALLOW_PRICE_CHANGE) {
   console.error("\nABORT: --apply would change the price of existing course(s) — re-run with --allow-price-change to confirm:")
   for (const p of priceChanges) {
     console.error(`  - ${p.program.title} (_id ${p.existing._id}): price ${p.existing.price} -> ${p.derivedPrice} · plans ${p.ladderLine}`)
+  }
+  console.error("No documents were written.")
+  await mongoose.disconnect()
+  process.exit(1)
+}
+
+// ---------------------------------------------------------------------------
+// Access-loss gate: the packages $set is wholesale, so an existing plan whose
+// flag is on (say, granted by hand in the editor) would be switched off for
+// every learner on it. Refuse unless the owner has said so in writing.
+// ---------------------------------------------------------------------------
+
+const accessLosses = plans.filter((p) => p.kind === "match" && p.planDiff.losses.length > 0)
+
+if (APPLY && accessLosses.length > 0 && !ALLOW_ACCESS_LOSS) {
+  console.error("\nABORT: --apply would remove access from existing plan(s) — learners on them would lose it. Re-run with --allow-access-loss only on the owner's written go:")
+  for (const p of accessLosses) {
+    console.error(`  - ${p.program.title} (_id ${p.existing._id}): ${p.planDiff.losses.join(", ")}`)
   }
   console.error("No documents were written.")
   await mongoose.disconnect()
@@ -652,6 +675,7 @@ for (const plan of plans) {
     console.log(`  school: ${existing.school ?? "none"} -> ${program.school}`)
     console.log(`  price: ${priceLine}`)
     console.log(`  plans (enabled prices): ${ladderLine}`)
+    for (const line of plan.planDiff.lines) console.log(`  ${line}`)
     console.log(`  $set: ${Object.keys(setDoc).join(", ")}`)
 
     if (APPLY) {
