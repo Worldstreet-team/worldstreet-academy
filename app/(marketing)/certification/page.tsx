@@ -4,7 +4,7 @@ import Link from "next/link"
 
 import { appUrl } from "@/lib/app-url"
 import { CERT_TIERS, CERT_TIER_LABEL, CERT_TIER_REQUIREMENTS } from "@/lib/certificate-tier"
-import { MASTERY_KEYS, MASTERY_PART_COPY, MASTERY_WEIGHTS } from "@/lib/mastery-score"
+import { MASTERY_KEYS, MASTERY_MIN_PARTS, MASTERY_PART_COPY, MASTERY_WEIGHTS } from "@/lib/mastery-score"
 import { SectionLabel, SectionTitle } from "@/components/marketing/section-heading"
 
 export const metadata: Metadata = {
@@ -84,7 +84,7 @@ export default function CertificationPage() {
           ))}
         </ul>
         <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-ws-muted">
-          {"Parts your plan doesn't include never count against you, and the score shows once two parts have data."}
+          {`Parts your plan doesn't include never count against you, and the score shows once ${MASTERY_MIN_PARTS} parts have data.`}
         </p>
       </section>
 
