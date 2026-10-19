@@ -4,6 +4,7 @@ import { BRAND } from "@/lib/brand"
 import { Course, Enrollment, type IEnrollment } from "@/lib/db/models"
 import { entitlementsFor } from "@/lib/entitlements"
 import { POINTS, awardPoints, pointKey } from "@/lib/points"
+import { ensureCertificateTier } from "@/lib/certificate-standing"
 
 /**
  * Certificate IDs (spec §13). One home for the rules: how an ID is generated,
@@ -14,6 +15,9 @@ import { POINTS, awardPoints, pointKey } from "@/lib/points"
  * a "use client" file. The legacy rule is repeated literally in
  * components/learn/certificate-view.tsx (client bundle) and
  * scripts/backfill-certificate-ids.mjs (can't import TS); keep all three equal.
+ *
+ * The tier a certificate shows lives in lib/certificate-tier.ts (rules) and
+ * lib/certificate-standing.ts (the stored, raise-only tier).
  */
 
 /** Crockford base32: 0-9 and A-Z without I, L, O, U (nothing to misread). */
@@ -117,7 +121,8 @@ export async function ensureCertificateId(
  * throws — then stamps the certificate ID via `ensureCertificateId`, random when
  * this save is the transition into "completed", which never throws. That
  * transition also earns the program-completion points (lib/points.ts), fire
- * and forget, once per enrollment.
+ * and forget, once per enrollment. A completion and every final-exam attempt
+ * (gradeAttempt calls this on each one) also re-evaluate the credential tier.
  */
 export async function saveWithCertificateId(enrollment: IEnrollment): Promise<void> {
   // Read before save() clears the modified state: an unchanged status means the
@@ -134,4 +139,5 @@ export async function saveWithCertificateId(enrollment: IEnrollment): Promise<vo
     })
   }
   await ensureCertificateId(enrollment, firstCompletion)
+  if (enrollment.status === "completed") await ensureCertificateTier(enrollment._id)
 }

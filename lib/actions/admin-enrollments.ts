@@ -11,6 +11,7 @@ import type { CourseStatus } from "@/lib/types/course"
 import { PACKAGE_RANK, entitlementsFor, isPackageKey, packageFor } from "@/lib/entitlements"
 import { getCourseAccess, openPublishedLessonIds } from "@/lib/course-access"
 import { ensureCertificateId } from "@/lib/certificate-id"
+import { ensureCertificateTier } from "@/lib/certificate-standing"
 import { courseKindOf } from "@/lib/course-kind"
 import { masteryInputsForMany, type MasteryEnrollmentRow } from "@/lib/mastery-inputs"
 import { masteryView } from "@/lib/mastery-score"
@@ -259,6 +260,7 @@ export async function adminSetEnrollmentStatus(
     // A restored completion that was never stamped stores the ID its certificate
     // already prints (the legacy value) — restore never mints a fresh one.
     if (action === "restore") await ensureCertificateId(enrollment, false)
+    if (action === "restore") await ensureCertificateTier(enrollment._id)
 
     revalidatePath("/admin/enrollments")
     return { success: true }
@@ -334,6 +336,7 @@ export async function adminSetEnrollmentPackage(
     // An upgrade can make an existing completion certify: store the ID its
     // certificate prints (the legacy value), never a fresh random one.
     await ensureCertificateId(enrollment, false)
+    await ensureCertificateTier(enrollment._id)
 
     try {
       await PaymentEvent.create({
