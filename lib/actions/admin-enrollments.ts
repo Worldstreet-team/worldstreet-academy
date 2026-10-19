@@ -270,8 +270,10 @@ export async function adminSetEnrollmentStatus(
     await enrollment.save()
     // A restored completion that was never stamped stores the ID its certificate
     // already prints (the legacy value) — restore never mints a fresh one.
-    if (action === "restore") await ensureCertificateId(enrollment, false)
-    if (action === "restore") await ensureCertificateTier(enrollment._id)
+    if (action === "restore") {
+      await ensureCertificateId(enrollment, false)
+      await ensureCertificateTier(enrollment._id)
+    }
 
     revalidatePath("/admin/enrollments")
     return { success: true }

@@ -303,9 +303,6 @@ export async function gradeSubmission(input: {
       points: gradePoints(parsed.data.grade),
       key: pointKey.assignmentGraded(submission._id.toString()),
     })
-    // A graded project can raise the credential (D25).
-    await ensureCertificateTier(submission.enrollment)
-
     const assignment = await Assignment.findById(submission.assignment).select("title").lean()
     const assignmentId = submission.assignment.toString()
     void notifyUser(submission.user.toString(), {
@@ -315,6 +312,9 @@ export async function gradeSubmission(input: {
       href: `/dashboard/assignments/${assignmentId}`,
       courseId: submission.course.toString(),
     })
+    // A graded project can raise the credential (D25). Not awaited, so the
+    // grade's response never waits on it; the tier write never throws.
+    void ensureCertificateTier(submission.enrollment)
 
     revalidatePath(`/instructor/courses/${submission.course.toString()}/assignments`)
     revalidatePath(`/dashboard/assignments/${assignmentId}`)
