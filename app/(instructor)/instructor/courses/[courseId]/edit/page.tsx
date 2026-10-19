@@ -34,6 +34,9 @@ export default async function EditCoursePage({
     packages: data.course.packages,
     kind: data.course.kind,
     communityUrl: data.course.communityUrl,
+    format: data.course.format,
+    productFile: data.course.productFile,
+    formatLocked: data.course.formatLocked,
     review: data.course.review,
     share: data.course.share,
   }

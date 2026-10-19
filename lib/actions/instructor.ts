@@ -16,6 +16,7 @@ import {
   type CourseKind,
   type CourseReviewStatus,
   type ICoursePackage,
+  type ICourseProductFile,
   type PackageKey,
 } from "@/lib/db/models"
 import { notifyUsers } from "@/lib/notify"
@@ -25,6 +26,16 @@ import { getCurrentUser } from "@/lib/auth"
 import { SCHOOL_BY_SLUG, isSchoolSlug, type SchoolSlug } from "@/lib/schools"
 import { canAccessLesson, PACKAGE_LABEL, isPackageKey, pricingFromPackages } from "@/lib/entitlements"
 import { courseKindOf } from "@/lib/course-kind"
+import {
+  COURSE_FORMATS,
+  MAX_PRODUCT_BYTES,
+  PRODUCT_MIME,
+  courseFormatOf,
+  isFileFormat,
+  type CourseFormat,
+  type ProductFileValue,
+} from "@/lib/course-format"
+import { productKeyPrefix } from "@/lib/r2"
 import { safeWebUrl } from "@/lib/faculty"
 import { appUrl } from "@/lib/app-url"
 import { referralPath } from "@/lib/referral-link"
@@ -223,8 +234,25 @@ function courseScope(user: { role?: string; _id: unknown }): mongoose.QueryFilte
  * sellers always write "marketplace". `communityUrl` is the class community
  * (WhatsApp, Telegram, Discord…): http(s), ≤ 500 characters, "" clears it.
  */
+const PRODUCT_FILE_ERROR = "Upload your file again"
+const ProductFileSchema = z.object(
+  {
+    key: z.string({ error: PRODUCT_FILE_ERROR }).min(1, PRODUCT_FILE_ERROR).max(300, PRODUCT_FILE_ERROR),
+    filename: z.string({ error: PRODUCT_FILE_ERROR }).trim().min(1, PRODUCT_FILE_ERROR).max(200, PRODUCT_FILE_ERROR),
+    mimeType: z.string({ error: PRODUCT_FILE_ERROR }).refine((m) => Object.hasOwn(PRODUCT_MIME, m), PRODUCT_FILE_ERROR),
+    sizeBytes: z
+      .number({ error: PRODUCT_FILE_ERROR })
+      .int(PRODUCT_FILE_ERROR)
+      .min(1, PRODUCT_FILE_ERROR)
+      .max(MAX_PRODUCT_BYTES, PRODUCT_FILE_ERROR),
+  },
+  { error: PRODUCT_FILE_ERROR }
+)
+
 const CourseExtrasSchema = z.object({
   kind: z.enum(["program", "marketplace", "new-economy"]).nullable(),
+  format: z.enum(COURSE_FORMATS).nullable(),
+  productFile: ProductFileSchema.nullable(),
   communityUrl: z
     .string()
     .trim()
@@ -238,20 +266,75 @@ const CourseExtrasSchema = z.object({
 function parseExtras(
   formData: FormData,
   fieldErrors: Record<string, string>
-): { kind: CourseKind | null; communityUrl: string | null; submitForReview: boolean } {
+): {
+  kind: CourseKind | null
+  format: CourseFormat | null
+  productFile: ProductFileValue | null
+  communityUrl: string | null
+  submitForReview: boolean
+} {
   const kind = formData.get("kind")
+  const format = formData.get("format")
+  const productFileRaw = formData.get("productFile")
   const communityUrl = formData.get("communityUrl")
+  let productFile: unknown = null
+  if (typeof productFileRaw === "string" && productFileRaw !== "" && productFileRaw !== "null") {
+    try {
+      productFile = JSON.parse(productFileRaw)
+    } catch {
+      productFile = "unreadable" // fails the schema
+    }
+  }
   const result = CourseExtrasSchema.safeParse({
     kind: typeof kind === "string" && kind !== "" ? kind : null,
+    format: typeof format === "string" && format !== "" ? format : null,
+    productFile,
     communityUrl: typeof communityUrl === "string" ? communityUrl : null,
     submitForReview: formData.get("submitForReview") === "true",
   })
   if (!result.success) {
     const issue = result.error.issues[0]
-    fieldErrors[issue?.path[0] === "kind" ? "kind" : "communityUrl"] = issue?.message ?? "Invalid course settings"
-    return { kind: null, communityUrl: null, submitForReview: false }
+    const field = issue?.path[0]
+    fieldErrors[field === "kind" || field === "format" || field === "productFile" ? field : "communityUrl"] =
+      issue?.message ?? "Invalid course settings"
+    return { kind: null, format: null, productFile: null, communityUrl: null, submitForReview: false }
   }
   return { ...result.data, communityUrl: result.data.communityUrl ?? null }
+}
+
+/**
+ * The format and product file a save writes. Marketplace only: any other kind
+ * stores neither. The family (lessons vs one file) locks at first publish, a
+ * lesson format never keeps a file, and a file format takes only a key inside
+ * the saving user's own folder or the course's current key (so an unchanged
+ * save keeps its file and upload date).
+ */
+function resolveProduct(input: {
+  kind: CourseKind
+  extras: { format: CourseFormat | null; productFile: ProductFileValue | null }
+  existing: { format?: CourseFormat | null; publishedAt?: Date | null; productFile?: ICourseProductFile | null } | null
+  actingUserId: string
+  sentProductFile: boolean
+}): { format: CourseFormat | null; productFile: ICourseProductFile | null } | { field: string; error: string } {
+  const { kind, extras, existing, actingUserId, sentProductFile } = input
+  if (kind !== "marketplace") return { format: null, productFile: null }
+
+  const format: CourseFormat = extras.format ?? courseFormatOf({ kind, format: existing?.format }) ?? "course"
+  if (existing?.publishedAt && isFileFormat(existing.format) !== isFileFormat(format)) {
+    return { field: "format", error: "A published course can't switch between lessons and a downloadable file" }
+  }
+  if (!isFileFormat(format)) return { format, productFile: null }
+
+  const incoming = sentProductFile ? extras.productFile : (existing?.productFile ?? null)
+  if (!incoming) return { format, productFile: null }
+  const { key, filename, mimeType, sizeBytes } = incoming
+  if (existing?.productFile && key === existing.productFile.key) {
+    return { format, productFile: { key, filename, mimeType, sizeBytes, uploadedAt: existing.productFile.uploadedAt } }
+  }
+  if (key.startsWith(productKeyPrefix(actingUserId)) && !key.includes("..")) {
+    return { format, productFile: { key, filename, mimeType, sizeBytes, uploadedAt: new Date() } }
+  }
+  return { field: "productFile", error: PRODUCT_FILE_ERROR }
 }
 
 /** How many lessons the editor sent (the review gate needs at least one). */
@@ -387,6 +470,16 @@ export async function fetchCourseForEdit(courseId: string) {
         id: course._id.toString(),
         kind,
         communityUrl: course.communityUrl ?? null,
+        format: courseFormatOf(course),
+        productFile: course.productFile
+          ? {
+              key: course.productFile.key,
+              filename: course.productFile.filename,
+              mimeType: course.productFile.mimeType,
+              sizeBytes: course.productFile.sizeBytes,
+            }
+          : null,
+        formatLocked: Boolean(course.publishedAt),
         review: {
           status: (course.review?.status ?? "none") as CourseReviewStatus,
           submittedAt: course.review?.submittedAt ? course.review.submittedAt.toISOString() : null,
@@ -526,7 +619,7 @@ export async function createCourse(
   if (!isSchoolSlug(school) && extras.kind !== "new-economy") {
     fieldErrors.school = "Choose a school"
   }
-  if (extras.submitForReview && !sentLessons) {
+  if (extras.submitForReview && !sentLessons && !isFileFormat(extras.format)) {
     fieldErrors.lessons = "Add at least one lesson before submitting for review"
   }
   if (pricing === "paid" && (!price || parseFloat(price) <= 0)) {
@@ -563,6 +656,25 @@ export async function createCourse(
     if (kind !== "new-economy" && !isSchoolSlug(school)) {
       return { success: false, error: null, fieldErrors: { school: "Choose a school" } }
     }
+    const product = resolveProduct({
+      kind,
+      extras,
+      existing: null,
+      actingUserId: instructor._id.toString(),
+      sentProductFile: formData.has("productFile"),
+    })
+    if ("field" in product) return { success: false, error: null, fieldErrors: { [product.field]: product.error } }
+    if (isFileFormat(product.format)) {
+      if ((sentLessons ?? 0) > 0) {
+        return { success: false, error: null, fieldErrors: { lessons: "A template or guide is one file — it has no lessons" } }
+      }
+      if (seller && extras.submitForReview && !product.productFile) {
+        return { success: false, error: null, fieldErrors: { productFile: "Upload your file before submitting for review" } }
+      }
+      if (requestedStatus === "published" && !product.productFile) {
+        return { success: false, error: null, fieldErrors: { productFile: "Upload the file before publishing" } }
+      }
+    }
     const pricingFields = coursePricing(kind, pricing, price, packages)
 
     // Create the course
@@ -578,6 +690,8 @@ export async function createCourse(
       ...courseHome(kind, school),
       kind,
       communityUrl: extras.communityUrl,
+      format: product.format,
+      productFile: product.productFile,
       whatYouWillLearn,
       availableAt: availableAt === "invalid" ? null : availableAt,
       preEnrollEnabled,
@@ -729,8 +843,26 @@ export async function updateCourse(
     if (kind !== "new-economy" && !isSchoolSlug(school)) {
       return { success: false, error: null, fieldErrors: { school: "Choose a school" } }
     }
+    const product = resolveProduct({
+      kind,
+      extras,
+      existing: existingCourse,
+      actingUserId: instructor._id.toString(),
+      sentProductFile: formData.has("productFile"),
+    })
+    if ("field" in product) return { success: false, error: null, fieldErrors: { [product.field]: product.error } }
     const submitting = seller && extras.submitForReview && status !== "published"
-    if (submitting && (sentLessons ?? existingCourse.totalLessons ?? 0) === 0) {
+    if (isFileFormat(product.format)) {
+      if ((sentLessons ?? 0) > 0) {
+        return { success: false, error: null, fieldErrors: { lessons: "A template or guide is one file — it has no lessons" } }
+      }
+      if (submitting && !product.productFile) {
+        return { success: false, error: null, fieldErrors: { productFile: "Upload your file before submitting for review" } }
+      }
+      if (status === "published" && !product.productFile) {
+        return { success: false, error: null, fieldErrors: { productFile: "Upload the file before publishing" } }
+      }
+    } else if (submitting && (sentLessons ?? existingCourse.totalLessons ?? 0) === 0) {
       return { success: false, error: null, fieldErrors: { lessons: "Add at least one lesson before submitting for review" } }
     }
     const pricingFields = coursePricing(kind, pricing, price, packages)
@@ -761,6 +893,8 @@ export async function updateCourse(
       kind,
       // A form without the field (an older editor tab) leaves the link alone.
       ...(formData.has("communityUrl") ? { communityUrl: extras.communityUrl } : {}),
+      format: product.format,
+      productFile: product.productFile,
       whatYouWillLearn,
       availableAt: availableAt === "invalid" ? existingCourse.availableAt : availableAt,
       preEnrollEnabled,
