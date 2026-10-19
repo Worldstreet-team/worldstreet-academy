@@ -1,6 +1,6 @@
 import { ArrowRightIcon } from "@/components/icons"
 import Link from "next/link"
-import { COHORT_DATE_LABEL, COHORT_DATE_SHORT, cohortIsUpcoming } from "@/lib/cohort"
+import { COHORT_DATE_LABEL, COHORT_DATE_SHORT, COHORT_NAME, cohortIsUpcoming } from "@/lib/cohort"
 import { PACKAGE_LABEL } from "@/lib/entitlements"
 import { cn } from "@/lib/utils"
 import { CardShell, Eyebrow } from "@/components/ui/system"
@@ -18,6 +18,8 @@ type Props =
     }
 
 /**
+ * Institutional blueprint §18: the band names its cohort ("Cohort 001 —
+ * Starts Monday 19 October") and offers Explore Programs / Join Cohort.
  * "Live cohort begins on the 19th" — the owner's countdown and call to action
  * (meeting 2026-10-03: join the upcoming cohort, choose your school, choose
  * your program, pay now to join). The date and countdown come from
@@ -78,8 +80,12 @@ function CohortBar() {
       <span className="mx-auto flex h-9 max-w-7xl items-center justify-center gap-2 overflow-hidden whitespace-nowrap px-4 text-[12px] sm:gap-3 sm:px-6 sm:text-[13px]">
         <span className="flex items-center gap-2 font-semibold text-ws-primary">
           <LiveDot />
-          <span className="md:hidden">Cohort starts {COHORT_DATE_SHORT}</span>
-          <span className="hidden md:inline">Live cohort begins {COHORT_DATE_LABEL}</span>
+          <span className="md:hidden">
+            {COHORT_NAME} starts {COHORT_DATE_SHORT}
+          </span>
+          <span className="hidden md:inline">
+            {COHORT_NAME} starts {COHORT_DATE_LABEL}
+          </span>
         </span>
         <CohortCountdown variant="compact" prefix="· " className="inline-block min-w-[8.9em] text-ws-muted" />
         <span aria-hidden className="hidden text-ws-subtle sm:inline">
@@ -101,7 +107,7 @@ function CohortBar() {
 
 function CohortBand({ className }: { className?: string }) {
   return (
-    <section aria-labelledby="cohort-heading" className={cn("mx-auto max-w-7xl px-6", className)}>
+    <section id="cohort" aria-labelledby="cohort-heading" className={cn("mx-auto max-w-7xl scroll-mt-24 px-6", className)}>
       <CardShell className="gap-8 p-6 sm:p-8 md:p-10 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-12">
         <div>
           <LiveEyebrow />
@@ -109,26 +115,21 @@ function CohortBand({ className }: { className?: string }) {
             id="cohort-heading"
             className="mt-4 text-balance font-display text-[clamp(1.875rem,3.2vw,2.625rem)] font-semibold leading-[1.08] tracking-[-0.02em] text-ws-primary"
           >
-            Live classes begin {COHORT_DATE_LABEL}
+            {`${COHORT_NAME} — Starts ${COHORT_DATE_LABEL}`}
           </h2>
           <p className="mt-4 max-w-xl text-pretty text-[16px] leading-relaxed text-ws-muted md:text-[17px]">
             Learn live with your tutor, rewatch every class from your dashboard, and choose the plan that fits:{" "}
             {PACKAGE_LABEL.basic}, {PACKAGE_LABEL.standard} or {PACKAGE_LABEL.executive}.
           </p>
-          <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-4">
-            <Link href="/schools" className={GOLD_CTA}>
-              Choose your school
-            </Link>
+          <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
             <Link
-              href="/#how-it-works"
-              className="group inline-flex items-center gap-1.5 text-[15px] font-semibold text-ws-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40"
+              href="/programs"
+              className="inline-flex h-12 w-full items-center justify-center rounded-full border border-ws-hairline px-7 text-[15px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:border-ws-brand/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40 sm:w-auto"
             >
-              How it works
-              <ArrowRightIcon
-                size={15}
-                aria-hidden
-                className="transition-transform duration-[var(--ws-motion-fast)] ease-[var(--ws-ease)] group-hover:translate-x-0.5 motion-reduce:transition-none"
-              />
+              Explore Programs
+            </Link>
+            <Link href="/schools" className={cn(GOLD_CTA, "w-full sm:w-auto")}>
+              Join Cohort
             </Link>
           </div>
         </div>
@@ -156,7 +157,7 @@ function CohortStrip({ note, className }: { note?: string; className?: string })
       <div className="min-w-0">
         <LiveEyebrow />
         <p className="mt-2 text-balance font-display text-[19px] font-semibold leading-snug tracking-[-0.01em] text-ws-primary sm:text-[21px]">
-          Live classes begin {COHORT_DATE_LABEL}
+          {`${COHORT_NAME} — Starts ${COHORT_DATE_LABEL}`}
         </p>
         {note && <p className="mt-1.5 text-pretty text-[14.5px] leading-relaxed text-ws-muted">{note}</p>}
       </div>
