@@ -196,7 +196,7 @@ export default async function SchoolPage({ params }: Params) {
     hasTopics ? { id: "topics", label: "Topics" } : null,
     areas.length > 0 ? { id: "areas", label: "Study areas" } : null,
     facultyMembers.length > 0 ? { id: "faculty", label: "Faculty" } : null,
-    calendar.next && cohortRows.length > 0 ? { id: "cohorts", label: "Cohorts" } : null,
+    calendar.next && cohortRows.length > 0 ? { id: "cohorts", label: "Cohorts", until: calendar.next.startsAt } : null,
     hasPath ? { id: "path", label: "Pathways" } : null,
     previews.length > 0 ? { id: "free-lessons", label: "Free lessons" } : null,
     hasReviews ? { id: "reviews", label: "Reviews" } : null,

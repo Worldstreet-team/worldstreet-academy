@@ -2,8 +2,14 @@
 
 import * as React from "react"
 import { cn } from "@/lib/utils"
+import { WhileCohortUpcoming } from "@/components/shared/cohort-countdown"
 
-export type SectionLink = { id: string; label: string }
+export type SectionLink = {
+  id: string
+  label: string
+  /** The section goes at this ISO instant (a cohort start), so its link goes with it. */
+  until?: string
+}
 
 /**
  * The program page's in-page nav: sticky under the site navbar, solid page
@@ -85,7 +91,7 @@ export function SectionNav({ links }: { links: SectionLink[] }) {
       >
         {links.map((link) => {
           const current = link.id === active
-          return (
+          const item = (
             <li key={link.id} className="flex shrink-0">
               <a
                 href={`#${link.id}`}
@@ -107,6 +113,13 @@ export function SectionNav({ links }: { links: SectionLink[] }) {
                 />
               </a>
             </li>
+          )
+          return link.until ? (
+            <WhileCohortUpcoming key={link.id} startsAt={link.until}>
+              {item}
+            </WhileCohortUpcoming>
+          ) : (
+            item
           )
         })}
       </ul>

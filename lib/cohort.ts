@@ -20,7 +20,6 @@ const dateParts = new Intl.DateTimeFormat("en-GB", {
   timeZone: COHORT_TIME_ZONE,
 })
 const dateShort = new Intl.DateTimeFormat("en-GB", {
-  weekday: "short",
   day: "numeric",
   month: "numeric",
   timeZone: COHORT_TIME_ZONE,
@@ -41,13 +40,19 @@ export function cohortDateLabel(iso: string): string {
   return `${weekday} ${day} ${month}`
 }
 
+const WEEKDAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
-/** Short weekday, day and a fixed three-letter month (newer ICU prints "Sept"), picked out of the parts. */
+/**
+ * Short weekday, day and a fixed three-letter month (newer ICU prints "Sept"),
+ * picked out of the parts. The weekday comes from the Lagos wall date and a
+ * pinned table, so no ICU or locale names it.
+ */
 export function cohortShortParts(iso: string): { weekday: string; day: string; month: string } {
   const out = { weekday: "", day: "", month: "" }
+  out.weekday = WEEKDAYS_SHORT[new Date(`${lagosLocal(iso).slice(0, 10)}T00:00:00Z`).getUTCDay()] ?? ""
   for (const p of dateShort.formatToParts(new Date(iso))) {
-    if (p.type === "weekday" || p.type === "day") out[p.type] = p.value
+    if (p.type === "day") out.day = p.value
     else if (p.type === "month") out.month = MONTHS_SHORT[Number(p.value) - 1] ?? p.value
   }
   return out
