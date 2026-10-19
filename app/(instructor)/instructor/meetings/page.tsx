@@ -1856,7 +1856,7 @@ export default function InstructorMeetingsPage() {
           </button>
         </div>
       )}
-      <Topbar title="Meetings" variant="instructor" />
+      <Topbar title="Live Classroom" variant="instructor" />
 
       {activeMeeting && isJoined && meetingCtx.isMinimized && (
         <ReturnToMeetingBanner

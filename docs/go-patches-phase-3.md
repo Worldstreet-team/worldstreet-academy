@@ -312,3 +312,13 @@ What Go does:
 - **What R1 and R4 already do with that data:** a Basic enrollment may start the final exam; `examRequired` now holds Basic completion until it passes; and a completed Basic enrollment gets a certificate.
 - **Basic's row today:** lessons open per R3 · final exam allowed · certificate yes (on completion) · live class refused · new thread refused.
 - **Display only:** `name`, `tagline` ("Foundation" / "Mastery" / "Personalized Mastery"), `duration` ("4 weeks" / "8–12 weeks" / "Flexible schedule") and `features`. The Executive tier label is "Executive"; it is not stored.
+
+## 17. Phase 19 — Faculty system (institutional blueprint §16, D29)
+
+Go needs no patch. All additive:
+
+- **`instructorapplications.demo`** — `null`, or `{ requested: true, meetingId, scheduledAt, outcome: "passed" | "not_passed" | null, note, decidedAt }`. A teaching demonstration requested during `interview_scheduled`; **the status never changes for it**. The web refuses approval while `requested` and `outcome` is `null` — if Go ever approves applications, apply the same rule.
+- The demonstration room is a `meetings` row shaped like the interview's (`applicationId` set, no `courseId`), titled "Teaching demonstration — <name>".
+- **`users.instructorProfile.handbook`** — `{ teachingStandardsAt, curriculumGuidelinesAt, platformTrainingAt }`, each a date or `null`.
+- **`users.instructorProfile.credential`** — `null`, or `{ id: "WMAF-XXXXXX", issuedAt }`. Unique when set (partial index `facultyCredential_unique`); written once, never changed.
+- Any whole-object write of `instructorProfile` (an approval or profile edit in Go) must carry `handbook` and `credential` across, as the web's approval does — or use dotted `$set` paths.

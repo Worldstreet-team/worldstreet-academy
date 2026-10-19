@@ -9,15 +9,17 @@ import { getTeachingHome } from "@/lib/actions/teaching-home"
 import { startOfDay } from "@/lib/calendar-grid"
 import { useUnreadCount } from "@/lib/hooks/queries"
 import { useClientNow } from "@/lib/hooks/use-now"
+import { agendaDays } from "@/lib/teaching-home"
 import { CohortGrid } from "./cohort-grid"
 import { MoneyCard } from "./money-card"
 import { NextClassHero } from "./next-class-hero"
+import { TodayClasses } from "./today-classes"
 import { TodoQueue } from "./todo-queue"
 import { WeekAgenda } from "./week-agenda"
 
 /*
- * The tutor home, top to bottom: the next class, this week, the cohorts, the
- * to-do queue and the money. One server read (getTeachingHome), refetched
+ * The tutor home, top to bottom: the next class, today's classes, this week,
+ * the cohorts, the to-do queue and the money. One server read (getTeachingHome), refetched
  * every 30 s so a class flips to live without a reload; the unread count is
  * the shell's own query, so the to-do row and the sidebar badge always agree.
  * The browser sends where its day and month begin — the week and "this month"
@@ -70,12 +72,15 @@ export function TeachingHome() {
         />
       </Rise>
       <Rise delay={60}>
-        <WeekAgenda entries={home.week} now={now} />
+        <TodayClasses entries={agendaDays(home.week, now)[0]?.entries ?? []} now={now} />
       </Rise>
       <Rise delay={120}>
-        <CohortGrid cohorts={home.cohorts} draftCount={home.draftCount} now={now} />
+        <WeekAgenda entries={home.week} now={now} />
       </Rise>
       <Rise delay={180}>
+        <CohortGrid cohorts={home.cohorts} draftCount={home.draftCount} now={now} />
+      </Rise>
+      <Rise delay={240}>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <div className="min-w-0 lg:col-span-2">
             <TodoQueue items={home.todo} unread={unread} now={now} />
@@ -89,7 +94,7 @@ export function TeachingHome() {
   )
 }
 
-/** The page's shape while it loads: hero, week, three cohort cards, the queue and the money. */
+/** The page's shape while it loads: hero, today, week, three cohort cards, the queue and the money. */
 export function TeachingHomeSkeleton() {
   return (
     <div className="flex flex-col gap-6" role="status" aria-busy="true" aria-label="Loading your teaching home">
@@ -109,6 +114,14 @@ export function TeachingHomeSkeleton() {
           <Skel className="h-11 w-36 rounded-full" />
           <Skel className="h-11 w-40 rounded-full" />
         </div>
+      </CardShell>
+
+      <CardShell>
+        <div className="flex flex-col gap-1.5 px-4 py-3.5 sm:px-5">
+          <Skel className="h-4 w-28" />
+          <Skel className="h-3 w-24" />
+        </div>
+        <SkeletonRows rows={2} label="Loading today's classes" className="border-t border-border/60" />
       </CardShell>
 
       <CardShell>
