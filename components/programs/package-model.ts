@@ -37,6 +37,7 @@ export function servicesOf(pkg: PublicPackage, tierCount: number): Record<Servic
       certificate: true,
       mentorship: false,
       prioritySupport: false,
+      recordings: false,
     }
   }
   return {

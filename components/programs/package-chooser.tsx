@@ -1,5 +1,5 @@
 "use client"
-import { ArrowRightIcon, AwardIcon, CheckIcon, ChevronDownIcon, ClipboardCheckIcon, HandshakeIcon, LayersIcon, LifeBuoyIcon, ListVideoIcon, MessagesSquareIcon, RadioIcon, ShieldCheckIcon, StarIcon, type IconComponent } from "@/components/icons"
+import { ArrowRightIcon, AwardIcon, CheckIcon, ChevronDownIcon, ClipboardCheckIcon, HandshakeIcon, LayersIcon, LifeBuoyIcon, ListVideoIcon, MessagesSquareIcon, RadioIcon, ShieldCheckIcon, StarIcon, VideoReplayIcon, type IconComponent } from "@/components/icons"
 
 import * as React from "react"
 import { motion } from "motion/react"
@@ -36,6 +36,7 @@ const SERVICE_ICON: Record<ServiceKey, IconComponent> = {
   certificate: AwardIcon,
   mentorship: HandshakeIcon,
   prioritySupport: LifeBuoyIcon,
+  recordings: VideoReplayIcon,
 }
 
 const GOLD_CTA =

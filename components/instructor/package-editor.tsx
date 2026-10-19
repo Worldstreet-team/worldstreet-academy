@@ -47,6 +47,7 @@ const NO_ENTITLEMENTS: IPackageEntitlements = {
   certificate: false,
   mentorship: false,
   prioritySupport: false,
+  recordings: false,
 }
 
 const TIER_ITEMS = PACKAGE_KEYS.map((k) => ({ value: k, label: PACKAGE_LABEL[k] }))
