@@ -1,7 +1,7 @@
 "use client"
 import { CheckIcon, ChevronLeftIcon, DownloadIcon } from "@/components/icons"
 
-import { useCallback, useState } from "react"
+import { useCallback, useState, useSyncExternalStore } from "react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
@@ -78,8 +78,15 @@ function CertificatePreview({
   verifyLabel: string | null
 }) {
   const { theme, systemTheme } = useTheme()
+  // The stored theme is only known on the client, so the first client render
+  // must match the server's (no theme) or the logo `src` mismatches on hydration.
+  const hydrated = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  )
   const [titleMain, titleSub] = CERT_TIER_TITLE[data.tier]
-  const currentTheme = theme === "system" ? systemTheme : theme
+  const currentTheme = !hydrated ? undefined : theme === "system" ? systemTheme : theme
   const logoPath = currentTheme === "light" 
     ? "/worldstreet-logo/WorldStreet4x.png"
     : "/worldstreet-logo/WorldStreet1x.png"

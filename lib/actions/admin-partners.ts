@@ -33,7 +33,7 @@ export async function adminExportPartnersCsv(): Promise<
     // numbers (a negative money figure) are written raw.
     const quote = (v: string | null) => {
       const text = v ?? ""
-      return `"${(/^[=+\-@]/.test(text) ? `'${text}` : text).replace(/"/g, '""')}"`
+      return `"${(/^[=+\-@\t\r]/.test(text) ? `'${text}` : text).replace(/"/g, '""')}"`
     }
     const usd = (minor: number) => (minor / 100).toFixed(2)
     const header = [

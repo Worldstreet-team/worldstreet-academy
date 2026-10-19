@@ -36,8 +36,10 @@ type FormState = { number: string; startsAt: string; endsAt: string; note: strin
 
 export default function AdminCohortsPage() {
   const queryClient = useQueryClient()
-  // `null` = closed, "new" = adding, otherwise the row being edited.
+  // "new" = adding, otherwise the row being edited; `open` says whether the dialog shows.
   const [target, setTarget] = React.useState<AdminCohortRow | "new" | null>(null)
+  // Closing keeps `target`, so the title doesn't change during the close animation.
+  const [open, setOpen] = React.useState(false)
   const [form, setForm] = React.useState<FormState>({ number: "1", startsAt: "", endsAt: "", note: "" })
   const [error, setError] = React.useState<string | null>(null)
 
@@ -67,7 +69,7 @@ export default function AdminCohortsPage() {
         return
       }
       setError(null)
-      setTarget(null)
+      setOpen(false)
       queryClient.invalidateQueries({ queryKey: ["admin", "cohorts"] })
     },
     onError: () => setError("Couldn't save the cohort"),
@@ -78,6 +80,7 @@ export default function AdminCohortsPage() {
     setForm({ number: String(highest + 1), startsAt: "", endsAt: "", note: "" })
     setError(null)
     setTarget("new")
+    setOpen(true)
   }
 
   const openEdit = (c: AdminCohortRow) => {
@@ -89,6 +92,7 @@ export default function AdminCohortsPage() {
     })
     setError(null)
     setTarget(c)
+    setOpen(true)
   }
 
   return (
@@ -162,7 +166,7 @@ export default function AdminCohortsPage() {
         </div>
       </div>
 
-      <Dialog open={target !== null} onOpenChange={(o) => !o && setTarget(null)}>
+      <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{editing ? `Edit ${editing.name}` : "Add a cohort"}</DialogTitle>
@@ -216,7 +220,7 @@ export default function AdminCohortsPage() {
           </div>
           {error && <p className="text-xs text-ws-danger">{error}</p>}
           <DialogFooter>
-            <Button variant="outline" size="sm" onClick={() => setTarget(null)}>
+            <Button variant="outline" size="sm" onClick={() => setOpen(false)}>
               Cancel
             </Button>
             <Button size="sm" disabled={save.isPending || !form.startsAt} onClick={() => save.mutate()}>

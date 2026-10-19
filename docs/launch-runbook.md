@@ -434,6 +434,5 @@ Expect `acknowledged: true`, and note `modifiedCount` in your run log. **Those s
   4. A second account without the purchase is sent to the program page.
   5. Within 5 minutes, the download URL works. After that, it returns `403`.
   6. R2 honours the signed upload size: within 15 minutes of an upload, copy its presigned PUT URL from the network tab and PUT a file of a different size to it (`curl -s -o /dev/null -w "%{http_code}\n" -X PUT -H "Content-Type: <the same type>" --data-binary @<other file> "<url>"`). Expect `403`; a `200` means R2 doesn't enforce the signed length, so record it (the 100 MB cap is then only the browser's declaration).
-
-  Delete the test listing afterwards. Uploaded files that are replaced or abandoned are never deleted: they stay in the private bucket under `worldstreet-academy/products/<user id>/`, because a buyer may be mid-download.
+  7. Delete the test listing afterwards. Uploaded files that are replaced or abandoned are never deleted: they stay in the private bucket under `worldstreet-academy/products/<user id>/`, because a buyer may be mid-download.
 - **Owner sign-off:** the format blurbs (`lib/course-format.ts`) and the check descriptions (`lib/review-checks.ts`).
