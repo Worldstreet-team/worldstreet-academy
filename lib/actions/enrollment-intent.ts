@@ -62,7 +62,7 @@ export async function saveEnrollmentIntent(input: SaveEnrollmentIntentInput): Pr
 
     const existing = await EnrollmentIntent.findOne({ user: user.id }).select("school course").lean()
     const changed =
-      !existing || existing.school !== school || String(existing.course ?? "") !== (courseId ?? "")
+      !existing || schoolSlugOf(existing.school) !== school || String(existing.course ?? "") !== (courseId ?? "")
 
     await EnrollmentIntent.updateOne(
       { user: user.id },

@@ -16,7 +16,7 @@ import {
   type PackageKey,
 } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth"
-import { schoolSlugOf, type SchoolSlug } from "@/lib/schools"
+import { schoolSlugOf, storedSlugsFor, type SchoolSlug } from "@/lib/schools"
 import { programArt } from "@/lib/school-art"
 import { FULL_ACCESS, PACKAGE_RANK, canAccessLesson, effectiveLessonTier, entitlementsFor } from "@/lib/entitlements"
 import {
@@ -229,7 +229,8 @@ export async function fetchBrowseCourses(options?: {
       else if (options.pricing === "Paid") query.price = { $gt: 0 }
     }
     if (typeof options?.school === "string" && options.school) {
-      query.school = options.school
+      const current = schoolSlugOf(options.school)
+      query.school = current ? { $in: storedSlugsFor(current) } : options.school
     }
     if (typeof options?.instructorId === "string" && mongoose.Types.ObjectId.isValid(options.instructorId)) {
       query.instructor = options.instructorId
