@@ -791,7 +791,7 @@ export async function fetchCourseForLearning(courseId: string): Promise<LearnCou
       rating: course.rating?.average || null,
       slug: course.slug,
       packageKey: enrollment?.packageKey ?? null,
-      entitlements: entitlementsFor({ packages }, enrollment),
+      entitlements: entitlementsFor({ packages, format: course.format }, enrollment),
       hasAccess,
       lessons: lessons.map((l) => {
         // Staff have no enrollment → nothing locks for them.
@@ -977,6 +977,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
         slug: course.slug,
         instructor: course.instructor._id,
         packages,
+        format: course.format,
       })
       const openIds = access
         ? openPublishedLessonIdsFromRows(access, courseLessons)
@@ -985,7 +986,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
       // rewritten on a completion, so it can't be scaled back into a count.
       const completedIds = new Set((enrollment.completedLessons ?? []).map((id) => id.toString()))
       const completedOpenLessons = [...openIds].filter((id) => completedIds.has(id)).length
-      const entitlements = entitlementsFor({ packages }, { packageKey })
+      const entitlements = entitlementsFor({ packages, format: course.format }, { packageKey })
       // The hero's lesson and track: the open lessons in course order, and the resume lesson's place among them.
       const openInOrder = courseLessons.filter((l) => openIds.has(l._id.toString()))
       const resumeRow = courseLessons.find((l) => l._id.toString() === resumeLessonId)

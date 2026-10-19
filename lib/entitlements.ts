@@ -1,4 +1,5 @@
 import type { ICoursePackage, IPackageEntitlements, PackageKey } from "@/lib/db/models"
+import { isFileFormat, type CourseFormat } from "@/lib/course-format"
 
 export const PACKAGE_RANK: Record<PackageKey, 1 | 2 | 3> = { basic: 1, standard: 2, executive: 3 }
 
@@ -12,10 +13,25 @@ export const FULL_ACCESS: IPackageEntitlements = {
   prioritySupport: true,
 }
 
+/**
+ * A template or guide (a file product) grants no services: no live classes, no
+ * Q&A, no assignments, no certificate, no recordings or mentorship. Its
+ * enrollment carries a null packageKey, which would otherwise read as
+ * FULL_ACCESS.
+ */
+export const NO_ENTITLEMENTS: IPackageEntitlements = {
+  liveClasses: false,
+  instructorQa: false,
+  assignments: false,
+  certificate: false,
+  mentorship: false,
+  prioritySupport: false,
+}
+
 // Optional fields: a .lean()/projected read of a legacy row predates these
 // fields and returns no key at all — Mongoose only materialises defaults when
 // it hydrates a document.
-type CourseLike = { packages?: ICoursePackage[] | null }
+type CourseLike = { packages?: ICoursePackage[] | null; format?: CourseFormat | null }
 type EnrollmentLike = { packageKey?: PackageKey | null } | null | undefined
 type LessonLike = { minPackageKey?: PackageKey | null; isFree?: boolean }
 
@@ -37,6 +53,8 @@ export function sellsPackages(course: CourseLike): boolean {
  * longer on the course at all → FULL_ACCESS (grandfathered).
  */
 export function entitlementsFor(course: CourseLike, enrollment: EnrollmentLike): IPackageEntitlements {
+  // The one rule for file products: callers must select `format` beside `packages`.
+  if (isFileFormat(course.format)) return NO_ENTITLEMENTS
   const key = enrollment?.packageKey ?? null
   const pkg = key ? (course.packages ?? []).find((p) => p.key === key) : undefined
   return pkg ? pkg.entitlements : FULL_ACCESS

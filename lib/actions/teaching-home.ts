@@ -194,7 +194,7 @@ export async function getTeachingHome(input: {
 
     const [courses, meetings, nextByCourse, requestsByCourse, earningGroups, referrals] = await Promise.all([
       Course.find({ instructor: me })
-        .select("title slug school kind status thumbnailUrl enrolledCount communityUrl packages")
+        .select("title slug school kind status thumbnailUrl enrolledCount communityUrl packages format")
         .lean(),
       // The week's classes and sessions, plus anything live right now.
       Meeting.find({

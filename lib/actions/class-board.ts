@@ -68,7 +68,7 @@ export async function getMyClassBoard(): Promise<ClassBoardEntry[]> {
     if (enrollments.length === 0) return []
 
     const courses = await Course.find({ _id: { $in: enrollments.map((e) => e.course) } })
-      .select("title packages kind")
+      .select("title packages format kind")
       .lean()
     const courseById = new Map(courses.map((c) => [c._id.toString(), c]))
     const entitled = enrollments.filter((e) => {

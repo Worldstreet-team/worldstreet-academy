@@ -83,7 +83,7 @@ export async function ensureCertificateId(
 
   const enrollmentId = enrollment._id.toString()
   try {
-    const course = await Course.findById(enrollment.course).select("packages").lean()
+    const course = await Course.findById(enrollment.course).select("packages format").lean()
     if (!course || !entitlementsFor(course, enrollment).certificate) return null
 
     const candidates = [

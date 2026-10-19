@@ -182,6 +182,7 @@ export type OwnedProduct = {
  * the normal course flow. Carries no storage key.
  */
 export async function getOwnedProduct(courseId: string): Promise<OwnedProduct | null> {
+  if (typeof courseId !== "string") return null
   try {
     await connectDB()
     const user = await getCurrentUser()

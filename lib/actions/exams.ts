@@ -22,6 +22,7 @@ import {
 import { getCurrentUser } from "@/lib/auth/actions"
 import { notifyUser } from "@/lib/notify"
 import { PACKAGE_LABEL, canAccessLesson, effectiveLessonTier, entitlementsFor, lowestPackageWith } from "@/lib/entitlements"
+import type { CourseFormat } from "@/lib/course-format"
 import { saveWithCertificateId } from "@/lib/certificate-id"
 import { POINTS, awardPoints, pointKey } from "@/lib/points"
 
@@ -360,7 +361,7 @@ export async function setCourseExamRequired(courseId: string, required: boolean)
  * lesson's tier. null = open.
  */
 async function examPackageLock(
-  course: { packages?: ICoursePackage[] | null },
+  course: { packages?: ICoursePackage[] | null; format?: CourseFormat | null },
   enrollment: { packageKey?: PackageKey | null },
   lessonId: string | null | undefined
 ): Promise<{ requiredLabel: string | null } | null> {
@@ -406,7 +407,7 @@ export async function getStudentExamStatus(
     if (!user) return null
 
     const [course, exam, enrollment] = await Promise.all([
-      Course.findById(courseId).select("examRequired packages").lean(),
+      Course.findById(courseId).select("examRequired packages format").lean(),
       Exam.findOne({ ...examFilter(courseId, lessonId), status: "published" }).lean(),
       Enrollment.findOne({ user: user.id, course: courseId, status: { $in: ["active", "completed"] } }).lean(),
     ])
@@ -555,7 +556,7 @@ export async function getMyAssessments(): Promise<MyAssessment[]> {
     const courseIds = enrollments.map((e) => e.course)
 
     const [courses, exams] = await Promise.all([
-      Course.find({ _id: { $in: courseIds } }).select("title packages").lean(),
+      Course.find({ _id: { $in: courseIds } }).select("title packages format").lean(),
       Exam.find({ course: { $in: courseIds }, status: "published" }).select("course scope lesson title").lean(),
     ])
     const coursesById = new Map(courses.map((c) => [c._id.toString(), c]))
@@ -778,7 +779,7 @@ export async function startExamAttempt(
       status: { $in: ["active", "completed"] },
     })
     if (!enrollment) return { success: false, error: "You're not enrolled in this course" }
-    const course = await Course.findById(courseId).select("packages").lean()
+    const course = await Course.findById(courseId).select("packages format").lean()
     if (course && (await examPackageLock(course, enrollment, lessonId))) {
       return {
         success: false,

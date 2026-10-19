@@ -94,21 +94,22 @@ export function hasDeliverable(course: {
  * A filename that is safe inside a Content-Disposition header. The stored
  * filename is creator-claimed, so it is never trusted: only letters, digits,
  * spaces and . _ ( ) - survive (CR, LF, quotes, path separators and every other
- * control or non-ASCII character become "_"), capped at 100 characters. An
- * empty or dots-only result falls back to a slug of the product title.
+ * control or non-ASCII character become "_"), capped at 100 characters (the extension is kept). A
+ * base with no letters or digits falls back to a slug of the product title.
  */
 export function safeDownloadFilename(filename: string | null | undefined, title: string): string {
   const cleaned = (filename ?? "")
     .replace(/[^A-Za-z0-9 ._()-]+/g, "_")
     .replace(/\.{2,}/g, ".")
     .trim()
-    .slice(0, 100)
-    .trim()
-  if (cleaned.replace(/[._\s-]/g, "") !== "") return cleaned
+  // The extension survives truncation: it is what makes the file open.
+  const ext = /\.[A-Za-z0-9]{1,10}$/.exec(cleaned)?.[0] ?? ""
+  const base = cleaned.slice(0, cleaned.length - ext.length).slice(0, 100 - ext.length).trim()
+  if (base.replace(/[._\s()-]/g, "") !== "") return base + ext
   const slug = title
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 80)
-  return slug || "download"
+  return (slug || "download") + ext
 }
