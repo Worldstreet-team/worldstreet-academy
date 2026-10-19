@@ -25,12 +25,13 @@ const GRID: Record<number, string> = {
 }
 
 /**
- * The six services a tier can carry, in the order a buyer climbs them. Used
+ * The seven services a tier can carry, in the order a buyer climbs them. Used
  * for the comparison table only — the per-card feature lists stay the
  * instructor's own copy.
  */
 const COMPARED: ReadonlyArray<{ key: keyof IPackageEntitlements; label: string }> = [
   { key: "liveClasses", label: "Live classes" },
+  { key: "recordings", label: "Recorded classes" },
   { key: "instructorQa", label: "Instructor Q&A" },
   { key: "assignments", label: "Graded assignments" },
   { key: "certificate", label: "Certificate of completion" },
@@ -45,7 +46,7 @@ const COMPARED: ReadonlyArray<{ key: keyof IPackageEntitlements; label: string }
  * (BASIC / STANDARD / EXECUTIVE 101) only make sense against siblings, so a
  * single-tier program shows none.
  *
- * Below the cards, multi-tier programs get a comparison table of the six
+ * Below the cards, multi-tier programs get a comparison table of the seven
  * entitlements. The cards sell each tier in the instructor's words; the table
  * answers the question the cards can't — what actually differs — without
  * making the visitor diff three bullet lists by eye.

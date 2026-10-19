@@ -11,9 +11,10 @@ import { packagePriceLabel } from "@/lib/program-price"
 
 export type ServiceKey = keyof IPackageEntitlements
 
-/** The six services a tier can carry, in the order a buyer climbs them. */
+/** The seven services a tier can carry, in the order a buyer climbs them. */
 export const SERVICES: ReadonlyArray<{ key: ServiceKey; label: string }> = [
   { key: "liveClasses", label: "Live classes" },
+  { key: "recordings", label: "Recorded classes" },
   { key: "instructorQa", label: "Instructor Q&A" },
   { key: "assignments", label: "Graded assignments" },
   { key: "certificate", label: "Certificate of completion" },
