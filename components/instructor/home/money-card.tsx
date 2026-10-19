@@ -54,7 +54,7 @@ export function MoneyCard({ money }: { money: TeachingMoney }) {
           Refer &amp; earn
           <ArrowRight size={14} strokeWidth={2} aria-hidden />
         </Link>
-        <Link href="/instructor/settings" className={LINK}>
+        <Link href="/instructor/earnings" className={LINK}>
           Earnings &amp; payout
           <ArrowRight size={14} strokeWidth={2} aria-hidden />
         </Link>

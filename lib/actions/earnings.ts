@@ -5,6 +5,7 @@ import { Types } from "mongoose"
 import { Course, Enrollment, User, Order, PaymentEvent, Earning, type IEarning } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth/actions"
 import { getSellerStatus } from "@/lib/seller"
+import { maskedName } from "@/lib/masked-name"
 import {
   createWalletCredit,
   createWalletCharge,
@@ -20,6 +21,9 @@ const WITHDRAW_URL = process.env.NEXT_PUBLIC_WALLET_WITHDRAW_URL || "/dashboard/
 export type EarningRow = {
   id: string
   courseTitle: string
+  courseId: string
+  /** The buyer, masked to "First L."; null when the row has no student. */
+  learnerName: string | null
   kind: "sale" | "adjustment" | "referral"
   grossMinor: number
   feeMinor: number
@@ -39,6 +43,8 @@ export type InstructorEarnings = {
   /** Withdrawals happen on the central Worldstreet dashboard, never in the Academy. */
   withdrawUrl: string
   rows: EarningRow[]
+  /** Net per program (sales minus refunds, not reversed; partner commissions excluded), highest first. */
+  byCourse: { courseId: string; courseTitle: string; netMinor: number; sales: number }[]
 }
 
 /**
@@ -108,9 +114,10 @@ export async function getMyInstructorEarnings(): Promise<InstructorEarnings | nu
 
     await clearMaturedEarnings(user.id)
 
-    const [rows, aggregates] = await Promise.all([
+    const [rows, aggregates, courseGroups] = await Promise.all([
       Earning.find({ instructor: user.id })
         .populate("course", "title")
+        .populate("student", "firstName lastName")
         .sort({ createdAt: -1 })
         .limit(100)
         .lean(),
@@ -124,7 +131,18 @@ export async function getMyInstructorEarnings(): Promise<InstructorEarnings | nu
           },
         },
       ]),
+      Earning.aggregate<{ _id: Types.ObjectId; netMinor: number; sales: number }>([
+        { $match: { instructor: new Types.ObjectId(user.id), kind: { $in: ["sale", "adjustment"] }, status: { $ne: "reversed" } } },
+        { $group: { _id: "$course", netMinor: { $sum: "$netMinor" }, sales: { $sum: { $cond: [{ $eq: ["$kind", "sale"] }, 1, 0] } } } },
+      ]),
     ])
+
+    const titles = new Map(
+      (await Course.find({ _id: { $in: courseGroups.map((g) => g._id) } }).select("title").lean()).map((c) => [String(c._id), c.title])
+    )
+    const byCourse = courseGroups
+      .map((g) => ({ courseId: String(g._id), courseTitle: titles.get(String(g._id)) ?? "Program", netMinor: g.netMinor, sales: g.sales }))
+      .sort((a, b) => b.netMinor - a.netMinor)
 
     let pendingMinor = 0
     let clearedMinor = 0
@@ -142,9 +160,14 @@ export async function getMyInstructorEarnings(): Promise<InstructorEarnings | nu
       totalSales,
       clearingDays: 7,
       withdrawUrl: WITHDRAW_URL,
-      rows: rows.map((r) => ({
+      byCourse,
+      rows: rows.map((r) => {
+        const student = r.student as unknown as { firstName?: string; lastName?: string } | null
+        return {
         id: r._id.toString(),
         courseTitle: (r.course as unknown as { title?: string })?.title ?? "Course",
+        courseId: String((r.course as { _id?: unknown })?._id ?? r.course),
+        learnerName: student ? maskedName(student.firstName, student.lastName) : null,
         kind: r.kind,
         grossMinor: r.grossMinor,
         feeMinor: r.feeMinor,
@@ -153,7 +176,8 @@ export async function getMyInstructorEarnings(): Promise<InstructorEarnings | nu
         availableAt: r.availableAt.toISOString(),
         clearedAt: r.clearedAt ? r.clearedAt.toISOString() : null,
         createdAt: r.createdAt.toISOString(),
-      })),
+        }
+      }),
     }
   } catch (error) {
     console.error("Get instructor earnings error:", error)
