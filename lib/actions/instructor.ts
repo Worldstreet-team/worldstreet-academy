@@ -914,6 +914,15 @@ export async function updateCourse(
         fieldErrors: {},
       }
     }
+    // Nor can a live template's or guide's file: buyers download it at once,
+    // so a new file must pass review before anyone can.
+    if (liveSellerEdit && (product.productFile?.key ?? null) !== (existingCourse.productFile?.key ?? null)) {
+      return {
+        success: false,
+        error: "A live template or guide's file can't change. Take it back to draft and submit it for review to change the file.",
+        fieldErrors: {},
+      }
+    }
 
     // Update course
     await Course.findByIdAndUpdate(courseId, {
