@@ -12,6 +12,7 @@ import { getCourseAccess } from "@/lib/course-access"
 import { entitlementsFor, includesMentorship } from "@/lib/entitlements"
 import { HOST_EARLY_START_MS } from "@/lib/class-schedule"
 import { announceClassLive } from "@/lib/class-live"
+import { openAttendance, closeAttendance, closeAllAttendance } from "@/lib/attendance"
 
 // ── Helpers ──
 
@@ -317,6 +318,7 @@ export async function joinMeeting(meetingId: string): Promise<{
         }),
         User.findById(meeting.hostId).select("firstName lastName avatarUrl").lean(),
         admittedIds.length > 0 ? emitEventToMany([...admittedIds, meeting.hostId.toString()], rejoinEvent) : Promise.resolve(),
+        openAttendance(meeting, currentUser.id),
       ])
 
       return {
@@ -360,6 +362,7 @@ export async function joinMeeting(meetingId: string): Promise<{
         User.findById(meeting.hostId).select("firstName lastName avatarUrl").lean(),
         // Tell the user's other sessions this session is being replaced
         emitEvent(currentUser.id, sessionReplacedEvent),
+        openAttendance(meeting, currentUser.id),
       ])
 
       return {
@@ -429,6 +432,7 @@ export async function joinMeeting(meetingId: string): Promise<{
         }),
         User.findById(meeting.hostId).select("firstName lastName avatarUrl").lean(),
         admittedIds.length > 0 ? emitEventToMany(admittedIds, joinedEvent) : Promise.resolve(),
+        openAttendance(meeting, currentUser.id),
       ])
 
       return {
@@ -512,6 +516,7 @@ export async function joinMeeting(meetingId: string): Promise<{
       }),
       User.findById(meeting.hostId).select("firstName lastName avatarUrl").lean(),
       otherAdmittedIds.length > 0 ? emitEventToMany(otherAdmittedIds, joinedEvent) : Promise.resolve(),
+      openAttendance(meeting, currentUser.id),
     ])
 
     return {
@@ -574,6 +579,7 @@ export async function admitParticipant(
         customParticipantId: userId,
         presetName: "group_call_participant",
       }),
+      openAttendance(meeting, userId),
     ])
 
     const participantName = user ? `${user.firstName} ${user.lastName}`.trim() : "Participant"
@@ -728,6 +734,7 @@ export async function endMeeting(meetingId: string): Promise<{
       userAvatar: currentUser.avatarUrl,
     }
     await meeting.save()
+    await closeAllAttendance(meeting._id.toString(), meeting.endedAt ?? new Date())
     // Don't block response — participants will get notified asynchronously
     if (participantIdsToNotify.length > 0) {
       backgroundSave(emitEventToMany(participantIdsToNotify, endPayload))
@@ -971,6 +978,7 @@ export async function leaveMeeting(meetingId: string): Promise<{
 
     const meeting = await Meeting.findById(meetingId)
     if (!meeting) return { success: false, error: "Meeting not found" }
+    await closeAttendance(meeting._id.toString(), currentUser.id)
 
     const participant = meeting.participants.find(
       (p) => p.userId.toString() === currentUser.id
@@ -1568,6 +1576,7 @@ export async function kickParticipant(
     await Promise.all([
       meeting.save(),
       emitEvent(userId, eventPayload),
+      closeAttendance(meeting._id.toString(), userId),
     ])
 
     return { success: true }
