@@ -31,7 +31,7 @@ import { POINTS, awardPoints, pointKey } from "@/lib/points"
 import { isCountryCode } from "@/lib/countries"
 import { FACULTY_ROLES, isFacultyRole, safeWebUrl } from "@/lib/faculty"
 import { PROGRAM_KIND_FILTER, courseKindOf } from "@/lib/course-kind"
-import { courseFormatOf, type CourseFormat } from "@/lib/course-format"
+import { FORMAT_LABEL, courseFormatOf, isFileFormat, productTypeLabel, type CourseFormat } from "@/lib/course-format"
 
 // ============================================================================
 // TYPES
@@ -524,6 +524,8 @@ export type ProgramDetail = BrowseCourse & {
    * course's own price, so every program renders the same components.
    */
   packages: PublicPackage[]
+  /** A file product's public metadata (type and size); never the key or filename. */
+  productFile: { typeLabel: string; sizeBytes: number } | null
 }
 
 const NO_ENTITLEMENTS: IPackageEntitlements = {
@@ -557,6 +559,8 @@ async function findProgram(filter: { slug: string } | { _id: string }): Promise<
   // Guard against missing instructor (deleted user, etc.)
   if (!instructor) return null
 
+  const format = courseFormatOf({ kind: courseKindOf(course), format: course.format })
+  const fileFormat = isFileFormat(format) ? format : null
   const whatYouWillLearn = course.whatYouWillLearn ?? []
   const enabled = (course.packages ?? [])
     .filter((p) => p.enabled)
@@ -579,15 +583,15 @@ async function findProgram(filter: { slug: string } | { _id: string }): Promise<
       : [
           {
             key: "standard",
-            name: courseKindOf(course) === "program" ? "Full program" : "Full course",
+            name: fileFormat ? FORMAT_LABEL[fileFormat] : courseKindOf(course) === "program" ? "Full program" : "Full course",
             tagline: "",
             price: course.pricing === "free" ? 0 : course.price ?? 0,
             listPrice: null,
             duration: null,
             features: whatYouWillLearn,
             highlight: false,
-            ctaLabel: null,
-            entitlements: FULL_ACCESS,
+            ctaLabel: fileFormat ? (course.pricing === "free" || !course.price ? "Get it free" : "Buy now") : null,
+            entitlements: fileFormat ? NO_ENTITLEMENTS : FULL_ACCESS,
           },
         ]
 
@@ -616,7 +620,7 @@ async function findProgram(filter: { slug: string } | { _id: string }): Promise<
     rating: course.rating?.average || null,
     outcomes: whatYouWillLearn.slice(0, 3),
     kind: courseKindOf(course),
-    format: courseFormatOf({ kind: courseKindOf(course), format: course.format }),
+    format,
     sellerName: sellerNameOf(courseKindOf(course), instructor),
     publishedAt: course.publishedAt ? course.publishedAt.toISOString() : null,
     ratingCount: course.rating?.count || 0,
@@ -629,6 +633,10 @@ async function findProgram(filter: { slug: string } | { _id: string }): Promise<
     // The course is published, so an INSTRUCTOR/ADMIN teaching it is faculty.
     instructorUsername: isFacultyRole(instructor.role) ? instructor.username : null,
     packages,
+    productFile:
+      fileFormat && course.productFile
+        ? { typeLabel: productTypeLabel(course.productFile.mimeType), sizeBytes: course.productFile.sizeBytes }
+        : null,
   }
 }
 

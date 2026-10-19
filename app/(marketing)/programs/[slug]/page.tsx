@@ -22,6 +22,7 @@ import { ProgramCurriculum } from "@/components/programs/program-curriculum"
 import { WhatsIncluded } from "@/components/programs/whats-included"
 import { ClampedText } from "@/components/programs/clamped-text"
 import { ProgramInstructor } from "@/components/programs/program-instructor"
+import { FORMAT_LABEL, isFileFormat } from "@/lib/course-format"
 import { PackageChooser } from "@/components/programs/package-chooser"
 import { PackageSelectionProvider } from "@/components/programs/package-selection"
 import type { LessonAccess } from "@/components/programs/package-model"
@@ -178,8 +179,9 @@ export default async function ProgramPage({
           ),
         }
       : null
-  // A ladder-less program is a legacy full enrollment, which earns the certificate.
-  const certificate = program.tierCount === 0 || program.packages.some((p) => p.entitlements.certificate)
+  // A ladder-less program's synthesized tier carries the certificate (FULL_ACCESS); a file product's carries none.
+  const certificate = program.packages.some((p) => p.entitlements.certificate)
+  const fileProduct = isFileFormat(program.format)
 
   const hasReviews = (reviewsPage.summary?.count ?? 0) > 0 || reviewsPage.total > 0
   // An enrolled learner is never quoted a price (lib/program-rail.ts): the
@@ -319,6 +321,7 @@ export default async function ProgramPage({
                       />
                     )}
                     <PackageChooser
+                      heading={fileProduct ? `Get this ${FORMAT_LABEL[program.format!].toLowerCase()}` : undefined}
                       noun={isProgram ? "program" : "course"}
                       programTitle={program.title}
                       comingSoon={access.kind === "coming_soon"}

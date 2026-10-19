@@ -1,5 +1,6 @@
 import { AwardIcon, ClipboardCheckIcon, HandshakeIcon, MessagesSquareIcon, RadioIcon, type IconComponent } from "@/components/icons"
 
+import { isFileFormat } from "@/lib/course-format"
 import type { ProgramDetail, PublicPackage } from "@/lib/actions/student"
 import type { IPackageEntitlements, PackageKey } from "@/lib/db/models"
 import { PACKAGE_LABEL } from "@/lib/entitlements"
@@ -39,7 +40,7 @@ export const LEVEL_LABEL: Record<ProgramDetail["level"], string> = {
 /** How the order line names what is being bought: "Standard · Forex Mastery", or the program's own single price. */
 export function packageLine(program: ProgramDetail, pkg: PublicPackage): { label: string | null; name: string } {
   // No ladder: the one synthesized tier is the program itself, not a package.
-  if (program.tierCount === 0) return { label: null, name: "Full program" }
+  if (program.tierCount === 0) return { label: null, name: isFileFormat(program.format) ? pkg.name : "Full program" }
   // One enabled tier: it is the program's single price (blueprint §8), so the
   // tier label ("Standard") would describe a choice nobody made.
   if (program.tierCount === 1) return { label: null, name: pkg.name }
@@ -83,7 +84,7 @@ const SERVICES: readonly Service[] = [
  */
 export function packageServices(program: ProgramDetail, pkg: PublicPackage): Service[] {
   if (program.tierCount === 0) {
-    return SERVICES.filter((s) => s.key === "instructorQa" || s.key === "certificate")
+    return SERVICES.filter((s) => (s.key === "instructorQa" || s.key === "certificate") && pkg.entitlements[s.key])
   }
   return SERVICES.filter((s) => pkg.entitlements[s.key] && (s.key !== "mentorship" || pkg.key === "executive"))
 }

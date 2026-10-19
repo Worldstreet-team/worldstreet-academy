@@ -61,11 +61,14 @@ const GOLD_CTA =
  */
 export function PackageChooser({
   noun = "program",
+  heading,
   programTitle,
   comingSoon,
   lessons,
   className,
 }: {
+  /** Replaces the single-offer heading, e.g. "Get this template". */
+  heading?: string
   /** What the page sells: a school program, or a marketplace / New Economy course. */
   noun?: "program" | "course"
   programTitle: string
@@ -78,7 +81,7 @@ export function PackageChooser({
   return (
     <section id="packages" aria-labelledby="packages-heading" className={cn(SECTION_SCROLL_MT, className)}>
       <h2 id="packages-heading" className={PROGRAM_H2}>
-        {multiTier ? "Choose your learning experience" : `Enrol in this ${noun}`}
+        {heading ?? (multiTier ? "Choose your learning experience" : `Enrol in this ${noun}`)}
       </h2>
       {multiTier ? (
         <>
@@ -90,7 +93,7 @@ export function PackageChooser({
           <PackageCompare lessons={lessons} />
         </>
       ) : (
-        <SingleOffer noun={noun} comingSoon={comingSoon} lessons={lessons} />
+        <SingleOffer comingSoon={comingSoon} lessons={lessons} />
       )}
     </section>
   )
@@ -571,11 +574,9 @@ function OfferTerms({ pkg, comingSoon, className }: { pkg: PublicPackage; coming
  * program's "What you'll learn", already on the page.
  */
 function SingleOffer({
-  noun,
   comingSoon,
   lessons,
 }: {
-  noun: "program" | "course"
   comingSoon: boolean
   lessons: LessonAccess | null
 }) {
@@ -587,7 +588,7 @@ function SingleOffer({
   const offer = (
     <>
       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ws-muted">
-        {tierCount > 0 ? pkg.name : `Full ${noun}`}
+        {pkg.name}
       </p>
       <p className="mt-3 font-display text-[52px] font-light leading-none tabular-nums tracking-[-0.03em] text-ws-primary">
         {packagePriceLabel(pkg.price)}
