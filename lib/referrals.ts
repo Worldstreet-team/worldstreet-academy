@@ -322,3 +322,109 @@ export async function referralSummary(userId: string, limit = 25): Promise<Refer
     })),
   }
 }
+
+/* ═══════════════════ the admin partners table ═══════════════════ */
+
+export type PartnerRow = {
+  userId: string
+  code: string
+  firstName: string
+  lastName: string
+  email: string
+  role: "USER" | "INSTRUCTOR" | "ADMIN"
+  clicks: number
+  signUps: number
+  enrolled: number
+  revenueMinor: number
+  commissionPendingMinor: number
+  commissionPaidMinor: number
+}
+
+/**
+ * Every Partner Code holder with any activity, best first; `inactive` counts the
+ * holders with none. A fixed number of queries, whatever the number of partners;
+ * the commission arithmetic mirrors `referralSummary`.
+ */
+export async function partnerRows(): Promise<{ rows: PartnerRow[]; inactive: number }> {
+  const holders = await User.find({ referralCode: { $type: "string" } })
+    .select("_id firstName lastName email role referralCode")
+    .lean()
+
+  const [clickTotals, referredUsers, revenue, commissions] = await Promise.all([
+    PartnerClick.aggregate<{ _id: string; total: number }>([{ $group: { _id: "$code", total: { $sum: "$count" } } }]),
+    User.find({ "referredBy.userId": { $type: "objectId" } })
+      .select("_id referredBy.userId")
+      .lean(),
+    Order.aggregate<{ _id: Types.ObjectId; total: number }>([
+      { $match: { "attribution.kind": "referral", status: { $in: ["paid", "enrolled"] } } },
+      { $group: { _id: "$attribution.userId", total: { $sum: "$amountMinor" } } },
+    ]),
+    Earning.find({ kind: "referral" }).select("_id instructor netMinor status").lean(),
+  ])
+
+  const [paidUserIds, clawbacks] = await Promise.all([
+    referredUsers.length
+      ? Order.distinct("user", { user: { $in: referredUsers.map((u) => u._id) }, status: { $in: ["paid", "enrolled"] } })
+      : Promise.resolve([]),
+    commissions.length
+      ? Earning.find({
+          kind: "adjustment",
+          creditReference: { $in: commissions.map((c) => `academy_clawback_${c._id.toString()}`) },
+          status: { $ne: "reversed" },
+        })
+          .select("instructor netMinor")
+          .lean()
+      : Promise.resolve([]),
+  ])
+
+  const clicksByCode = new Map(clickTotals.map((c) => [c._id, c.total]))
+  const revenueByUser = new Map(revenue.map((r) => [String(r._id), r.total]))
+  const paid = new Set(paidUserIds.map((id) => String(id)))
+  const signUps = new Map<string, number>()
+  const enrolled = new Map<string, number>()
+  for (const u of referredUsers) {
+    const owner = String(u.referredBy?.userId)
+    signUps.set(owner, (signUps.get(owner) ?? 0) + 1)
+    if (paid.has(u._id.toString())) enrolled.set(owner, (enrolled.get(owner) ?? 0) + 1)
+  }
+  const pending = new Map<string, number>()
+  const cleared = new Map<string, number>()
+  for (const c of commissions) {
+    const owner = String(c.instructor)
+    if (c.status === "pending") pending.set(owner, (pending.get(owner) ?? 0) + c.netMinor)
+    if (c.status === "cleared") cleared.set(owner, (cleared.get(owner) ?? 0) + c.netMinor)
+  }
+  for (const c of clawbacks) {
+    const owner = String(c.instructor)
+    cleared.set(owner, (cleared.get(owner) ?? 0) + c.netMinor)
+  }
+
+  const all = holders.map((h): PartnerRow => {
+    const id = h._id.toString()
+    return {
+      userId: id,
+      code: h.referralCode as string,
+      firstName: h.firstName,
+      lastName: h.lastName,
+      email: h.email,
+      role: h.role,
+      clicks: clicksByCode.get(h.referralCode as string) ?? 0,
+      signUps: signUps.get(id) ?? 0,
+      enrolled: enrolled.get(id) ?? 0,
+      revenueMinor: revenueByUser.get(id) ?? 0,
+      commissionPendingMinor: pending.get(id) ?? 0,
+      commissionPaidMinor: cleared.get(id) ?? 0,
+    }
+  })
+
+  const rows = all
+    .filter((r) => r.clicks > 0 || r.signUps > 0 || r.revenueMinor > 0 || r.commissionPendingMinor !== 0 || r.commissionPaidMinor !== 0)
+    .sort(
+      (a, b) =>
+        b.revenueMinor - a.revenueMinor ||
+        b.commissionPendingMinor + b.commissionPaidMinor - (a.commissionPendingMinor + a.commissionPaidMinor) ||
+        b.clicks - a.clicks ||
+        a.code.localeCompare(b.code),
+    )
+  return { rows, inactive: all.length - rows.length }
+}
