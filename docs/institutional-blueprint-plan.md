@@ -491,7 +491,7 @@ Total ≈ 28–35 dev-days in sequence, or ≈ 14–18 across three tracks:
   - The admin review page shows the pipeline. The creator sees which check asked for changes.
   - A re-submission keeps passed checks unless the content changed.
 - **20.3 `/sell` "How it works" is §17's pipeline:** Application → Content review → Quality review → Accuracy review (where relevant) → Technical review → Approval → Publishing.
-- **20.4 ⛔ Templates and guides (not built here).** Sketch for the owner: `format: "template" | "guide"`, one private-bucket file, bought like a course and downloaded through a short-lived signed URL. It needs D30, plus a Go note to keep it out of every program list (already true by `kind`).
+- **20.4 Templates and guides (built, owner 2026-10-19).** `lib/course-format.ts` holds the formats and file limits, the file sits in the private bucket, and owners get a product home at `/dashboard/courses/[courseId]` with a signed 5-minute Download.
 
 ### Exit criteria
 - [ ] Marketplace listings show their format and filter by it.
