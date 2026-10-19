@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
-import { isSchoolSlug } from "@/lib/schools"
+import { schoolSlugOf } from "@/lib/schools"
 
 /**
  * The in-dashboard "Programs" catalogue is retired (owner, 2026-09-18): a
@@ -14,5 +14,6 @@ export default async function BrowseProgramsRedirect({
   searchParams: Promise<{ school?: string | string[] }>
 }) {
   const { school } = await searchParams
-  redirect(typeof school === "string" && isSchoolSlug(school) ? `/schools/${school}` : "/programs")
+  const target = schoolSlugOf(school)
+  redirect(target ? `/schools/${target}` : "/programs")
 }

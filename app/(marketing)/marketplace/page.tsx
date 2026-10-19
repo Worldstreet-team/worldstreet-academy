@@ -4,7 +4,7 @@ import Link from "next/link"
 
 import { BRAND } from "@/lib/brand"
 import { appUrl } from "@/lib/app-url"
-import { SCHOOLS, SCHOOL_BY_SLUG, countProgramsBySchool, isSchoolSlug } from "@/lib/schools"
+import { SCHOOLS, SCHOOL_BY_SLUG, countProgramsBySchool, schoolSlugOf } from "@/lib/schools"
 import { fetchBrowseCourses, type BrowseCourse } from "@/lib/actions/student"
 import { getCachedUser } from "@/lib/auth/cached"
 import { MARKETPLACE_SHARE_ACADEMY, MARKETPLACE_SHARE_OWN_LINK } from "@/lib/db/models"
@@ -37,7 +37,7 @@ function readFilters(params: Record<string, string | string[] | undefined>): Mar
   const sort = first(params.sort)
   return {
     q: (first(params.q) ?? "").trim().replace(/\s+/g, " ").slice(0, 80),
-    school: isSchoolSlug(school) ? school : "",
+    school: schoolSlugOf(school) ?? "",
     price: price === "free" || price === "paid" ? price : "",
     level: level === "beginner" || level === "intermediate" || level === "advanced" ? level : "",
     sort: isMarketplaceSort(sort) ? sort : "popular",

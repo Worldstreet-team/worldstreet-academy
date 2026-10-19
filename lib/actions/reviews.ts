@@ -6,6 +6,7 @@ import connectDB from "@/lib/db"
 import { Review, Course, Enrollment } from "@/lib/db/models"
 import { z } from "zod/v4"
 import { countryName } from "@/lib/countries"
+import { schoolSlugOf } from "@/lib/schools"
 import { getCurrentUser } from "@/lib/auth"
 
 // ============================================================================
@@ -451,7 +452,8 @@ export async function getUserReview(
 async function revalidateReviewPages(courseId: string) {
   const course = await Course.findById(courseId).select("slug school").lean()
   if (course?.slug) revalidatePath(`/programs/${course.slug}`)
-  if (course?.school) revalidatePath(`/schools/${course.school}`)
+  const school = schoolSlugOf(course?.school)
+  if (school) revalidatePath(`/schools/${school}`)
   revalidatePath("/")
 }
 

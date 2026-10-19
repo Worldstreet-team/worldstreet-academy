@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
-import { notFound } from "next/navigation"
-import { SCHOOL_BY_SLUG, cheapestBySchool, countProgramsBySchool, isSchoolSlug } from "@/lib/schools"
+import { notFound, permanentRedirect } from "next/navigation"
+import { SCHOOL_BY_SLUG, cheapestBySchool, countProgramsBySchool, isSchoolSlug, schoolFromSlug } from "@/lib/schools"
 import { schoolCover } from "@/lib/school-art"
 import { fetchBrowseCourses, fetchFaculty, fetchProgramBySlug } from "@/lib/actions/student"
 import { fetchProgramCurriculum } from "@/lib/actions/program-page"
@@ -84,6 +84,8 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
  */
 export default async function SchoolPage({ params }: Params) {
   const { slug } = await params
+  const moved = isSchoolSlug(slug) ? null : schoolFromSlug(slug)
+  if (moved) permanentRedirect(`/schools/${moved.slug}`)
   if (!isSchoolSlug(slug)) notFound()
   const school = SCHOOL_BY_SLUG[slug]
   const cover = schoolCover(school.slug)

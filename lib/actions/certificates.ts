@@ -5,7 +5,7 @@ import connectDB from "@/lib/db"
 import { Enrollment, Course, User, type ICoursePackage } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth"
 import { entitlementsFor } from "@/lib/entitlements"
-import { SCHOOL_BY_SLUG, isSchoolSlug } from "@/lib/schools"
+import { schoolFromSlug } from "@/lib/schools"
 import { ensureCertificateId, normalizeCertificateId } from "@/lib/certificate-id"
 
 // ============================================================================
@@ -119,7 +119,7 @@ export async function fetchCertificate(courseId: string): Promise<CertificateDat
       studentSignatureUrl: user.signatureUrl ?? null,
       certificateId,
       programName: course.title,
-      schoolName: isSchoolSlug(course.school) ? SCHOOL_BY_SLUG[course.school].name : null,
+      schoolName: schoolFromSlug(course.school)?.name ?? null,
     }
   } catch (error) {
     console.error("Fetch certificate error:", error)
@@ -288,7 +288,7 @@ export async function verifyCertificate(
       certificateId: enrollment.certificateId,
       studentName: maskedStudentName(student.firstName, student.lastName),
       programName: course.title,
-      schoolName: isSchoolSlug(course.school) ? SCHOOL_BY_SLUG[course.school].name : null,
+      schoolName: schoolFromSlug(course.school)?.name ?? null,
       completedAt: enrollment.completedAt.toISOString(),
       instructorName: instructor ? `${instructor.firstName ?? ""} ${instructor.lastName ?? ""}`.trim() : "",
     }
