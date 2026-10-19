@@ -9,6 +9,7 @@ import type { CertificateData } from "@/lib/actions/certificates"
 import { SignatureCanvas } from "@/components/shared/signature-canvas"
 import { useTheme } from "next-themes"
 import { BRAND } from "@/lib/brand"
+import { CERT_TIER_TITLE } from "@/lib/certificate-tier"
 
 // ── Helper: fetch image as base64 data URL ───────────────────────────────────
 
@@ -77,6 +78,7 @@ function CertificatePreview({
   verifyLabel: string | null
 }) {
   const { theme, systemTheme } = useTheme()
+  const [titleMain, titleSub] = CERT_TIER_TITLE[data.tier]
   const currentTheme = theme === "system" ? systemTheme : theme
   const logoPath = currentTheme === "light" 
     ? "/worldstreet-logo/WorldStreet4x.png"
@@ -169,10 +171,10 @@ function CertificatePreview({
         {/* Title */}
         <div className="text-center space-y-1 sm:space-y-1.5">
           <h1 className="text-xl sm:text-3xl md:text-[42px] font-extralight tracking-[0.2em] sm:tracking-[0.25em] uppercase text-ws-primary leading-none">
-            Certificate
+            {titleMain}
           </h1>
           <p className="text-[8px] sm:text-[9px] md:text-[11px] tracking-[0.3em] uppercase text-ws-subtle font-light">
-            of Completion
+            {titleSub}
           </p>
         </div>
 
@@ -318,6 +320,7 @@ export function CertificateClient({ data, verifyUrl }: { data: CertificateData; 
 
   const downloadPDF = useCallback(async () => {
     const { jsPDF } = await import("jspdf")
+    const [titleMain, titleSub] = CERT_TIER_TITLE[data.tier]
     const doc = new jsPDF({
       orientation: "landscape",
       unit: "mm",
@@ -418,16 +421,16 @@ export function CertificateClient({ data, verifyUrl }: { data: CertificateData; 
     doc.setTextColor(160, 160, 160)
     doc.text(BRAND.name.toUpperCase(), cx, 39, { align: "center" })
 
-    // ── "Certificate" title ──────────────────────────────────────
+    // ── Title line one (follows the tier) ──────────────────────────────────────
     doc.setFont("helvetica", "normal")
     doc.setFontSize(32)
     doc.setTextColor(50, 50, 50)
-    doc.text("CERTIFICATE", cx, 56, { align: "center" })
+    doc.text(titleMain.toUpperCase(), cx, 56, { align: "center" })
 
-    // ── "of Completion" subtitle ─────────────────────────────────
+    // ── Title line two (follows the tier) ─────────────────────────────────
     doc.setFontSize(7)
     doc.setTextColor(160, 160, 160)
-    doc.text("OF COMPLETION", cx, 63, { align: "center" })
+    doc.text(titleSub.toUpperCase(), cx, 63, { align: "center" })
 
     // ── "This is proudly presented to" ───────────────────────────
     doc.setFontSize(6.5)

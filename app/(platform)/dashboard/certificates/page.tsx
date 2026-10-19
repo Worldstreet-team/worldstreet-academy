@@ -1,8 +1,9 @@
-import { ChevronRightIcon } from "@/components/icons"
+import { ArrowRightIcon, ChevronRightIcon } from "@/components/icons"
 import Link from "next/link"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Topbar } from "@/components/platform/topbar"
 import { fetchMyCertificates } from "@/lib/actions/certificates"
+import { CERT_TIER_LABEL } from "@/lib/certificate-tier"
 import { EmptyState } from "@/components/shared/empty-state"
 import { ArtCertificate, SealRosette } from "@/components/shared/illustrations"
 
@@ -25,6 +26,13 @@ export default async function CertificatesPage() {
                 ? `${certificates.length} ${certificates.length === 1 ? "credential" : "credentials"} earned by completing courses.`
                 : "Credentials you earn by completing courses live here."}
             </p>
+            <Link
+              href="/certification"
+              className="mt-2 inline-flex items-center gap-1 text-[13px] font-medium text-ws-muted hover:text-ws-primary"
+            >
+              How certification works
+              <ArrowRightIcon size={14} />
+            </Link>
           </div>
 
           {certificates.length === 0 ? (
@@ -55,7 +63,7 @@ export default async function CertificatesPage() {
                     <SealRosette className="h-10 w-10" />
 
                     <p className="mt-4 text-[11px] font-medium uppercase tracking-[0.1em] text-ws-subtle">
-                      Certificate of Completion
+                      {CERT_TIER_LABEL[cert.tier]}
                     </p>
                     <h3 className="mt-1.5 line-clamp-2 font-display text-[17px] font-semibold leading-snug tracking-[-0.01em] text-ws-primary">
                       {cert.courseTitle}
@@ -74,6 +82,19 @@ export default async function CertificatesPage() {
                         {cert.instructorName}
                       </span>
                     </div>
+
+                    {cert.next && (
+                      <div className="mb-5">
+                        <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-ws-subtle">
+                          {`Next · ${CERT_TIER_LABEL[cert.next.tier]}`}
+                        </p>
+                        <ul className="mt-1.5 space-y-1 text-[13px] tabular-nums text-ws-muted">
+                          {cert.next.needs.map((need) => (
+                            <li key={need}>{need}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
 
                     <div className="mt-auto flex items-center justify-between border-t border-ws-hairline pt-3">
                       <span className="text-[13px] tabular-nums text-ws-muted">
