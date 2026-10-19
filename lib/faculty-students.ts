@@ -1,4 +1,4 @@
-import type { PackageKey } from "@/lib/db/models"
+import type { EnrollmentStatus, PackageKey } from "@/lib/db/models"
 import { PACKAGE_KEYS, PACKAGE_LABEL, isPackageKey } from "@/lib/entitlements"
 
 /** Pure helpers for the faculty "My Students" list: its filters, links and labels. */
@@ -44,4 +44,14 @@ export function planOf(packageKey: PackageKey | null | undefined): { key: PlanFi
 
 export function assignmentsLabel(graded: number, average: number | null): string {
   return graded === 0 || average === null ? "None graded" : `${graded} graded · avg ${average}`
+}
+
+export const ENROLLMENT_STATUS_LABEL: Record<EnrollmentStatus, string> = {
+  active: "Active",
+  completed: "Completed",
+  pre_enrolled: "Pre-enrolled",
+  expired: "Expired",
+  refunded: "Refunded",
+  suspended: "Suspended",
+  cancelled: "Cancelled",
 }
