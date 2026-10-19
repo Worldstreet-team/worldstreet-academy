@@ -3,6 +3,7 @@ import "server-only"
 import { Types } from "mongoose"
 import connectDB from "@/lib/db"
 import { User, type IUser } from "@/lib/db/models"
+import { adminLevelOf, type AdminLevel } from "@/lib/admin-levels"
 import { referralCookieCode, referralOwner } from "@/lib/referrals"
 import type { AuthUser } from "./types"
 
@@ -77,6 +78,7 @@ export type LocalUser = {
   avatarUrl: string | null
   signatureUrl: string | null
   role: "USER" | "INSTRUCTOR" | "ADMIN"
+  adminLevel: AdminLevel
   instructorStatus: "none" | "applied" | "interview" | "approved" | "rejected"
   verified: boolean
   walletBalance: number
@@ -128,10 +130,12 @@ export async function syncUserToLocal(authUser: AuthUser, updateNames = true): P
       user.verified = authUser.isVerified
       // Role is NOT taken from Clerk for an existing account — the database is
       // authoritative (roles are granted in the admin console). Only ever
-      // upgrade, never silently demote an admin/instructor to USER.
-      const claimedRole = mapRole(authUser.role)
-      if (claimedRole !== "USER" && user.role === "USER") {
-        user.role = claimedRole
+      // upgrade a USER to INSTRUCTOR, never demote. Admins are granted only by a
+      // super admin or scripts/grant-admin.mjs (D32), so an "admin" claim on an
+      // existing account is ignored: a removed admin whose Clerk metadata is
+      // stale must not get ADMIN back when a new Clerk id links by email.
+      if (mapRole(authUser.role) === "INSTRUCTOR" && user.role === "USER") {
+        user.role = "INSTRUCTOR"
       }
       // Backfill avatar for existing users without one
       if (!user.avatarUrl) {
@@ -166,10 +170,10 @@ export async function syncUserToLocal(authUser: AuthUser, updateNames = true): P
     user.email = authUser.email.toLowerCase()
     user.verified = authUser.isVerified
     // Database is authoritative for role (see the linking branch above) —
-    // upgrade from Clerk metadata if it grants more, never demote.
-    const claimedRole = mapRole(authUser.role)
-    if (claimedRole !== "USER" && user.role === "USER") {
-      user.role = claimedRole
+    // raise a USER to INSTRUCTOR from Clerk metadata, never demote and never
+    // raise to ADMIN (D32; see the linking branch above).
+    if (mapRole(authUser.role) === "INSTRUCTOR" && user.role === "USER") {
+      user.role = "INSTRUCTOR"
     }
 
     // Only update names if provided from API and updateNames is true
@@ -200,6 +204,7 @@ export async function syncUserToLocal(authUser: AuthUser, updateNames = true): P
     avatarUrl: user.avatarUrl,
     signatureUrl: user.signatureUrl ?? null,
     role: user.role,
+    adminLevel: adminLevelOf(user.adminLevel),
     instructorStatus: user.instructorStatus ?? "none",
     verified: user.verified,
     walletBalance: user.walletBalance,
@@ -236,6 +241,7 @@ export async function getLocalUserByAuthId(authUserId: string): Promise<LocalUse
     avatarUrl: user.avatarUrl,
     signatureUrl: user.signatureUrl ?? null,
     role: user.role,
+    adminLevel: adminLevelOf(user.adminLevel),
     instructorStatus: user.instructorStatus ?? "none",
     verified: user.verified,
     walletBalance: user.walletBalance,
@@ -269,6 +275,7 @@ export async function getLocalUserById(id: string): Promise<LocalUser | null> {
     avatarUrl: user.avatarUrl,
     signatureUrl: user.signatureUrl ?? null,
     role: user.role,
+    adminLevel: adminLevelOf(user.adminLevel),
     instructorStatus: user.instructorStatus ?? "none",
     verified: user.verified,
     walletBalance: user.walletBalance,

@@ -216,3 +216,17 @@ Indexes: `{ key: 1 }` unique, `{ user: 1, createdAt: -1 }`, `{ course: 1, user: 
 | `extraDocumentUrl` | string \| `null` | An optional extra PDF, uploaded like `cvUrl`. |
 
 The web requires the first five on every new application. Any wholesale application write must keep them (write dotted paths or keep the fields).
+
+## 12. Super admins and admin levels (Phase 21, D32)
+
+**R14 — Admin levels. Go needs no patch.** Two web-only fields on `users`, both additive:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `adminLevel` | `"super" \| null` | Missing = `null`. A super admin is `role: "ADMIN"` and `adminLevel: "super"`. |
+| `adminAudit[]` | `{ action: "grant" \| "revoke" \| "promote" \| "demote", fromRole, toRole, fromLevel, toLevel, by: ObjectId \| null, at }` | One entry per change involving `ADMIN` or the level. `by: null` means the bootstrap script. |
+
+- Go keeps treating `role: "ADMIN"` as admin everywhere, including the mobile admin surfaces such as Vision. A super admin is still an `ADMIN`.
+- Go never writes `adminLevel` or `adminAudit`. Any wholesale user write must carry them (write dotted `$set`s, or keep the fields).
+- If Go has any path that sets `users.role`, it must neither set nor clear `ADMIN`. Admin access is granted and removed only on the web, by a super admin, so it is audited.
+- If Go raises roles from Clerk metadata at sign-in, it must never raise an **existing** account to `ADMIN`. The web stopped doing so in Phase 21; otherwise a removed admin whose metadata is stale gets admin back.

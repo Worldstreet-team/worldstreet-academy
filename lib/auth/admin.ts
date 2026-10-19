@@ -1,5 +1,6 @@
 import "server-only"
 
+import { isSuperAdmin } from "@/lib/admin-levels"
 import { getCurrentUser } from "./actions"
 import type { LocalUser } from "./sync"
 
@@ -10,6 +11,19 @@ import type { LocalUser } from "./sync"
 export async function requireAdmin(): Promise<LocalUser> {
   const user = await getCurrentUser()
   if (!user || user.role !== "ADMIN") {
+    throw new Error("Not authorized")
+  }
+  return user
+}
+
+/**
+ * Guard for D32 actions (granting, changing and removing admin access). The
+ * database is re-read on every call, so a demotion takes effect on the very
+ * next request.
+ */
+export async function requireSuperAdmin(): Promise<LocalUser> {
+  const user = await requireAdmin()
+  if (!isSuperAdmin(user)) {
     throw new Error("Not authorized")
   }
   return user
