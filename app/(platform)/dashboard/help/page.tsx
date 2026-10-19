@@ -34,7 +34,7 @@ const faqs: Faq[] = [
   {
     question: "How do I become an instructor?",
     answer:
-      "Apply from the Become a WMA Instructor page in the sidebar. Tell us about your expertise and the courses you want to teach; our team reviews every application and you'll get a notification with the decision.",
+      "Choose “Become a WMA Instructor” in the sidebar and apply there. Tell us about your expertise and the courses you want to teach; our team reviews every application and you'll get a notification with the decision.",
   },
   {
     question: "Can I get a refund on a course?",
