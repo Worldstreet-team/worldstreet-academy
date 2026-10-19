@@ -545,6 +545,7 @@ Total ≈ 28–35 dev-days in sequence, or ≈ 14–18 across three tracks:
 4. **Attendance only counts web joins (16)** until Go writes `attendances`. Show attendance only after at least one class has been held, and note "classes joined on the web" beside it.
 5. **Content debt.** Owed by product:
    - school overviews, audiences and careers (13)
+   - real school covers for Entrepreneurship & Wealth Creation and Leadership & Personal Development (13; placeholders now)
    - handbook copy (19)
    - certificate thresholds (17)
    - Cohort 002's date (12)
