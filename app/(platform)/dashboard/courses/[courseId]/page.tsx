@@ -16,6 +16,9 @@ import {
   fetchProgramSlug,
 } from "@/lib/actions/student"
 import { checkEnrollment } from "@/lib/actions/enrollments"
+import { getOwnedProduct } from "@/lib/actions/product-files"
+import { getCourseRatingSummary, getUserReview } from "@/lib/actions/reviews"
+import { ProductHome } from "@/components/marketplace/product-home"
 import { classCommunityUrl, getCourseAccess, getLearnStart } from "@/lib/course-access"
 import { CourseSchedulingCta } from "@/components/shared/course-scheduling-cta"
 import { courseAvailability } from "@/lib/types/course"
@@ -43,7 +46,8 @@ export const revalidate = 0
  * Not a stop on the way to the lessons (owner, 2026-09-18). An enrolled
  * learner is sent straight into the player where they start
  * (`getLearnStart`), so dashboard cards, emails and old links land on the
- * video; anyone else signed in goes to the public program page, the one place
+ * video (a template or guide's owner lands on its product home instead, the
+ * file and its Download action, because it has no lessons); anyone else signed in goes to the public program page, the one place
  * packages are chosen and bought. What stays here: `?view=overview` (the
  * player's "Overview" link), the waiting state for a learner whose package
  * opens no lesson yet, and course staff previewing.
@@ -57,6 +61,16 @@ export default async function CourseDetailPage({
 }) {
   const [{ courseId }, { view }] = await Promise.all([params, searchParams])
   const currentUser = await getCurrentUser()
+
+  // A template or guide has no player: its buyer, owner or an admin gets the product home.
+  const product = currentUser ? await getOwnedProduct(courseId) : null
+  if (currentUser && product) {
+    const [rating, review] = await Promise.all([
+      getCourseRatingSummary(courseId),
+      product.viewer === "buyer" ? getUserReview(currentUser.id, courseId) : Promise.resolve(null),
+    ])
+    return <ProductHome product={product} rating={rating} review={review} />
+  }
 
   const start = currentUser ? await getLearnStart(currentUser.id, courseId) : null
   if (start && view !== "overview") redirect(start.href)

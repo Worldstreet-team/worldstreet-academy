@@ -43,7 +43,7 @@ export async function announceClassLive(meetingId: string, opts: { email: boolea
     if (!meeting?.courseId) return
 
     const [course, enrollments, host] = await Promise.all([
-      Course.findById(meeting.courseId).select("title packages thumbnailUrl").lean(),
+      Course.findById(meeting.courseId).select("title packages format thumbnailUrl").lean(),
       Enrollment.find({ course: meeting.courseId, status: { $in: ["active", "completed"] } })
         .select("user packageKey")
         .lean(),

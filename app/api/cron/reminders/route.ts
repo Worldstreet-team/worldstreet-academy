@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
       } else if (meeting.courseId) {
         // Course class: host + invitees + students whose package includes live classes.
         const [course, enrollments] = await Promise.all([
-          Course.findById(meeting.courseId).select("title packages").lean(),
+          Course.findById(meeting.courseId).select("title packages format").lean(),
           Enrollment.find({ course: meeting.courseId, status: { $in: ["active", "completed"] } })
             .select("user packageKey")
             .lean(),

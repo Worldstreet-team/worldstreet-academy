@@ -329,7 +329,7 @@ export async function adminSetEnrollmentPackage(
         ...current,
         packageKey: pkg.key,
         packageName: pkg.name,
-        entitlements: entitlementsFor({ packages: current.course.packages }, { packageKey: pkg.key }),
+        entitlements: entitlementsFor({ packages: current.course.packages, format: current.course.format }, { packageKey: pkg.key }),
       }
       const open = await openPublishedLessonIds(next)
       const done = enrollment.completedLessons.filter((id: { toString(): string }) => open.has(id.toString())).length

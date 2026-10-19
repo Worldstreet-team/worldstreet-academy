@@ -10,6 +10,7 @@ import {
   type MarketplaceFilterValues,
   type MarketplaceSort,
 } from "@/lib/marketplace"
+import type { CourseFormat } from "@/lib/course-format"
 import { cn } from "@/lib/utils"
 
 const FIELD =
@@ -51,7 +52,7 @@ function FilterSelect({
 }
 
 /**
- * The marketplace's search and filters: topic (the course's school), price,
+ * The marketplace's search and filters: topic (the course's school), format, price,
  * level and sort. A plain GET form, so it works before hydration; once
  * hydrated, a change navigates straight away and the URL keeps only the
  * filters that are set. The page itself filters on the server.
@@ -59,11 +60,14 @@ function FilterSelect({
 export function MarketplaceFilters({
   values,
   topics,
+  formats,
   className,
 }: {
   values: MarketplaceFilterValues
   /** Schools that have at least one marketplace course, with how many. */
   topics: ReadonlyArray<{ slug: string; label: string; count: number }>
+  /** Formats that have at least one listing, with how many. */
+  formats: ReadonlyArray<{ value: CourseFormat; label: string; count: number }>
   className?: string
 }) {
   const router = useRouter()
@@ -111,7 +115,7 @@ export function MarketplaceFilters({
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
         <FilterSelect
           name="school"
           label="Topic"
@@ -120,6 +124,16 @@ export function MarketplaceFilters({
           options={[
             { value: "", label: "All topics" },
             ...topics.map((t) => ({ value: t.slug, label: `${t.label} (${t.count})` })),
+          ]}
+        />
+        <FilterSelect
+          name="format"
+          label="Format"
+          value={values.format}
+          onChange={(format) => go({ format: format as MarketplaceFilterValues["format"] })}
+          options={[
+            { value: "", label: "All formats" },
+            ...formats.map((f) => ({ value: f.value, label: `${f.label} (${f.count})` })),
           ]}
         />
         <FilterSelect

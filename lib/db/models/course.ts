@@ -1,5 +1,7 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose"
 import type { SchoolSlug } from "@/lib/schools"
+import { COURSE_FORMATS, type CourseFormat } from "@/lib/course-format"
+import { REVIEW_CHECK_STATUSES, type ReviewCheckKey, type ReviewCheckStatus } from "@/lib/review-checks"
 
 export type CourseLevel = "beginner" | "intermediate" | "advanced"
 export type CoursePricing = "free" | "paid"
@@ -45,6 +47,15 @@ export interface IPackageEntitlements {
   recordings: boolean
 }
 
+/** Templates and guides: the one file buyers download. A key into the private bucket, never a URL. */
+export interface ICourseProductFile {
+  key: string
+  filename: string
+  mimeType: string
+  sizeBytes: number
+  uploadedAt: Date
+}
+
 /**
  * One purchasable tier of a course. Prices are whole USD like Course.price.
  * An empty `packages` array means the course sells at its single `price`
@@ -68,6 +79,25 @@ export interface ICoursePackage {
   ctaLabel: string | null
   enabled: boolean
   entitlements: IPackageEntitlements
+}
+
+/** One recorded quality check: who, when, the note, and the content fingerprint it was recorded on. */
+export interface IReviewCheck {
+  status: ReviewCheckStatus | null
+  by: Types.ObjectId | null
+  at: Date | null
+  note: string | null
+  contentHash: string | null
+}
+
+function reviewCheckPaths() {
+  return {
+    status: { type: String, enum: [null, ...REVIEW_CHECK_STATUSES], default: null },
+    by: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    at: { type: Date, default: null },
+    note: { type: String, default: null, maxlength: 2000 },
+    contentHash: { type: String, default: null },
+  }
 }
 
 export interface ICourse extends Document {
@@ -134,9 +164,15 @@ export interface ICourse extends Document {
     reviewedAt: Date | null
     reviewedBy: Types.ObjectId | null
     note: string | null
+    /** The four recorded quality checks (lib/review-checks.ts); missing on legacy rows. */
+    checks?: Partial<Record<ReviewCheckKey, IReviewCheck>>
   }
   /** The class community for this course (WhatsApp, Telegram, Discord, Social…); null = none. */
   communityUrl: string | null
+  /** Marketplace only (lib/course-format.ts): null on programs and New Economy; null on a marketplace course reads "course". Read through courseFormatOf. */
+  format: CourseFormat | null
+  /** Templates and guides: their one file, in the PRIVATE resources bucket. A key, never a URL. */
+  productFile: ICourseProductFile | null
   createdAt: Date
   updatedAt: Date
 }
@@ -290,8 +326,28 @@ const CourseSchema = new Schema<ICourse>(
       reviewedAt: { type: Date, default: null },
       reviewedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
       note: { type: String, default: null, maxlength: 2000 },
+      checks: {
+        content: reviewCheckPaths(),
+        quality: reviewCheckPaths(),
+        accuracy: reviewCheckPaths(),
+        technical: reviewCheckPaths(),
+      },
     },
     communityUrl: { type: String, default: null, trim: true, maxlength: 500 },
+    format: { type: String, enum: [null, ...COURSE_FORMATS], default: null },
+    productFile: {
+      type: new Schema<ICourseProductFile>(
+        {
+          key: { type: String, required: true, maxlength: 300 },
+          filename: { type: String, required: true, trim: true, maxlength: 200 },
+          mimeType: { type: String, required: true, maxlength: 200 },
+          sizeBytes: { type: Number, required: true, min: 1 },
+          uploadedAt: { type: Date, required: true },
+        },
+        { _id: false }
+      ),
+      default: null,
+    },
     publishedAt: {
       type: Date,
       default: null,

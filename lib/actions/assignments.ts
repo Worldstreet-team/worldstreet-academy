@@ -216,7 +216,7 @@ export async function saveAssignment(input: {
 async function announceAssignment(courseId: string, assignmentId: string, title: string, dueAt: Date | null) {
   try {
     const [course, enrollments] = await Promise.all([
-      Course.findById(courseId).select("title packages status").lean(),
+      Course.findById(courseId).select("title packages format status").lean(),
       Enrollment.find({ course: courseId, status: "active" }).select("user packageKey").lean(),
     ])
     if (!course || course.status !== "published") return

@@ -154,6 +154,23 @@ export function generateSubmissionKey(assignmentId: string, userId: string, orig
 }
 
 /**
+ * The folder one uploader's template and guide files live in. PRIVATE bucket
+ * only: a save accepts only keys inside the saving user's folder. The prefix is
+ * the uploader's, not the course's, so a file can be uploaded before the
+ * course's first save.
+ */
+export function productKeyPrefix(userId: string): string {
+  return `worldstreet-academy/products/${userId}/`
+}
+
+/** Key for one product file: inside the uploader's folder, unguessable, extension kept. PRIVATE bucket only. */
+export function generateProductKey(userId: string, originalFilename: string): string {
+  const randomId = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10)
+  const extension = originalFilename.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "bin"
+  return `${productKeyPrefix(userId)}${Date.now()}-${randomId}.${extension}`
+}
+
+/**
  * The folder one learner's ESPEE payment proofs live in — submitEspeePayment
  * only accepts keys inside it. Private bucket only, like submissions: callers
  * refuse outright while hasPrivateResourceBucket() is false.

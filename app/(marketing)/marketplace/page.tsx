@@ -14,6 +14,7 @@ import {
   sharePercent,
   type MarketplaceFilterValues,
 } from "@/lib/marketplace"
+import { COURSE_FORMATS, FORMAT_LABEL, formatCount, isCourseFormat } from "@/lib/course-format"
 import { MarketingCourseCard } from "@/components/marketing/course-card"
 import { MarketplaceFilters } from "@/components/marketplace/marketplace-filters"
 
@@ -32,12 +33,14 @@ const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v
 
 function readFilters(params: Record<string, string | string[] | undefined>): MarketplaceFilterValues {
   const school = first(params.school)
+  const format = first(params.format)
   const price = first(params.price)
   const level = first(params.level)
   const sort = first(params.sort)
   return {
     q: (first(params.q) ?? "").trim().replace(/\s+/g, " ").slice(0, 80),
     school: schoolSlugOf(school) ?? "",
+    format: isCourseFormat(format) ? format : "",
     price: price === "free" || price === "paid" ? price : "",
     level: level === "beginner" || level === "intermediate" || level === "advanced" ? level : "",
     sort: isMarketplaceSort(sort) ? sort : "popular",
@@ -97,6 +100,7 @@ export default async function MarketplacePage({ searchParams }: Search) {
   const filtered = catalogue.filter(
     (c) =>
       (!filters.school || c.school === filters.school) &&
+      (!filters.format || c.format === filters.format) &&
       (!filters.price || (filters.price === "free" ? isFree(c) : !isFree(c))) &&
       (!filters.level || c.level === filters.level) &&
       (words.length === 0 || matches(c, words))
@@ -110,7 +114,13 @@ export default async function MarketplacePage({ searchParams }: Search) {
     label: s.short,
     count: counts[s.slug],
   }))
-  const filtering = Boolean(filters.q || filters.school || filters.price || filters.level)
+  // Formats with a listing on the shelf — plus the one in the URL, so the select can show it.
+  const formats = COURSE_FORMATS.map((value) => ({
+    value,
+    label: FORMAT_LABEL[value],
+    count: catalogue.filter((c) => c.format === value).length,
+  })).filter((f) => f.count > 0 || f.value === filters.format)
+  const filtering = Boolean(filters.q || filters.school || filters.format || filters.price || filters.level)
 
   return (
     <div className="mx-auto max-w-7xl px-6 pb-24 pt-10 md:pb-32 md:pt-16">
@@ -138,13 +148,17 @@ export default async function MarketplacePage({ searchParams }: Search) {
       </header>
 
       {catalogue.length > 0 && (
-        <MarketplaceFilters key={marketplaceHref(filters)} values={filters} topics={topics} className="mt-10" />
+        <MarketplaceFilters key={marketplaceHref(filters)} values={filters} topics={topics} formats={formats} className="mt-10" />
       )}
 
       {catalogue.length > 0 && (
         <p className="mt-6 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[13px]">
           <span className="tabular-nums text-ws-muted">
-            {courses.length === 1 ? "1 course" : `${courses.length} courses`}
+            {filters.format
+              ? formatCount(courses.length, filters.format)
+              : courses.length === 1
+                ? "1 course"
+                : `${courses.length} courses`}
             {filters.q && (
               <>
                 {" "}

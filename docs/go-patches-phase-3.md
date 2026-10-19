@@ -182,6 +182,19 @@ The Academy now has two halves: **school programs** (live cohorts, three plans) 
 - **`sellerapplications`** — web-only; Go may ignore it. `{ user, status: "submitted" | "approved" | "rejected", fullName, school, topic, experience, sampleUrl, pitch, agreedAt, reviewedBy, reviewedAt, reason }`, one `submitted` row per user (partial unique index). Approval mirrors into `users.sellerStatus`.
 - Any wholesale course write must carry `kind`, `review` and `communityUrl`, and any wholesale user write `sellerStatus` (write dotted paths or keep the fields).
 
+**Phase 20 — formats, templates and guides, staged review (2026-10-19).** All additive; Go needs no patch to keep working.
+- **`courses.format`**: `"course" | "masterclass" | "workshop" | "template" | "guide"` or `null`, marketplace only. `null` or missing on a marketplace course means `"course"`. Programs and New Economy courses always have `null`.
+- **`courses.productFile`**: `{ key, filename, mimeType, sizeBytes, uploadedAt }` or `null`. Templates and guides only; the key is in the private resources bucket under `worldstreet-academy/products/<uploader user id>/`.
+- **`courses.review.checks`**: `{ content, quality, accuracy, technical }`, each `{ status: "passed" | "changes" | "n/a" | null, by, at, note, contentHash }`. Only `accuracy` may be `"n/a"`.
+- **The rules:**
+  - Templates and guides are marketplace kinds, so they stay out of every program list (the `$nin` filter above).
+  - **Go must never return `productFile.key`, a public URL or a signed URL for the file.** The web mints 5-minute signed downloads after checking an access-granting enrollment.
+  - **A template or guide enrollment grants NO services.** Go must not apply its null-`packageKey` = full access rule to courses whose `format` is `template` or `guide`, or mobile buyers would get live classes, Q&A and a certificate.
+  - A template or guide has no lessons. Its enrollment stays `active`, never completes and earns no certificate. Mobile should show it as "Download on the web", or leave it out of the learner's course list.
+  - It is bought exactly like a marketplace course. If Go ever sells it, the rules above apply.
+  - Approval now needs four recorded checks on the current content. Go must never set `review.status: "approved"` or publish a course whose owner is a `USER`.
+  - Wholesale course writes must keep `format`, `productFile` and `review.checks`.
+
 ## 10. Live teaching: go-live notices and class recordings (owner, 2026-10-03 / 2026-10-05)
 
 Go needs no patch. All additive:

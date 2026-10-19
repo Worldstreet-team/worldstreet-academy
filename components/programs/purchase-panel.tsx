@@ -1,10 +1,11 @@
-import { AwardIcon, CircleCheckIcon, ClipboardCheckIcon, HandshakeIcon, ListVideoIcon, MessagesSquareIcon, MonitorPlayIcon, PlayIcon, RadioIcon, SquarePlayIcon, VideoReplayIcon, type IconComponent } from "@/components/icons"
+import { AwardIcon, CircleCheckIcon, DownloadIcon, FileIcon, ClipboardCheckIcon, HandshakeIcon, ListVideoIcon, MessagesSquareIcon, MonitorPlayIcon, PlayIcon, RadioIcon, SquarePlayIcon, VideoReplayIcon, type IconComponent } from "@/components/icons"
 import Link from "next/link"
 import Image from "next/image"
 
 import type { ProgramDetail } from "@/lib/actions/student"
 import type { IPackageEntitlements, PackageKey } from "@/lib/db/models"
 import { PACKAGE_LABEL } from "@/lib/entitlements"
+import { FORMAT_LABEL, fileSizeLabel, isFileFormat } from "@/lib/course-format"
 import { SCHOOL_BY_SLUG } from "@/lib/schools"
 import { packagePriceLabel } from "@/lib/program-price"
 import { cn } from "@/lib/utils"
@@ -67,8 +68,14 @@ export function programIncludes(program: ProgramDetail, facts: ProgramFacts): In
   }
 
   if (program.tierCount === 0) {
-    items.push({ icon: MessagesSquareIcon, label: "Instructor Q&A", tier: null })
-    items.push({ icon: AwardIcon, label: "Certificate of completion", tier: null })
+    if (program.productFile) {
+      const { typeLabel, sizeBytes } = program.productFile
+      items.push({ icon: DownloadIcon, label: "Instant download after purchase", tier: null })
+      items.push({ icon: FileIcon, label: `${typeLabel} · ${fileSizeLabel(sizeBytes)}`, tier: null })
+    }
+    const own = program.packages[0]?.entitlements
+    if (own?.instructorQa) items.push({ icon: MessagesSquareIcon, label: "Instructor Q&A", tier: null })
+    if (own?.certificate) items.push({ icon: AwardIcon, label: "Certificate of completion", tier: null })
     return items
   }
 
@@ -116,6 +123,7 @@ export function PurchasePanel({
   variant: "card" | "inline"
 }) {
   const card = variant === "card"
+  const fileFormat = isFileFormat(program.format) ? FORMAT_LABEL[program.format].toLowerCase() : null
 
   return (
     <div
@@ -139,9 +147,11 @@ export function PurchasePanel({
               </span>
               <div className="min-w-0">
                 <p className="font-display text-[19px] font-semibold tracking-[-0.01em] text-ws-primary">
-                  You&apos;re enrolled
+                  {fileFormat ? `You own this ${fileFormat}` : "You're enrolled"}
                 </p>
-                <p className="mt-0.5 text-[13.5px] text-ws-muted">Pick up where you left off.</p>
+                <p className="mt-0.5 text-[13.5px] text-ws-muted">
+                  {fileFormat ? "Download it from your dashboard any time." : "Pick up where you left off."}
+                </p>
               </div>
             </div>
           ) : scheduling ? (
@@ -173,7 +183,7 @@ export function PurchasePanel({
                 href={access.continueHref}
                 className="flex h-12 w-full items-center justify-center rounded-full bg-ws-brand px-5 text-[15px] font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40 focus-visible:ring-offset-2 focus-visible:ring-offset-ws-surface active:translate-y-px"
               >
-                Continue learning
+                {fileFormat ? `Go to your ${fileFormat}` : "Continue learning"}
               </Link>
             </div>
           ) : scheduling ? (

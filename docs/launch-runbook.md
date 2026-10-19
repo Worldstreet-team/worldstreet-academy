@@ -421,3 +421,19 @@ Expect `acknowledged: true`, and note `modifiedCount` in your run log. **Those s
 2. **After deploying: check the index.** Run `mongosh "$PROD_URI" --quiet --eval 'db.users.getIndexes().map(i => i.name)'`. The output must include `facultyCredential_unique`.
 3. **What existing faculty will see.** They see three new checklist items on `/instructor`. Each member receives a `WMAF-` credential once everything apart from "Create your first course" is done, with KYC verified.
 4. **`FACULTY_PUBLIC` stays `false` (D31).** The public "WMA Faculty · since …" line appears when you switch it on.
+
+## 12. Phase 20 — Marketplace formats and staged review
+
+- **No migration.** Courses already in the review queue keep their place, and an admin records their four checks on `/admin/courses/<id>/review`.
+- **The private bucket.** It needs `R2_RESOURCES_BUCKET_NAME` and its CORS `PUT` rule from §3. Templates and guides upload straight to it from the browser. Without it, their uploads and downloads refuse, and lesson courses are unaffected.
+- **Order.** Ship the Go release carrying the §9 note (`docs/go-patches-phase-3.md`) first, or accept in writing that mobile shows templates as courses with no lessons.
+- **Staging check, from the academy origin** (`https://academy.worldstreetgold.com`, as in B7; an upload from any other origin doesn't prove the bucket's CORS):
+  1. A Marketplace Creator uploads a PDF template and submits it.
+  2. An admin downloads it on the review page, records the four checks and approves it.
+  3. A buyer buys it and downloads it.
+  4. A second account without the purchase is sent to the program page.
+  5. Within 5 minutes, the download URL works. After that, it returns `403`.
+  6. R2 honours the signed upload size: within 15 minutes of an upload, copy its presigned PUT URL from the network tab and PUT a file of a different size to it (`curl -s -o /dev/null -w "%{http_code}\n" -X PUT -H "Content-Type: <the same type>" --data-binary @<other file> "<url>"`). Expect `403`; a `200` means R2 doesn't enforce the signed length, so record it (the 100 MB cap is then only the browser's declaration).
+
+  Delete the test listing afterwards. Uploaded files that are replaced or abandoned are never deleted: they stay in the private bucket under `worldstreet-academy/products/<user id>/`, because a buyer may be mid-download.
+- **Owner sign-off:** the format blurbs (`lib/course-format.ts`) and the check descriptions (`lib/review-checks.ts`).

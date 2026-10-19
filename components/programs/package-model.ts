@@ -33,9 +33,9 @@ export function servicesOf(pkg: PublicPackage, tierCount: number): Record<Servic
   if (tierCount === 0) {
     return {
       liveClasses: false,
-      instructorQa: true,
+      instructorQa: pkg.entitlements.instructorQa,
       assignments: false,
-      certificate: true,
+      certificate: pkg.entitlements.certificate,
       mentorship: false,
       prioritySupport: false,
       recordings: false,

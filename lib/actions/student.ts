@@ -33,6 +33,7 @@ import { FACULTY_ROLES, isFacultyRole, safeWebUrl } from "@/lib/faculty"
 import { facultySinceLabel } from "@/lib/faculty-credential"
 import { cohortsForEnrollments } from "@/lib/cohort-calendar"
 import { PROGRAM_KIND_FILTER, courseKindOf } from "@/lib/course-kind"
+import { FORMAT_LABEL, courseFormatOf, isFileFormat, productTypeLabel, type CourseFormat } from "@/lib/course-format"
 
 // ============================================================================
 // TYPES
@@ -70,6 +71,8 @@ export type BrowseCourse = {
   outcomes: string[]
   /** School program, marketplace course or New Economy course (`courseKindOf`). */
   kind: CourseKind
+  /** Marketplace items only, via courseFormatOf: never null on a marketplace item, always null otherwise. */
+  format: CourseFormat | null
   /**
    * Who a marketplace course credits: the seller's name when an approved
    * seller (not faculty) sells it. null credits the Academy's faculty —
@@ -142,6 +145,8 @@ export type StudentEnrollment = {
   resumeLesson: ResumeLesson | null
   /** The package's open lessons in course order, true where completed — the hero's per-lesson track. */
   lessonTrack: boolean[]
+  /** The marketplace format; null for programs and New Economy courses. A template or guide is a file product. */
+  format: CourseFormat | null
   /** The class community link (`Course.communityUrl`) — only on an access-granting enrollment; it's a private group. */
   communityUrl: string | null
   /** The program's school (`Course.school`); null when unassigned. */
@@ -288,6 +293,7 @@ export async function fetchBrowseCourses(options?: {
         rating: course.rating?.average || null,
         outcomes: (course.whatYouWillLearn ?? []).slice(0, 3),
         kind: courseKind,
+        format: courseFormatOf({ kind: courseKind, format: course.format }),
         sellerName: sellerNameOf(courseKind, instructor),
         publishedAt: course.publishedAt ? course.publishedAt.toISOString() : null,
       }
@@ -527,6 +533,8 @@ export type ProgramDetail = BrowseCourse & {
    * course's own price, so every program renders the same components.
    */
   packages: PublicPackage[]
+  /** A file product's public metadata (type and size); never the key or filename. */
+  productFile: { typeLabel: string; sizeBytes: number } | null
 }
 
 const NO_ENTITLEMENTS: IPackageEntitlements = {
@@ -561,6 +569,8 @@ async function findProgram(filter: { slug: string } | { _id: string }): Promise<
   // Guard against missing instructor (deleted user, etc.)
   if (!instructor) return null
 
+  const format = courseFormatOf({ kind: courseKindOf(course), format: course.format })
+  const fileFormat = isFileFormat(format) ? format : null
   const whatYouWillLearn = course.whatYouWillLearn ?? []
   const enabled = (course.packages ?? [])
     .filter((p) => p.enabled)
@@ -583,15 +593,15 @@ async function findProgram(filter: { slug: string } | { _id: string }): Promise<
       : [
           {
             key: "standard",
-            name: courseKindOf(course) === "program" ? "Full program" : "Full course",
+            name: fileFormat ? FORMAT_LABEL[fileFormat] : courseKindOf(course) === "program" ? "Full program" : "Full course",
             tagline: "",
             price: course.pricing === "free" ? 0 : course.price ?? 0,
             listPrice: null,
             duration: null,
             features: whatYouWillLearn,
             highlight: false,
-            ctaLabel: null,
-            entitlements: FULL_ACCESS,
+            ctaLabel: fileFormat ? (course.pricing === "free" || !course.price ? "Get it free" : "Buy now") : null,
+            entitlements: fileFormat ? NO_ENTITLEMENTS : FULL_ACCESS,
           },
         ]
 
@@ -620,6 +630,7 @@ async function findProgram(filter: { slug: string } | { _id: string }): Promise<
     rating: course.rating?.average || null,
     outcomes: whatYouWillLearn.slice(0, 3),
     kind: courseKindOf(course),
+    format,
     sellerName: sellerNameOf(courseKindOf(course), instructor),
     publishedAt: course.publishedAt ? course.publishedAt.toISOString() : null,
     ratingCount: course.rating?.count || 0,
@@ -632,6 +643,10 @@ async function findProgram(filter: { slug: string } | { _id: string }): Promise<
     // The course is published, so an INSTRUCTOR/ADMIN teaching it is faculty.
     instructorUsername: isFacultyRole(instructor.role) ? instructor.username : null,
     packages,
+    productFile:
+      fileFormat && course.productFile
+        ? { typeLabel: productTypeLabel(course.productFile.mimeType), sizeBytes: course.productFile.sizeBytes }
+        : null,
   }
 }
 
@@ -784,7 +799,7 @@ export async function fetchCourseForLearning(courseId: string): Promise<LearnCou
       rating: course.rating?.average || null,
       slug: course.slug,
       packageKey: enrollment?.packageKey ?? null,
-      entitlements: entitlementsFor({ packages }, enrollment),
+      entitlements: entitlementsFor({ packages, format: course.format }, enrollment),
       hasAccess,
       lessons: lessons.map((l) => {
         // Staff have no enrollment → nothing locks for them.
@@ -865,6 +880,7 @@ export async function fetchOtherCourses(excludeCourseId: string): Promise<Browse
         rating: course.rating?.average || null,
         outcomes: (course.whatYouWillLearn ?? []).slice(0, 3),
         kind: courseKind,
+        format: courseFormatOf({ kind: courseKind, format: course.format }),
         sellerName: sellerNameOf(courseKind, instructor),
         publishedAt: course.publishedAt ? course.publishedAt.toISOString() : null,
       }
@@ -890,7 +906,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
     const enrollments = await Enrollment.find({ user: user._id })
       .populate({
         path: "course",
-        select: "slug title thumbnailUrl instructor totalLessons availableAt status packages examRequired school communityUrl kind",
+        select: "slug title thumbnailUrl kind format instructor totalLessons availableAt status packages examRequired school communityUrl",
         populate: {
           path: "instructor",
           select: "firstName lastName avatarUrl instructorProfile.headline",
@@ -904,13 +920,14 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
       slug: string
       title: string
       thumbnailUrl: string
+      kind?: CourseKind | null
+      format?: CourseFormat | null
       school?: string | null
       totalLessons?: number
       availableAt?: Date | null
       packages?: ICoursePackage[] | null
       examRequired?: boolean
       communityUrl?: string | null
-      kind?: CourseKind | null
       instructor: {
         _id: { toString(): string }
         firstName: string
@@ -976,6 +993,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
         slug: course.slug,
         instructor: course.instructor._id,
         packages,
+        format: course.format,
       })
       const openIds = access
         ? openPublishedLessonIdsFromRows(access, courseLessons)
@@ -984,7 +1002,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
       // rewritten on a completion, so it can't be scaled back into a count.
       const completedIds = new Set((enrollment.completedLessons ?? []).map((id) => id.toString()))
       const completedOpenLessons = [...openIds].filter((id) => completedIds.has(id)).length
-      const entitlements = entitlementsFor({ packages }, { packageKey })
+      const entitlements = entitlementsFor({ packages, format: course.format }, { packageKey })
       // The hero's lesson and track: the open lessons in course order, and the resume lesson's place among them.
       const openInOrder = courseLessons.filter((l) => openIds.has(l._id.toString()))
       const resumeRow = courseLessons.find((l) => l._id.toString() === resumeLessonId)
@@ -1001,6 +1019,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
         courseId,
         courseTitle: course.title,
         courseThumbnail: programArt(course),
+        format: courseFormatOf({ kind: courseKindOf(course), format: course.format }),
         instructorName: `${course.instructor.firstName} ${course.instructor.lastName}`,
         instructorAvatarUrl: course.instructor.avatarUrl,
         progress: enrollment.progress,

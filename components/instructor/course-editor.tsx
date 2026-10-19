@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/collapsible"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { SectionDivider } from "@/components/instructor/section-divider"
+import { CHECK_STATUS_LABEL, REVIEW_CHECK_DETAILS, type ReviewCheckKey, type ReviewCheckStatus } from "@/lib/review-checks"
 import { cn } from "@/lib/utils"
 import { EmptyState } from "@/components/shared/empty-state"
 import { ArtCourses } from "@/components/shared/illustrations"
@@ -45,6 +46,15 @@ import { RenderIcon } from "@/components/shared/render-icon"
 import { SCHOOLS, type SchoolSlug } from "@/lib/schools"
 import type { CourseKind, CourseReviewStatus, ICoursePackage, PackageKey } from "@/lib/db/models"
 import { COURSE_KIND_LABEL } from "@/lib/course-kind"
+import {
+  COURSE_FORMATS,
+  FORMAT_BLURB,
+  FORMAT_LABEL,
+  isFileFormat,
+  type CourseFormat,
+  type ProductFileValue,
+} from "@/lib/course-format"
+import { ProductFileField } from "@/components/instructor/product-file-field"
 import { PACKAGE_KEYS, PACKAGE_LABEL } from "@/lib/entitlements"
 import { isoToLocalInput, localInputToIso } from "@/lib/datetime-local"
 import {
@@ -74,8 +84,21 @@ type EditableCourse = {
   /** Missing = a school program (legacy rows). */
   kind?: CourseKind
   communityUrl?: string | null
+  /** Marketplace only; null reads "course". */
+  format?: CourseFormat | null
+  /** Templates and guides: the one downloadable file. */
+  productFile?: ProductFileValue | null
+  /** Published: the course can't switch between lessons and a file. */
+  formatLocked?: boolean
   /** The marketplace quality review (sellers' courses). */
-  review?: { status: CourseReviewStatus; submittedAt: string | null; reviewedAt: string | null; note: string | null }
+  review?: {
+    status: CourseReviewStatus
+    submittedAt: string | null
+    reviewedAt: string | null
+    note: string | null
+    /** The four recorded quality checks, in pipeline order. */
+    checks?: { key: ReviewCheckKey; status: ReviewCheckStatus | null; note: string | null }[]
+  }
   /** The seller's own link to this live marketplace course. */
   share?: { url: string; note: string } | null
 }
@@ -119,6 +142,22 @@ function ShareLink({ url, note }: { url: string; note: string }) {
 }
 
 /** Where a seller's marketplace course stands in review, and what the reviewer said. */
+/** The four quality checks and where each stands (shown once a course is in or back from review). */
+function ReviewChecks({ checks }: { checks: NonNullable<NonNullable<EditableCourse["review"]>["checks"]> }) {
+  return (
+    <div className="space-y-1 pt-1">
+      <p className="text-[11px] font-semibold text-foreground">Quality control</p>
+      <ul className="space-y-0.5 text-[11px] text-muted-foreground">
+        {checks.map((c) => (
+          <li key={c.key}>
+            {REVIEW_CHECK_DETAILS[c.key].title} · {CHECK_STATUS_LABEL[c.status ?? "none"]}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 function ReviewState({
   review,
   status,
@@ -130,11 +169,14 @@ function ReviewState({
 }) {
   if (review.status === "pending") {
     return (
-      <p className="rounded-md border p-3 text-[11px] text-muted-foreground">
-        <span className="font-semibold text-foreground">In review</span>
-        {review.submittedAt ? ` since ${formatDay(review.submittedAt)}` : ""}. An admin checks it against the quality
-        standards — {seller ? "we'll email you the decision." : "approve or request changes from Courses → Review queue."}
-      </p>
+      <div className="rounded-md border p-3 text-[11px] text-muted-foreground">
+        <p>
+          <span className="font-semibold text-foreground">In review</span>
+          {review.submittedAt ? ` since ${formatDay(review.submittedAt)}` : ""}. An admin checks it against the quality
+          standards — {seller ? "we'll email you the decision." : "approve or request changes from Courses → Review queue."}
+        </p>
+        {review.checks && <ReviewChecks checks={review.checks} />}
+      </div>
     )
   }
   if (review.status === "changes_requested") {
@@ -143,6 +185,7 @@ function ReviewState({
         <p className="font-semibold text-foreground">Changes requested</p>
         {review.note && <p className="whitespace-pre-line text-muted-foreground">{review.note}</p>}
         {seller && <p className="text-muted-foreground">Make the changes, then choose Save &amp; submit for review.</p>}
+        {review.checks && <ReviewChecks checks={review.checks} />}
       </div>
     )
   }
@@ -278,6 +321,13 @@ export function CourseEditor({
   )
   const [kind, setKind] = useState<CourseKind>(course?.kind ?? (sellerMode ? "marketplace" : "program"))
   const [communityUrl, setCommunityUrl] = useState(course?.communityUrl ?? "")
+  const [format, setFormat] = useState<CourseFormat>(course?.format ?? "course")
+  const [productFile, setProductFile] = useState<ProductFileValue | null>(course?.productFile ?? null)
+  const fileFormat = kind === "marketplace" && isFileFormat(format)
+  // A published course keeps its family: lessons stay lessons, a file stays a file.
+  const formatItems = COURSE_FORMATS.filter(
+    (value) => !course?.formatLocked || isFileFormat(value) === isFileFormat(course.format ?? "course")
+  ).map((value) => ({ value, label: FORMAT_LABEL[value] }))
   const [submitForReview, setSubmitForReview] = useState(false)
   const review = course?.review ?? { status: "none" as const, submittedAt: null, reviewedAt: null, note: null }
   // Marketplace and New Economy courses sell at one price (owner, 2026-10-05):
@@ -412,11 +462,13 @@ export function CourseEditor({
             <input type="hidden" name="returnTo" value={returnTo} />
             <input type="hidden" name="kind" value={kind} />
             <input type="hidden" name="communityUrl" value={communityUrl} />
+            <input type="hidden" name="format" value={kind === "marketplace" ? format : ""} />
+            <input type="hidden" name="productFile" value={JSON.stringify(fileFormat ? productFile : null)} />
             <input type="hidden" name="submitForReview" value={submitForReview ? "true" : "false"} />
             <input
               type="hidden"
               name="lessons"
-              value={JSON.stringify(lessons)}
+              value={JSON.stringify(fileFormat ? [] : lessons)}
             />
 
             <DropdownMenu>
@@ -564,6 +616,32 @@ export function CourseEditor({
                   : kind === "marketplace"
                     ? "A pre-recorded course on the marketplace, at one price. Faculty courses publish directly."
                     : "A free course on how to use a WorldStreet product, listed on New Economy."}
+              </p>
+            </div>
+          )}
+
+          {kind === "marketplace" && (
+            <div className="space-y-1.5">
+              <Label>Format</Label>
+              <Select items={formatItems} value={format} onValueChange={(v) => setFormat((v ?? "course") as CourseFormat)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {formatItems.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[10px] text-muted-foreground">
+                {FORMAT_BLURB[format]}
+                {course?.formatLocked
+                  ? isFileFormat(format)
+                    ? " Published: it stays a downloadable file."
+                    : " Published: it stays lesson-based."
+                  : ""}
               </p>
             </div>
           )}
@@ -865,6 +943,19 @@ export function CourseEditor({
 
         {/* ───────── CENTER: Curriculum ───────── */}
         <div className="overflow-auto border-r p-5 space-y-3">
+          {fileFormat ? (
+            <>
+              <SectionDivider label="Product file" />
+              {lessons.length > 0 && (
+                <p className="text-xs text-ws-warning">
+                  Saving removes this draft&apos;s {lessons.length === 1 ? "1 lesson" : `${lessons.length} lessons`}. A{" "}
+                  {FORMAT_LABEL[format].toLowerCase()} is one file, with no lessons.
+                </p>
+              )}
+              <ProductFileField value={productFile} onChange={setProductFile} format={format as "template" | "guide"} />
+            </>
+          ) : (
+            <>
           <SectionDivider label="Curriculum" />
 
           {lessons.length === 0 ? (
@@ -1195,6 +1286,8 @@ export function CourseEditor({
                 </span>
               </div>
             </div>
+          )}
+            </>
           )}
         </div>
 

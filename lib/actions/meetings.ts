@@ -2207,7 +2207,7 @@ export async function getUpcomingClasses(): Promise<UpcomingClass[]> {
     if (enrollments.length === 0) return []
 
     const courses = await Course.find({ _id: { $in: enrollments.map((e) => e.course) } })
-      .select("title packages")
+      .select("title packages format")
       .lean()
     const coursesById = new Map(courses.map((c) => [c._id.toString(), c]))
     const classCourseIds = enrollments
@@ -2294,7 +2294,7 @@ export async function getMyMeetingInvites(): Promise<{
     // A course's classes show only for enrollments whose package includes live classes.
     const enrolledCourses =
       enrollments.length > 0
-        ? await Course.find({ _id: { $in: enrollments.map((e) => e.course) } }).select("packages").lean()
+        ? await Course.find({ _id: { $in: enrollments.map((e) => e.course) } }).select("packages format").lean()
         : []
     const coursesById = new Map(enrolledCourses.map((c) => [c._id.toString(), c]))
     const enrolledCourseIds = enrollments

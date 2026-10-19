@@ -1,5 +1,6 @@
 "use server"
 
+import type { CourseFormat } from "@/lib/course-format"
 import { headers } from "next/headers"
 import connectDB from "@/lib/db"
 import { Enrollment, Course, User, type ICoursePackage } from "@/lib/db/models"
@@ -153,7 +154,7 @@ export async function fetchMyCertificates(): Promise<StudentCertificate[]> {
     })
       .populate({
         path: "course",
-        select: "title thumbnailUrl instructor packages",
+        select: "title thumbnailUrl instructor packages format",
         populate: {
           path: "instructor",
           select: "firstName lastName avatarUrl",
@@ -165,7 +166,7 @@ export async function fetchMyCertificates(): Promise<StudentCertificate[]> {
     const kept = enrollments.filter(
       (e) =>
         e.course &&
-        entitlementsFor(e.course as unknown as { packages?: ICoursePackage[] | null }, e).certificate
+        entitlementsFor(e.course as unknown as { packages?: ICoursePackage[] | null; format: CourseFormat | null }, e).certificate
     )
     // A learner holds few certificates; no batching.
     const standings = await Promise.all(kept.map((e) => ensureCertificateTier(e._id)))
@@ -290,7 +291,7 @@ export async function verifyCertificate(
 
     const [course, student] = await Promise.all([
       Course.findById(enrollment.course)
-        .select("title school packages instructor")
+        .select("title school packages format instructor")
         .populate("instructor", "firstName lastName")
         .lean(),
       User.findById(enrollment.user).select("firstName lastName").lean(),
@@ -336,7 +337,7 @@ export async function fetchInstructorCertificateStats(): Promise<InstructorCerti
     const courses = await Course.find({
       instructor: currentUser.id,
     })
-      .select("title thumbnailUrl rating packages")
+      .select("title thumbnailUrl rating packages format")
       .lean()
 
     if (courses.length === 0) return []

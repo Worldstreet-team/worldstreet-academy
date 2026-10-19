@@ -74,7 +74,7 @@ async function listableCourseIds(user: Viewer): Promise<Types.ObjectId[] | null>
     Course.find({ instructor: userId }).select("_id").lean(),
   ])
   const courses = enrollments.length
-    ? await Course.find({ _id: { $in: enrollments.map((e) => e.course) } }).select("packages").lean()
+    ? await Course.find({ _id: { $in: enrollments.map((e) => e.course) } }).select("packages format").lean()
     : []
   const byId = new Map(courses.map((c) => [c._id.toString(), c]))
   const ids = new Map<string, Types.ObjectId>()

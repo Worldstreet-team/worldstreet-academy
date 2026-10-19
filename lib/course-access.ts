@@ -11,6 +11,7 @@ import {
   type PackageKey,
 } from "@/lib/db/models"
 import { canAccessLesson, entitlementsFor } from "@/lib/entitlements"
+import type { CourseFormat } from "@/lib/course-format"
 import { safeWebUrl } from "@/lib/faculty"
 
 /**
@@ -27,7 +28,7 @@ export type CourseAccess = {
   packageKey: PackageKey | null
   packageName: string | null
   entitlements: IPackageEntitlements
-  course: { id: string; slug: string; instructorId: string; packages: ICoursePackage[] }
+  course: { id: string; slug: string; instructorId: string; packages: ICoursePackage[]; format: CourseFormat | null }
 }
 
 /** Enrollment statuses `getCourseAccess` reads as access-granting (its own `$in` filter). */
@@ -45,6 +46,8 @@ type CourseAccessRow = {
   slug: string
   instructor: { toString(): string } | string
   packages?: ICoursePackage[] | null
+  /** A file product (template or guide) grants no services; see entitlementsFor. */
+  format: CourseFormat | null | undefined
 }
 
 /**
@@ -66,12 +69,13 @@ export function courseAccessFromRows(
     enrollmentId: enrollment._id.toString(),
     packageKey,
     packageName: enrollment.packageName ?? null,
-    entitlements: entitlementsFor({ packages }, { packageKey }),
+    entitlements: entitlementsFor({ packages, format: course.format }, { packageKey }),
     course: {
       id: course._id.toString(),
       slug: course.slug,
       instructorId: course.instructor.toString(),
       packages,
+      format: course.format ?? null,
     },
   }
 }
@@ -83,7 +87,7 @@ export async function getCourseAccess(userId: string, courseId: string): Promise
     Enrollment.findOne({ user: userId, course: courseId, status: { $in: ["active", "completed"] } })
       .select("_id status packageKey packageName")
       .lean(),
-    Course.findById(courseId).select("slug instructor packages").lean(),
+    Course.findById(courseId).select("slug instructor packages format").lean(),
   ])
   if (!enrollment || !course) return null
   return courseAccessFromRows(enrollment, course)
@@ -103,7 +107,7 @@ export async function instructorQaRefusal(
   if (user.role !== "USER") return null
   if (!mongoose.isValidObjectId(recipientId)) return null
   await connectDB()
-  const taught = await Course.find({ instructor: recipientId }).select("_id packages").lean()
+  const taught = await Course.find({ instructor: recipientId }).select("_id packages format").lean()
   if (taught.length === 0) return null
   const enrollments = await Enrollment.find({
     user: user.id,
@@ -203,7 +207,7 @@ export async function getLearnStart(userId: string, courseId: string): Promise<L
     Enrollment.findOne({ user: userId, course: courseId, status: { $in: ["active", "completed"] } })
       .select("_id status packageKey packageName lastAccessedLesson")
       .lean(),
-    Course.findById(courseId).select("slug instructor packages").lean(),
+    Course.findById(courseId).select("slug instructor packages format").lean(),
   ])
   if (!enrollment || !course) return null
   const access = courseAccessFromRows(enrollment, course)

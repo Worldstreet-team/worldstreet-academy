@@ -26,6 +26,7 @@ import {
   formatClassWhen,
   formatShortDate,
   grantsAccess,
+  isFileProductEnrollment,
   holdsSeat,
   initials,
   isComingSoon,
@@ -140,6 +141,7 @@ function ProgramRowState({ enrollment: e, now }: { enrollment: StudentEnrollment
     return <StatusChip>Opens {formatShortDate(e.courseAvailableAt, now)}</StatusChip>
   }
   if (!grantsAccess(e)) return null
+  if (isFileProductEnrollment(e)) return <StatusChip>Ready to download</StatusChip>
   const step = learningStep(e)
   if (step === "complete") {
     return (

@@ -6,6 +6,8 @@ import { BRAND } from "@/lib/brand"
 import { SCHOOLS } from "@/lib/schools"
 import { appUrl } from "@/lib/app-url"
 import { EARNINGS_CLEARING_DAYS, MARKETPLACE_SHARE_ACADEMY, MARKETPLACE_SHARE_OWN_LINK } from "@/lib/db/models"
+import { COURSE_FORMATS, FORMAT_BLURB, FORMAT_LABEL } from "@/lib/course-format"
+import { REVIEW_CHECKS, REVIEW_CHECK_DETAILS } from "@/lib/review-checks"
 import { QUALITY_CRITERIA, sharePercent } from "@/lib/marketplace"
 import { SectionLabel, SectionTitle } from "@/components/marketing/section-heading"
 
@@ -20,13 +22,18 @@ const APPLY_HREF = "/dashboard/sell/apply"
 const GOLD_CTA =
   "inline-flex h-12 items-center justify-center gap-2 rounded-full bg-ws-brand px-7 text-[15px] font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90"
 
-/** From application to a live course — what happens, and who does it. */
+/** Institutional blueprint §17's pipeline: the application, the four recorded reviews, approval and publishing. */
 const STEPS = [
-  { title: "Apply", body: "Tell us what you'll teach, show us a sample and agree to the standards. It takes ten minutes." },
-  { title: "Get approved", body: "Our team reads every application. You'll hear back by email and in the app." },
-  { title: "Build your course", body: "Upload your lessons, set your price and write the page in the course editor." },
-  { title: "Submit for review", body: "We check the course against the quality standards — then publish it, or tell you exactly what to change." },
-  { title: "Share your link", body: "Your course goes live on the marketplace. Copy your own link and send it to your audience." },
+  {
+    title: "Application",
+    body: "Apply in ten minutes: what you'll teach, a sample of your work and your agreement to the standards. Once you're approved as a Marketplace Creator, build your listing in the editor and submit it.",
+  },
+  ...REVIEW_CHECKS.map((key) => {
+    const d = REVIEW_CHECK_DETAILS[key]
+    return { title: d.qualifier ? `${d.title} (${d.qualifier})` : d.title, body: d.body }
+  }),
+  { title: "Approval", body: "Once all four reviews pass, an admin approves it. You'll hear by email and in the app." },
+  { title: "Publishing", body: "It goes live on the Academy Marketplace. Share your own link: sales through it pay you the larger share." },
 ] as const
 
 /**
@@ -109,6 +116,22 @@ export default function SellPage() {
           </ul>
         </section>
 
+        {/* Formats */}
+        <section aria-labelledby="formats-heading">
+          <SectionLabel>What you can sell</SectionLabel>
+          <SectionTitle id="formats-heading" className="mt-3 max-w-3xl">
+            Courses, masterclasses, workshops, templates and guides.
+          </SectionTitle>
+          <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {COURSE_FORMATS.map((format) => (
+              <li key={format} className="rounded-[20px] border border-ws-hairline bg-ws-surface p-5 dark:border-transparent">
+                <p className="text-[15px] font-semibold text-ws-primary">{FORMAT_LABEL[format]}</p>
+                <p className="mt-1.5 text-[13.5px] leading-relaxed text-ws-muted">{FORMAT_BLURB[format]}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+
         {/* Quality criteria */}
         <section aria-labelledby="quality-heading">
           <SectionLabel>The standard</SectionLabel>
@@ -136,11 +159,10 @@ export default function SellPage() {
           <div>
             <SectionLabel>How it works</SectionLabel>
             <SectionTitle id="steps-heading" className="mt-3">
-              From application to a live course.
+              From application to publishing.
             </SectionTitle>
             <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-ws-muted md:text-[16px]">
-              Approved sellers get their own space to build and sell marketplace courses. Once a course is approved,
-              your edits stay live — you don&rsquo;t start over.
+              Every submission passes four recorded reviews before it is published. If one asks for changes, you&rsquo;ll see which review and why, and reviews that passed stay passed unless you change the content.
             </p>
           </div>
           <ol className="space-y-3">

@@ -1,8 +1,9 @@
-import { AwardIcon, CalendarClockIcon, ChevronRightIcon, ListVideoIcon, MonitorPlayIcon, ChartNoAxesColumnIncreasingIcon, SquarePlayIcon, UsersIcon } from "@/components/icons"
+import { AwardIcon, CalendarClockIcon, ChevronRightIcon, ListVideoIcon, MonitorPlayIcon, ChartNoAxesColumnIncreasingIcon, SquarePlayIcon, UsersIcon, FileIcon } from "@/components/icons"
 import Link from "next/link"
 
 import type { ProgramDetail } from "@/lib/actions/student"
 import { SCHOOL_BY_SLUG } from "@/lib/schools"
+import { FORMAT_LABEL, fileSizeLabel } from "@/lib/course-format"
 import { ACADEMY_FACULTY, FACULTY_PUBLIC, facultyHref } from "@/lib/faculty"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { AcademyMark } from "@/components/shared/academy-mark"
@@ -58,7 +59,7 @@ export function ProgramHero({
             label: school ? "All schools" : "All programs",
             schoolHref: (slug: string) => `/schools/${slug}`,
           }
-  const badge = program.kind === "marketplace" ? "Marketplace" : program.kind === "new-economy" ? "New Economy · Free" : null
+  const badge = program.kind === "marketplace" ? `Marketplace · ${FORMAT_LABEL[program.format ?? "course"]}` : program.kind === "new-economy" ? "New Economy · Free" : null
   const profileHref = program.instructorUsername
     ? facultyHref(program.instructorUsername)
     : signedIn
@@ -67,6 +68,7 @@ export function ProgramHero({
 
   const meta = [
     { icon: ChartNoAxesColumnIncreasingIcon, label: program.level, capitalize: true },
+    program.productFile ? { icon: FileIcon, label: `${program.productFile.typeLabel} · ${fileSizeLabel(program.productFile.sizeBytes)}` } : null,
     facts.videoSec > 0 ? { icon: MonitorPlayIcon, label: `${formatLength(facts.videoSec)} of video` } : null,
     facts.lessons > 0 ? { icon: ListVideoIcon, label: plural(facts.lessons, "lesson") } : null,
     facts.previews > 0 ? { icon: SquarePlayIcon, label: plural(facts.previews, "free preview") } : null,
