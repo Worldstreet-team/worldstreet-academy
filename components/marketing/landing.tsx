@@ -8,6 +8,7 @@ import { HeroWall } from "@/components/marketing/hero-wall"
 import { CohortBanner } from "@/components/marketing/cohort-banner"
 import { cohortIsUpcoming } from "@/lib/cohort"
 import { HowItWorks } from "@/components/marketing/how-it-works"
+import { WorldsBand } from "@/components/marketing/worlds-band"
 import { WordsMarquee } from "@/components/marketing/words-marquee"
 import { AboutBand } from "@/components/marketing/about-band"
 import { WhyBand } from "@/components/marketing/why-band"
@@ -41,10 +42,10 @@ function futureDrops(published: BrowseCourse[]): BrowseCourse[] {
 
 /**
  * The Academy landing at `/` — clean editorial composition, in order: hero,
- * the live cohort band (hidden once the cohort has begun), "Who we are"
- * (the owner's own framing, 2026-10-03), the band of
+ * the live cohort band (hidden once the cohort has begun), "Our mission"
+ * (blueprint §4, the three gaps), the band of
  * words, the Schools grid, the About statement, the Why pillars, the
- * How-it-works timeline, the catalogue
+ * How-it-works timeline, the three worlds, the catalogue
  * card grid (the one program section with course thumbnails), the
  * "Watch a free lesson" rail (real free previews only; hidden at zero), the
  * marketplace and New Economy teasers (up to four cards each — the
@@ -121,6 +122,9 @@ export async function Landing() {
 
       {/* How it works — the four-step journey (spec §11) */}
       <HowItWorks />
+
+      {/* The three worlds — the Academy, the Marketplace, the Opportunity Hub (blueprint §6) */}
+      <WorldsBand />
 
       {/* Featured programs — the catalogue grid (the ONLY course-art section; hides below 3) */}
       <CatalogueGrid courses={gridCourses} signedIn={signedIn} />

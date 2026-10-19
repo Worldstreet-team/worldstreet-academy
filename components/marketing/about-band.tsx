@@ -9,16 +9,7 @@ import { cn } from "@/lib/utils"
 import { Reveal } from "@/components/marketing/motion/reveal"
 import { useMotionOK } from "@/components/marketing/motion/bus"
 import { SectionLabel } from "@/components/marketing/section-heading"
-import { BRAND } from "@/lib/brand"
-
-/** The blueprint's own arc (§2, last line). A real sequence, so the one
- *  stepped device on the page is earned here; the last stop is the outcome,
- *  and the only word on the rule that takes gold. */
-const ARC = ["Interest", "Knowledge", "Skill", "Opportunity"] as const
-
-/** The purpose statement (§2, verbatim). */
-const STATEMENT =
-  "To help people learn valuable skills, develop practical capabilities and create opportunities for themselves in the new economy."
+import { COMBINES, PURPOSE, VALUE_LINE, WEALTH_LIQUEFACTION, WEALTH_LIQUEFACTION_DEFINITION } from "@/lib/institution"
 
 /** Unlit words sit at this opacity of the ink — present, legible as shapes, clearly waiting. */
 const DIM = 0.18
@@ -27,13 +18,14 @@ const DIM = 0.18
 const WORD_SPAN = 0.14
 
 /**
- * ABOUT (spec §2) — typographic. The purpose statement is set as one wide
- * paragraph in the house hero register: Manrope Light 300, large, the weight
- * the wallet hero gives its balance, borrowed here for words. Under it the
- * interest → opportunity arc, then the remaining spec paragraphs in two body
- * columns. "Welcome to…" is the small title beside the label — the statement
- * is the picture, and nothing here duplicates the Why band's heading any more.
- * Copy is §2 verbatim; only the typesetting changed.
+ * OUR PHILOSOPHY (institutional blueprint §1–§2) — typographic. The purpose
+ * statement is set as one wide paragraph in the house hero register: Manrope
+ * Light 300, large, the weight the wallet hero gives its balance, borrowed
+ * here for words. Under it the six-stop Wealth Liquefaction arc (a real
+ * sequence, so the one stepped device on the page is earned; the last stop is
+ * the outcome and the only word on the rule that takes gold), then the
+ * definition and the value line beside what the Academy combines. Copy lives
+ * in lib/institution.ts.
  *
  * Moment 3: the statement lights up word by word, scrubbed by scroll — it
  * arrives dim and each word turns to full ink in reading order as the
@@ -49,12 +41,12 @@ export function AboutBand() {
         <div className="grid gap-x-12 gap-y-8 lg:grid-cols-[13rem_1fr]">
           {/* Label column */}
           <Reveal>
-            <SectionLabel>About</SectionLabel>
+            <SectionLabel>Our philosophy</SectionLabel>
             <h2
               id="about-heading"
               className="mt-3 font-display text-[17px] font-semibold leading-snug tracking-[-0.01em] text-ws-primary"
             >
-              Welcome to {BRAND.name}.
+              Wealth Liquefaction
             </h2>
           </Reveal>
 
@@ -63,19 +55,19 @@ export function AboutBand() {
             <Reveal as="p" className="text-[15px] text-ws-muted">
               Our purpose is simple:
             </Reveal>
-            <LitStatement text={STATEMENT} />
+            <LitStatement text={PURPOSE} />
 
             {/* The arc — ordered, because it is one. */}
             <Reveal delay={0.12}>
-              {/* One line with hairline connectors from sm; on a phone the four
+              {/* One line with hairline connectors from sm; on a phone the six
                   stops sit two by two (the line broke after "Skill" there,
                   orphaning a connector and "Opportunity"). */}
               <ol
-                aria-label="From interest to opportunity"
+                aria-label="Wealth Liquefaction, from knowledge to financial transformation"
                 className="mt-10 grid grid-cols-2 gap-y-3 sm:flex sm:flex-wrap sm:items-center md:mt-12"
               >
-                {ARC.map((stop, i) => {
-                  const last = i === ARC.length - 1
+                {WEALTH_LIQUEFACTION.map((stop, i) => {
+                  const last = i === WEALTH_LIQUEFACTION.length - 1
                   return (
                     <li key={stop} className="flex items-center">
                       {i > 0 && (
@@ -107,30 +99,14 @@ export function AboutBand() {
             {/* The argument — two body columns under one hairline. */}
             <div className="mt-12 grid gap-x-12 gap-y-6 border-t border-ws-hairline pt-10 md:mt-14 md:grid-cols-2">
               <Reveal delay={0.05} className="space-y-4 text-[15px] leading-relaxed text-ws-muted md:text-[16px]">
-                <p>
-                  {BRAND.name} is the education and skills development arm of
-                  the WorldStreet ecosystem.
-                </p>
-                <p>
-                  We bring together expert instructors, structured programs,
-                  practical learning experiences, mentorship and a growing
-                  ecosystem of opportunities.
-                </p>
-              </Reveal>
-              <Reveal delay={0.1} className="text-[15px] leading-relaxed text-ws-muted md:text-[16px]">
-                <p>
-                  From financial markets to artificial intelligence, from
-                  blockchain to cybersecurity, from content creation to digital
-                  business, {BRAND.name} is designed to help you move from
-                  interest to knowledge, knowledge to skill, and skill to
-                  opportunity.
-                </p>
+                <p>{WEALTH_LIQUEFACTION_DEFINITION}</p>
+                <p className="font-semibold text-ws-primary">{VALUE_LINE}</p>
                 <Link
-                  href="/schools"
-                  className="group mt-5 inline-flex items-center gap-1.5 text-[14px] font-semibold text-ws-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40"
+                  href="/academy"
+                  className="group inline-flex items-center gap-1.5 text-[14px] font-semibold text-ws-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40"
                 >
                   <span className="relative">
-                    Explore the schools
+                    About the Academy
                     <span className="absolute -bottom-0.5 left-0 h-px w-full origin-left scale-x-0 bg-ws-primary transition-transform duration-200 ease-[var(--ws-ease)] group-hover:scale-x-100" />
                   </span>
                   <ArrowRightIcon
@@ -139,6 +115,20 @@ export function AboutBand() {
                     className="transition-transform duration-200 group-hover:translate-x-0.5"
                   />
                 </Link>
+              </Reveal>
+              <Reveal delay={0.1} className="text-[15px] leading-relaxed text-ws-muted md:text-[16px]">
+                <p>
+                  This Academy is not simply an online course platform. It is designed to function as a modern
+                  institution of learning, combining:
+                </p>
+                <ul className="mt-4 grid gap-x-6 gap-y-2 text-[14px] sm:grid-cols-2">
+                  {COMBINES.map((item) => (
+                    <li key={item} className="flex gap-2.5">
+                      <span aria-hidden className="mt-[0.6em] size-1 shrink-0 rounded-full bg-ws-subtle" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
               </Reveal>
             </div>
           </div>

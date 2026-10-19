@@ -18,7 +18,7 @@ import { Reveal, RevealGroup } from "@/components/marketing/motion/reveal"
 import { useMediaQuery, useMotionOK } from "@/components/marketing/motion/bus"
 import { SectionLabel, SectionTitle } from "@/components/marketing/section-heading"
 import type { LandingReview } from "@/lib/actions/reviews"
-import { BRAND } from "@/lib/brand"
+import { ACADEMY_LINE, BIGGER_VISION } from "@/lib/institution"
 
 /** From this many reviews up, two rows slide past each other. */
 const ROWS_FROM = 6
@@ -407,8 +407,8 @@ export function FinaleCta({
             delay={0.17}
             className="mx-auto mt-5 max-w-xl text-[15px] leading-relaxed text-ws-muted md:text-[16px]"
           >
-            Welcome to {BRAND.name}.{" "}
-            <span className="font-semibold text-ws-primary">Learn Skills. Build Value. Create Your Future.</span>
+            {BIGGER_VISION.question}{" "}
+            <span className="font-semibold text-ws-primary">{ACADEMY_LINE}</span>
           </Reveal>
           {/* Phones: one column of equal-width buttons, not two ragged centred pills. */}
           <Reveal
@@ -420,7 +420,7 @@ export function FinaleCta({
               href="/schools"
               className="inline-flex h-12 items-center justify-center rounded-full bg-ws-brand px-9 text-[15px] font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90"
             >
-              Explore programs
+              Explore the Academy
             </Link>
             {signedIn ? (
               <Link
