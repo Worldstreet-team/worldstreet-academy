@@ -1,6 +1,14 @@
 import type { Metadata } from "next"
 import { notFound, permanentRedirect } from "next/navigation"
-import { SCHOOL_BY_SLUG, cheapestBySchool, countProgramsBySchool, isSchoolSlug, schoolFromSlug } from "@/lib/schools"
+import {
+  SCHOOLS,
+  SCHOOL_BY_SLUG,
+  cheapestBySchool,
+  countProgramsBySchool,
+  isSchoolSlug,
+  schoolFromSlug,
+  studyAreas,
+} from "@/lib/schools"
 import { schoolCover } from "@/lib/school-art"
 import { fetchBrowseCourses, fetchFaculty, fetchProgramBySlug } from "@/lib/actions/student"
 import { fetchProgramCurriculum } from "@/lib/actions/program-page"
@@ -20,6 +28,8 @@ import type { SchoolCta } from "@/components/schools/cta"
 import { SchoolHero } from "@/components/schools/school-hero"
 import { SchoolPrograms } from "@/components/schools/school-programs"
 import { SchoolCompare } from "@/components/schools/school-compare"
+import { SchoolPoints } from "@/components/schools/school-points"
+import { SchoolAreas } from "@/components/schools/school-areas"
 import { SchoolTopics } from "@/components/schools/school-topics"
 import { SchoolPath } from "@/components/schools/school-path"
 import { SchoolFreeLessons } from "@/components/schools/school-free-lessons"
@@ -63,18 +73,27 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 
 /**
  * `/schools/[slug]` — where a visitor decides a school is for them (spec §5,
- * blueprint §17/§18: School → Program → Package → Checkout). Unknown slugs 404.
+ * blueprint §17/§18: School → Program → Package → Checkout). Unknown slugs 404;
+ * retired slugs 308 to their new school.
  *
- *   hero          the school's render, full bleed; name, promise, one gold
+ * The sections follow institutional blueprint §8 (faculty is behind
+ * FACULTY_PUBLIC, D31):
+ *
+ *   hero          the school's render, full bleed; name, overview, one gold
  *                 action, and a strip of real facts
  *   section nav   sticky under the navbar, one link per section that renders
+ *   learn         what you'll learn, the school's own list
+ *   audience      who it's for
+ *   careers       career and economic applications
  *   programs      image-led cards (1 = feature, 2 = pair, 3+ = grid), with
- *                 the live cohort strip between the heading and the cards
- *   compare       2+ programs, side by side
- *   learn         the programs' own outcomes, de-duplicated and attributed
- *   path          2+ levels, beginner → advanced
- *   free lessons  the shared preview player; hidden when none
+ *                 the live cohort strip between the heading and the cards;
+ *                 then compare (2+ programs), the topics the programs teach,
+ *                 and the study areas (D22: each links to its published
+ *                 program, or reads "Coming soon")
  *   faculty       hidden when none, and while FACULTY_PUBLIC is off
+ *   (cohorts)     Phase 12 mounts "Upcoming cohorts" here
+ *   pathways      2+ levels, beginner → advanced
+ *   free lessons  the shared preview player; hidden when none
  *   reviews       combined rating + the best written reviews; hidden when none
  *   FAQ · other schools · closing band · phone bar
  *
@@ -112,6 +131,10 @@ export default async function SchoolPage({ params }: Params) {
   const counts = countProgramsBySchool(catalogue)
   const cheapestAll = cheapestBySchool(catalogue)
   const cheapest = cheapestAll[school.slug]
+  const areas = studyAreas(
+    school,
+    programs.map(({ program }) => ({ title: program.title, slug: program.slug }))
+  )
   const hasTopics = topicMap(programs).total > 0
   const hasPath = levelsOf(programs).length > 1
   const hasReviews = reviews.summary !== null || reviews.reviews.length > 0
@@ -145,7 +168,7 @@ export default async function SchoolPage({ params }: Params) {
     programs.length === 0
       ? {
           title: "Start in another school",
-          body: "Every program open today, across all eight schools, is in one list — each with its level and price.",
+          body: `Every program open today, across all ${SCHOOLS.length} schools, is in one list — each with its level and price.`,
           cta: { href: "/programs", label: "Browse all programs" },
         }
       : only
@@ -161,12 +184,16 @@ export default async function SchoolPage({ params }: Params) {
           }
 
   const links: SectionLink[] = [
+    school.learn.length > 0 ? { id: "learn", label: "What you’ll learn" } : null,
+    school.audience.length > 0 ? { id: "audience", label: "Who it’s for" } : null,
+    school.careers.length > 0 ? { id: "careers", label: "Careers" } : null,
     { id: "programs", label: "Programs" },
     programs.length > 1 ? { id: "compare", label: "Compare" } : null,
-    hasTopics ? { id: "learn", label: "What you’ll learn" } : null,
-    hasPath ? { id: "path", label: "Path" } : null,
-    previews.length > 0 ? { id: "free-lessons", label: "Free lessons" } : null,
+    hasTopics ? { id: "topics", label: "Topics" } : null,
+    areas.length > 0 ? { id: "areas", label: "Study areas" } : null,
     facultyMembers.length > 0 ? { id: "faculty", label: "Faculty" } : null,
+    hasPath ? { id: "path", label: "Pathways" } : null,
+    previews.length > 0 ? { id: "free-lessons", label: "Free lessons" } : null,
     hasReviews ? { id: "reviews", label: "Reviews" } : null,
     { id: "faq", label: "FAQ" },
     { id: "other-schools", label: "Other schools" },
@@ -193,6 +220,10 @@ export default async function SchoolPage({ params }: Params) {
             </div>
           </div>
 
+          <SchoolPoints id="learn" title="What you’ll learn" items={school.learn} layout="list" />
+          <SchoolPoints id="audience" title="Who it’s for" items={school.audience} layout="cards" />
+          <SchoolPoints id="careers" title="Career & economic applications" items={school.careers} layout="list" />
+
           <SchoolPrograms
             school={school}
             programs={programs}
@@ -212,9 +243,11 @@ export default async function SchoolPage({ params }: Params) {
           />
           <SchoolCompare programs={programs} schoolName={school.name} />
           <SchoolTopics programs={programs} />
+          <SchoolAreas areas={areas} />
+          <SchoolFaculty members={facultyMembers} />
+          {/* §8 "Upcoming cohorts": Phase 12 mounts <SchoolCohorts /> (components/schools/school-cohorts.tsx) here, between Faculty and Learning pathways. */}
           <SchoolPath programs={programs} />
           <SchoolFreeLessons previews={previews} />
-          <SchoolFaculty members={facultyMembers} />
           <SchoolReviews data={reviews} />
           <div className="pt-6 md:pt-10">
             <Faq />

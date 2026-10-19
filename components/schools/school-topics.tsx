@@ -8,7 +8,8 @@ import { topicMap, type SchoolProgram, type SharedTopic } from "@/components/sch
 const PER_COLUMN = 10
 
 /**
- * `#learn` — "What you'll learn here", built only from the programs' own
+ * `#topics` — "Topics across the programs" (§8's "What you'll learn" is now the school's own
+ * list, `#learn`), built only from the programs' own
  * "what you'll learn" lines (`topicMap`): de-duplicated across the school and
  * attributed to the program that teaches each one.
  *
@@ -33,8 +34,8 @@ export function SchoolTopics({ programs }: { programs: SchoolProgram[] }) {
       : `${plural(map.total, "topic")} across the school's ${programs.length} programs.`
 
   return (
-    <section id="learn" aria-labelledby="learn-heading" className={SCHOOL_SECTION}>
-      <SectionHead id="learn-heading" title="What you’ll learn here" lede={lede} />
+    <section id="topics" aria-labelledby="topics-heading" className={SCHOOL_SECTION}>
+      <SectionHead id="topics-heading" title="Topics across the programs" lede={lede} />
 
       {venn ? (
         <div className="mt-10 grid gap-3 rounded-[20px] border border-ws-hairline bg-ws-surface p-3 dark:border-transparent lg:grid-cols-3">

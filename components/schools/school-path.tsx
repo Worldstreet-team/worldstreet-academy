@@ -22,7 +22,7 @@ export function SchoolPath({ programs }: { programs: SchoolProgram[] }) {
     <section id="path" aria-labelledby="path-heading" className={SCHOOL_SECTION}>
       <SectionHead
         id="path-heading"
-        title="Suggested path"
+        title="Learning pathways"
         lede="Begin at the level that fits you and move up. The programs in order, from beginner to advanced."
       />
 
