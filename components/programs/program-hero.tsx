@@ -3,6 +3,7 @@ import Link from "next/link"
 
 import type { ProgramDetail } from "@/lib/actions/student"
 import { SCHOOL_BY_SLUG } from "@/lib/schools"
+import { FORMAT_LABEL } from "@/lib/course-format"
 import { ACADEMY_FACULTY, FACULTY_PUBLIC, facultyHref } from "@/lib/faculty"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { AcademyMark } from "@/components/shared/academy-mark"
@@ -58,7 +59,7 @@ export function ProgramHero({
             label: school ? "All schools" : "All programs",
             schoolHref: (slug: string) => `/schools/${slug}`,
           }
-  const badge = program.kind === "marketplace" ? "Marketplace" : program.kind === "new-economy" ? "New Economy · Free" : null
+  const badge = program.kind === "marketplace" ? `Marketplace · ${FORMAT_LABEL[program.format ?? "course"]}` : program.kind === "new-economy" ? "New Economy · Free" : null
   const profileHref = program.instructorUsername
     ? facultyHref(program.instructorUsername)
     : signedIn

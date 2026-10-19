@@ -31,6 +31,7 @@ import { POINTS, awardPoints, pointKey } from "@/lib/points"
 import { isCountryCode } from "@/lib/countries"
 import { FACULTY_ROLES, isFacultyRole, safeWebUrl } from "@/lib/faculty"
 import { PROGRAM_KIND_FILTER, courseKindOf } from "@/lib/course-kind"
+import { courseFormatOf, type CourseFormat } from "@/lib/course-format"
 
 // ============================================================================
 // TYPES
@@ -68,6 +69,8 @@ export type BrowseCourse = {
   outcomes: string[]
   /** School program, marketplace course or New Economy course (`courseKindOf`). */
   kind: CourseKind
+  /** Marketplace items only, via courseFormatOf: never null on a marketplace item, always null otherwise. */
+  format: CourseFormat | null
   /**
    * Who a marketplace course credits: the seller's name when an approved
    * seller (not faculty) sells it. null credits the Academy's faculty —
@@ -281,6 +284,7 @@ export async function fetchBrowseCourses(options?: {
         rating: course.rating?.average || null,
         outcomes: (course.whatYouWillLearn ?? []).slice(0, 3),
         kind: courseKind,
+        format: courseFormatOf({ kind: courseKind, format: course.format }),
         sellerName: sellerNameOf(courseKind, instructor),
         publishedAt: course.publishedAt ? course.publishedAt.toISOString() : null,
       }
@@ -612,6 +616,7 @@ async function findProgram(filter: { slug: string } | { _id: string }): Promise<
     rating: course.rating?.average || null,
     outcomes: whatYouWillLearn.slice(0, 3),
     kind: courseKindOf(course),
+    format: courseFormatOf({ kind: courseKindOf(course), format: course.format }),
     sellerName: sellerNameOf(courseKindOf(course), instructor),
     publishedAt: course.publishedAt ? course.publishedAt.toISOString() : null,
     ratingCount: course.rating?.count || 0,
@@ -857,6 +862,7 @@ export async function fetchOtherCourses(excludeCourseId: string): Promise<Browse
         rating: course.rating?.average || null,
         outcomes: (course.whatYouWillLearn ?? []).slice(0, 3),
         kind: courseKind,
+        format: courseFormatOf({ kind: courseKind, format: course.format }),
         sellerName: sellerNameOf(courseKind, instructor),
         publishedAt: course.publishedAt ? course.publishedAt.toISOString() : null,
       }

@@ -10,6 +10,7 @@
  * those rates into `sellerSplitNote`, and the figures keep one home.
  * Server-only seller reads are in lib/seller.ts.
  */
+import type { CourseFormat } from "@/lib/course-format"
 
 /** Where an approved seller lands in the instructor area — the only home they have there. */
 export const SELLER_HOME = "/instructor/courses"
@@ -75,11 +76,13 @@ export function isMarketplaceSort(value: unknown): value is MarketplaceSort {
   return typeof value === "string" && MARKETPLACE_SORTS.some((s) => s.value === value)
 }
 
-/** The marketplace's URL state: `?q=&school=&price=&level=&sort=`. */
+/** The marketplace's URL state: `?q=&school=&format=&price=&level=&sort=`. */
 export type MarketplaceFilterValues = {
   q: string
   /** A school slug, used as the course's topic; "" = every topic. */
   school: string
+  /** A marketplace format; "" = every format. */
+  format: "" | CourseFormat
   price: "" | "free" | "paid"
   level: "" | "beginner" | "intermediate" | "advanced"
   sort: MarketplaceSort
@@ -90,6 +93,7 @@ export function marketplaceHref(values: Partial<MarketplaceFilterValues>): strin
   const params = new URLSearchParams()
   if (values.q?.trim()) params.set("q", values.q.trim())
   if (values.school) params.set("school", values.school)
+  if (values.format) params.set("format", values.format)
   if (values.price) params.set("price", values.price)
   if (values.level) params.set("level", values.level)
   if (values.sort && values.sort !== "popular") params.set("sort", values.sort)

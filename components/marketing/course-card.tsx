@@ -6,6 +6,7 @@ import Link from "next/link"
 import Image from "next/image"
 
 import { cn } from "@/lib/utils"
+import { FORMAT_LABEL } from "@/lib/course-format"
 import { levelChipStyle } from "@/components/shared/level-badge"
 import { WishlistButton, autoBookmark } from "@/components/marketing/wishlist-button"
 import type { BrowseCourse } from "@/lib/actions/student"
@@ -153,12 +154,19 @@ export function MarketingCourseCard({
         {/* Body */}
         <div className="flex flex-1 flex-col p-4">
           <div className="flex items-center justify-between gap-2">
-            <span
-              className="rounded-sm px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.05em]"
-              style={levelChipStyle(course.level)}
-            >
-              {course.level}
-            </span>
+            <div className="flex items-center gap-1.5">
+              {course.kind === "marketplace" && (
+                <span className="rounded-full bg-ws-chip px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.05em] text-ws-primary">
+                  {FORMAT_LABEL[course.format ?? "course"]}
+                </span>
+              )}
+              <span
+                className="rounded-sm px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.05em]"
+                style={levelChipStyle(course.level)}
+              >
+                {course.level}
+              </span>
+            </div>
             {drop && course.availableAt ? (
               <span className="inline-flex items-center rounded-full bg-ws-warning/15 px-2.5 py-0.5 text-[11px] font-semibold text-ws-warning">
                 Drops {dropDateLabel(course.availableAt)}
