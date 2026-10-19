@@ -1,10 +1,12 @@
 import { ShieldCheckIcon } from "@/components/icons"
+import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 
 import { BrandLockup } from "@/components/shared/brand-lockup"
 import { UserProvider } from "@/components/providers/user-provider"
 import { QueryProvider } from "@/components/providers/query-provider"
 import { getCachedUser } from "@/lib/auth/cached"
+import { checkoutReturnPath, loginUrl } from "@/lib/auth/login-url"
 
 /**
  * Checkout runs in its OWN route group, deliberately outside `(platform)`.
@@ -17,8 +19,9 @@ import { getCachedUser } from "@/lib/auth/cached"
  * so every existing link and the wallet-funding round trip still work.
  *
  * It still gates on auth — a route group is not a security boundary, and
- * checkout must never render for a signed-out visitor. The local-dev Clerk
- * branch is mirrored from `(platform)/layout.tsx`; keep them in step.
+ * checkout must never render for a signed-out visitor. The fallback sends the
+ * visitor back to this checkout, query included, through `loginUrl()`, which
+ * mirrors `middleware.ts` and its `pk_test_` switch.
  *
  * Providers are only the two the pages actually use: `UserProvider` for the
  * buyer's identity and `QueryProvider` so a completed purchase can invalidate
@@ -29,8 +32,8 @@ export default async function CheckoutLayout({ children }: { children: React.Rea
   const user = await getCachedUser()
 
   if (!user) {
-    const isLocalDev = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_")
-    redirect(isLocalDev ? "/login" : "https://www.worldstreetgold.com/login")
+    const h = await headers()
+    redirect(loginUrl(checkoutReturnPath(h.get("x-next-pathname"), h.get("x-next-search"))))
   }
 
   return (
