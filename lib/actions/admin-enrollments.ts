@@ -197,10 +197,17 @@ export async function adminListEnrollments(filters?: {
         course: { _id: String(course._id), packages: course.packages ?? null },
       })
     }
-    const facts = await masteryInputsForMany(pairs)
-    for (const m of mapped) {
-      const f = facts.get(m.id)
-      if (f) m.mastery = masteryView(f).result.score
+    // A Mastery Score failure leaves every row listed with no score, never an empty table.
+    try {
+      const facts = await masteryInputsForMany(pairs)
+      const scores = new Map<string, number | null>()
+      for (const m of mapped) {
+        const f = facts.get(m.id)
+        if (f) scores.set(m.id, masteryView(f).result.score)
+      }
+      for (const m of mapped) m.mastery = scores.get(m.id) ?? null
+    } catch (masteryError) {
+      console.error("Admin enrollments mastery error:", masteryError)
     }
 
     return {
