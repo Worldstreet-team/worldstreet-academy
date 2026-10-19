@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import type { Types } from "mongoose"
 import { z } from "zod/v4"
 import connectDB from "@/lib/db"
 import { Assignment, Course, Enrollment, Submission, User, type AssignmentKind } from "@/lib/db/models"
@@ -130,6 +131,87 @@ export async function getCourseAssignments(courseId: string): Promise<CourseAssi
   } catch (error) {
     console.error("Get course assignments error:", error)
     return null
+  }
+}
+
+export type FacultyAssignmentRow = {
+  id: string
+  title: string
+  kind: AssignmentKind
+  status: "draft" | "published"
+  dueAt: string | null
+  program: { id: string; title: string }
+  submissions: number
+  /** Submitted and not graded yet. */
+  waiting: number
+  /** Grading happens on the program's own assignments page. */
+  href: string
+}
+
+/**
+ * The faculty Assignments page (institutional blueprint §16): every assignment
+ * and project on the programs the caller teaches — an admin too sees only
+ * their own, as on My Courses. Ownership comes from the signed-in user, never
+ * an argument. Waiting-to-grade rows first, then by due date (none last).
+ */
+export async function getMyAssignments(): Promise<
+  { success: true; data: { programs: number; rows: FacultyAssignmentRow[] } } | { success: false; error: string }
+> {
+  try {
+    await connectDB()
+    const user = await getCurrentUser()
+    if (!user) return { success: false, error: "You need to be signed in" }
+    if (user.role !== "INSTRUCTOR" && user.role !== "ADMIN") return { success: false, error: "Instructors only" }
+
+    const courses = await Course.find({ instructor: user.id }).select("title").lean()
+    if (courses.length === 0) return { success: true, data: { programs: 0, rows: [] } }
+    const titleOf = new Map(courses.map((c) => [c._id.toString(), c.title as string]))
+
+    const assignments = await Assignment.find({ course: { $in: courses.map((c) => c._id) } })
+      .select("course title kind status dueAt")
+      .lean()
+    const counts = assignments.length
+      ? await Submission.aggregate<{ _id: Types.ObjectId; submissions: number; waiting: number }>([
+          { $match: { assignment: { $in: assignments.map((a) => a._id) } } },
+          {
+            $group: {
+              _id: "$assignment",
+              submissions: { $sum: 1 },
+              waiting: { $sum: { $cond: [{ $eq: ["$status", "submitted"] }, 1, 0] } },
+            },
+          },
+        ])
+      : []
+    const countOf = new Map(counts.map((c) => [c._id.toString(), c]))
+
+    const rows: FacultyAssignmentRow[] = assignments.map((a) => {
+      const courseId = a.course.toString()
+      const c = countOf.get(a._id.toString())
+      return {
+        id: a._id.toString(),
+        title: a.title,
+        kind: a.kind ?? "assignment",
+        status: a.status,
+        dueAt: a.dueAt ? a.dueAt.toISOString() : null,
+        program: { id: courseId, title: titleOf.get(courseId) ?? "Untitled program" },
+        submissions: c?.submissions ?? 0,
+        waiting: c?.waiting ?? 0,
+        href: `/instructor/courses/${courseId}/assignments`,
+      }
+    })
+    const due = (r: FacultyAssignmentRow) => (r.dueAt ? Date.parse(r.dueAt) : Infinity)
+    rows.sort(
+      (a, b) =>
+        Number(b.waiting > 0) - Number(a.waiting > 0) ||
+        due(a) - due(b) ||
+        a.program.title.localeCompare(b.program.title) ||
+        a.title.localeCompare(b.title)
+    )
+
+    return { success: true, data: { programs: courses.length, rows } }
+  } catch (error) {
+    console.error("[getMyAssignments]", error)
+    return { success: false, error: "Could not load your assignments" }
   }
 }
 
