@@ -447,8 +447,9 @@ export function AppSidebar() {
   const hasMentorship = enrollments.some(isMentorEnrollment)
   const inboxUnread = useNotificationFeed().data?.unreadCount ?? 0
 
+  // The meetings page is titled "Meetings" for people who can host (see the page); learners see "My classes".
   const learn = [
-    ...learnItems,
+    ...learnItems.map((i) => (isInstructor && i.href === "/dashboard/meetings" ? { ...i, title: "Meetings" } : i)),
     ...(hasMentorship ? [mentorshipItem] : []),
     ...(isInstructor ? [teachItem] : []),
   ]
