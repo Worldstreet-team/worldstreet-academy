@@ -9,7 +9,7 @@ import { packagePriceLabel, programPriceLabel } from "@/lib/program-price"
 import { appUrl } from "@/lib/app-url"
 import { BRAND } from "@/lib/brand"
 import { FACULTY_PUBLIC } from "@/lib/faculty"
-import { cohortIsUpcoming } from "@/lib/cohort"
+import { getCohortCalendar } from "@/lib/cohort-calendar"
 import { Faq } from "@/components/marketing/faq"
 import { CohortBanner } from "@/components/marketing/cohort-banner"
 import { PreviewProvider } from "@/components/programs/preview-player"
@@ -88,10 +88,11 @@ export default async function SchoolPage({ params }: Params) {
   const school = SCHOOL_BY_SLUG[slug]
   const cover = schoolCover(school.slug)
 
-  const [catalogue, faculty, reviews] = await Promise.all([
+  const [catalogue, faculty, reviews, calendar] = await Promise.all([
     fetchBrowseCourses(),
     FACULTY_PUBLIC ? fetchFaculty() : Promise.resolve([]),
     fetchSchoolReviews(school.slug, 6),
+    getCohortCalendar(),
   ])
   const loaded = await Promise.all(
     catalogue
@@ -196,9 +197,10 @@ export default async function SchoolPage({ params }: Params) {
             programs={programs}
             cohort={
               // Checked here too: the slot's wrapper must go with the strip.
-              cohortIsUpcoming() ? (
+              calendar.next ? (
                 <CohortBanner
                   variant="strip"
+                  cohort={calendar.next}
                   note={
                     only
                       ? "Open the program, choose your package and pay now to join the live cohort."

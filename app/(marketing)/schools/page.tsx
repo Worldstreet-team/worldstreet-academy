@@ -5,7 +5,7 @@ import { getStartGateState } from "@/lib/start-gate-state"
 import { needsSchoolChoice } from "@/lib/start-gate"
 import { appUrl } from "@/lib/app-url"
 import { FACULTY_PUBLIC } from "@/lib/faculty"
-import { cohortIsUpcoming } from "@/lib/cohort"
+import { getCohortCalendar } from "@/lib/cohort-calendar"
 import { SchoolsIndex } from "@/components/schools-index/schools-index"
 import { GateNotice } from "@/components/schools-index/gate-notice"
 import { FreeLessons } from "@/components/schools-index/free-lessons"
@@ -63,12 +63,13 @@ export default async function SchoolsPage({ searchParams }: Search) {
   const levelParam = first(params.level)
   const level: LevelFilter = LEVEL_ORDER.find((l) => l === levelParam) ?? "all"
 
-  const [courses, previews, facultyCount, welcome] = await Promise.all([
+  const [courses, previews, facultyCount, welcome, calendar] = await Promise.all([
     fetchBrowseCourses(),
     fetchFreePreviewLessons(9),
     // No faculty count or link while people are hidden from the public site (owner 2026-10-03).
     FACULTY_PUBLIC ? fetchFacultyCount() : Promise.resolve(0),
     start ? gateWelcome().catch(() => null) : Promise.resolve(null),
+    getCohortCalendar(),
   ])
 
   const data = buildSchoolsIndex(courses)
@@ -94,9 +95,10 @@ export default async function SchoolsPage({ searchParams }: Search) {
         notice={welcome ? <GateNotice firstName={welcome.firstName} /> : null}
         cohort={
           // Checked here too: the slot's wrapper must go with the strip.
-          cohortIsUpcoming() ? (
+          calendar.next ? (
             <CohortBanner
               variant="strip"
+              cohort={calendar.next}
               note="Choose your school below, then your program and package, and pay now to join."
             />
           ) : null

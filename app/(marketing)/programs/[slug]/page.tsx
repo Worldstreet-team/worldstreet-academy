@@ -32,6 +32,7 @@ import { ProgramStickyBar } from "@/components/programs/program-sticky-bar"
 import { PROGRAM_H2, SECTION_SCROLL_MT } from "@/components/programs/section-title"
 import { Faq } from "@/components/marketing/faq"
 import { CohortBanner } from "@/components/marketing/cohort-banner"
+import { getCohortCalendar } from "@/lib/cohort-calendar"
 import type { ProgramAccess } from "@/components/programs/access"
 
 // Per-visitor: enrollment state and the coming-soon/live cutover both change
@@ -113,12 +114,13 @@ export default async function ProgramPage({
   if (!program) notFound()
 
   const user = await getCachedUser()
-  const [enrollment, start, curriculum, reviewsPage, catalogue] = await Promise.all([
+  const [enrollment, start, curriculum, reviewsPage, catalogue, calendar] = await Promise.all([
     user ? checkEnrollment(user.id, program.id) : Promise.resolve(null),
     user ? getLearnStart(user.id, program.id) : Promise.resolve(null),
     fetchProgramCurriculum(program.id),
     fetchProgramReviews(program.id, 1, 6),
     fetchBrowseCourses({ kind: program.kind }),
+    getCohortCalendar(),
   ])
   const isProgram = program.kind === "program"
   const signedIn = Boolean(user)
@@ -310,6 +312,7 @@ export default async function ProgramPage({
                     {access.kind === "open" && isProgram && (
                       <CohortBanner
                         variant="strip"
+                        cohort={calendar.next}
                         note={
                           multiTier
                             ? "Choose your package below and pay now to take your seat in the live cohort."

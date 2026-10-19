@@ -3,6 +3,7 @@ import { CalendarRangeIcon } from "@/components/icons"
 import type { PublicPackage } from "@/lib/actions/student"
 import { packagePriceLabel } from "@/lib/program-price"
 import { cn } from "@/lib/utils"
+import { COHORT_STARTS_AT_ISO } from "@/lib/cohort"
 import { CohortCountdown } from "@/components/shared/cohort-countdown"
 import { discountOf } from "@/components/programs/package-model"
 
@@ -74,6 +75,7 @@ export function OfferEnds({ pkg, className }: { pkg: Priced; className?: string 
   if (!discountOf(pkg)) return null
   return (
     <CohortCountdown
+      startsAt={COHORT_STARTS_AT_ISO}
       variant="compact"
       prefix="Offer ends in "
       className={cn("text-[13px] font-medium text-ws-muted", className)}
