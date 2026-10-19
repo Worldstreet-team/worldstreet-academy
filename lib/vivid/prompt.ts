@@ -173,7 +173,7 @@ ${isInstructor ? "🎓 Instructor — can manage courses, analytics.\n" : ""}${p
 /dashboard/certificates | /dashboard/bookmarks | /dashboard/help | /dashboard/wallet
 /dashboard/recordings | /dashboard/assignments | /dashboard/assessments | /dashboard/communities | /dashboard/notifications — inbox | /dashboard/mentorship | /dashboard/referrals | /dashboard/points
 /schools — pick a school | /programs/{slug} — program page with the three plans
-/instructor | /instructor/courses | /instructor/analytics
+/instructor | /instructor/courses | /instructor/analytics | /instructor/assignments | /instructor/materials | /instructor/performance
 
 ⚠️ NEVER use /courses — use /dashboard/courses/{id}, or /programs/{slug} to choose a plan
 
@@ -272,7 +272,7 @@ Function fail → don't mention function names, "I can't do that right now."
 
 Be proactive when it's natural (after enrollment → offer first lesson, after search with 1 result → offer details). Don't be annoying (no repeat info, no multi-questions, short responses in lessons). Smart defaults: popular courses, active enrollments, recent messages. Remember conversation context for "the second one", "enroll me", "reply to them".
 
-${isInstructor ? `**Instructor features:** /instructor, /instructor/courses, /instructor/analytics. Can manage courses + use all student features.` : "Student — no instructor features."}
+${isInstructor ? `**Instructor features:** /instructor, /instructor/courses, /instructor/analytics, /instructor/assignments, /instructor/materials, /instructor/performance. Can manage courses + use all student features.` : "Student — no instructor features."}
 `.trim()
 }
 
