@@ -139,3 +139,8 @@ Online education platform for cryptocurrency/trading courses. Instructor portal 
 - **Removed** `link-tmp.cjs` and `link-mobile-identity.cjs` (one-off Clerk-id linking; `lib/auth/sync.ts` links by email).
 - **Launch:** env, crons, catalogue, certificate backfill, §17 QA and rollback live in `docs/launch-runbook.md`.
 - The sections above predate the Mastery rebuild (`/courses` routes, Hugeicons, `#44A08E`) — `CLAUDE.md` and `design-system/` are current.
+
+### 2026-10-19 — Cohorts as data (Phase 12)
+- **Cohorts are data.** The `cohorts` collection (web-only) is entered by an admin at `/admin/cohorts`; every countdown, banner, strip, offer timer, school page and learner card follows it with no redeploy. The public Academic Calendar is `/calendar`, and school pages list "Upcoming cohorts".
+- **A learner's cohort is derived, never stored** (rulings 2 and 3): the enrolment date is `purchasedAt` (or an earlier approved ESPEE proof's `createdAt`), and only active or completed school-program enrollments have one.
+- **Env fallback:** `NEXT_PUBLIC_COHORT_STARTS_AT` and `NEXT_PUBLIC_COHORT_NUMBER` apply only while the collection is empty.

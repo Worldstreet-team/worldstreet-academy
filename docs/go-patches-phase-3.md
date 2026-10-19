@@ -216,3 +216,11 @@ Indexes: `{ key: 1 }` unique, `{ user: 1, createdAt: -1 }`, `{ course: 1, user: 
 | `extraDocumentUrl` | string \| `null` | An optional extra PDF, uploaded like `cvUrl`. |
 
 The web requires the first five on every new application. Any wholesale application write must keep them (write dotted paths or keep the fields).
+
+## 12. Phase 12 — cohorts (web-only)
+
+Go needs no patch: nothing it reads changed.
+
+- **`cohorts`** is a new collection that Go doesn't read. One row per academic session (`number`, `name`, `startsAt`, `endsAt`, `note`), entered by an admin at `/admin/cohorts`.
+- **No `enrollments` field changes.** A learner's cohort is derived on the web from `purchasedAt` (or, for ESPEE, the approved proof's `createdAt` when it was submitted earlier). Nothing is stored.
+- Mobile shows no cohort until a later Go release chooses to read the collection.

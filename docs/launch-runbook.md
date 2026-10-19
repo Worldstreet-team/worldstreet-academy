@@ -29,7 +29,7 @@ From the 2026-10-03 meeting: three plans on every program, ESPEE proof-of-paymen
    - `ESPEE_PAYMENT_DETAILS` is the account details learners send ESPEE to. Free text; literal `\n` becomes a line break.
    - `R2_RESOURCES_BUCKET_NAME` is the private bucket, with no public access. Receipts go there under `worldstreet-academy/payment-proofs/<userId>/`.
    - The private bucket's CORS must allow `PUT` with `Content-Type` from `https://academy.worldstreetgold.com`. Assignment uploads need the same rule.
-   - `NEXT_PUBLIC_COHORT_STARTS_AT` is optional. It defaults to `2026-10-19T00:00:00+01:00` and is read at build time, so a change needs a redeploy.
+   - `NEXT_PUBLIC_COHORT_STARTS_AT` is the fallback while no cohort exists in `/admin/cohorts`. It defaults to `2026-10-19T00:00:00+01:00` and is read at build time, so a change needs a redeploy.
 2. **Deploy** (§4).
 3. **Catalogue** (§6). Every program becomes Basic $49 (was $300), Standard $199 (was $1,000, 9 weeks) and Executive $999 (was $10,000, 9 weeks), so the dry run shows a price change on every program. Apply with `--allow-price-change`.
    - Existing slugs are kept. `--rename-slugs` would break every shared `/programs/<slug>` link.
@@ -49,6 +49,14 @@ From the 2026-10-03 meeting: three plans on every program, ESPEE proof-of-paymen
    - Smoke test: open `/?ref=<your code>` from `/dashboard/referrals` in a private window, buy as a fresh account, and check `/dashboard/referrals` shows the pending 10%.
 
 **Rollback:** set `FACULTY_PUBLIC` in `lib/faculty.ts` back to `true` to show faculty again. Reverting the `feat/cohort-launch` merge restores the old gate and wallet-only checkout. Approved ESPEE enrollments stay valid, and their Orders carry `paymentMethod: "espee"`.
+
+## Cohorts as data (Phase 12)
+
+1. **Deploy** (§4).
+2. As an admin, open `/admin/cohorts` and add Cohort 1, starting 2026-10-19 00:00 (Lagos time).
+3. Add Cohort 2 at the owner's date.
+4. **Check:** `/`, `/schools` and a program page count down to Cohort 002, and `/calendar` lists both.
+5. Then remove `NEXT_PUBLIC_COHORT_STARTS_AT` and `NEXT_PUBLIC_COHORT_NUMBER` from Coolify. They only matter while the collection is empty.
 
 ## 0. Blockers — settle these first
 
