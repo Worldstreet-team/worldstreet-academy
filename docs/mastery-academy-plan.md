@@ -1,6 +1,6 @@
 # Worldstreet Mastery Academy — Phased Implementation Plan
 
-**Date:** 2026-09-14 · **Status:** IN PROGRESS — Phases 0–7 done and Phase 8 repo side done (unmerged branches; production steps in `docs/launch-runbook.md`) · **Spec:** `docs/mastery-academy-blueprint.md`
+**Date:** 2026-09-14 · **Status:** IN PROGRESS — Phases 11–21 (institutional build) built and merged on `feat/institutional`, not released (see `docs/institutional-blueprint-plan.md`). Phases 0–7 done and Phase 8 repo side done (unmerged branches; production steps in `docs/launch-runbook.md`) · **Spec:** `docs/mastery-academy-blueprint.md`
 **Predecessor:** `docs/academy-update-plan.md` (July — admin, instructor pipeline, wallet, CBT exams; all built). Its hard constraints (Part 1) still bind this plan and are restated in §0.3.
 
 > **How to drive this plan.** Say **"start phase N"**. The executor reads this file + the spec, opens a branch `mastery/phase-N`, expands the phase into bite-sized tasks (superpowers:subagent-driven-development), and reports against the phase's **Exit criteria** checklist — those are the sentences to read out in a status meeting. Phases are ordered by dependency; the "Parallel tracks" table in §0.5 shows what can overlap. Each phase ends with `pnpm lint`, `npx tsc --noEmit`, and a walk through the affected routes in `pnpm dev:mock` (mock Clerk, local Mongo, persona cookie `mock_persona=student|instructor|admin|guest`).
@@ -25,18 +25,18 @@ Total ≈ 25–34 dev-days sequential; ≈ 18–24 with the parallel tracks in �
 
 | Phase | Name | Est. | Status |
 |---|---|---|---|
-| 10 | Release the cohort build (`feat/cohort-launch` → production) | 0.5 d + owner | planned — owner-run |
-| 11 | The institution's voice — hero, `/academy`, vocabulary | 2–3 d | planned — task plan `docs/plans/mastery-phase-11.md` |
-| 12 | Cohorts as data + Academic Calendar | 3–4 d | planned |
-| 13 | Schools v2 — seven schools, the full school page | 4–5 d | planned (D21, D22 answered yes, 2026-10-19) |
-| 14 | Plans to the blueprint | 2 d | planned (D23 answered yes) |
-| 15 | Student portal, welcome email, communities | 2–3 d | planned |
-| 16 | Mastery Score and attendance | 3 d | planned |
-| 17 | Certification tiers and Alumni | 2–3 d | planned (D25 defaults; after 14, 16) |
-| 18 | WMA Partners | 2–3 d | planned |
-| 19 | Faculty system | 4–5 d | planned |
-| 20 | Marketplace formats and quality control | 3 d | planned (templates and guides included — owner, 2026-10-19) |
-| 21 | Super admin and admin levels | 1–2 d | planned (first — owner "asap") |
+| 10 | Release the cohort build (`feat/cohort-launch` → production) | 0.5 d + owner | **owner step** — Phases 11–21 are built and merged on `feat/institutional`; nothing is pushed; the production release is the owner's |
+| 11 | The institution's voice — hero, `/academy`, vocabulary | 2–3 d | built, merged on `feat/institutional` 2026-10-19; runtime QA clean; final-review fixes on `fix/final-review`; not released |
+| 12 | Cohorts as data + Academic Calendar | 3–4 d | built, merged on `feat/institutional` 2026-10-19; runtime QA clean; final-review fixes on `fix/final-review`; not released |
+| 13 | Schools v2 — seven schools, the full school page | 4–5 d | built, merged on `feat/institutional` 2026-10-19; runtime QA clean; final-review fixes on `fix/final-review`; not released |
+| 14 | Plans to the blueprint | 2 d | built, merged on `feat/institutional` 2026-10-19; runtime QA clean; final-review fixes on `fix/final-review`; not released |
+| 15 | Student portal, welcome email, communities | 2–3 d | built, merged on `feat/institutional` 2026-10-19; runtime QA clean; final-review fixes on `fix/final-review`; not released |
+| 16 | Mastery Score and attendance | 3 d | built, merged on `feat/institutional` 2026-10-19; runtime QA clean; final-review fixes on `fix/final-review`; not released |
+| 17 | Certification tiers and Alumni | 2–3 d | built, merged on `feat/institutional` 2026-10-19; runtime QA clean; final-review fixes on `fix/final-review`; not released |
+| 18 | WMA Partners | 2–3 d | built, merged on `feat/institutional` 2026-10-19; runtime QA clean; final-review fixes on `fix/final-review`; not released |
+| 19 | Faculty system | 4–5 d | built, merged on `feat/institutional` 2026-10-19; runtime QA clean; final-review fixes on `fix/final-review`; not released |
+| 20 | Marketplace formats and quality control | 3 d | built, merged on `feat/institutional` 2026-10-19; runtime QA clean; final-review fixes on `fix/final-review`; not released |
+| 21 | Super admin and admin levels | 1–2 d | built, merged on `feat/institutional` 2026-10-19; runtime QA clean; final-review fixes on `fix/final-review`; not released |
 
 ---
 
