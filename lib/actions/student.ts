@@ -1021,7 +1021,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
           : null,
         lessonTrack: openInOrder.map((l) => completedIds.has(l._id.toString())),
         communityUrl: access ? safeWebUrl(course.communityUrl) : null,
-        school: isSchoolSlug(course.school) ? course.school : null,
+        school: schoolSlugOf(course.school),
       }
     })
   } catch (error) {
