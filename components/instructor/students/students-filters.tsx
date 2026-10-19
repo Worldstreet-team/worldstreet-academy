@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 
 import { ChevronDownIcon } from "@/components/icons"
-import { PLAN_FILTERS, studentsHref, type FacultyStudentFilters, type PlanFilter } from "@/lib/faculty-students"
+import { PLAN_FILTERS, studentsHref, type FacultyStudentFilters, type PlanFilter, type StudentsBase } from "@/lib/faculty-students"
 
 const FIELD =
   "h-11 w-full appearance-none rounded-full border border-ws-hairline bg-ws-surface pl-4 pr-9 text-[14px] font-medium text-ws-primary outline-none transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-raised focus-visible:border-ws-muted/50 focus-visible:ring-2 focus-visible:ring-ws-brand/30 md:h-10 dark:border-transparent"
@@ -49,18 +49,21 @@ export function StudentsFilters({
   values,
   programs,
   cohorts,
+  base = "/instructor/students",
 }: {
   values: FacultyStudentFilters
   programs: { id: string; title: string }[]
   cohorts: { number: number; name: string }[]
+  /** The page being filtered: My Students (default) or Student Performance. */
+  base?: StudentsBase
 }) {
   const router = useRouter()
   const go = (next: Partial<FacultyStudentFilters>) =>
-    router.push(studentsHref({ ...values, ...next }), { scroll: false })
+    router.push(studentsHref({ ...values, ...next }, base), { scroll: false })
   const anySet = values.program !== null || values.plan !== null || values.cohort !== null
 
   return (
-    <form action="/instructor/students" method="get" className="flex flex-wrap items-center gap-2.5">
+    <form action={base} method="get" className="flex flex-wrap items-center gap-2.5">
       <div className="grid w-full grid-cols-1 gap-2.5 sm:w-auto sm:grid-cols-[repeat(3,minmax(10rem,14rem))]">
         <FilterSelect
           name="program"
@@ -96,7 +99,7 @@ export function StudentsFilters({
       </noscript>
       {anySet && (
         <Link
-          href="/instructor/students"
+          href={base}
           className="text-[13px] font-medium text-ws-muted transition-colors hover:text-ws-primary"
         >
           Clear filters

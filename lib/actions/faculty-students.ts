@@ -19,8 +19,12 @@ import { getCurrentUser } from "@/lib/auth/actions"
 import {
   planOf,
   parseStudentFilters,
+  programSummaries,
+  rankForAttention,
+  type AttentionReason,
   type FacultyStudentFilters,
   type PlanFilter,
+  type ProgramSummary,
 } from "@/lib/faculty-students"
 import { canAccessLesson, includesMentorship } from "@/lib/entitlements"
 import { cohortsFor, masteryFor, type CohortTag, type MasteryResult, type SeamEnrollment } from "@/lib/faculty-seams"
@@ -42,6 +46,8 @@ export type FacultyStudentRow = {
   status: "active" | "completed"
   cohort: CohortTag | null
   progress: number
+  /** When the enrolment became active (activation, else purchase). */
+  enrolledAt: string
   lastActiveAt: string | null
   bestExam: { percent: number; passed: boolean } | null
   assignments: { graded: number; average: number | null }
@@ -164,6 +170,7 @@ export async function getFacultyStudents(
         status: r.status === "completed" ? "completed" : "active",
         cohort: cohortMap.get(id) ?? null,
         progress: r.progress ?? 0,
+        enrolledAt: new Date(r.activatedAt ?? r.purchasedAt).toISOString(),
         lastActiveAt: r.lastAccessedAt ? new Date(r.lastAccessedAt).toISOString() : null,
         bestExam:
           r.bestScorePercent !== null && r.bestScorePercent !== undefined
@@ -190,6 +197,29 @@ export async function getFacultyStudents(
   } catch (e) {
     console.error("[getFacultyStudents]", e)
     return { success: false, error: "Could not load your students" }
+  }
+}
+
+export type PerformanceOverview = Omit<FacultyStudentsView, "rows"> & {
+  summaries: ProgramSummary[]
+  attention: (FacultyStudentRow & { reasons: AttentionReason[] })[]
+  rest: FacultyStudentRow[]
+}
+
+/**
+ * Student Performance across learners: My Students' rows (same scope, same
+ * filters) as a summary per program and a ranked list, needs-attention first
+ * (`NEEDS_ATTENTION` in lib/faculty-students.ts).
+ */
+export async function getStudentPerformanceOverview(
+  filters: FacultyStudentFilters
+): Promise<{ success: true; data: PerformanceOverview } | { success: false; error: string }> {
+  const result = await getFacultyStudents(filters)
+  if (!result.success) return result
+  const { rows, ...view } = result.data
+  return {
+    success: true,
+    data: { ...view, summaries: programSummaries(rows), ...rankForAttention(rows, Date.now(), view.masteryReady) },
   }
 }
 

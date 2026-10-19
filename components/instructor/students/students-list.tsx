@@ -6,7 +6,7 @@ import type { FacultyStudentRow, FacultyStudentsView } from "@/lib/actions/facul
 import { shortDate } from "@/lib/faculty-format"
 import { assignmentsLabel } from "@/lib/faculty-students"
 
-function initials(name: string): string {
+export function initials(name: string): string {
   return (
     name
       .split(/\s+/)
@@ -17,7 +17,7 @@ function initials(name: string): string {
   )
 }
 
-function ProgressBar({ value }: { value: number }) {
+export function ProgressBar({ value }: { value: number }) {
   return (
     <span className="flex items-center gap-2">
       <span className="h-1 w-20 overflow-hidden rounded-full bg-ws-chip" aria-hidden>
