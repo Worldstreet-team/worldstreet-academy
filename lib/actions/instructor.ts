@@ -869,7 +869,8 @@ export async function updateCourse(
       !seller &&
       instructor.role === "ADMIN" &&
       existingCourse.instructor.toString() !== instructor._id.toString() &&
-      kind === "marketplace" &&
+      // The stored kind counts too: a posted kind must not slip a marketplace course past the gate.
+      (kind === "marketplace" || courseKindOf(existingCourse) === "marketplace") &&
       status === "published" &&
       existingCourse.status !== "published" &&
       existingCourse.review?.status !== "approved"

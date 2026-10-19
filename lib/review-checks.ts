@@ -61,11 +61,16 @@ export type ReviewContent = {
   whatYouWillLearn?: Nullish<string[]>
   communityUrl?: Nullish<string>
   productFileKey?: Nullish<string>
+  /** Course Resources in order; `lessonIndex` is the owning lesson's position (ids change on every save). */
+  resources?: Nullish<
+    { title?: Nullish<string>; kind?: Nullish<string>; storageKey?: Nullish<string>; externalUrl?: Nullish<string>; filename?: Nullish<string>; sizeBytes?: Nullish<number>; isFree?: Nullish<boolean>; lessonIndex?: Nullish<number> }[]
+  >
   lessons?: Nullish<
     {
       title?: Nullish<string>
       description?: Nullish<string>
       type?: Nullish<string>
+      sectionTitle?: Nullish<string>
       videoUrl?: Nullish<string>
       content?: Nullish<string>
       videoDuration?: Nullish<number>
@@ -80,6 +85,7 @@ export function reviewContentString(c: ReviewContent): string {
   return JSON.stringify([
     v(c.title), v(c.shortDescription), v(c.description), v(c.thumbnailUrl), v(c.level), v(c.school), v(c.format),
     v(c.pricing), v(c.price), c.whatYouWillLearn ?? [], v(c.communityUrl), v(c.productFileKey),
-    (c.lessons ?? []).map((l) => [v(l.title), v(l.description), v(l.type), v(l.videoUrl), v(l.content), v(l.videoDuration), Boolean(l.isFree)]),
+    (c.lessons ?? []).map((l) => [v(l.title), v(l.description), v(l.type), v(l.videoUrl), v(l.content), v(l.videoDuration), Boolean(l.isFree), v(l.sectionTitle)]),
+    (c.resources ?? []).map((r) => [v(r.title), v(r.kind), v(r.storageKey), v(r.externalUrl), v(r.filename), v(r.sizeBytes), Boolean(r.isFree), v(r.lessonIndex)]),
   ])
 }

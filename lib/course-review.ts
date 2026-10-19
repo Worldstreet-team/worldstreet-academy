@@ -1,6 +1,6 @@
 import "server-only"
 import { createHash } from "node:crypto"
-import { Course, Lesson, User } from "@/lib/db/models"
+import { Course, Lesson, Resource, User } from "@/lib/db/models"
 import { courseFormatOf } from "@/lib/course-format"
 import { EMPTY_CHECK, REVIEW_CHECKS, outstandingChecks, reviewContentString } from "@/lib/review-checks"
 import { notifyAdmins } from "@/lib/notify"
@@ -17,13 +17,17 @@ export const REVIEW_QUEUE_PATH = "/admin/courses?review=pending"
  * file's key. Null when the course doesn't exist. Callers have run connectDB().
  */
 export async function courseReviewFingerprint(courseId: string): Promise<string | null> {
-  const [course, lessons] = await Promise.all([
+  const [course, lessons, resources] = await Promise.all([
     Course.findById(courseId)
       .select("title shortDescription description thumbnailUrl level school kind format pricing price whatYouWillLearn communityUrl productFile")
       .lean(),
     Lesson.find({ course: courseId })
       .sort({ order: 1 })
-      .select("title description type videoUrl content videoDuration isFree")
+      .select("title description type videoUrl content videoDuration isFree sectionTitle")
+      .lean(),
+    Resource.find({ course: courseId })
+      .sort({ order: 1, title: 1 })
+      .select("title kind storageKey externalUrl filename sizeBytes isFree lesson")
       .lean(),
   ])
   if (!course) return null
@@ -41,6 +45,16 @@ export async function courseReviewFingerprint(courseId: string): Promise<string 
     communityUrl: course.communityUrl,
     productFileKey: course.productFile?.key ?? null,
     lessons,
+    resources: resources.map((r) => ({
+      title: r.title,
+      kind: r.kind,
+      storageKey: r.storageKey,
+      externalUrl: r.externalUrl,
+      filename: r.filename,
+      sizeBytes: r.sizeBytes,
+      isFree: r.isFree,
+      lessonIndex: r.lesson ? lessons.findIndex((l) => l._id.toString() === r.lesson?.toString()) : null,
+    })),
   })
   return createHash("sha256").update(content).digest("hex")
 }

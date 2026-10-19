@@ -46,9 +46,10 @@ export function ReviewPipeline({ review }: { review: AdminCourseReview }) {
   function record(check: ReviewCheckKey, status: ReviewCheckStatus, text: string) {
     setError(null)
     startTransition(async () => {
-      const res = await adminRecordReviewCheck(review.id, check, status, text)
+      const res = await adminRecordReviewCheck(review.id, check, status, text, review.fingerprint)
       if (!res.success) {
         setError(res.error)
+        router.refresh()
         return
       }
       setChangesFor(null)
@@ -60,9 +61,10 @@ export function ReviewPipeline({ review }: { review: AdminCourseReview }) {
   function approve() {
     setError(null)
     startTransition(async () => {
-      const res = await adminApproveCourseReview(review.id)
+      const res = await adminApproveCourseReview(review.id, review.fingerprint)
       if (!res.success) {
         setError(res.error)
+        router.refresh()
         return
       }
       router.push("/admin/courses?review=pending")

@@ -58,12 +58,14 @@ const CheckInput = z
     path: ["note"],
   })
 
+const CHANGED_MESSAGE = "This course changed since you opened it — reload to review the latest version"
+
 async function sellerContact(userId: string) {
   return User.findById(userId).select("email firstName").lean()
 }
 
 /** Approve: review "approved", the course and its lessons published, publishedAt stamped once. */
-export async function adminApproveCourseReview(courseId: string): Promise<Result> {
+export async function adminApproveCourseReview(courseId: string, seenFingerprint: string): Promise<Result> {
   try {
     await connectDB()
     const admin = await requireAdmin()
@@ -84,11 +86,12 @@ export async function adminApproveCourseReview(courseId: string): Promise<Result
     }
     // Approval waits for all four checks, recorded on the content as it is now (ruling 7).
     const fingerprint = await courseReviewFingerprint(id.data)
-    const outstanding = fingerprint ? outstandingChecks(course.review?.checks, fingerprint) : null
-    if (!outstanding || outstanding.length > 0) {
+    if (!fingerprint || fingerprint !== seenFingerprint) return { success: false, error: CHANGED_MESSAGE }
+    const outstanding = outstandingChecks(course.review?.checks, fingerprint)
+    if (outstanding.length > 0) {
       return {
         success: false,
-        error: `Every check must pass first. Still to do: ${(outstanding ?? ["content", "quality", "accuracy", "technical"] as const).map((k) => REVIEW_CHECK_DETAILS[k].title).join(", ")}`,
+        error: `Every check must pass first. Still to do: ${outstanding.map((k) => REVIEW_CHECK_DETAILS[k].title).join(", ")}`,
       }
     }
 
@@ -153,7 +156,8 @@ export async function adminRecordReviewCheck(
   courseId: string,
   check: ReviewCheckKey,
   status: ReviewCheckStatus,
-  note: string
+  note: string,
+  seenFingerprint: string
 ): Promise<Result> {
   try {
     await connectDB()
@@ -169,6 +173,8 @@ export async function adminRecordReviewCheck(
     if (!course) return { success: false, error: "This course isn't waiting for review" }
     const fingerprint = await courseReviewFingerprint(input.courseId)
     if (!fingerprint) return { success: false, error: "This course isn't waiting for review" }
+    // Record against the content the admin actually saw, never the content at the moment of the click.
+    if (fingerprint !== seenFingerprint) return { success: false, error: CHANGED_MESSAGE }
 
     const now = new Date()
     const prefixed = `${REVIEW_CHECK_DETAILS[input.check].title}: ${input.note}`
@@ -240,6 +246,8 @@ export type AdminReviewCheckView = {
 }
 export type AdminCourseReview = {
   id: string
+  /** The content fingerprint this page loaded; sent back with each record and the approval. */
+  fingerprint: string
   title: string
   format: CourseFormat
   status: CourseStatus
@@ -288,6 +296,7 @@ export async function adminGetCourseReview(courseId: string): Promise<AdminCours
     const format = courseFormatOf(course) ?? "course"
     return {
       id: course._id.toString(),
+      fingerprint: fingerprint ?? "",
       title: course.title,
       format,
       status: course.status,
