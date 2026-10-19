@@ -34,7 +34,7 @@ From the 2026-10-03 meeting: three plans on every program, ESPEE proof-of-paymen
 3. **Catalogue** (§6). Every program becomes Basic $49 (was $300), Standard $199 (was $1,000, 9 weeks) and Executive $999 (was $10,000, 9 weeks), so the dry run shows a price change on every program. Apply with `--allow-price-change`.
    - Existing slugs are kept. `--rename-slugs` would break every shared `/programs/<slug>` link.
    - Two production programs are outside the 12 titles and keep a single price: "Cryptocurrency Trading Masterclass Beginner to Advanced" and "DIGITALMARKETING MASTERCLASS".
-4. **Admins.** Grant each new admin with `MONGODB_URI="$PROD_URI" node scripts/grant-admin.mjs <email>`. It also writes the role to Clerk with `.env.local`'s `CLERK_SECRET_KEY`. Every admin account needs a real email address: each new ESPEE proof is emailed to all admins.
+4. **Admins.** Grant each new admin with `MONGODB_URI="$PROD_URI" node scripts/grant-admin.mjs <email>`. It also writes the role to Clerk with `.env.local`'s `CLERK_SECRET_KEY`. Every admin account needs a real email address: each new ESPEE proof is emailed to all admins. From Phase 21 on, super admins grant admins at /admin/team — see "Admin levels" below.
 5. **Smoke test** on production with a test account that has no enrollment:
    - `/dashboard` sends it to `/schools`.
    - Submit an ESPEE proof. `/dashboard` then shows "Payment received — under review".
@@ -49,6 +49,21 @@ From the 2026-10-03 meeting: three plans on every program, ESPEE proof-of-paymen
    - Smoke test: open `/?ref=<your code>` from `/dashboard/referrals` in a private window, buy as a fresh account, and check `/dashboard/referrals` shows the pending 10%.
 
 **Rollback:** set `FACULTY_PUBLIC` in `lib/faculty.ts` back to `true` to show faculty again. Reverting the `feat/cohort-launch` merge restores the old gate and wallet-only checkout. Approved ESPEE enrollments stay valid, and their Orders carry `paymentMethod: "espee"`.
+
+## Admin levels — 2026-10-19 (Phase 21, `feat/institutional`)
+
+Super admins run the admin team; regular admins keep every other admin power (owner, 2026-10-19).
+
+1. **First super admins, before anything else.** Pick the owner and one other trusted person; two, so neither is ever "the last". Each must have signed in to the Academy once. For each, run `MONGODB_URI="$PROD_URI" node scripts/grant-admin.mjs <email> --super`. This is safe before or after the deploy, because older code ignores `adminLevel`. Until it runs, nobody can grant admin access from the web. **Check:** the script prints `… → ADMIN/super`.
+2. **Deploy** (§4). Every existing admin stays an admin, at the regular level.
+3. **Check:**
+   - As a super admin, the admin sidebar shows Team, the eyebrow reads "Super admin", and `/admin/team` lists every admin.
+   - As a regular admin, `/admin/team` is a 404 and `/admin/users` offers no Admin role.
+4. **From now on:** grant admins at `/admin/team` → "Add an admin".
+   - `grant-admin.mjs` without `--super` still makes a regular admin.
+   - `--revoke` removes admin access and restores the earlier role. It refuses the last super admin.
+   - Every change is in Team's audit trail.
+5. **Go team:** `docs/go-patches-phase-3.md` §12 (R14). No Go change, unless Go writes `users.role`.
 
 ## 0. Blockers — settle these first
 
