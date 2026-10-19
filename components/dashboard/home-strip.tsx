@@ -95,12 +95,15 @@ export function HeroStats({
   showCertificates,
   showClasses,
   toDo = 0,
+  toDoHref = "/dashboard/assignments",
 }: {
   totals: LearningTotals
   showCertificates: boolean
   showClasses: boolean
-  /** Open assignments and exams (assessmentCounts). */
+  /** Open assignments, exams and knowledge checks (assessmentCounts). */
   toDo?: number
+  /** Where the count is listed: the assessments page when any open item is an exam or quiz, else assignments. */
+  toDoHref?: string
   now?: number
 }) {
   return (
@@ -124,7 +127,7 @@ export function HeroStats({
       {showClasses && <NextClassStat />}
       <PointsStat />
       {toDo > 0 && (
-        <StatCell icon={Task01Icon} value={toDo} label={toDo === 1 ? "Assignment due" : "Assignments due"} href="/dashboard/assignments" />
+        <StatCell icon={Task01Icon} value={toDo} label="To do" href={toDoHref} />
       )}
       {showCertificates && <CertificatesStat />}
     </div>

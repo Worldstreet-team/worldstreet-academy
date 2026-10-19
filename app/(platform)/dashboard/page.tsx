@@ -24,6 +24,7 @@ import { useUser } from "@/components/providers/user-provider"
 import { CardShell, EmptyState, Eyebrow, Rise } from "@/components/ui/system"
 import {
   assessmentCounts,
+  toDoHref,
   hasPrioritySupport,
   includesAny,
   instructorRows,
@@ -233,6 +234,7 @@ export default function DashboardPage() {
                             showCertificates={showCertificates}
                             showClasses={showClasses}
                             toDo={toDo}
+                            toDoHref={toDoHref(assessments)}
                           />
                         ) : null
                       }

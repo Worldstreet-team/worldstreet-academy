@@ -366,6 +366,12 @@ export function assessmentCounts(assessments: MyAssessment[]): { toDo: number; d
   return { toDo: assessments.length - done, done }
 }
 
+/** The page that lists what `assessmentCounts().toDo` counts: Assessments when any open item is an exam or quiz, else Assignments. */
+export function toDoHref(assessments: MyAssessment[]): string {
+  const openExam = assessments.some((a) => assessmentKindOf(a) === "assessments" && !ASSESSMENT_DONE.has(a.status))
+  return openExam ? "/dashboard/assessments" : "/dashboard/assignments"
+}
+
 export type AssessmentKind = "assessments" | "assignments"
 
 /** Which page a row belongs to: practical assignments, or exams (finals and knowledge checks). */
