@@ -14,7 +14,7 @@ import { requireAdmin } from "@/lib/auth/admin"
 import { notifyAdmins, notifyUser } from "@/lib/notify"
 import { sendNewSellerApplicationAdminEmail, sendSellerDecisionEmail } from "@/lib/email"
 import { appUrl } from "@/lib/app-url"
-import { SCHOOL_BY_SLUG, SCHOOL_SLUGS, isSchoolSlug, type SchoolSlug } from "@/lib/schools"
+import { SCHOOL_BY_SLUG, SCHOOL_SLUGS, schoolSlugOf, type SchoolSlug } from "@/lib/schools"
 import { isFacultyRole, safeWebUrl } from "@/lib/faculty"
 import { SELLER_HOME } from "@/lib/marketplace"
 
@@ -109,7 +109,7 @@ function toView(app: ApplicationDoc): SellerApplicationView {
     id: app._id.toString(),
     status: app.status,
     fullName: app.fullName,
-    school: isSchoolSlug(app.school) ? app.school : null,
+    school: schoolSlugOf(app.school),
     topic: app.topic,
     experience: app.experience,
     sampleUrl: app.sampleUrl,

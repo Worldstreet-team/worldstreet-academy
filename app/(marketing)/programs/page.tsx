@@ -15,7 +15,7 @@ import { SchoolIcon } from "@/components/shared/school-icon"
 
 export const metadata: Metadata = {
   title: "Programs",
-  description: `Browse every program across the eight schools of ${BRAND.name}.`,
+  description: `Browse every program across the ${SCHOOLS.length} schools of ${BRAND.name}.`,
   alternates: { canonical: appUrl("/programs") },
 }
 
@@ -80,7 +80,7 @@ export default async function ProgramsPage({
           All programs
         </h1>
         <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-ws-muted md:text-[17px]">
-          Browse every program across the eight schools of {BRAND.name}.
+          Browse every program across the {SCHOOLS.length} schools of {BRAND.name}.
         </p>
         {query ? (
           courses.length > 0 && (
@@ -173,7 +173,7 @@ export default async function ProgramsPage({
  * A school's face beside its programs. With one to three programs per school a
  * bare three-column grid is mostly air; the cover fills it and says where you
  * are. From lg it sticks while a longer list scrolls past. No gold here — a
- * page of eight gold buttons would have no primary action.
+ * page of seven gold buttons would have no primary action.
  */
 function SchoolPanel({ school, count, matched }: { school: School; count: number; matched: number | null }) {
   const cover = schoolCover(school.slug)

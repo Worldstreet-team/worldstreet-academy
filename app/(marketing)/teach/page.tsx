@@ -50,7 +50,7 @@ const STEPS = [
 const FAQS = [
   {
     q: "Who can teach?",
-    a: `People with real, practical knowledge in one of our ${SCHOOLS.length} schools — from trading and blockchain to AI, software, cybersecurity, data, digital media and digital business — who want to see their learners succeed.`,
+    a: `People with real, practical knowledge in one of our ${SCHOOLS.length} schools — from trading and technology to digital business, entrepreneurship, the creative economy, leadership and emerging technologies — who want to see their learners succeed.`,
   },
   {
     q: "Do I need teaching experience?",

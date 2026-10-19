@@ -72,7 +72,7 @@ export function SchoolPanel({
   const cover = schoolCover(school.slug)
   const lead = school.name.startsWith(LEAD) ? LEAD.trim() : null
   const title = lead ? school.name.slice(LEAD.length) : school.name
-  const programs = count === 1 ? "1 program" : `${count} programs`
+  const programs = count === 0 ? "Programs coming soon" : count === 1 ? "1 program" : `${count} programs`
   const price = fromPrice === null ? null : fromPrice === 0 ? "Free" : `$${fromPrice.toLocaleString("en-US")}`
   const number = String(index + 1).padStart(2, "0")
 

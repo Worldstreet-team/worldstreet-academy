@@ -19,6 +19,9 @@ import { compareGroups, type CompareCell, type SchoolProgram } from "@/component
  * A real table: row and column headers, a caption for assistive tech. On a
  * phone two programs fit without sideways scrolling; with more, the table
  * scrolls inside its own card (never the page) with the row labels pinned.
+ * The scroller is `relative` on purpose: the `sr-only` spans are absolutely
+ * positioned, and without a positioned scroller they escape its clip and
+ * stretch the page sideways.
  */
 export function SchoolCompare({ programs, schoolName }: { programs: SchoolProgram[]; schoolName: string }) {
   if (programs.length < 2) return null
@@ -34,7 +37,7 @@ export function SchoolCompare({ programs, schoolName }: { programs: SchoolProgra
       />
 
       <div className="mt-10 overflow-hidden rounded-[20px] border border-ws-hairline bg-ws-surface dark:border-transparent">
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table
             className={cn("w-full border-collapse text-left text-[14px]", wide && "min-w-[44rem]")}
             style={{ tableLayout: "fixed" }}

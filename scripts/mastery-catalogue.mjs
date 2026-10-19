@@ -6,6 +6,11 @@
  *   node scripts/mastery-catalogue.mjs           # dry run — prints the plan
  *   node scripts/mastery-catalogue.mjs --apply   # writes
  *
+ * Phase 13 (D21): the 12 programs are filed under the seven schools, and
+ * `category` is the school's short label. Run `migrate-schools-v2.mjs` first;
+ * never run a pre-Phase 13 copy of this script after it (it would move the
+ * programs back to retired slugs). Each MATCH prints `school: <existing> -> <new>`.
+ *
  * Modeled on scripts/_swap-catalogue.mjs (dotenv, mongoose.connect, raw
  * db.collection("courses"), --apply gate). Differs from it in one way that
  * matters: this script never archives or deletes, and every program is
@@ -118,33 +123,29 @@ const SCHOOLS = {
     short: "Trading & Financial Markets",
     blurb: "Learn about Forex, cryptocurrency, market analysis, risk management and trading psychology.",
   },
-  "blockchain-web3": {
-    short: "Blockchain & Web3",
-    blurb: "Understand the technology behind blockchain, digital assets and the emerging Web3 economy.",
+  "technology-ai": {
+    short: "Technology & AI",
+    blurb: "Build practical skills in artificial intelligence, software, data and cybersecurity.",
   },
-  "ai-automation": {
-    short: "AI & Automation",
-    blurb: "Discover how AI is transforming business, productivity, creativity and everyday work.",
-  },
-  "software-app-development": {
-    short: "Software & App Development",
-    blurb: "Learn how modern applications are designed and developed, including the use of AI-powered development tools.",
-  },
-  cybersecurity: {
-    short: "Cybersecurity",
-    blurb: "Build knowledge of digital security, cyber threats and responsible cybersecurity practices.",
-  },
-  "data-analytics": {
-    short: "Data & Analytics",
-    blurb: "Learn how to collect, understand, analyze and communicate data for better decisions.",
-  },
-  "digital-media-creative": {
-    short: "Digital Media & Creative Technology",
-    blurb: "Turn ideas into compelling digital content and develop skills for the creator economy.",
-  },
-  "digital-business-remote-careers": {
-    short: "Digital Business & Remote Careers",
+  "digital-business": {
+    short: "Digital Business",
     blurb: "Build practical skills for selling, marketing, e-commerce and working in the global digital economy.",
+  },
+  "entrepreneurship-wealth-creation": {
+    short: "Entrepreneurship & Wealth Creation",
+    blurb: "Learn to start, run and grow a business, and the principles of investing and building wealth.",
+  },
+  "creative-economy": {
+    short: "Creative Economy",
+    blurb: "Turn ideas into compelling design, video and content, and build skills for the creator economy.",
+  },
+  "leadership-personal-development": {
+    short: "Leadership & Personal Development",
+    blurb: "Develop the leadership, communication and personal effectiveness that turn knowledge into results.",
+  },
+  "emerging-technologies": {
+    short: "Emerging Technologies",
+    blurb: "Understand blockchain, Web3, FinTech and the technologies shaping what comes next.",
   },
 }
 
@@ -328,11 +329,11 @@ const PROGRAMS = [
     buildPackages: () => cryptoPackages,
   },
   {
-    title: "Blockchain Technology Mastery", legacyTitles: [], school: "blockchain-web3",
+    title: "Blockchain Technology Mastery", legacyTitles: [], school: "emerging-technologies",
     newInsertDraft: false, spec: null, buildPackages: () => genericLadder("Blockchain"),
   },
   {
-    title: "AI & AI Automation", legacyTitles: ["Artificial Intelligence & AI Automation"], school: "ai-automation",
+    title: "AI & AI Automation", legacyTitles: ["Artificial Intelligence & AI Automation"], school: "technology-ai",
     newInsertDraft: false,
     spec: {
       shortDescription: "Turn Artificial Intelligence into a practical skill.",
@@ -342,35 +343,35 @@ const PROGRAMS = [
     buildPackages: () => genericLadder("AI"),
   },
   {
-    title: "App Development with AI", legacyTitles: [], school: "software-app-development",
+    title: "App Development with AI", legacyTitles: [], school: "technology-ai",
     newInsertDraft: false, spec: null, buildPackages: () => genericLadder("App Development"),
   },
   {
-    title: "Cybersecurity", legacyTitles: [], school: "cybersecurity",
+    title: "Cybersecurity", legacyTitles: [], school: "technology-ai",
     newInsertDraft: false, spec: null, buildPackages: () => genericLadder("Cybersecurity"),
   },
   {
-    title: "Data Analysis", legacyTitles: [], school: "data-analytics",
+    title: "Data Analysis", legacyTitles: [], school: "technology-ai",
     newInsertDraft: false, spec: null, buildPackages: () => genericLadder("Data Analysis"),
   },
   {
-    title: "Content Creation Mastery", legacyTitles: ["Content Creation / Video Editing Mastery"], school: "digital-media-creative",
+    title: "Content Creation Mastery", legacyTitles: ["Content Creation / Video Editing Mastery"], school: "creative-economy",
     newInsertDraft: false, spec: null, buildPackages: () => genericLadder("Content Creation"),
   },
   {
-    title: "Video Editing Mastery", legacyTitles: [], school: "digital-media-creative",
+    title: "Video Editing Mastery", legacyTitles: [], school: "creative-economy",
     newInsertDraft: true, spec: null, buildPackages: () => genericLadder("Video Editing"),
   },
   {
-    title: "Tech Sales & Digital Marketing", legacyTitles: [], school: "digital-business-remote-careers",
+    title: "Tech Sales & Digital Marketing", legacyTitles: [], school: "digital-business",
     newInsertDraft: false, spec: null, buildPackages: () => genericLadder("Tech Sales & Marketing"),
   },
   {
-    title: "E-Commerce & Digital Business", legacyTitles: [], school: "digital-business-remote-careers",
+    title: "E-Commerce & Digital Business", legacyTitles: [], school: "digital-business",
     newInsertDraft: true, spec: null, buildPackages: () => genericLadder("E-Commerce"),
   },
   {
-    title: "Virtual Assistance", legacyTitles: [], school: "digital-business-remote-careers",
+    title: "Virtual Assistance", legacyTitles: [], school: "digital-business",
     newInsertDraft: false, spec: null, buildPackages: () => genericLadder("Virtual Assistance"),
   },
 ]
@@ -648,6 +649,7 @@ for (const plan of plans) {
     counts.matched++
     console.log(`  _id: ${existing._id} · status: ${existing.status} · owner: ${email} · price: ${existing.price}`)
     console.log(`  slug: ${slugResult.slug ? `-> "${slugResult.slug}"` : `unchanged ("${existing.slug}")`}`)
+    console.log(`  school: ${existing.school ?? "none"} -> ${program.school}`)
     console.log(`  price: ${priceLine}`)
     console.log(`  plans (enabled prices): ${ladderLine}`)
     console.log(`  $set: ${Object.keys(setDoc).join(", ")}`)

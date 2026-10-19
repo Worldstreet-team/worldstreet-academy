@@ -22,7 +22,7 @@ function programCountLabel(count: number): string {
 /**
  * "Explore schools" — the marketplace header's catalogue menu. A Base UI
  * popover (click to open; Esc, outside click and a chosen link close it)
- * holding the eight schools in two columns of four, in school order, with
+ * holding the seven schools in two columns, in school order, with
  * "All schools" / "All programs" at its foot. No gold in here: the bar's
  * one gold button stays the only primary action.
  */

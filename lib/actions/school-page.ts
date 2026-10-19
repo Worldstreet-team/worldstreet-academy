@@ -3,7 +3,7 @@
 import mongoose from "mongoose"
 import connectDB from "@/lib/db"
 import { Course, Review } from "@/lib/db/models"
-import { isSchoolSlug } from "@/lib/schools"
+import { isSchoolSlug, storedSlugsFor } from "@/lib/schools"
 import { PROGRAM_KIND_FILTER } from "@/lib/course-kind"
 import { countryName } from "@/lib/countries"
 import { maskedName } from "@/lib/masked-name"
@@ -50,7 +50,7 @@ export async function fetchSchoolReviews(slug: string, limit = 6): Promise<Schoo
 
     await connectDB()
     // The school speaks for its programs: marketplace courses filed under it are not part of its record.
-    const courses = await Course.find({ school: slug, status: "published", ...PROGRAM_KIND_FILTER })
+    const courses = await Course.find({ school: { $in: storedSlugsFor(slug) }, status: "published", ...PROGRAM_KIND_FILTER })
       .select("title slug rating")
       .lean()
     if (courses.length === 0) return EMPTY

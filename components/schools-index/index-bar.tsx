@@ -10,7 +10,7 @@ import type { IndexSchool } from "./model"
  * The index's follow-along bar (md+): once the header's search has scrolled
  * away and the schools are on screen, a solid bar drops in under the navbar
  * with the same search (one query, two fields) and, from lg, a jump list of
- * the eight schools that marks the one you are reading — its number and
+ * the seven schools that marks the one you are reading — its number and
  * name, the rest numbers only. Solid page fill and a hairline foot, like the
  * navbar (no glass). `inert` while hidden keeps it out of the tab order.
  *

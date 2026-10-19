@@ -22,7 +22,7 @@ import { entitlementsFor } from "@/lib/entitlements"
 import { COURSE_KIND_LABEL, courseKindOf } from "@/lib/course-kind"
 import { safeWebUrl } from "@/lib/faculty"
 import { referralSummary } from "@/lib/referrals"
-import { SCHOOL_BY_SLUG, isSchoolSlug } from "@/lib/schools"
+import { schoolFromSlug } from "@/lib/schools"
 
 /*
  * The tutor home (/instructor) in one read: the class to start next (or the
@@ -431,7 +431,7 @@ export async function getTeachingHome(input: {
           title: c.title,
           kind,
           kindLabel: COURSE_KIND_LABEL[kind],
-          schoolName: isSchoolSlug(c.school) ? SCHOOL_BY_SLUG[c.school].short : null,
+          schoolName: schoolFromSlug(c.school)?.short ?? null,
           status: c.status,
           art: c.thumbnailUrl || null,
           enrolled: c.enrolledCount || 0,

@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils"
  * later, as a fade and a short rise.
  *
  * Nothing below moves: the cell stacks every variant it can show (the
- * default and all eight schools) invisibly in one grid area, so it is always
+ * default and all seven schools) invisibly in one grid area, so it is always
  * as tall as its tallest variant, at every width.
  *
  * The variant on screen at load plays the page's load sequence (the old

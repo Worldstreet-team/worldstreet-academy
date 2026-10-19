@@ -8,10 +8,10 @@ import { SchoolCard } from "@/components/marketing/school-card"
 import { SCHOOL_SECTION, SectionHead } from "@/components/schools/section-head"
 
 /**
- * `#other-schools` — the seven other schools, as the landing and /schools
+ * `#other-schools` — the six other schools, as the landing and /schools
  * show them (`SchoolCard`, unchanged), starting with the one after this
- * school and wrapping round. The eighth tile is the way out to the whole
- * catalogue, so four across closes on two full rows.
+ * school and wrapping round. The seventh tile is the way out to the whole
+ * catalogue, so four across closes on a row of four and a row of three.
  */
 export function OtherSchools({
   school,
@@ -44,7 +44,7 @@ export function OtherSchools({
           </Link>
         }
       />
-      {/* Phones: a swipeable row (eight stacked cards would be a page of
+      {/* Phones: a swipeable row (seven stacked cards would be a page of
           their own); from sm a grid, four across from lg. */}
       <ul className="no-scrollbar -mx-6 mt-10 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-px-6 px-6 pb-1 sm:mx-0 sm:grid sm:snap-none sm:grid-cols-2 sm:gap-5 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-4">
         {others.map((s) => (
@@ -68,7 +68,7 @@ export function OtherSchools({
                 Every program in one list
               </h3>
               <p className="mb-6 mt-2 text-[14px] leading-relaxed text-ws-muted">
-                Across all eight schools, with each one&apos;s level and price.
+                Across all {SCHOOLS.length} schools, with each one&apos;s level and price.
               </p>
               <span className="mt-auto flex items-center justify-between gap-3 border-t border-ws-hairline pt-4 text-[13px]">
                 <span className="tabular-nums text-ws-muted">{plural(total, "program")}</span>

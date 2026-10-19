@@ -72,6 +72,29 @@ Nothing to configure. The `partnerclicks` collection and its unique index are cr
 1. **Smoke test.** Signed in, open `/dashboard/referrals` and copy your partner link. Open it in a private window and reload once. Back in your own session, Clicks reads 1 more, not 2. Opening your own link while signed in adds nothing (a signed-out visit by you does count).
 2. **Admin.** `/admin/partners` lists you. "Export CSV" opens cleanly in a spreadsheet.
 
+## Seven schools — Phase 13 (D21, D22)
+
+The academic structure becomes the seven schools of the institutional blueprint (§7). Stored school slugs move with `scripts/migrate-schools-v2.mjs`. Until it runs, the web already shows a retired slug under its new school, so the order of deploy and migration cannot strand a program. Run these steps in order:
+
+1. **Go.** R12 is live (`docs/go-patches-phase-3.md` §15).
+2. **Backup** (§1).
+3. **Deploy** the web app (§4). From here, the site already shows retired slugs under their new school.
+4. **Dry run:**
+
+   ```bash
+   MONGODB_URI="$PROD_URI" node scripts/migrate-schools-v2.mjs | tee "schools-v2-dryrun-$(date +%Y%m%d-%H%M).log"
+   ```
+
+   Review the per-mapping counts. Every `LEFTOVER` line must be explained before applying; none is expected.
+5. **Apply, the same day:** the same command with `--apply`, tee'd to `schools-v2-apply-…log`.
+6. **Check:**
+   - Re-running `--apply` prints `moved 0`.
+   - `curl -s -o /dev/null -w "%{http_code} %{redirect_url}\n" "$SITE/schools/cybersecurity"` prints `308 $SITE/schools/technology-ai`.
+   - `$SITE/schools/entrepreneurship-wealth-creation` returns `200`.
+7. **Catalogue dry run (§6), from a Phase 13 checkout.** Every MATCH prints `school: X -> X`. **Never run `mastery-catalogue.mjs` from an older checkout after this step.** It would move the 12 programs back to retired slugs.
+8. **Rollback.** The apply log lists every `MOVED` document, old → new. The mapping is many-to-one, so restore the four fields from the backup (`mongorestore` of those collections) or reverse the logged lines by hand. Reverting only the web deploy leaves programs under schools the old code doesn't know.
+9. **Owed by product:** sign off each school's copy in `lib/schools.ts` (entries marked `DRAFT: owner sign-off pending`), and the two placeholder covers.
+
 ## 0. Blockers — settle these first
 
 | # | Item | Who | Blocks launch? |
@@ -349,4 +372,4 @@ Expect `acknowledged: true`, and note `modifiedCount` in your run log. **Those s
 
 - No script, no env and no data migration. The `attendances` index builds itself at boot.
 - Smoke test after deploy: as a Standard learner, join a live class on the web for over two minutes and leave. Then check that `db.attendances.find({ user: <id> })` shows `seconds` > 0 and `openSince: null`.
-- Classes joined in the mobile app don't count until Go writes attendance rows (Go doc §12, R-A).
+- Classes joined in the mobile app don't count until Go writes attendance rows (Go doc §13, R-A).

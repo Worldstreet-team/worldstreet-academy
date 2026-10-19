@@ -272,3 +272,31 @@ Go needs no patch.
 - If Go ever sends that welcome, it must claim the same field the same way first.
 - The web also skips the welcome when the learner already had an earlier paid enrollment (the rule in `lib/welcome-email.ts`), so Go must do the same if it ever sends it.
 - Any wholesale user write must keep it.
+
+## 15. Phase 13 — the seven schools (owner, 2026-10-19; D21, D22)
+
+**R12 — School slugs and labels change; ship before `scripts/migrate-schools-v2.mjs --apply` runs.**
+
+The institutional blueprint (§7) replaces the eight schools with seven. Four old schools merge into one, three are renamed, and two are new:
+
+| Old slug(s) | New slug | New `courses.category` |
+|---|---|---|
+| `trading-financial-markets` (unchanged) | `trading-financial-markets` | Trading & Financial Markets |
+| `ai-automation`, `software-app-development`, `cybersecurity`, `data-analytics` | `technology-ai` | Technology & AI |
+| `digital-business-remote-careers` | `digital-business` | Digital Business |
+| (new) | `entrepreneurship-wealth-creation` | Entrepreneurship & Wealth Creation (no programs yet) |
+| `digital-media-creative` | `creative-economy` | Creative Economy |
+| (new) | `leadership-personal-development` | Leadership & Personal Development (no programs yet) |
+| `blockchain-web3` | `emerging-technologies` | Emerging Technologies |
+
+Fields whose **values** the migration rewrites:
+- `courses.school`, and `courses.category` (on moved courses only);
+- `enrollmentintents.school`;
+- `sellerapplications.school`;
+- `instructorapplications.answers.school`.
+
+What Go does:
+- Any mobile list of school slugs, names, icons or filters switches to the seven, in §7's order (the order of the table above), in the same release.
+- Go must never write a retired slug. Until the migration has run, a read should map a retired slug through the table, as the web does (`schoolFromSlug`, `lib/schools.ts`).
+- Web `/schools/<retired>` answers 308 to the new school.
+- Nothing is added, renamed or removed: no field, model, route or enum changes. Only these string values move.

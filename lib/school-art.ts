@@ -1,24 +1,28 @@
-import { isSchoolSlug, type SchoolSlug } from "@/lib/schools"
+import { schoolSlugOf, type SchoolSlug } from "@/lib/schools"
 
 /**
- * Cover art for the eight schools: static, code-owned files under
+ * Cover art for the seven schools: static, code-owned files under
  * `public/art/schools/`. A slug missing here has no cover yet and every
  * surface falls back to the school's icon, so art lands one file at a time.
- * Add an entry only in the same commit as its file.
+ * Add an entry only in the same commit as its file. Two covers are
+ * placeholders until real renders land (content debt): Entrepreneurship &
+ * Wealth Creation reuses the data-analytics growth chart, Leadership &
+ * Personal Development the cybersecurity padlock.
  */
 export const SCHOOL_COVERS: Partial<Record<SchoolSlug, string>> = {
   "trading-financial-markets": "/art/schools/trading-financial-markets.webp",
-  "blockchain-web3": "/art/schools/blockchain-web3.webp",
-  "ai-automation": "/art/schools/ai-automation.webp",
-  "software-app-development": "/art/schools/software-app-development.webp",
-  "cybersecurity": "/art/schools/cybersecurity.webp",
-  "data-analytics": "/art/schools/data-analytics.webp",
-  "digital-media-creative": "/art/schools/digital-media-creative.webp",
-  "digital-business-remote-careers": "/art/schools/digital-business-remote-careers.webp",
+  "technology-ai": "/art/schools/ai-automation.webp",
+  "digital-business": "/art/schools/digital-business-remote-careers.webp",
+  "entrepreneurship-wealth-creation": "/art/schools/data-analytics.webp",
+  "creative-economy": "/art/schools/digital-media-creative.webp",
+  "leadership-personal-development": "/art/schools/cybersecurity.webp",
+  "emerging-technologies": "/art/schools/blockchain-web3.webp",
 }
 
+/** The cover for a current or retired school slug. */
 export function schoolCover(slug: string | null | undefined): string | null {
-  return isSchoolSlug(slug) ? (SCHOOL_COVERS[slug] ?? null) : null
+  const current = schoolSlugOf(slug)
+  return current ? (SCHOOL_COVERS[current] ?? null) : null
 }
 
 /**

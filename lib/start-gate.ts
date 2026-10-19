@@ -1,4 +1,4 @@
-import { isSchoolSlug } from "@/lib/schools"
+import { schoolSlugOf } from "@/lib/schools"
 
 /** First-party memory of a guest's landing-page choice (30 days). */
 export const START_SCHOOL_COOKIE = "wsa_school"
@@ -48,11 +48,15 @@ export function needsSchoolChoice(input: StartGateInput): boolean {
  * school they named — by URL or the `wsa_school` cookie — else every school.
  * Always a public marketing page, so it can never bounce back into the gate.
  *
+ * The `wsa_school` cookie outlives a school rename by 30 days, so a retired slug
+ * resolves to its new school here.
+ *
  * The all-schools target carries `?start=1` so `/schools` can say why the
  * learner is there ("choose a program to get started"). The page shows that
  * notice only to a signed-in learner the gate would still send, so an
  * enrolled learner following an old `/dashboard/start` link never sees it.
  */
 export function schoolsPathFor(school: string | null | undefined): string {
-  return isSchoolSlug(school) ? `/schools/${school}` : "/schools?start=1"
+  const slug = schoolSlugOf(school)
+  return slug ? `/schools/${slug}` : "/schools?start=1"
 }

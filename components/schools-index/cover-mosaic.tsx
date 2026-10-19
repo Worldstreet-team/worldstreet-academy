@@ -12,7 +12,7 @@ import { SCHOOL_BY_SLUG } from "@/lib/schools"
 import { plural, type IndexSchool } from "./model"
 
 /**
- * The header's collage: the eight path-traced covers as a 4 × 2 wall, one
+ * The header's collage: the seven path-traced covers as a 4 + 3 wall, one
  * tile per school in the spec's order, each a jump to that school's entry
  * further down the page.
  *

@@ -16,7 +16,7 @@ import {
   type PackageKey,
 } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth"
-import { isSchoolSlug, type SchoolSlug } from "@/lib/schools"
+import { schoolSlugOf, storedSlugsFor, type SchoolSlug } from "@/lib/schools"
 import { programArt } from "@/lib/school-art"
 import { FULL_ACCESS, PACKAGE_RANK, canAccessLesson, effectiveLessonTier, entitlementsFor } from "@/lib/entitlements"
 import {
@@ -231,7 +231,8 @@ export async function fetchBrowseCourses(options?: {
       else if (options.pricing === "Paid") query.price = { $gt: 0 }
     }
     if (typeof options?.school === "string" && options.school) {
-      query.school = options.school
+      const current = schoolSlugOf(options.school)
+      query.school = current ? { $in: storedSlugsFor(current) } : options.school
     }
     if (typeof options?.instructorId === "string" && mongoose.Types.ObjectId.isValid(options.instructorId)) {
       query.instructor = options.instructorId
@@ -270,7 +271,7 @@ export async function fetchBrowseCourses(options?: {
         instructorAvatarUrl: instructor.avatarUrl,
         level: course.level as "beginner" | "intermediate" | "advanced",
         category: course.category || "",
-        school: isSchoolSlug(course.school) ? course.school : null,
+        school: schoolSlugOf(course.school),
         pricing: course.pricing as "free" | "paid",
         price: course.price,
         tierCount: (course.packages ?? []).filter((p) => p.enabled).length,
@@ -355,7 +356,7 @@ export async function fetchFreePreviewLessons(limit = 6): Promise<FreePreview[]>
         videoUrl: lesson.videoUrl,
         courseTitle: course.title,
         courseSlug: course.slug,
-        school: isSchoolSlug(course.school) ? course.school : null,
+        school: schoolSlugOf(course.school),
       })
       if (out.length >= limit) break
     }
@@ -601,7 +602,7 @@ async function findProgram(filter: { slug: string } | { _id: string }): Promise<
     instructorAvatarUrl: instructor.avatarUrl,
     level: course.level as "beginner" | "intermediate" | "advanced",
     category: course.category || "",
-    school: isSchoolSlug(course.school) ? course.school : null,
+    school: schoolSlugOf(course.school),
     pricing: course.pricing as "free" | "paid",
     price: course.price,
     tierCount: enabled.length,
@@ -846,7 +847,7 @@ export async function fetchOtherCourses(excludeCourseId: string): Promise<Browse
         instructorAvatarUrl: instructor.avatarUrl,
         level: course.level as "beginner" | "intermediate" | "advanced",
         category: course.category || "",
-        school: isSchoolSlug(course.school) ? course.school : null,
+        school: schoolSlugOf(course.school),
         pricing: course.pricing as "free" | "paid",
         price: course.price,
         tierCount: (course.packages ?? []).filter((p) => p.enabled).length,

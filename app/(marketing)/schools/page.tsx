@@ -48,7 +48,7 @@ async function gateWelcome(): Promise<{ firstName: string } | null> {
 
 /**
  * `/schools` — "Explore our schools" (blueprint §4, §17): the step between
- * the homepage and a school. A header with the eight covers and the real
+ * the homepage and a school. A header with the seven covers and the real
  * totals, a search that narrows schools and their programs as you type, each
  * school as an editorial row listing its actual programs, then free lessons
  * and the full program list for anyone not ready to pick a school.

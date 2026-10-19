@@ -11,6 +11,8 @@
  * Server-only seller reads are in lib/seller.ts.
  */
 
+import { SCHOOLS } from "@/lib/schools"
+
 /** Where an approved seller lands in the instructor area — the only home they have there. */
 export const SELLER_HOME = "/instructor/courses"
 
@@ -44,8 +46,8 @@ export const QUALITY_CRITERIA = [
     body: "Learners finish able to do something they couldn't before — real tasks, real tools, real examples.",
   },
   {
-    title: "Fits one of the eight schools",
-    body: "The topic belongs in a school of the Academy, from trading and Web3 to data, media and digital business.",
+    title: `Fits one of the ${SCHOOLS.length} schools`,
+    body: "The topic belongs in a school of the Academy, from trading and technology to digital business, the creative economy and leadership.",
   },
   {
     title: "Clear audio and video",
