@@ -6,6 +6,7 @@ import { registerUrl } from "@/lib/auth/login-url"
 import { cheapestBySchool, countProgramsBySchool } from "@/lib/schools"
 import { HeroWall } from "@/components/marketing/hero-wall"
 import { CohortBanner } from "@/components/marketing/cohort-banner"
+import { cohortIsUpcoming } from "@/lib/cohort"
 import { HowItWorks } from "@/components/marketing/how-it-works"
 import { WordsMarquee } from "@/components/marketing/words-marquee"
 import { AboutBand } from "@/components/marketing/about-band"
@@ -97,8 +98,8 @@ export async function Landing() {
       {/* Reading progress — a gold line on the navbar's foot, landing only */}
       <ScrollProgress />
 
-      {/* Hero — the still claim over a slideshow of students, the school picker and its CTAs (spec §1) */}
-      <HeroWall counts={schoolCounts} cheapest={schoolFrom} signedIn={signedIn} registerUrl={REGISTER_URL} />
+      {/* Hero — the still claim over a slideshow of students, the school picker and its CTAs (institutional blueprint §18) */}
+      <HeroWall counts={schoolCounts} cheapest={schoolFrom} signedIn={signedIn} registerUrl={REGISTER_URL} cohortOpen={cohortIsUpcoming()} />
 
       {/* Live cohort — the date, the countdown and "Choose your school" (owner 2026-10-03); gone once it begins */}
       <CohortBanner variant="band" className="pt-14 md:pt-20" />
