@@ -207,48 +207,6 @@ export async function uploadCourseThumbnail(
 }
 
 /**
- * Publish a course
- */
-export async function publishCourse(courseId: string, instructorId: string) {
-  try {
-    await connectDB()
-
-    const course = await Course.findOne({
-      _id: courseId,
-      instructor: instructorId,
-    })
-
-    if (!course) {
-      return { success: false, error: "Course not found or unauthorized" }
-    }
-
-    // Check if course has lessons
-    const lessonCount = await Lesson.countDocuments({
-      course: courseId,
-      isPublished: true,
-    })
-
-    if (lessonCount === 0) {
-      return { success: false, error: "Course must have at least one published lesson" }
-    }
-
-    // Publish
-    course.status = "published"
-    course.publishedAt = new Date()
-    await course.save()
-
-    revalidatePath(`/instructor/courses/${courseId}`)
-    revalidatePath("/instructor/courses")
-    revalidatePath("/dashboard/courses")
-
-    return { success: true }
-  } catch (error) {
-    console.error("Publish course error:", error)
-    return { success: false, error: "Failed to publish course" }
-  }
-}
-
-/**
  * Archive a course
  */
 export async function archiveCourse(courseId: string, instructorId: string) {
