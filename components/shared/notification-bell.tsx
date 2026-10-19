@@ -3,20 +3,20 @@ import { Glyph, ArrowRight01Icon, Notification03Icon } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent } from "@/components/ui/dropdown-menu"
 import { Segmented } from "@/components/ui/system"
 import { NotificationRow } from "@/components/notifications/notification-row"
 import {
-  getMyNotifications,
   markAllNotificationsRead,
   markNotificationRead,
   type NotificationFeed,
   type NotificationItem,
 } from "@/lib/actions/notifications"
 import { queryKeys } from "@/lib/hooks/queries/keys"
+import { useNotificationFeed } from "@/lib/hooks/queries/use-notifications"
 import type { SSEEventPayload } from "@/lib/call-events"
 
 /**
@@ -28,7 +28,6 @@ import type { SSEEventPayload } from "@/lib/call-events"
 
 type BellTab = "courses" | "other"
 
-const BELL_LIMIT = 40
 const BELL_ROWS = 8
 
 function BellPanel({
@@ -149,12 +148,7 @@ export function NotificationBell() {
   const [open, setOpen] = React.useState(false)
   const queryClient = useQueryClient()
 
-  const { data, isLoading } = useQuery({
-    queryKey: queryKeys.notifications,
-    queryFn: () => getMyNotifications(BELL_LIMIT),
-    staleTime: 30_000,
-    refetchInterval: 120_000, // slow polling fallback; Ably invalidates live
-  })
+  const { data, isLoading } = useNotificationFeed()
 
   const unreadCount = data?.unreadCount ?? 0
 

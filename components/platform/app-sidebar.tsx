@@ -1,5 +1,5 @@
 "use client"
-import { Glyph, ArrowDown01Icon, ArrowRight01Icon, BookOpen01Icon, Bookmark02Icon, Brain01Icon, Certificate01Icon, ChampionIcon, ChartUpIcon, DashboardSquare01Icon, DollarCircleIcon, EyeIcon, GameController01Icon, GiftIcon, HelpCircleIcon, LinkSquare02Icon, Logout01Icon, MentoringIcon, Message01Icon, Store01Icon, Task01Icon, TeachingIcon, UserGroup02Icon, UserGroupIcon, Video01Icon, VideoReplayIcon, Wallet01Icon } from "@/components/icons"
+import { Glyph, ArrowDown01Icon, ArrowRight01Icon, BookOpen01Icon, Bookmark02Icon, Brain01Icon, Calendar03Icon, Certificate01Icon, ChampionIcon, ClipboardCheckIcon, ChartUpIcon, DashboardSquare01Icon, DollarCircleIcon, EyeIcon, GameController01Icon, GiftIcon, HelpCircleIcon, Inbox, LinkSquare02Icon, Logout01Icon, MentoringIcon, Message01Icon, Store01Icon, Task01Icon, TeachingIcon, UserGroup02Icon, UserMultiple02Icon, Video01Icon, VideoReplayIcon, Wallet01Icon } from "@/components/icons"
 
 import * as React from "react"
 import Image from "next/image"
@@ -27,7 +27,7 @@ import { LogoutConfirmDialog } from "@/components/shared/logout-confirm-dialog"
 import { useUnreadCount } from "@/lib/hooks/use-unread-count"
 import { useOngoingCall } from "@/components/providers/call-provider"
 import { useSidebarActivity } from "@/lib/hooks/use-sidebar-activity"
-import { useEnrollments } from "@/lib/hooks/queries"
+import { useEnrollments, useNotificationFeed } from "@/lib/hooks/queries"
 import { enrollmentHref, grantsAccess, isMentorEnrollment, pickHero } from "@/lib/dashboard-home"
 import { useNow } from "@/lib/hooks/use-now"
 import { BRAND } from "@/lib/brand"
@@ -58,7 +58,10 @@ type NavItem = {
   match?: (pathname: string) => boolean
 }
 
-/** Primary loop — the reasons a learner opens the Academy at all. */
+/**
+ * Primary loop — the reasons a learner opens the Academy at all. Order and
+ * labels follow the student portal of institutional blueprint §11.
+ */
 const learnItems: NavItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: DashboardSquare01Icon, match: (p) => p === "/dashboard" },
   // No in-dashboard "Programs" catalogue beside this (owner, 2026-09-18) — a
@@ -74,18 +77,36 @@ const learnItems: NavItem[] = [
       (p.startsWith("/dashboard/courses/") && !p.includes("/certificate")),
   },
   {
+    title: "My classes",
+    href: "/dashboard/meetings",
+    icon: Calendar03Icon,
+    match: (p) => p.startsWith("/dashboard/meetings"),
+  },
+  {
+    title: "Recordings",
+    href: "/dashboard/recordings",
+    icon: VideoReplayIcon,
+    match: (p) => p.startsWith("/dashboard/recordings"),
+  },
+  {
     title: "Assignments",
     href: "/dashboard/assignments",
     icon: Task01Icon,
     match: (p) => p.startsWith("/dashboard/assignments"),
   },
   {
+    title: "Assessments",
+    href: "/dashboard/assessments",
+    icon: ClipboardCheckIcon,
+    match: (p) => p.startsWith("/dashboard/assessments"),
+  },
+  { title: "My points", href: "/dashboard/points", icon: ChampionIcon, match: (p) => p === "/dashboard/points" },
+  {
     title: "Certificates",
     href: "/dashboard/certificates",
     icon: Certificate01Icon,
     match: (p) => p === "/dashboard/certificates" || p.includes("/certificate"),
   },
-  { title: "Points", href: "/dashboard/points", icon: ChampionIcon, match: (p) => p === "/dashboard/points" },
 ]
 
 /** Executive-package mentees only (`isMentorEnrollment`). */
@@ -107,22 +128,22 @@ const teachItem: NavItem = {
 /** Live/social — carries unread and in-progress state. */
 const connectItems: NavItem[] = [
   {
+    title: "Inbox",
+    href: "/dashboard/notifications",
+    icon: Inbox,
+    match: (p) => p === "/dashboard/notifications",
+  },
+  {
     title: "Messages",
     href: "/dashboard/messages",
     icon: Message01Icon,
     match: (p) => p === "/dashboard/messages",
   },
   {
-    title: "Meetings",
-    href: "/dashboard/meetings",
-    icon: UserGroupIcon,
-    match: (p) => p.startsWith("/dashboard/meetings"),
-  },
-  {
-    title: "Recordings",
-    href: "/dashboard/recordings",
-    icon: VideoReplayIcon,
-    match: (p) => p.startsWith("/dashboard/recordings"),
+    title: "Communities",
+    href: "/dashboard/communities",
+    icon: UserMultiple02Icon,
+    match: (p) => p === "/dashboard/communities",
   },
 ]
 
@@ -424,6 +445,7 @@ export function AppSidebar() {
   const inProgressCount = enrollments.filter((e) => grantsAccess(e) && e.progress < 100).length
   const liveCount = activeMeetings.length + invites.length
   const hasMentorship = enrollments.some(isMentorEnrollment)
+  const inboxUnread = useNotificationFeed().data?.unreadCount ?? 0
 
   const learn = [
     ...learnItems,
@@ -451,6 +473,9 @@ export function AppSidebar() {
       if (unreadCount > 0) {
         return { label: unreadCount > 99 ? "99+" : String(unreadCount), spoken: `${unreadCount} unread`, tone: "brand" }
       }
+    }
+    if (item.href === "/dashboard/notifications" && inboxUnread > 0) {
+      return { label: inboxUnread > 99 ? "99+" : String(inboxUnread), spoken: `${inboxUnread} unread`, tone: "brand" }
     }
     if (item.href === "/dashboard/meetings" && liveCount > 0) {
       return { label: `${liveCount} live`, spoken: `${liveCount} live`, tone: "live" }

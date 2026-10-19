@@ -73,7 +73,9 @@ export function HomeGreeting({
   const name = firstName ? `, ${firstName}` : ""
   return (
     <header className="flex flex-col gap-1">
+      {/* D19: the dashboard is the Campus. Eyebrow only; the nav keeps "Dashboard". */}
       <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        WMA Campus ·{" "}
         {date ? (
           date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
         ) : (

@@ -21,4 +21,5 @@ export {
 } from "./use-messages"
 export { useMyCertificates } from "./use-certificates"
 export { useMyAssessments } from "./use-assessments"
+export { useNotificationFeed, NOTIFICATION_FEED_LIMIT } from "./use-notifications"
 export { useMyPoints } from "./use-points"
