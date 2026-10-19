@@ -231,7 +231,7 @@ export default function AcademyPage() {
 
       {/* §23's closing banner: the brand's sign-off, the page's last word. */}
       <div className="border-t border-ws-hairline py-10 md:py-12">
-        <Reveal as="p" className={`${WRAP} text-balance text-center text-[12px] font-semibold uppercase tracking-[0.14em] text-ws-gold md:text-[13px]`}>
+        <Reveal as="p" className={`${WRAP} text-balance text-center text-[12px] font-semibold uppercase tracking-[0.14em] text-ws-muted md:text-[13px]`}>
           {CLOSING_BANNER}
         </Reveal>
       </div>
