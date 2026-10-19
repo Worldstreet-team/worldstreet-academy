@@ -76,6 +76,14 @@ export interface IUser extends Document {
     totalStudents: number
     totalCourses: number
     totalEarnings: number
+    /** acknowledged handbook pages (institutional blueprint §16, D29) */
+    handbook?: {
+      teachingStandardsAt: Date | null
+      curriculumGuidelinesAt: Date | null
+      platformTrainingAt: Date | null
+    }
+    /** WMA Faculty credential, set once by `ensureFacultyCredential`, never rewritten */
+    credential?: { id: string; issuedAt: Date } | null
   }
   createdAt: Date
   updatedAt: Date
@@ -211,6 +219,15 @@ const UserSchema = new Schema<IUser>(
       totalStudents: { type: Number, default: 0 },
       totalCourses: { type: Number, default: 0 },
       totalEarnings: { type: Number, default: 0 },
+      handbook: {
+        teachingStandardsAt: { type: Date, default: null },
+        curriculumGuidelinesAt: { type: Date, default: null },
+        platformTrainingAt: { type: Date, default: null },
+      },
+      credential: {
+        type: new Schema({ id: { type: String, required: true }, issuedAt: { type: Date, required: true } }, { _id: false }),
+        default: null,
+      },
     },
   },
   {
@@ -227,6 +244,12 @@ UserSchema.index(
   { unique: true, partialFilterExpression: { referralCode: { $type: "string" } }, name: "referralCode_unique" }
 )
 UserSchema.index({ "referredBy.userId": 1 }, { sparse: true })
+// One owner per faculty credential. A partial filter, not `sparse`, as on `certificateId`:
+// the default `null` must not count as a value.
+UserSchema.index(
+  { "instructorProfile.credential.id": 1 },
+  { unique: true, partialFilterExpression: { "instructorProfile.credential.id": { $type: "string" } }, name: "facultyCredential_unique" }
+)
 
 // Virtual for full name
 UserSchema.virtual("fullName").get(function () {

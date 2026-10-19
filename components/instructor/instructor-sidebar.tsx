@@ -1,5 +1,5 @@
 "use client"
-import { BookOpen, CalendarDays, ChartLine, ChevronDown, Gift, House, LayoutDashboard, LogOut, MessageCircle, Plus, Settings, Store, Trophy, User, Users, type IconComponent } from "@/components/icons"
+import { BookOpen, CalendarDays, ChartLine, ChevronDown, Gift, House, LayoutDashboard, LogOut, MessageCircle, Notebook01Icon, Plus, Settings, Store, Trophy, User, UserGroupIcon, Video, Wallet, type IconComponent } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
@@ -34,9 +34,12 @@ import { BrandLockup } from "@/components/shared/brand-lockup"
  * WorldStreet links collapse behind one disclosure so they stop competing
  * with teaching navigation.
  *
- * An approved marketplace seller (`seller`, owner 2026-10-05) sees only the
- * course tools they may use — My Courses, Add Course, Profile, Settings —
- * and the marketplace instead of the faculty-only connect rows.
+ * Faculty's rail follows institutional blueprint §16: Overview, My Students,
+ * My Courses, Live Classroom, Calendar, Earnings, WMA Partners, Profile,
+ * Handbook; then Messages, Add Course, Certificates, Analytics; then the
+ * Student Dashboard. An approved marketplace seller (`seller`, owner
+ * 2026-10-05) sees only the course tools they may use — My Courses, Add
+ * Course, Profile, Settings — then the Marketplace and WMA Partners.
  */
 
 type NavItem = {
@@ -46,81 +49,60 @@ type NavItem = {
   match?: (pathname: string) => boolean
 }
 
-const teachItems: NavItem[] = [
-  {
-    title: "Overview",
-    href: "/instructor",
-    icon: House,
-    match: (p) => p === "/instructor",
-  },
-  {
-    title: "Profile",
-    href: "/instructor/profile",
-    icon: User,
-    match: (p) => p === "/instructor/profile",
-  },
-  {
-    title: "My Courses",
-    href: "/instructor/courses",
-    icon: BookOpen,
-    match: (p) =>
-      p === "/instructor/courses" ||
-      (p.startsWith("/instructor/courses/") && !p.endsWith("/new")),
-  },
-  {
-    title: "Add Course",
-    href: "/instructor/courses/new",
-    icon: Plus,
-    match: (p) => p === "/instructor/courses/new",
-  },
-  {
-    title: "Certificates",
-    href: "/instructor/certificates",
-    icon: Trophy,
-    match: (p) => p.startsWith("/instructor/certificates"),
-  },
-  {
-    title: "Analytics",
-    href: "/instructor/analytics",
-    icon: ChartLine,
-    match: (p) => p === "/instructor/analytics",
-  },
-  { title: "WMA Partners", href: "/dashboard/referrals", icon: Gift, match: (p) => p.startsWith("/dashboard/referrals") },
-]
+const overview: NavItem = { title: "Overview", href: "/instructor", icon: House, match: (p) => p === "/instructor" }
+const myStudents: NavItem = {
+  title: "My Students",
+  href: "/instructor/students",
+  icon: UserGroupIcon,
+  match: (p) => p.startsWith("/instructor/students"),
+}
+const myCourses: NavItem = {
+  title: "My Courses",
+  href: "/instructor/courses",
+  icon: BookOpen,
+  match: (p) =>
+    p === "/instructor/courses" ||
+    (p.startsWith("/instructor/courses/") && !p.endsWith("/new")),
+}
+const liveClassroom: NavItem = {
+  title: "Live Classroom",
+  href: "/instructor/meetings",
+  icon: Video,
+  match: (p) => p.startsWith("/instructor/meetings"),
+}
+const calendar: NavItem = {
+  title: "Calendar",
+  href: "/instructor/calendar",
+  icon: CalendarDays,
+  match: (p) => p.startsWith("/instructor/calendar"),
+}
+const earnings: NavItem = { title: "Earnings", href: "/instructor/earnings", icon: Wallet, match: (p) => p === "/instructor/earnings" }
+const partners: NavItem = { title: "WMA Partners", href: "/dashboard/referrals", icon: Gift, match: (p) => p.startsWith("/dashboard/referrals") }
+const profile: NavItem = { title: "Profile", href: "/instructor/profile", icon: User, match: (p) => p === "/instructor/profile" }
+const handbook: NavItem = {
+  title: "Handbook",
+  href: "/instructor/handbook",
+  icon: Notebook01Icon,
+  match: (p) => p.startsWith("/instructor/handbook"),
+}
+const messages: NavItem = { title: "Messages", href: "/instructor/messages", icon: MessageCircle, match: (p) => p === "/instructor/messages" }
+const addCourse: NavItem = { title: "Add Course", href: "/instructor/courses/new", icon: Plus, match: (p) => p === "/instructor/courses/new" }
+const certificates: NavItem = {
+  title: "Certificates",
+  href: "/instructor/certificates",
+  icon: Trophy,
+  match: (p) => p.startsWith("/instructor/certificates"),
+}
+const analytics: NavItem = { title: "Analytics", href: "/instructor/analytics", icon: ChartLine, match: (p) => p === "/instructor/analytics" }
+const settings: NavItem = { title: "Settings", href: "/instructor/settings", icon: Settings, match: (p) => p === "/instructor/settings" }
 
-const connectItems: NavItem[] = [
-  {
-    title: "Messages",
-    href: "/instructor/messages",
-    icon: MessageCircle,
-    match: (p) => p === "/instructor/messages",
-  },
-  {
-    title: "Meetings",
-    href: "/instructor/meetings",
-    icon: Users,
-    match: (p) => p.startsWith("/instructor/meetings"),
-  },
-  {
-    title: "Calendar",
-    href: "/instructor/calendar",
-    icon: CalendarDays,
-    match: (p) => p.startsWith("/instructor/calendar"),
-  },
-]
+/** Faculty's main rail, in the order of institutional blueprint §16. */
+const teachItems: NavItem[] = [overview, myStudents, myCourses, liveClassroom, calendar, earnings, partners, profile, handbook]
+
+const connectItems: NavItem[] = [messages, addCourse, certificates, analytics]
 
 /** A seller's whole rail: their courses, and where earnings and profile live. */
-const sellerItems: NavItem[] = [
-  teachItems[2],
-  teachItems[3],
-  teachItems[1],
-  {
-    title: "Settings",
-    href: "/instructor/settings",
-    icon: Settings,
-    match: (p) => p === "/instructor/settings",
-  },
-]
+const sellerItems: NavItem[] = [myCourses, addCourse, profile, settings]
 
 const worldstreetApps = [
   { title: "Crypto Dashboard", href: "https://www.worldstreetgold.com" },
@@ -203,6 +185,14 @@ export function InstructorSidebar({ seller = false }: { seller?: boolean }) {
 
   const railItems = seller ? sellerItems : teachItems
 
+  const badgeFor = (title: string): React.ReactNode => {
+    if (title === "Messages") {
+      if (hasOngoingCall) return <NavBadge tone="live">On call</NavBadge>
+      return unreadCount > 0 ? <NavBadge tone="brand">{unreadCount > 99 ? "99+" : unreadCount}</NavBadge> : undefined
+    }
+    return title === "Live Classroom" && liveCount > 0 ? <NavBadge tone="live">{liveCount} live</NavBadge> : undefined
+  }
+
   // Prefetch all navigation routes on mount for faster transitions
   React.useEffect(() => {
     const routes = seller
@@ -235,7 +225,7 @@ export function InstructorSidebar({ seller = false }: { seller?: boolean }) {
           <SidebarGroupContent>
             <SidebarMenu>
               {railItems.map((item) => (
-                <NavRow key={item.title} item={item} active={isActive(item, pathname)} />
+                <NavRow key={item.title} item={item} active={isActive(item, pathname)} badge={badgeFor(item.title)} />
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
@@ -252,17 +242,7 @@ export function InstructorSidebar({ seller = false }: { seller?: boolean }) {
                     key={item.title}
                     item={item}
                     active={isActive(item, pathname)}
-                    badge={
-                      item.title === "Messages" ? (
-                        hasOngoingCall ? (
-                          <NavBadge tone="live">On call</NavBadge>
-                        ) : unreadCount > 0 ? (
-                          <NavBadge tone="brand">{unreadCount > 99 ? "99+" : unreadCount}</NavBadge>
-                        ) : undefined
-                      ) : item.title === "Meetings" && liveCount > 0 ? (
-                        <NavBadge tone="live">{liveCount} live</NavBadge>
-                      ) : undefined
-                    }
+                    badge={badgeFor(item.title)}
                   />
                 ))}
               </SidebarMenu>

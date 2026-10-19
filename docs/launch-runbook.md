@@ -392,3 +392,10 @@ Expect `acknowledged: true`, and note `modifiedCount` in your run log. **Those s
 - No script, no env and no data migration. The `attendances` index builds itself at boot.
 - Smoke test after deploy: as a Standard learner, join a live class on the web for over two minutes and leave. Then check that `db.attendances.find({ user: <id> })` shows `seconds` > 0 and `openSince: null`.
 - Classes joined in the mobile app don't count until Go writes attendance rows (Go doc §13, R-A).
+
+### Phase 19 — Faculty system (owner)
+
+1. **Before release: sign off the handbook.** Read the three pages (`lib/faculty-handbook.ts`, or `/instructor/handbook` on staging), correct or approve the copy, and set `HANDBOOK_APPROVED = true`. Until then every page shows "Draft · awaiting approval".
+2. **After deploying: check the index.** Run `mongosh "$PROD_URI" --quiet --eval 'db.users.getIndexes().map(i => i.name)'`. The output must include `facultyCredential_unique`.
+3. **What existing faculty will see.** They see three new checklist items on `/instructor`. Each member receives a `WMAF-` credential once everything apart from "Create your first course" is done, with KYC verified.
+4. **`FACULTY_PUBLIC` stays `false` (D31).** The public "WMA Faculty · since …" line appears when you switch it on.

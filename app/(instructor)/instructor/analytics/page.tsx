@@ -13,6 +13,7 @@ import { useInstructorCourses } from "@/lib/hooks/queries"
 import { useQuery } from "@tanstack/react-query"
 import { fetchInstructorCertificateStats } from "@/lib/actions/certificates"
 import { getMyInstructorEarnings } from "@/lib/actions/earnings"
+import { formatMinor } from "@/lib/teaching-home"
 
 
 export default function AnalyticsPage() {
@@ -41,6 +42,9 @@ export default function AnalyticsPage() {
   const certStatsMap = new Map<string, (typeof certStats)[0]>(
     certStats.map((cs) => [cs.courseId, cs])
   )
+
+  // From the earnings ledger (sales minus refunds); partner commissions are excluded
+  const netByCourse = new Map((earnings?.byCourse ?? []).map((c) => [c.courseId, c.netMinor]))
 
   const isAnyLoading = isLoading || isLoadingStats
 
@@ -180,10 +184,12 @@ export default function AnalyticsPage() {
                         <div>
                           <p className="font-display text-lg font-semibold tabular-nums text-ws-primary">
                             {course.pricing === "paid"
-                              ? `$${((course.price ?? 0) * course.enrolledCount * 0.85).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                              ? earnings
+                                ? formatMinor(netByCourse.get(course.id) ?? 0)
+                                : "—"
                               : "Free"}
                           </p>
-                          <p className="text-[11px] text-ws-muted">Revenue (est.)</p>
+                          <p className="text-[11px] text-ws-muted">Revenue (net)</p>
                         </div>
                       </div>
 

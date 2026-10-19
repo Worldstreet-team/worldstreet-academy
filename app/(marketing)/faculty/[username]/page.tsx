@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ProgramRow } from "@/components/marketing/program-row"
 import { fetchBrowseCourses, fetchFacultyProfile } from "@/lib/actions/student"
 import { appUrl } from "@/lib/app-url"
+import { FACULTY_CREDENTIAL_NAME } from "@/lib/faculty-credential"
 import { BRAND } from "@/lib/brand"
 import { countryName } from "@/lib/countries"
 import { FACULTY_PUBLIC, facultyHref, facultyInitials } from "@/lib/faculty"
@@ -76,7 +77,9 @@ export default async function FacultyProfilePage({ params }: Params) {
           </AvatarFallback>
         </Avatar>
         <div className="min-w-0">
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-ws-gold">Faculty</p>
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-ws-gold">
+            {profile.facultySince ? `${FACULTY_CREDENTIAL_NAME} · ${profile.facultySince}` : "Faculty"}
+          </p>
           <h1
             className="mt-3 break-words font-display font-semibold leading-[1.05] tracking-[-0.02em] text-ws-primary"
             style={{ fontSize: "clamp(2rem, 4.5vw, 3.5rem)" }}

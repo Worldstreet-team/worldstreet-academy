@@ -9,6 +9,8 @@ import mongoose, { Schema, Document, Model, Types } from "mongoose"
  * State machine (history[] records every transition, Order-style):
  *   submitted → under_review → interview_scheduled → approved | rejected
  *        ↘ withdrawn (by the applicant, any time before a decision)
+ * A teaching demonstration may be requested during `interview_scheduled`; it
+ * never changes the status.
  *
  * Approval is the ONLY in-app path that promotes users.role to INSTRUCTOR.
  * The denormalized mirror `User.instructorStatus` keeps gating cheap across
@@ -86,6 +88,17 @@ export interface IScorecard {
   at: Date
 }
 
+export type DemoOutcome = "passed" | "not_passed"
+
+export interface ITeachingDemo {
+  requested: boolean
+  meetingId: Types.ObjectId | null
+  scheduledAt: Date | null
+  outcome: DemoOutcome | null
+  note: string
+  decidedAt: Date | null
+}
+
 export interface IApplicationTransition {
   status: ApplicationStatus
   at: Date
@@ -124,6 +137,8 @@ export interface IInstructorApplication extends Document {
   decidedAt: Date | null
   decisionNote: string
   rejectionReason: RejectionReason | ""
+  /** Teaching demonstration (institutional blueprint §16, D29) — null until a reviewer requests one. The status stays interview_scheduled throughout. */
+  demo: ITeachingDemo | null
 
   history: IApplicationTransition[]
   createdAt: Date
@@ -200,6 +215,20 @@ const InstructorApplicationSchema = new Schema<IInstructorApplication>(
       type: String,
       enum: ["not_enough_experience", "content_fit", "quality_concerns", "incomplete_application", "other", ""],
       default: "",
+    },
+    demo: {
+      type: new Schema(
+        {
+          requested: { type: Boolean, default: true },
+          meetingId: { type: Schema.Types.ObjectId, ref: "Meeting", default: null },
+          scheduledAt: { type: Date, default: null },
+          outcome: { type: String, enum: [null, "passed", "not_passed"], default: null },
+          note: { type: String, default: "", maxlength: 2000 },
+          decidedAt: { type: Date, default: null },
+        },
+        { _id: false }
+      ),
+      default: null,
     },
     history: [
       {

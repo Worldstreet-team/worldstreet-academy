@@ -228,6 +228,7 @@ Total ≈ 28–35 dev-days in sequence, or ≈ 14–18 across three tracks:
   - The admin enrollment sheet shows the cohort.
   - Nothing is written to `Enrollment`.
 - **12.9 Owner.** Runbook: after deploying, create Cohort 001 (2026-10-19 00:00 Lagos) and Cohort 002 at `/admin/cohorts`, then remove `NEXT_PUBLIC_COHORT_STARTS_AT`.
+- **Phase 19 seam.** Fill `cohortsFor` in `lib/faculty-seams.ts` (the fill is in its comment).
 
 ### Exit criteria
 - [ ] Entering Cohort 002 in admin moves every countdown, banner, strip and "Offer ends in" timer to its date, with no redeploy.
@@ -371,6 +372,7 @@ Total ≈ 28–35 dev-days in sequence, or ≈ 14–18 across three tracks:
   - The admin enrollment sheet shows it.
   - Phase 19's My Students and Student Performance read it.
   - It never appears on a public page.
+- **Phase 19 seams.** `masteryFor` in `lib/faculty-seams.ts` is filled (Phase 19 integration). Still to do: pass `attended` to `ClassesList` on Student Performance.
 
 ### Exit criteria
 - [ ] A learner sees a score and its parts per program once two parts have data. Parts the plan doesn't include never count against them.

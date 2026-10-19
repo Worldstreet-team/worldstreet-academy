@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import connectDB from "@/lib/db"
-import { Course, Enrollment, EnrollmentIntent, Meeting, MentorshipSession, User } from "@/lib/db/models"
+import {
+  Course,
+  Enrollment,
+  EnrollmentIntent,
+  InstructorApplication,
+  Meeting,
+  MentorshipSession,
+  User,
+} from "@/lib/db/models"
 import { notifyUser } from "@/lib/notify"
 import {
   formatUtcDateTime,
@@ -33,8 +41,8 @@ const HOST_CLASS_PATH = "/instructor/meetings"
  *   student only, session wording — and only while the session is confirmed and
  *   the student still holds mentorship. A lapsed session sends nothing and its
  *   window is stamped, so it never retries.
- * - Every other scheduled meeting (instructor interviews): host + invitees,
- *   interview wording, exactly as before.
+ * - Every other scheduled meeting (instructor interviews and teaching demonstrations):
+ *   host + invitees, interview wording (demonstration wording for a demo room).
  * - Saved, unpaid programs (`EnrollmentIntent`): one email at 24 h, a last one at 72 h.
  *
  * Coolify scheduled task (~every 10 min):
@@ -180,6 +188,11 @@ export async function POST(request: NextRequest) {
         }
       } else {
         // Interview (or any other scheduled meeting): host + everyone invited.
+        const what =
+          meeting.applicationId &&
+          (await InstructorApplication.exists({ _id: meeting.applicationId, "demo.meetingId": meeting._id }))
+            ? "teaching demonstration"
+            : "interview"
         const invitees = inviteeIds.length
           ? await User.find({ _id: { $in: inviteeIds } }).select("firstName lastName email").lean()
           : []
@@ -196,6 +209,7 @@ export async function POST(request: NextRequest) {
               scheduledAt: when.toISOString(),
               joinUrl: `${APP_URL}${joinPath}`,
               window,
+              what,
             })
           )
         }
@@ -210,6 +224,7 @@ export async function POST(request: NextRequest) {
                 scheduledAt: when.toISOString(),
                 joinUrl: `${APP_URL}${joinPath}`,
                 window,
+                what,
               })
             )
           }

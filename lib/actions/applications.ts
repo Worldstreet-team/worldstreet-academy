@@ -21,11 +21,18 @@ import {
   sendApplicationReceivedEmail,
   sendApplicationDecisionEmail,
   sendInterviewInviteEmail,
+  sendTeachingDemoInviteEmail,
   sendNewApplicationAdminEmail,
   sendUnderReviewEmail,
   sendSlotsProposedEmail,
 } from "@/lib/email"
-import type { ApplicationPassion, IApplicationAnswers, IScorecard, RejectionReason } from "@/lib/db/models"
+import type {
+  ApplicationPassion,
+  DemoOutcome,
+  IApplicationAnswers,
+  IScorecard,
+  RejectionReason,
+} from "@/lib/db/models"
 import { APP_URL } from "@/lib/app-url"
 import { BRAND } from "@/lib/brand"
 import { SCHOOL_SLUGS, schoolSlugOf, type SchoolSlug } from "@/lib/schools"
@@ -100,6 +107,15 @@ export type InterviewInfo = {
   joinPath: string
 }
 
+export type AdminDemoView = {
+  scheduledAt: string | null
+  /** Null once the room has ended. */
+  joinPath: string | null
+  outcome: DemoOutcome | null
+  note: string
+  decidedAt: string | null
+}
+
 export type ProposedSlotView = { at: string; note?: string }
 
 export type MyApplication = {
@@ -110,6 +126,10 @@ export type MyApplication = {
   history: { status: string; at: string; note?: string }[]
   createdAt: string
   interview: InterviewInfo | null
+  /** A reviewer asked for a teaching demonstration (adds a tracker step). */
+  demoRequested: boolean
+  /** The demonstration room while it hasn't ended — the outcome is never exposed. */
+  demo: InterviewInfo | null
   /** Interview slots the admin proposed — the applicant picks one. */
   proposedSlots: ProposedSlotView[]
 }
@@ -291,6 +311,19 @@ export async function getMyInstructorApplication(): Promise<MyApplication | null
       }
     }
 
+    // Teaching demonstration room, read the same way.
+    let demo: InterviewInfo | null = null
+    if (app.demo?.meetingId) {
+      const demoMeeting = await Meeting.findById(app.demo.meetingId).select("scheduledAt status").lean()
+      if (demoMeeting && demoMeeting.status !== "ended") {
+        demo = {
+          meetingId: app.demo.meetingId.toString(),
+          scheduledAt: demoMeeting.scheduledAt ? new Date(demoMeeting.scheduledAt).toISOString() : null,
+          joinPath: `/dashboard/meetings?join=${app.demo.meetingId.toString()}`,
+        }
+      }
+    }
+
     return {
       id: app._id.toString(),
       status: app.status,
@@ -316,6 +349,8 @@ export async function getMyInstructorApplication(): Promise<MyApplication | null
       })),
       createdAt: app.createdAt.toISOString(),
       interview,
+      demoRequested: Boolean(app.demo?.requested),
+      demo,
       proposedSlots:
         // Slots are only actionable before an interview is locked in.
         !interview && ACTIVE_APPLICATION_STATUSES.includes(app.status)
@@ -487,6 +522,8 @@ export type AdminApplicationDetail = AdminApplicationRow & {
   proposedSlots: ProposedSlotView[]
   scorecard: ScorecardView | null
   termsAcceptedAt: string | null
+  /** Null means a teaching demonstration was never requested. */
+  demo: AdminDemoView | null
 }
 
 export async function adminGetApplication(applicationId: string): Promise<AdminApplicationDetail | null> {
@@ -524,6 +561,24 @@ export async function adminGetApplication(applicationId: string): Promise<AdminA
           scheduledAt: meeting.scheduledAt ? new Date(meeting.scheduledAt).toISOString() : null,
           joinPath: `/dashboard/meetings?join=${a.interviewMeetingId.toString()}`,
         }
+      }
+    }
+
+    let demo: AdminDemoView | null = null
+    if (a.demo) {
+      const demoMeeting = a.demo.meetingId
+        ? await Meeting.findById(a.demo.meetingId).select("scheduledAt status").lean()
+        : null
+      const demoMeetingId = a.demo.meetingId?.toString() ?? null
+      demo = {
+        scheduledAt: demoMeeting?.scheduledAt ? new Date(demoMeeting.scheduledAt).toISOString() : null,
+        joinPath:
+          demoMeeting && demoMeetingId && demoMeeting.status !== "ended"
+            ? `/dashboard/meetings?join=${demoMeetingId}`
+            : null,
+        outcome: a.demo.outcome ?? null,
+        note: a.demo.note ?? "",
+        decidedAt: a.demo.decidedAt ? new Date(a.demo.decidedAt).toISOString() : null,
       }
     }
 
@@ -589,6 +644,7 @@ export async function adminGetApplication(applicationId: string): Promise<AdminA
           }
         : null,
       termsAcceptedAt: a.termsAcceptedAt ? new Date(a.termsAcceptedAt).toISOString() : null,
+      demo,
     }
   } catch (error) {
     console.error("Admin get application error:", error)
@@ -610,13 +666,20 @@ type InterviewHost = {
  * room and the RTK room minted up front — the host's join via the standard
  * `?join=` deep link flips it live. The applicant is invited via invites[],
  * notified in-app, and emailed the join link with an .ics calendar attachment.
+ *
+ * `kind: "demo"` runs the same machinery for a teaching demonstration: its own
+ * room (`app.demo.meetingId`), and the only application write is `app.demo` —
+ * the status never moves. Every write follows the RealtimeKit calls, so a
+ * failed room leaves the application untouched.
  */
 async function scheduleInterviewCore(
   app: HydratedDocument<import("@/lib/db/models").IInstructorApplication>,
   host: InterviewHost,
   scheduledAt: Date,
-  byName: string
+  byName: string,
+  kind: "interview" | "demo" = "interview"
 ) {
+  const isDemo = kind === "demo"
   const applicant = app.user as unknown as {
     _id: Types.ObjectId
     firstName?: string
@@ -627,8 +690,9 @@ async function scheduleInterviewCore(
   const applicantName = `${applicant.firstName ?? ""} ${applicant.lastName ?? ""}`.trim() || "Applicant"
 
   // Reschedule path: reuse the existing meeting if it hasn't ended.
-  let meetingDoc = app.interviewMeetingId
-    ? await Meeting.findOne({ _id: app.interviewMeetingId, status: { $ne: "ended" } })
+  const existingMeetingId = isDemo ? app.demo?.meetingId : app.interviewMeetingId
+  let meetingDoc = existingMeetingId
+    ? await Meeting.findOne({ _id: existingMeetingId, status: { $ne: "ended" } })
     : null
   let rescheduled = false
 
@@ -640,7 +704,9 @@ async function scheduleInterviewCore(
     rescheduled = true
   } else {
     // Mint the RTK room + host token up front, mirroring createMeeting.
-    const rtkMeetingId = await createRTKMeeting(`Interview: ${applicantName}`)
+    const rtkMeetingId = await createRTKMeeting(
+      isDemo ? `Demonstration: ${applicantName}` : `Interview: ${applicantName}`
+    )
     const hostParticipant = await addParticipant(rtkMeetingId, {
       name: host.name,
       customParticipantId: host.id,
@@ -648,8 +714,10 @@ async function scheduleInterviewCore(
     })
 
     meetingDoc = await Meeting.create({
-      title: `Instructor Interview — ${applicantName}`,
-      description: `Interview call for a ${BRAND.name} instructor application.`,
+      title: isDemo ? `Teaching demonstration — ${applicantName}` : `Instructor Interview — ${applicantName}`,
+      description: isDemo
+        ? `Teaching demonstration for a ${BRAND.name} instructor application.`
+        : `Interview call for a ${BRAND.name} instructor application.`,
       hostId: new Types.ObjectId(host.id),
       status: "scheduled",
       scheduledAt,
@@ -684,16 +752,30 @@ async function scheduleInterviewCore(
 
   // Application state: interview_scheduled + pointer + history; proposed slots
   // are consumed by the pick (or superseded by a direct schedule).
-  app.interviewMeetingId = meetingDoc._id
-  app.proposedSlots = []
-  if (app.status !== "interview_scheduled") {
-    app.status = "interview_scheduled"
+  const when = scheduledAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })
+  if (isDemo) {
+    app.demo = {
+      requested: true,
+      meetingId: meetingDoc._id,
+      scheduledAt,
+      outcome: null,
+      note: "",
+      decidedAt: null,
+    }
+  } else {
+    app.interviewMeetingId = meetingDoc._id
+    app.proposedSlots = []
+    if (app.status !== "interview_scheduled") {
+      app.status = "interview_scheduled"
+    }
   }
   app.history.push({
     status: "interview_scheduled",
     at: new Date(),
     by: byName,
-    note: `${rescheduled ? "Rescheduled" : "Scheduled"} for ${scheduledAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}`,
+    note: isDemo
+      ? `Teaching demonstration ${rescheduled ? "rescheduled" : "scheduled"} for ${when}`
+      : `${rescheduled ? "Rescheduled" : "Scheduled"} for ${when}`,
   })
   await app.save()
   await User.findByIdAndUpdate(applicant._id, { $set: { instructorStatus: "interview" } })
@@ -703,21 +785,30 @@ async function scheduleInterviewCore(
   // Fire-and-forget: bell + email (with calendar attachment) to the applicant.
   void notifyUser(applicant._id.toString(), {
     type: "meeting",
-    title: rescheduled ? "Your interview was rescheduled" : "Interview scheduled",
+    title: isDemo
+      ? rescheduled
+        ? "Your teaching demonstration was rescheduled"
+        : "Teaching demonstration scheduled"
+      : rescheduled
+        ? "Your interview was rescheduled"
+        : "Interview scheduled",
     body: `${scheduledAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })} — with ${host.name}`,
     href: "/dashboard/become-instructor",
   })
   if (applicant.email) {
     const ics = buildInterviewIcs({
       uid: meetingDoc._id.toString(),
-      title: `${BRAND.name} — Instructor Interview`,
-      description: `Interview with ${host.name} about your instructor application.`,
+      title: isDemo ? `${BRAND.name} — Teaching Demonstration` : `${BRAND.name} — Instructor Interview`,
+      description: isDemo
+        ? `Teaching demonstration with ${host.name} for your instructor application.`
+        : `Interview with ${host.name} about your instructor application.`,
       startsAt: scheduledAt,
       durationMinutes: 30,
       url: `${APP_URL}${joinPath}`,
       organizerName: host.name,
     })
-    void sendInterviewInviteEmail(
+    const sendInvite = isDemo ? sendTeachingDemoInviteEmail : sendInterviewInviteEmail
+    void sendInvite(
       applicant.email,
       {
         applicantName: applicant.firstName || "there",
@@ -769,6 +860,123 @@ export async function adminScheduleInterview(applicationId: string, scheduledAtI
   } catch (error) {
     console.error("Schedule interview error:", error)
     return { success: false, error: "Failed to schedule interview" }
+  }
+}
+
+const ObjectIdSchema = z.string().regex(/^[a-f0-9]{24}$/, "Application not found")
+
+/**
+ * Admin requests (or reschedules) a teaching demonstration — a second room run
+ * through the interview machinery. Allowed only while the interview is
+ * scheduled; refused once an outcome is recorded. A RealtimeKit failure writes
+ * nothing, so `demo` stays null and approval is never blocked.
+ */
+export async function adminRequestTeachingDemo(
+  applicationId: string,
+  scheduledAtISO: string
+): Promise<
+  | { success: true; data: { meetingId: string; joinPath: string; rescheduled: boolean } }
+  | { success: false; error: string }
+> {
+  try {
+    await connectDB()
+    const admin = await requireAdmin()
+
+    const id = ObjectIdSchema.safeParse(applicationId)
+    if (!id.success) return { success: false, error: "Application not found" }
+    const when = z.iso.datetime().safeParse(scheduledAtISO)
+    if (!when.success) return { success: false, error: "Invalid date" }
+    const scheduledAt = new Date(when.data)
+    if (scheduledAt.getTime() < Date.now() - 60_000) {
+      return { success: false, error: "Demonstration time must be in the future" }
+    }
+
+    const app = await InstructorApplication.findById(id.data).populate(
+      "user",
+      "firstName lastName email avatarUrl"
+    )
+    if (!app) return { success: false, error: "Application not found" }
+    if (app.status !== "interview_scheduled") {
+      return { success: false, error: "Schedule the interview before a teaching demonstration" }
+    }
+    if (app.demo?.outcome) {
+      return { success: false, error: "This teaching demonstration already has an outcome" }
+    }
+
+    const adminName = `${admin.firstName} ${admin.lastName}`.trim()
+    let result: Awaited<ReturnType<typeof scheduleInterviewCore>>
+    try {
+      result = await scheduleInterviewCore(
+        app,
+        { id: admin.id, name: adminName, avatarUrl: admin.avatarUrl },
+        scheduledAt,
+        adminName,
+        "demo"
+      )
+    } catch (error) {
+      console.error("Teaching demonstration room error:", error)
+      return { success: false, error: "Couldn't open a room for the teaching demonstration — try again" }
+    }
+
+    revalidatePath(`/admin/applications/${id.data}`)
+    revalidatePath("/admin/applications")
+    return { success: true, data: result }
+  } catch (error) {
+    console.error("Request teaching demonstration error:", error)
+    return { success: false, error: "Failed to request the teaching demonstration" }
+  }
+}
+
+/** Record (or overwrite) the teaching demonstration's outcome. */
+export async function adminRecordDemoOutcome(
+  applicationId: string,
+  outcome: DemoOutcome,
+  note: string
+): Promise<{ success: true; data: null } | { success: false; error: string }> {
+  try {
+    await connectDB()
+    const admin = await requireAdmin()
+
+    const parsed = z
+      .object({
+        applicationId: ObjectIdSchema,
+        outcome: z.enum(["passed", "not_passed"]),
+        note: z.string().trim().max(2000, "Keep the note under 2,000 characters"),
+      })
+      .safeParse({ applicationId, outcome, note })
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" }
+    }
+
+    const app = await InstructorApplication.findById(parsed.data.applicationId)
+    if (!app) return { success: false, error: "Application not found" }
+    if (!ACTIVE_APPLICATION_STATUSES.includes(app.status)) {
+      return { success: false, error: `Application is already ${app.status}` }
+    }
+    if (!app.demo?.requested) {
+      return { success: false, error: "No teaching demonstration was requested" }
+    }
+
+    const now = new Date()
+    app.demo.outcome = parsed.data.outcome
+    app.demo.note = parsed.data.note
+    app.demo.decidedAt = now
+    app.history.push({
+      status: app.status,
+      at: now,
+      by: `${admin.firstName} ${admin.lastName}`.trim(),
+      note:
+        `Teaching demonstration: ${parsed.data.outcome === "passed" ? "passed" : "not passed"}` +
+        (parsed.data.note ? ` — ${parsed.data.note}` : ""),
+    })
+    await app.save()
+
+    revalidatePath(`/admin/applications/${parsed.data.applicationId}`)
+    revalidatePath("/admin/applications")
+    return { success: true, data: null }
+  } catch (error) {
+    console.error("Record demonstration outcome error:", error)
+    return { success: false, error: "Failed to record the outcome" }
   }
 }
 
@@ -1003,6 +1211,10 @@ export async function adminDecideApplication(
       return { success: false, error: `Application is already ${app.status}` }
     }
 
+    if (decision === "approved" && app.demo?.requested && !app.demo.outcome) {
+      return { success: false, error: "Record the teaching demonstration's outcome before approving" }
+    }
+
     const user = await User.findById(app.user)
     if (!user) return { success: false, error: "Applicant no longer exists" }
 
@@ -1026,7 +1238,8 @@ export async function adminDecideApplication(
       const newRole = user.role === "USER" ? "INSTRUCTOR" : user.role
       // Spec §10 "Professional experience" starts as the application's answer
       // but never replaces one already on the profile. This $set rewrites the
-      // whole instructorProfile, so the Phase 5 fields are carried across.
+      // whole instructorProfile, so the Phase 5 fields, the handbook acknowledgements
+      // and the faculty credential are carried across.
       const currentExperience = user.instructorProfile?.experience ?? null
       await User.updateOne(
         { _id: user._id },
@@ -1049,6 +1262,8 @@ export async function adminDecideApplication(
               totalStudents: user.instructorProfile?.totalStudents ?? 0,
               totalCourses: user.instructorProfile?.totalCourses ?? 0,
               totalEarnings: user.instructorProfile?.totalEarnings ?? 0,
+              handbook: user.instructorProfile?.handbook ?? { teachingStandardsAt: null, curriculumGuidelinesAt: null, platformTrainingAt: null },
+              credential: user.instructorProfile?.credential ?? null,
             },
           },
         }

@@ -51,6 +51,8 @@ export {
   type ApplicationStatus,
   type IProposedSlot,
   type IScorecard,
+  type ITeachingDemo,
+  type DemoOutcome,
   type RejectionReason,
 } from "./instructor-application"
 export { Exam, type IExam, type IExamSettings, type ExamStatus, type ExamScope } from "./exam"

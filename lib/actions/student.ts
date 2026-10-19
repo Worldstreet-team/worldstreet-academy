@@ -30,6 +30,7 @@ import { saveWithCertificateId } from "@/lib/certificate-id"
 import { POINTS, awardPoints, pointKey } from "@/lib/points"
 import { isCountryCode } from "@/lib/countries"
 import { FACULTY_ROLES, isFacultyRole, safeWebUrl } from "@/lib/faculty"
+import { facultySinceLabel } from "@/lib/faculty-credential"
 import { PROGRAM_KIND_FILTER, courseKindOf } from "@/lib/course-kind"
 
 // ============================================================================
@@ -1476,6 +1477,8 @@ export type FacultyProfile = FacultyMember & {
   credentials: string[]
   /** Only safe http(s) addresses; anything else stored reads as null. */
   socialLinks: { website: string | null; linkedin: string | null; twitter: string | null }
+  /** "since October 2026" once the WMA Faculty credential is issued. */
+  facultySince: string | null
 }
 
 const FACULTY_FIELDS = "username firstName lastName avatarUrl bio country instructorProfile"
@@ -1492,6 +1495,7 @@ type FacultyUserDoc = {
     specialization?: string | null
     expertise?: string[] | null
     featured?: boolean | null
+    credential?: { issuedAt?: Date | null } | null
   } | null
 }
 
@@ -1578,6 +1582,7 @@ export async function fetchFacultyProfile(username: string): Promise<FacultyProf
         linkedin: safeWebUrl(profile?.socialLinks?.linkedin),
         twitter: safeWebUrl(profile?.socialLinks?.twitter),
       },
+      facultySince: profile?.credential?.issuedAt ? facultySinceLabel(profile.credential.issuedAt) : null,
     }
   } catch (error) {
     console.error("Fetch faculty profile error:", error)
