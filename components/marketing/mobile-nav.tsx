@@ -45,7 +45,7 @@ function NavAnchor({ link, className, onClick }: { link: MarketingNavLink; class
 /**
  * The narrow-screen counterpart to the marketplace header. Below lg the bar
  * keeps only the lockup, (md+) Explore and search, and the gold CTA; this
- * sheet holds everything else: the search, the eight schools and the page
+ * sheet holds everything else: the search, the seven schools and the page
  * links scroll; the theme switch sits in the header and the account actions
  * (guests) stay pinned at the foot, so Sign in never needs a scroll.
  */

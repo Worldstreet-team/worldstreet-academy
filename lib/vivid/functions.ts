@@ -60,6 +60,9 @@ const navigateToPage: VividFunctionConfig = {
   /instructor — instructor home
   /instructor/courses — instructor courses
   /instructor/analytics — analytics
+  /instructor/assignments — assignments across the instructor's programs
+  /instructor/materials — course materials
+  /instructor/performance — student performance
   NEVER use /course/slug — always use /dashboard/courses/{id}`,
   parameters: params({
     path: str("The URL path to navigate to", true),

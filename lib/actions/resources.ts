@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import connectDB from "@/lib/db"
-import { Course, Enrollment, Resource, ResourceDownload } from "@/lib/db/models"
+import { Course, Enrollment, Lesson, Resource, ResourceDownload } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth/actions"
 import {
   generatePresignedUploadUrl,
@@ -285,5 +285,82 @@ export async function getResourceDownloadUrl(
   } catch (error) {
     console.error("Get resource download URL error:", error)
     return { success: false, error: "Failed to prepare download" }
+  }
+}
+
+export type FacultyMaterial = {
+  id: string
+  title: string
+  kind: ResourceKind
+  sizeBytes: number
+  /** The lesson it is attached to; null = the whole program. */
+  lesson: string | null
+  isFree: boolean
+}
+
+export type FacultyMaterialsProgram = {
+  id: string
+  title: string
+  /** The course page's materials section, where uploads and removals happen. */
+  manageHref: string
+  materials: FacultyMaterial[]
+}
+
+/**
+ * The faculty Course Materials page (institutional blueprint §16): every
+ * program the caller teaches (an admin too sees only their own, as on My
+ * Courses) with its materials. Read only, and metadata only: neither a
+ * storage key nor a link's destination is selected, so neither can leave.
+ */
+export async function getMyCourseMaterials(): Promise<
+  { success: true; data: { programs: FacultyMaterialsProgram[]; total: number } } | { success: false; error: string }
+> {
+  try {
+    await connectDB()
+    const user = await getCurrentUser()
+    if (!user) return { success: false, error: "You need to be signed in" }
+    if (user.role !== "INSTRUCTOR" && user.role !== "ADMIN") return { success: false, error: "Instructors only" }
+
+    const courses = await Course.find({ instructor: user.id }).select("title").sort({ title: 1 }).lean()
+    if (courses.length === 0) return { success: true, data: { programs: [], total: 0 } }
+
+    const resources = await Resource.find({ course: { $in: courses.map((c) => c._id) } })
+      .select("course lesson title kind sizeBytes isFree order")
+      .sort({ order: 1 })
+      .lean()
+    const lessonIds = [...new Set(resources.flatMap((r) => (r.lesson ? [r.lesson.toString()] : [])))]
+    const lessons = lessonIds.length ? await Lesson.find({ _id: { $in: lessonIds } }).select("title").lean() : []
+    const lessonTitle = new Map(lessons.map((l) => [l._id.toString(), l.title as string]))
+
+    const byCourse = new Map<string, FacultyMaterial[]>()
+    for (const r of resources) {
+      const key = r.course.toString()
+      const list = byCourse.get(key) ?? []
+      list.push({
+        id: r._id.toString(),
+        title: r.title,
+        kind: r.kind,
+        sizeBytes: r.kind === "link" ? 0 : r.sizeBytes ?? 0,
+        lesson: r.lesson ? (lessonTitle.get(r.lesson.toString()) ?? "A removed lesson") : null,
+        isFree: Boolean(r.isFree),
+      })
+      byCourse.set(key, list)
+    }
+
+    return {
+      success: true,
+      data: {
+        programs: courses.map((c) => ({
+          id: c._id.toString(),
+          title: c.title,
+          manageHref: `/instructor/courses/${c._id}#materials`,
+          materials: byCourse.get(c._id.toString()) ?? [],
+        })),
+        total: resources.length,
+      },
+    }
+  } catch (error) {
+    console.error("[getMyCourseMaterials]", error)
+    return { success: false, error: "Could not load your course materials" }
   }
 }

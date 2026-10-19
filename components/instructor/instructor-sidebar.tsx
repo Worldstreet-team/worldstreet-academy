@@ -1,5 +1,5 @@
 "use client"
-import { BookOpen, CalendarDays, ChartLine, ChevronDown, Gift, House, LayoutDashboard, LogOut, MessageCircle, Notebook01Icon, Plus, Settings, Store, Trophy, User, UserGroupIcon, Video, Wallet, type IconComponent } from "@/components/icons"
+import { BookOpen, CalendarDays, ChartLine, ChartUpIcon, ChevronDown, ClipboardCheck, FolderOpenIcon, Gift, House, LayoutDashboard, LogOut, MessageCircle, Notebook01Icon, Plus, Settings, Store, Trophy, User, UserGroupIcon, Video, Wallet, type IconComponent } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
@@ -34,10 +34,12 @@ import { BrandLockup } from "@/components/shared/brand-lockup"
  * WorldStreet links collapse behind one disclosure so they stop competing
  * with teaching navigation.
  *
- * Faculty's rail follows institutional blueprint §16: Overview, My Students,
- * My Courses, Live Classroom, Calendar, Earnings, WMA Partners, Profile,
- * Handbook; then Messages, Add Course, Certificates, Analytics; then the
- * Student Dashboard. An approved marketplace seller (`seller`, owner
+ * Faculty's rail follows institutional blueprint §16's Faculty Dashboard:
+ * Overview (today's and upcoming classes), Calendar, My Students, My Courses,
+ * Assignments, Course Materials, Live Classroom, Student Performance,
+ * Earnings, WMA Partners, then Profile and Handbook; then Messages, Add
+ * Course, Certificates, Analytics; then the Student Dashboard. A program's
+ * own pages (its assignments and materials too) stay on My Courses. An approved marketplace seller (`seller`, owner
  * 2026-10-05) sees only the course tools they may use — My Courses, Add
  * Course, Profile, Settings — then the Marketplace and WMA Partners.
  */
@@ -63,6 +65,24 @@ const myCourses: NavItem = {
   match: (p) =>
     p === "/instructor/courses" ||
     (p.startsWith("/instructor/courses/") && !p.endsWith("/new")),
+}
+const assignments: NavItem = {
+  title: "Assignments",
+  href: "/instructor/assignments",
+  icon: ClipboardCheck,
+  match: (p) => p.startsWith("/instructor/assignments"),
+}
+const materials: NavItem = {
+  title: "Course Materials",
+  href: "/instructor/materials",
+  icon: FolderOpenIcon,
+  match: (p) => p.startsWith("/instructor/materials"),
+}
+const performance: NavItem = {
+  title: "Student Performance",
+  href: "/instructor/performance",
+  icon: ChartUpIcon,
+  match: (p) => p.startsWith("/instructor/performance"),
 }
 const liveClassroom: NavItem = {
   title: "Live Classroom",
@@ -97,7 +117,20 @@ const analytics: NavItem = { title: "Analytics", href: "/instructor/analytics", 
 const settings: NavItem = { title: "Settings", href: "/instructor/settings", icon: Settings, match: (p) => p === "/instructor/settings" }
 
 /** Faculty's main rail, in the order of institutional blueprint §16. */
-const teachItems: NavItem[] = [overview, myStudents, myCourses, liveClassroom, calendar, earnings, partners, profile, handbook]
+const teachItems: NavItem[] = [
+  overview,
+  calendar,
+  myStudents,
+  myCourses,
+  assignments,
+  materials,
+  liveClassroom,
+  performance,
+  earnings,
+  partners,
+  profile,
+  handbook,
+]
 
 const connectItems: NavItem[] = [messages, addCourse, certificates, analytics]
 

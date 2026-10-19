@@ -183,8 +183,10 @@ export default async function InstructorCourseInfoPage({
 
               <div className="h-px bg-ws-hairline" />
 
-              {/* Downloadable materials */}
-              <ResourceManager courseId={course.id} />
+              {/* Downloadable materials — Course Materials' "Manage" lands here */}
+              <div id="materials" className="scroll-mt-24">
+                <ResourceManager courseId={course.id} />
+              </div>
             </div>
 
             {/* Sidebar — stats & actions */}

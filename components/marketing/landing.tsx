@@ -109,10 +109,10 @@ export async function Landing() {
       {/* Our mission — the mission and the three gaps it closes (blueprint §4) */}
       <InstitutionBand />
 
-      {/* The band of words — the eight schools' vocabulary */}
+      {/* The band of words — the seven schools' vocabulary */}
       <WordsMarquee />
 
-      {/* Our schools — eight cards with live program counts (spec §4) */}
+      {/* Our schools — seven cards with live program counts (spec §4) */}
       <SchoolsGrid counts={schoolCounts} cheapest={schoolFrom} />
 
       {/* About (spec §2) */}

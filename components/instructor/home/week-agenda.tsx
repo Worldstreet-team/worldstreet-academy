@@ -11,8 +11,9 @@ import { agendaDays, timeLabel, type AgendaDay } from "@/lib/teaching-home"
 import { cn } from "@/lib/utils"
 
 /*
- * "This week": seven local days from today — the classes the tutor hosts and
- * their confirmed mentorship sessions. Seven columns once the card is ~900px
+ * "Upcoming classes" (institutional blueprint §16, beside "Today's classes"):
+ * seven local days from today — the classes the tutor hosts and their
+ * confirmed mentorship sessions. Seven columns once the card is ~900px
  * wide; below that a list of the days that have something (today always
  * shows), so a phone never scrolls sideways. Today's upcoming items count down.
  */
@@ -76,7 +77,7 @@ export function WeekAgenda({ entries, now }: { entries: HomeEntry[]; now: number
     <CardShell className="@container">
       <div className="flex items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
         <div className="flex min-w-0 flex-col">
-          <h2 className="text-[15px] font-semibold leading-tight">This week</h2>
+          <h2 className="text-[15px] font-semibold leading-tight">Upcoming classes</h2>
           <span className="text-[13px] text-muted-foreground tabular-nums">
             {total === 0 ? "Nothing scheduled in the next 7 days" : `${total} in the next 7 days`}
           </span>

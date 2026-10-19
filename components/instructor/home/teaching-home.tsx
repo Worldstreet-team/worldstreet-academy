@@ -18,7 +18,7 @@ import { TodoQueue } from "./todo-queue"
 import { WeekAgenda } from "./week-agenda"
 
 /*
- * The tutor home, top to bottom: the next class, today's classes, this week,
+ * The tutor home, top to bottom: the next class, today's classes, upcoming classes (the week),
  * the cohorts, the to-do queue and the money. One server read (getTeachingHome), refetched
  * every 30 s so a class flips to live without a reload; the unread count is
  * the shell's own query, so the to-do row and the sidebar badge always agree.

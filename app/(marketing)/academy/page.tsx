@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils"
 import {
   ACADEMY_LINE,
   BIGGER_VISION,
+  CLOSING_BANNER,
   COMBINES,
   CORE_PROPOSITION,
   CORE_TRANSFORMATION,
@@ -227,6 +228,13 @@ export default function AcademyPage() {
           </Reveal>
         </div>
       </section>
+
+      {/* §23's closing banner: the brand's sign-off, the page's last word. */}
+      <div className="border-t border-ws-hairline py-10 md:py-12">
+        <Reveal as="p" className={`${WRAP} text-balance text-center text-[12px] font-semibold uppercase tracking-[0.14em] text-ws-muted md:text-[13px]`}>
+          {CLOSING_BANNER}
+        </Reveal>
+      </div>
     </main>
   )
 }
