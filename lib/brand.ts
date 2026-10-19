@@ -22,7 +22,8 @@ export const BRAND = {
   wordmark: "WorldStreet",
   /** Lockup eyebrow; rendered uppercase by CSS. Admin shell overrides with "Admin". */
   eyebrow: "Mastery Academy",
-  tagline: "Learn Skills. Build Value. Own Your Future.",
+  shortName: "WMA",
+  tagline: "The Academy of the New Economy",
   descriptor:
     "The world's premier institution for skills, innovation and wealth liquefaction.",
   supportEmail: "support@worldstreetgold.com",
@@ -33,6 +34,6 @@ export const BRAND = {
 
 /**
  * Default meta description — the root layout's (every page without its own)
- * and the homepage's. Spec §1 hero copy; the name comes from BRAND (D1).
+ * and the homepage's. Institutional blueprint §22; the name comes from BRAND (D1).
  */
-export const SITE_DESCRIPTION = `Master practical, in-demand skills through expert-led programs designed for the new and modern economy. Explore the eight schools of ${BRAND.name}, choose your path and start building capabilities you can apply in the real world.`
+export const SITE_DESCRIPTION = `${BRAND.name} is a global institution for the new economy that equips people with practical knowledge, develops that knowledge into mastery, and helps them apply valuable skills to create economic value and transform their financial capacity.`
