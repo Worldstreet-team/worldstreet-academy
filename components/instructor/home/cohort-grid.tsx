@@ -7,7 +7,7 @@ import { CardShell, EmptyState } from "@/components/ui/system"
 import { Countdown } from "@/components/shared/countdown"
 import { ProgramCover } from "@/components/platform/program-bits"
 import type { CohortCard } from "@/lib/actions/teaching-home"
-import { cohortIsUpcoming } from "@/lib/cohort"
+import type { CohortView } from "@/lib/cohort-rules"
 import { cohortStartLabel } from "@/lib/teaching-home"
 import { cn } from "@/lib/utils"
 
@@ -56,7 +56,7 @@ function CountLink({ count, href, noun }: { count: number; href: string; noun: s
   )
 }
 
-function NextClassValue({ card, now }: { card: CohortCard; now: number }) {
+function NextClassValue({ card, now, nextCohort }: { card: CohortCard; now: number; nextCohort: CohortView | null }) {
   const next = card.nextClass
   if (next?.live) {
     return (
@@ -86,7 +86,9 @@ function NextClassValue({ card, now }: { card: CohortCard; now: number }) {
   return (
     <span className="flex flex-wrap items-center justify-end gap-x-2 gap-y-0.5">
       <span className="text-muted-foreground">
-        {cohortIsUpcoming(now) ? `None · cohort ${cohortStartLabel()}` : "None scheduled"}
+        {nextCohort && Date.parse(nextCohort.startsAt) > now
+          ? `None · ${nextCohort.name} ${cohortStartLabel(nextCohort.startsAt)}`
+          : "None scheduled"}
       </span>
       <Link href={SCHEDULE_HREF} className={VALUE_LINK}>
         Schedule
@@ -95,7 +97,7 @@ function NextClassValue({ card, now }: { card: CohortCard; now: number }) {
   )
 }
 
-function Cohort({ card, now }: { card: CohortCard; now: number }) {
+function Cohort({ card, now, nextCohort }: { card: CohortCard; now: number; nextCohort: CohortView | null }) {
   const recording = card.latestRecording ? RECORDING_LABEL[card.latestRecording.status] : null
   const statusChip = STATUS_CHIP[card.status]
   return (
@@ -123,8 +125,17 @@ function Cohort({ card, now }: { card: CohortCard; now: number }) {
         <Row label="Students">
           <span className="font-semibold tabular-nums">{card.enrolled.toLocaleString()}</span>
         </Row>
+        {card.cohortCounts.length > 0 && (
+          <Row label="By cohort">
+            <span className="flex flex-wrap justify-end gap-x-2 gap-y-0.5 tabular-nums">
+              {card.cohortCounts.map((c) => (
+                <span key={c.name}>{`${c.name} · ${c.count}`}</span>
+              ))}
+            </span>
+          </Row>
+        )}
         <Row label="Next class">
-          <NextClassValue card={card} now={now} />
+          <NextClassValue card={card} now={now} nextCohort={nextCohort} />
         </Row>
         <Row label="To grade">
           <CountLink count={card.toGrade} href={card.gradeHref} noun={card.toGrade === 1 ? "submission" : "submissions"} />
@@ -172,7 +183,17 @@ function Cohort({ card, now }: { card: CohortCard; now: number }) {
   )
 }
 
-export function CohortGrid({ cohorts, draftCount, now }: { cohorts: CohortCard[]; draftCount: number; now: number }) {
+export function CohortGrid({
+  cohorts,
+  draftCount,
+  now,
+  nextCohort,
+}: {
+  cohorts: CohortCard[]
+  draftCount: number
+  now: number
+  nextCohort: CohortView | null
+}) {
   return (
     <section aria-labelledby="cohorts-heading" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-end justify-between gap-2">
@@ -200,7 +221,7 @@ export function CohortGrid({ cohorts, draftCount, now }: { cohorts: CohortCard[]
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
           {cohorts.map((card) => (
-            <Cohort key={card.id} card={card} now={now} />
+            <Cohort key={card.id} card={card} now={now} nextCohort={nextCohort} />
           ))}
         </div>
       )}

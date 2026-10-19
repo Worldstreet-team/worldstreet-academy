@@ -20,6 +20,8 @@ import {
 import { getCurrentUser } from "@/lib/auth/actions"
 import { entitlementsFor } from "@/lib/entitlements"
 import { COURSE_KIND_LABEL, courseKindOf } from "@/lib/course-kind"
+import { cohortsForEnrollments, getCohortCalendar } from "@/lib/cohort-calendar"
+import type { CohortView } from "@/lib/cohort-rules"
 import { safeWebUrl } from "@/lib/faculty"
 import { referralSummary } from "@/lib/referrals"
 import { SCHOOL_BY_SLUG, isSchoolSlug } from "@/lib/schools"
@@ -97,6 +99,8 @@ export type CohortCard = {
   mentorshipRequests: number
   latestRecording: { status: RecordingStatus; recordedAt: string } | null
   communityUrl: string | null
+  /** Program courses only: learners per cohort (D20), ascending by cohort number, zeros left out. */
+  cohortCounts: { name: string; count: number }[]
   manageHref: string
 }
 
@@ -130,6 +134,8 @@ export type TeachingHome = {
   draftCount: number
   /** Teaches a school program that is out of draft (the cohort start applies). */
   teachesProgram: boolean
+  /** The next cohort that has not begun (D20); null when none is scheduled. */
+  nextCohort: CohortView | null
   /** Grade, then mentorship, then recordings; oldest first within each. Unread messages are added by the page from the shell's count. */
   todo: TodoItem[]
   money: TeachingMoney
@@ -414,6 +420,25 @@ export async function getTeachingHome(input: {
     week.sort((a, b) => a.start.localeCompare(b.start))
 
     /* ── Cohorts ── */
+    const calendar = await getCohortCalendar()
+    const programIds = taught.filter((c) => courseKindOf(c) === "program").map((c) => c._id)
+    const placed = programIds.length
+      ? await Enrollment.find({ course: { $in: programIds }, status: { $in: ["active", "completed"] } })
+          .select("_id course purchasedAt createdAt")
+          .lean()
+      : []
+    const cohortOf = await cohortsForEnrollments(placed)
+    const countsByCourse = new Map<string, Map<number, { name: string; count: number }>>()
+    for (const row of placed) {
+      const cohort = cohortOf.get(String(row._id))
+      if (!cohort) continue
+      const key = row.course.toString()
+      const perCohort = countsByCourse.get(key) ?? new Map<number, { name: string; count: number }>()
+      const tally = perCohort.get(cohort.number) ?? { name: cohort.name, count: 0 }
+      tally.count += 1
+      perCohort.set(cohort.number, tally)
+      countsByCourse.set(key, perCohort)
+    }
     const facets = recordingFacets[0] ?? { latest: [], failed: [] }
     const latestRecording = new Map(facets.latest.map((r) => [r._id.toString(), r]))
     const toGrade = new Map(toGradeByCourse.map((g) => [g._id.toString(), g]))
@@ -450,6 +475,7 @@ export async function getTeachingHome(input: {
           mentorshipRequests: requests.get(id)?.count ?? 0,
           latestRecording: recording ? { status: recording.status, recordedAt: recording.recordedAt.toISOString() } : null,
           communityUrl: safeWebUrl(c.communityUrl),
+          cohortCounts: [...(countsByCourse.get(id) ?? [])].sort(([a], [b]) => a - b).map(([, tally]) => tally),
           manageHref: `/instructor/courses/${id}`,
         }
       })
@@ -515,6 +541,7 @@ export async function getTeachingHome(input: {
         cohorts,
         draftCount: courses.filter((c) => c.status === "draft").length,
         teachesProgram: taught.some((c) => courseKindOf(c) === "program"),
+        nextCohort: calendar.next,
         todo,
         money: {
           pendingMinor,

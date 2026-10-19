@@ -9,7 +9,7 @@ import { Countdown } from "@/components/shared/countdown"
 import { ProgramCover } from "@/components/platform/program-bits"
 import type { HeroClass } from "@/lib/actions/teaching-home"
 import { HOST_EARLY_START_MS, hostMayStart } from "@/lib/class-schedule"
-import { COHORT_STARTS_AT_ISO, cohortIsUpcoming } from "@/lib/cohort"
+import type { CohortView } from "@/lib/cohort-rules"
 import { browserZone, classWhenLabel, cohortStartLabel, downloadClassIcs, timeLabel } from "@/lib/teaching-home"
 import { cn } from "@/lib/utils"
 
@@ -151,8 +151,18 @@ function UpcomingHero({ hero, now }: { hero: HeroClass; now: number }) {
   )
 }
 
-function EmptyHero({ now, teachesProgram, hasCourses }: { now: number; teachesProgram: boolean; hasCourses: boolean }) {
-  const showCohort = teachesProgram && cohortIsUpcoming(now)
+function EmptyHero({
+  now,
+  teachesProgram,
+  hasCourses,
+  nextCohort,
+}: {
+  now: number
+  teachesProgram: boolean
+  hasCourses: boolean
+  nextCohort: CohortView | null
+}) {
+  const showCohort = teachesProgram && nextCohort !== null && Date.parse(nextCohort.startsAt) > now
   return (
     <HeroFrame art={null}>
       <Eyebrow>Next live class</Eyebrow>
@@ -166,10 +176,10 @@ function EmptyHero({ now, teachesProgram, hasCourses }: { now: number; teachesPr
             : "Live classes run on your published courses. Publish one to schedule its first class."}
         </p>
       </div>
-      {showCohort && (
+      {showCohort && nextCohort && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[9px] bg-ws-chip px-3 py-2 text-[13.5px]">
-          <span className="font-medium">Cohort begins {cohortStartLabel()}</span>
-          <Countdown target={COHORT_STARTS_AT_ISO} variant="compact" prefix="in " className="text-muted-foreground" />
+          <span className="font-medium">{nextCohort.name} begins {cohortStartLabel(nextCohort.startsAt)}</span>
+          <Countdown target={nextCohort.startsAt} variant="compact" prefix="in " className="text-muted-foreground" />
         </div>
       )}
       <div className="mt-auto flex flex-wrap items-center gap-2">
@@ -192,14 +202,17 @@ export function NextClassHero({
   now,
   teachesProgram,
   hasCourses,
+  nextCohort,
 }: {
   hero: HeroClass | null
   now: number
   teachesProgram: boolean
   /** Has a course out of draft — the only kind a class can be scheduled on. */
   hasCourses: boolean
+  /** The next cohort that has not begun (D20). */
+  nextCohort: CohortView | null
 }) {
   if (hero?.live) return <LiveHero hero={hero} />
   if (hero) return <UpcomingHero hero={hero} now={now} />
-  return <EmptyHero now={now} teachesProgram={teachesProgram} hasCourses={hasCourses} />
+  return <EmptyHero now={now} teachesProgram={teachesProgram} hasCourses={hasCourses} nextCohort={nextCohort} />
 }
