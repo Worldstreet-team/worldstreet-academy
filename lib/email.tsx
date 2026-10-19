@@ -982,7 +982,7 @@ function EnrollmentConfirmationEmail({ data }: { data: EnrollmentEmailData }) {
                 the account is the WorldStreet account they signed up with. */}
             <Text style={{ ...sub, marginTop: "12px" }}>
               Sign in at <Link href={dashboardUrl}>{dashboardUrl}</Link> with <strong>{data.to}</strong> to open
-              your dashboard.
+              the WMA Student Portal.
             </Text>
 
             <Section style={{ marginTop: "28px" }}>
@@ -1025,6 +1025,101 @@ export async function sendEnrollmentConfirmationEmail(data: EnrollmentEmailData)
     return { success: true }
   } catch (err) {
     console.error("[Email] Enrollment confirmation error:", err)
+    return { success: false, error: "Failed to send email" }
+  }
+}
+
+export type WelcomeEmailData = {
+  to: string
+  firstName: string
+  /** "Monday 16 November" while a cohort is upcoming; null omits the line. */
+  cohortStartLabel: string | null
+}
+
+/** The Student Portal, in §11's order — the labels are the sidebar's (keep them in step). */
+const PORTAL_MAP = [
+  { label: "My programs", path: "/dashboard/my-courses", body: "Your lessons and your progress." },
+  { label: "My classes", path: "/dashboard/meetings", body: "Live classes and their times." },
+  { label: "Recordings", path: "/dashboard/recordings", body: "Past live classes, to watch again." },
+  { label: "Assignments", path: "/dashboard/assignments", body: "Practical work to hand in." },
+  { label: "Assessments", path: "/dashboard/assessments", body: "Knowledge checks and final exams." },
+  { label: "My points", path: "/dashboard/points", body: "Points you earn as you learn." },
+  { label: "Communities", path: "/dashboard/communities", body: "Your program, school and Academy groups." },
+] as const
+
+function WelcomeEmail({ data }: { data: WelcomeEmailData }) {
+  const portalUrl = appUrl("/dashboard")
+  return (
+    <Html style={base}>
+      <Head />
+      <Preview>Your WMA Student Portal is ready</Preview>
+      <Body style={body}>
+        <Container style={card}>
+          <Section style={contentPad}>
+            <Text style={heading}>{`Welcome to ${BRAND.name}`}</Text>
+            <Text style={sub}>
+              {`${data.firstName ? `${data.firstName}, your` : "Your"} payment is confirmed and your place at the Academy is ready.`}
+            </Text>
+            <Text style={sub}>
+              Sign in at <Link href={portalUrl}>{portalUrl}</Link> with <strong>{data.to}</strong> and the password of
+              your WorldStreet account.
+            </Text>
+            {data.cohortStartLabel ? (
+              <Text style={sub}>
+                Your cohort begins on <strong>{data.cohortStartLabel}</strong>.
+              </Text>
+            ) : null}
+            <Text style={{ ...sub, fontWeight: 600 }}>Your WMA Student Portal</Text>
+            {PORTAL_MAP.map((row) => (
+              <Text key={row.path} style={sub}>
+                <Link href={appUrl(row.path)}>
+                  <strong>{row.label}</strong>
+                </Link>{" "}
+                — {row.body}
+              </Text>
+            ))}
+            <Text style={muted}>What each page holds depends on the plan you chose.</Text>
+
+            <Section style={{ marginTop: "28px" }}>
+              <Button href={portalUrl} style={cta}>
+                Open the Student Portal
+              </Button>
+            </Section>
+
+            <Hr style={{ borderColor: "#E4E4E9", margin: "24px 0 16px" }} />
+
+            <Link href={portalUrl} style={linkSmall}>
+              {portalUrl}
+            </Link>
+          </Section>
+        </Container>
+
+        <Section style={footer}>
+          <Text style={footerText}>{BRAND.name}</Text>
+        </Section>
+      </Body>
+    </Html>
+  )
+}
+
+export async function sendWelcomeEmail(
+  data: WelcomeEmailData
+): Promise<{ success: true } | { success: false; error: string }> {
+  if (!data.to) return { success: false, error: "No recipient" }
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: data.to,
+      subject: `Welcome to ${BRAND.name}`,
+      react: React.createElement(WelcomeEmail, { data }),
+    })
+    if (error) {
+      console.error("[Email] Welcome failed:", error)
+      return { success: false, error: error.message }
+    }
+    return { success: true }
+  } catch (err) {
+    console.error("[Email] Welcome error:", err)
     return { success: false, error: "Failed to send email" }
   }
 }
@@ -1274,7 +1369,7 @@ export type EspeeLearnerEmailData = {
   amountLabel: string
 }
 
-/** "We received your proof — your dashboard opens once it's confirmed." */
+/** "We received your proof — the WMA Student Portal opens once it's confirmed." */
 export async function sendEspeeProofReceivedEmail(data: EspeeLearnerEmailData) {
   if (!data.to) return { success: false, error: "No recipient" }
   const statusUrl = appUrl("/dashboard/checkout/pending")
@@ -1296,7 +1391,7 @@ export async function sendEspeeProofReceivedEmail(data: EspeeLearnerEmailData) {
             {data.packageName ? ` — ${data.packageName}` : ""}.
           </Text>
           <Text style={sub}>
-            Our team checks every transfer by hand. Your dashboard opens once it&apos;s confirmed, and we&apos;ll
+            Our team checks every transfer by hand. The WMA Student Portal opens once it&apos;s confirmed, and we&apos;ll
             email you the moment it is.
           </Text>
         </PaymentNoticeEmail>

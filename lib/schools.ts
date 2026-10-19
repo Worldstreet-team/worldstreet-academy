@@ -26,6 +26,8 @@ export type School = {
   tagline: string | null
   /** School-page intro paragraph (spec §5); null falls back to blurb. */
   intro: string | null
+  /** §14 School Community (D26): an external group link; absent or null until product supplies one. */
+  communityUrl?: string | null
   /** lucide icon name for RenderIcon. */
   icon: string
   order: number

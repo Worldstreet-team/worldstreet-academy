@@ -16,9 +16,10 @@ const isLocalDev = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk
 export default clerkMiddleware(async (auth, request) => {
   const { pathname } = request.nextUrl
 
-  // Add pathname header so server components can read the current path
+  // Add pathname and query-string headers so server components can read the current path and its query
   const requestHeaders = new Headers(request.headers)
   requestHeaders.set("x-next-pathname", pathname)
+  requestHeaders.set("x-next-search", request.nextUrl.search)
 
   // Referral links (owner, 2026-10-05): any page with a valid `?ref=CODE`
   // stores the code for 30 days, so it survives sign-up on the hub. First

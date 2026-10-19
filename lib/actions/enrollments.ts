@@ -21,6 +21,7 @@ import { Types } from "mongoose"
 import { getCurrentUser } from "@/lib/auth/actions"
 import { courseAvailability } from "@/lib/types/course"
 import { sendEnrollmentConfirmationEmail } from "@/lib/email"
+import { sendWelcomeOnce } from "@/lib/welcome-email"
 import { notifyAdmins, notifyUser } from "@/lib/notify"
 import { getCourseAccess, isLessonLockedFor, lockedLessonIds } from "@/lib/course-access"
 import { saveWithCertificateId } from "@/lib/certificate-id"
@@ -554,6 +555,8 @@ export async function purchaseCourse(input: { courseId: string; packageKey?: Pac
       price,
       packageName: packageFields.packageName,
     })
+    // D27: one welcome on the learner's first paid enrollment — after the confirmation, never awaited.
+    if (isPaid) void sendWelcomeOnce(user.id, enrollment._id.toString())
 
     revalidatePath("/dashboard/my-courses")
     revalidatePath(`/courses/${courseId}`)

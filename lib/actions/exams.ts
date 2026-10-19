@@ -491,6 +491,14 @@ export type MyAssessment = {
   /** Assignments only: `project` or `assignment`; null for exams. */
   kind: AssignmentKind | null
   href: string
+  /** Exams: finished attempts (status ≠ "in_progress"). Assignments: null. */
+  attemptsUsed: number | null
+  /** Exams: the exam's attempt limit, 0 = unlimited. Assignments: null. */
+  maxAttempts: number | null
+  /** Exams: the best finished score, 0–100; null before any. Assignments: null. */
+  bestScorePercent: number | null
+  /** Exams: the pass mark, 1–100. Assignments: null. */
+  passMarkPercent: number | null
 }
 
 const ASSESSMENT_STATUS_ORDER: Record<MyAssessment["status"], number> = {
@@ -506,7 +514,7 @@ const ASSESSMENT_STATUS_ORDER: Record<MyAssessment["status"], number> = {
 /** Within a course: knowledge checks, then the final exam, then assignments. */
 const ASSESSMENT_SCOPE_ORDER: Record<MyAssessment["scope"], number> = { lesson: 0, final: 1, assignment: 2 }
 
-type AssessmentAttempt = { _id: Types.ObjectId; status: AttemptStatus; submittedAt: Date | null; createdAt: Date }
+type AssessmentAttempt = { _id: Types.ObjectId; status: AttemptStatus; submittedAt: Date | null; createdAt: Date; scorePercent: number | null }
 
 /**
  * The attempt the exam runner itself would treat as authoritative: newest by
@@ -542,6 +550,9 @@ function latestFinishedAttempt(history: AssessmentAttempt[]): AssessmentAttempt 
  * it's `locked`, never a false `not_started`. Exams are NOT gated on the
  * `assignments` entitlement.
  *
+ * Exam rows also carry attempts used, the attempt limit, the best finished
+ * score and the pass mark (null on assignments).
+ *
  * Practical assignments (Phase 7): published ones on programs whose package
  * includes `assignments`, with the student's submission state. Bulk queries
  * only, whatever the number of courses.
@@ -552,14 +563,14 @@ export async function getMyAssessments(): Promise<MyAssessment[]> {
     if (!user) return []
 
     const enrollments = await Enrollment.find({ user: user.id, status: { $in: ["active", "completed"] } })
-      .select("course packageKey examPassed progress")
+      .select("course packageKey examPassed progress bestScorePercent")
       .lean()
     if (enrollments.length === 0) return []
     const courseIds = enrollments.map((e) => e.course)
 
     const [courses, exams] = await Promise.all([
       Course.find({ _id: { $in: courseIds } }).select("title packages").lean(),
-      Exam.find({ course: { $in: courseIds }, status: "published" }).select("course scope lesson title").lean(),
+      Exam.find({ course: { $in: courseIds }, status: "published" }).select("course scope lesson title settings.passMarkPercent settings.maxAttempts").lean(),
     ])
     const coursesById = new Map(courses.map((c) => [c._id.toString(), c]))
     const enrollmentsByCourse = new Map(enrollments.map((e) => [e.course.toString(), e]))
@@ -573,7 +584,7 @@ export async function getMyAssessments(): Promise<MyAssessment[]> {
     const [lessons, attempts, assignments] = await Promise.all([
       Lesson.find({ _id: { $in: quizLessonIds } }).select("course minPackageKey isFree").lean(),
       ExamAttempt.find({ user: user.id, exam: { $in: exams.map((exam) => exam._id) } })
-        .select("exam status submittedAt createdAt")
+        .select("exam status submittedAt createdAt scorePercent")
         .lean(),
       Assignment.find({ course: { $in: assignmentCourseIds }, status: "published" })
         .select("course title dueAt kind")
@@ -614,6 +625,16 @@ export async function getMyAssessments(): Promise<MyAssessment[]> {
       const history = attemptsByExam.get(exam._id.toString()) ?? []
       const inProgress = history.some((a) => a.status === "in_progress")
       const finished = latestFinishedAttempt(history)
+      const finishedAttempts = history.filter((a) => a.status !== "in_progress")
+      let bestScorePercent: number | null = null
+      for (const a of finishedAttempts) {
+        if (a.scorePercent != null && (bestScorePercent === null || a.scorePercent > bestScorePercent)) {
+          bestScorePercent = a.scorePercent
+        }
+      }
+      if (!isQuiz && enrollment.bestScorePercent != null) {
+        bestScorePercent = Math.max(bestScorePercent ?? 0, enrollment.bestScorePercent)
+      }
 
       const status: MyAssessment["status"] = isQuiz
         ? inProgress
@@ -644,6 +665,10 @@ export async function getMyAssessments(): Promise<MyAssessment[]> {
         dueAt: null,
         kind: null,
         href: isQuiz ? `/dashboard/courses/${courseId}/learn/${lessonId}` : `/dashboard/courses/${courseId}/exam`,
+        attemptsUsed: finishedAttempts.length,
+        maxAttempts: exam.settings?.maxAttempts ?? 3,
+        bestScorePercent,
+        passMarkPercent: exam.settings?.passMarkPercent ?? 70,
       })
     }
 
@@ -662,6 +687,10 @@ export async function getMyAssessments(): Promise<MyAssessment[]> {
         dueAt: assignment.dueAt ? assignment.dueAt.toISOString() : null,
         kind: assignment.kind ?? "assignment",
         href: `/dashboard/assignments/${id}`,
+        attemptsUsed: null,
+        maxAttempts: null,
+        bestScorePercent: null,
+        passMarkPercent: null,
       })
     }
 

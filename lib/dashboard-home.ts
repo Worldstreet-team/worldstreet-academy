@@ -129,23 +129,6 @@ export function instructorRows(enrollments: StudentEnrollment[]): InstructorRow[
   return [...rows.values()]
 }
 
-export type ClassCommunity = { courseId: string; courseTitle: string; url: string }
-
-/**
- * One row per distinct class community link across the student's
- * access-granting enrollments (the server only sends the link for those; the
- * check is repeated so a stale row never shows one). Two programs sharing a
- * group list it once.
- */
-export function classCommunities(enrollments: StudentEnrollment[]): ClassCommunity[] {
-  const byUrl = new Map<string, ClassCommunity>()
-  for (const e of enrollments) {
-    if (!grantsAccess(e) || !e.communityUrl || byUrl.has(e.communityUrl)) continue
-    byUrl.set(e.communityUrl, { courseId: e.courseId, courseTitle: e.courseTitle, url: e.communityUrl })
-  }
-  return [...byUrl.values()]
-}
-
 /** Whether any access-granting enrollment's package includes `flag` — tiles that can't be backed stay hidden. */
 export function includesAny(enrollments: StudentEnrollment[], flag: keyof IPackageEntitlements): boolean {
   return enrollments.some((e) => grantsAccess(e) && e.entitlements[flag])
@@ -381,6 +364,59 @@ const ASSESSMENT_DONE: ReadonlySet<MyAssessment["status"]> = new Set(["passed", 
 export function assessmentCounts(assessments: MyAssessment[]): { toDo: number; done: number } {
   const done = assessments.filter((a) => ASSESSMENT_DONE.has(a.status)).length
   return { toDo: assessments.length - done, done }
+}
+
+/** The page that lists what `assessmentCounts().toDo` counts: Assessments when any open item is an exam or quiz, else Assignments. */
+export function toDoHref(assessments: MyAssessment[]): string {
+  const openExam = assessments.some((a) => assessmentKindOf(a) === "assessments" && !ASSESSMENT_DONE.has(a.status))
+  return openExam ? "/dashboard/assessments" : "/dashboard/assignments"
+}
+
+export type AssessmentKind = "assessments" | "assignments"
+
+/** Which page a row belongs to: practical assignments, or exams (finals and knowledge checks). */
+export function assessmentKindOf(a: Pick<MyAssessment, "scope">): AssessmentKind {
+  return a.scope === "assignment" ? "assignments" : "assessments"
+}
+
+/** The row's next action, or null when there is none. */
+export function assessmentAction(a: MyAssessment): string | null {
+  if (a.scope === "assignment") {
+    if (a.status === "not_started") return "Submit"
+    if (a.status === "in_progress") return "Resume"
+    if (a.status === "graded") return "View grade"
+    return null
+  }
+  switch (a.status) {
+    case "not_started":
+      return "Start"
+    case "in_progress":
+      return "Resume"
+    case "failed": {
+      const max = a.maxAttempts ?? 0
+      return max === 0 || (a.attemptsUsed ?? 0) < max ? "Retake" : "View result"
+    }
+    case "passed":
+      return "View result"
+    default:
+      return null
+  }
+}
+
+/** The exam meta line: attempts · best score · pass mark. Null for assignments. */
+export function assessmentMeta(a: MyAssessment): string | null {
+  if (a.scope === "assignment") return null
+  const parts: string[] = []
+  const used = a.attemptsUsed ?? 0
+  const max = a.maxAttempts
+  if (max != null) {
+    if (max > 0) parts.push(`${used} of ${max} ${max === 1 ? "attempt" : "attempts"}`)
+    else if (used === 0) parts.push("Unlimited attempts")
+    else parts.push(`${used} ${used === 1 ? "attempt" : "attempts"} · unlimited`)
+  }
+  if (a.bestScorePercent !== null) parts.push(`Best ${a.bestScorePercent}%`)
+  if (a.passMarkPercent !== null) parts.push(`Pass mark ${a.passMarkPercent}%`)
+  return parts.length > 0 ? parts.join(" · ") : null
 }
 
 /** A class past its start time that the host hasn't started — listed as "Waiting for your instructor". */

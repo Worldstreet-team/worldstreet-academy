@@ -144,11 +144,11 @@ export default function NotificationsPage() {
 
   return (
     <>
-      <Topbar title="Notifications" />
+      <Topbar title="Inbox" breadcrumbOverrides={{ notifications: "Inbox" }} />
       <div className="flex-1 px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-8 sm:px-6 md:px-8 md:pb-12 lg:px-12">
         <div className="mx-auto w-full max-w-3xl space-y-6">
           <PageHeader
-            title="Notifications"
+            title="Inbox"
             subtitle="What's happening in your programs — new lessons, live classes, grades, certificates and mentorship."
             actions={
               <Button

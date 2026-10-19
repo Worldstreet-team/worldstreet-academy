@@ -24,7 +24,7 @@ import { useUser } from "@/components/providers/user-provider"
 import { CardShell, EmptyState, Eyebrow, Rise } from "@/components/ui/system"
 import {
   assessmentCounts,
-  classCommunities,
+  toDoHref,
   hasPrioritySupport,
   includesAny,
   instructorRows,
@@ -33,6 +33,7 @@ import {
   pickHero,
   programsForTab,
 } from "@/lib/dashboard-home"
+import { myCommunities } from "@/lib/communities"
 import {
   useBookmarkedIds,
   useBookmarks,
@@ -169,7 +170,7 @@ export default function DashboardPage() {
   tiles.push({
     key: "support",
     prefer: "narrow",
-    node: <SupportTile priority={hasPrioritySupport(enrollments)} communities={classCommunities(enrollments)} />,
+    node: <SupportTile priority={hasPrioritySupport(enrollments)} communities={myCommunities(enrollments)} />,
   })
 
   // Programs the student already has would only repeat the list above.
@@ -233,6 +234,7 @@ export default function DashboardPage() {
                             showCertificates={showCertificates}
                             showClasses={showClasses}
                             toDo={toDo}
+                            toDoHref={toDoHref(assessments)}
                           />
                         ) : null
                       }

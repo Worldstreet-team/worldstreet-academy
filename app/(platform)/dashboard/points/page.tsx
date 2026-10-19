@@ -19,7 +19,7 @@ import {
 import { cn } from "@/lib/utils"
 
 export const metadata: Metadata = {
-  title: "Points",
+  title: "My points",
   robots: { index: false, follow: false },
 }
 
@@ -74,11 +74,11 @@ export default async function PointsPage() {
 
   return (
     <>
-      <Topbar title="Points" breadcrumbOverrides={{ points: "Points" }} />
+      <Topbar title="My points" breadcrumbOverrides={{ points: "My points" }} />
       <div className="flex-1 px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-8 sm:px-6 md:px-8 md:pb-12 lg:px-12">
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
           <PageHeader
-            title="Points"
+            title="My points"
             subtitle="Earned as you learn — lessons, assignments, exams and finished programs. Points have no cash value."
           />
 

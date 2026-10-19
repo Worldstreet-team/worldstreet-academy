@@ -261,3 +261,14 @@ The unique index is on `{ meeting, user }`. The web writes rows only for course 
 **`assignments.kind`** is `"assignment" | "project"` (missing means `"assignment"`), on a web-only collection.
 
 **The Mastery Score** is computed on read from enrollments, submissions, meetings and attendances. Nothing is stored. If mobile ever shows it, it must use the weights in `lib/mastery-score.ts`.
+
+## 14. Phase 15 — the welcome email (institutional blueprint §10, D27)
+
+Go needs no patch.
+
+**`users.welcomedAt`** is a date or `null` (missing = `null`). It is web-only, and Go may ignore it.
+
+- The web claims it with a filtered update (`{ _id, welcomedAt: null }`) before sending the one-time "Welcome to WorldStreet Mastery Academy" email, after a learner's first paid enrollment (a wallet purchase or an ESPEE approval).
+- If Go ever sends that welcome, it must claim the same field the same way first.
+- The web also skips the welcome when the learner already had an earlier paid enrollment (the rule in `lib/welcome-email.ts`), so Go must do the same if it ever sends it.
+- Any wholesale user write must keep it.

@@ -142,6 +142,8 @@ export type StudentEnrollment = {
   lessonTrack: boolean[]
   /** The class community link (`Course.communityUrl`) — only on an access-granting enrollment; it's a private group. */
   communityUrl: string | null
+  /** The program's school (`Course.school`); null when unassigned. */
+  school: SchoolSlug | null
 }
 
 export type ResumeLesson = {
@@ -1018,6 +1020,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
           : null,
         lessonTrack: openInOrder.map((l) => completedIds.has(l._id.toString())),
         communityUrl: access ? safeWebUrl(course.communityUrl) : null,
+        school: isSchoolSlug(course.school) ? course.school : null,
       }
     })
   } catch (error) {

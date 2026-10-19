@@ -36,6 +36,8 @@ export interface IUser extends Document {
   referredBy: { text: string; at: Date; code?: string | null; userId?: Types.ObjectId | null } | null
   /** This person's own referral code (students and tutors alike), minted on first use. Unique when set. */
   referralCode: string | null
+  /** When the one-time welcome email was claimed (D27); null = never. Additive, web-only: Go ignores it. */
+  welcomedAt: Date | null
   /** Marketplace seller pipeline; "approved" opens the seller area. */
   sellerStatus: SellerStatus
   /**
@@ -172,6 +174,7 @@ const UserSchema = new Schema<IUser>(
       default: null,
     },
     referralCode: { type: String, default: null, trim: true, uppercase: true },
+    welcomedAt: { type: Date, default: null },
     sellerStatus: {
       type: String,
       enum: ["none", "applied", "approved", "rejected"],

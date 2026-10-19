@@ -21,7 +21,6 @@ import {
 import type { StudentEnrollment } from "@/lib/actions/student"
 import { BRAND } from "@/lib/brand"
 import {
-  type ClassCommunity,
   enrollmentStatusLabel,
   formatClassWhen,
   formatShortDate,
@@ -36,6 +35,7 @@ import {
   type InstructorRow,
   type ProgramTab,
 } from "@/lib/dashboard-home"
+import { COMMUNITY_SCOPE_TITLE, type CommunityLink } from "@/lib/communities"
 import { useMyCertificates, useMyPoints, useUpcomingClasses } from "@/lib/hooks/queries"
 import { cn } from "@/lib/utils"
 
@@ -380,30 +380,17 @@ export function InstructorsTile({ rows }: { rows: InstructorRow[] }) {
 
 /* ── Help & community ─────────────────────────────────────────────────── */
 
-/** Inlined at build time; unset or blank hides the community row (D6). */
-const COMMUNITY_URL = process.env.NEXT_PUBLIC_COMMUNITY_URL?.trim() || null
-
 /**
  * Always present, so the grid always has a closing tile. "Priority support"
  * only for a package bought with it. At full page width its rows sit side by
- * side instead of stretching one row across the screen. Community: one row per
- * enrolled program's class community (owner, 2026-10-03); the general
- * community link only when none of the student's programs has one.
+ * side instead of stretching one row across the screen. Community (§14, D26):
+ * the first two rows of the learner's list (program, school, Academy,
+ * Executive); "All communities" opens the rest on /dashboard/communities.
  */
-export function SupportTile({ priority, communities }: { priority: boolean; communities: ClassCommunity[] }) {
-  const communityRows =
-    communities.length > 0
-      ? communities.map((c) => ({ key: c.url, href: c.url, title: "Class community", subtitle: c.courseTitle }))
-      : COMMUNITY_URL
-        ? [
-            {
-              key: "general",
-              href: COMMUNITY_URL,
-              title: "Community",
-              subtitle: `Connect with other ${BRAND.wordmark} learners`,
-            },
-          ]
-        : []
+export function SupportTile({ priority, communities }: { priority: boolean; communities: CommunityLink[] }) {
+  const communityRows = communities
+    .slice(0, 2)
+    .map((c) => ({ key: c.url, href: c.url, title: COMMUNITY_SCOPE_TITLE[c.scope], subtitle: c.label }))
   return (
     <CardShell className="@container">
       <CardHeader
@@ -449,6 +436,12 @@ export function SupportTile({ priority, communities }: { priority: boolean; comm
           </a>
         ))}
       </div>
+      {communities.length > 2 ? (
+        <Link href="/dashboard/communities" className={TILE_FOOT_LINK}>
+          All communities
+          <Chevron />
+        </Link>
+      ) : null}
     </CardShell>
   )
 }
