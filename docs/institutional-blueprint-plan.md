@@ -1,6 +1,6 @@
 # WorldStreet Mastery Academy — Institutional Blueprint Implementation Plan (Phases 10–20)
 
-**Date:** 2026-10-19 · **Status:** BUILT, NOT RELEASED — Phases 11–21 are merged on `feat/institutional`, the final fix round is in progress on `fix/final-review`, and nothing has been pushed. Phase 10, the production release, is the owner's step. Owner, 2026-10-19: "we need all these in the document implemented and we will need super admin and admin level people asap". Every phase runs; D21–D23 answered yes; D25 and D30 built on their defaults (Phase 21 added for super admin) · **Integration branch:** `feat/institutional` (off `feat/cohort-launch`) · **Spec:** `docs/institutional-blueprint.md` (cited "institutional blueprint §N", shortened to "§N" in this file)
+**Date:** 2026-10-19 · **Status:** BUILT, NOT RELEASED — Phases 11–21 are merged on `feat/institutional`, nothing has been pushed. Final review: ready to ship. Runtime pass #2 on the final tip: 13/13. Release check: build OK, lint at baseline, dev-bypass guard empty. Phase 10, the production release, is the owner's step. Owner, 2026-10-19: "we need all these in the document implemented and we will need super admin and admin level people asap". Every phase runs; D21–D23 answered yes; D25 and D30 built on their defaults (Phase 21 added for super admin) · **Integration branch:** `feat/institutional` (off `feat/cohort-launch`) · **Spec:** `docs/institutional-blueprint.md` (cited "institutional blueprint §N", shortened to "§N" in this file)
 **Builds on:** `feat/cohort-launch` @ `3ceca71`, which is 67 commits ahead of production `main` (`52bcf8f`). **Predecessor:** `docs/mastery-academy-plan.md` (Phases 0–9, decisions D1–D15). Its hard constraints (§0.3 there) still bind every phase here, and phase numbers continue from it. Nothing is renumbered.
 
 > **How to drive this plan.** Say **"start phase N"**. The executor reads this file and the spec, cuts `mastery/phase-N` from the current release tip (never from a `main` that doesn't yet hold `feat/cohort-launch`), writes or refreshes `docs/plans/mastery-phase-N.md` (bite-sized tasks, superpowers:writing-plans), runs it with superpowers:subagent-driven-development, and reports against the phase's **Exit criteria**. A phase marked ⛔ waits for the owner's answer to the decision it names (§2). Every other phase proceeds on the bold defaults unless the owner overrules them. Phase 11's task plan is already written: `docs/plans/mastery-phase-11.md`.
@@ -21,7 +21,7 @@
 3. **The production catalogue is still the old one.** `scripts/mastery-catalogue.mjs --apply` has never run there, so programs are single-price under legacy titles, plus two programs outside the catalogue.
 4. **This blueprint disagrees with the build in four places:** 7 schools against our 8; about 44 program names against our 12; a Basic plan that includes recordings, assignments, assessments and a certificate, where ours grants none of them; and Basic at 4 weeks and Standard at 8–12 weeks, against "9 weeks". These are owner decisions (§2), not build tasks.
 
-5. **Update, 2026-10-19 (end of day): built, not released.** Phases 11–21 are built, reviewed task by task, and merged into `feat/institutional`. A runtime QA pass on the integrated branch (dev-mock, local DB, about 70 routes as guest, student, instructor and admin, at 1280 and 390) found no blockers and no majors. The final whole-branch review found 0 Critical and 4 Important; they are being fixed on `fix/final-review`: a live file swap with no review, going back to draft keeping the approval, the Go note for file products becoming a REQUIRED patch, and the faculty Mastery Score filter. Nothing has been pushed. Phase 10 (the production release) is the owner's step. Exit criteria below are ticked only where a local run or a phase ledger verifies them, marked "(verified locally)"; anything needing production, the owner, or a real email send stays open and says what remains.
+5. **Update, 2026-10-19 (end of day): built, not released.** Phases 11–21 are built, reviewed task by task, and merged into `feat/institutional`. A runtime QA pass on the integrated branch (dev-mock, local DB, about 70 routes as guest, student, instructor and admin, at 1280 and 390) found no blockers and no majors. The final whole-branch review found 0 Critical and 4 Important (a live file swap with no review, going back to draft keeping the approval, the Go note for file products becoming a REQUIRED patch, and the faculty Mastery Score filter); all were fixed, and the review now reads ready to ship. Runtime pass #2 on the final tip (13/13) and the release check (build OK, lint at baseline, dev-bypass guard empty) passed. Nothing has been pushed. Phase 10 (the production release) is the owner's step. Exit criteria below are ticked only where a local run or a phase ledger verifies them, marked "(verified locally)"; anything needing production, the owner, or a real email send stays open and says what remains.
 
 ---
 
@@ -185,7 +185,7 @@ Total ≈ 28–35 dev-days in sequence, or ≈ 14–18 across three tracks:
 - [x] `/` shows the §18 hero and CTAs verbatim. With a future cohort configured, the cohort band reads "Cohort 00N — Starts …" with the countdown and both CTAs. (verified locally)
 - [x] `/academy` is live with §1–§6 and §20–§23. The Opportunity Hub reads "Coming soon" and links nowhere. (verified locally)
 - [x] No user-facing "package", "seller" or "Become an Instructor" remains. "Own Your Future" appears nowhere. (verified locally) on the checked pages: 0 "package" or "seller"; "Become a WMA Instructor" on `/` and `/teach`.
-- [ ] 390 px: no horizontal scroll on `/` or `/academy`, and the hero claim holds two lines from 320 px. Verified locally: no horizontal scroll at 390, and at 320 on `/` and `/academy`. The two-line hero claim from 320 px was not recorded separately, so this stays open.
+- [x] 390 px: no horizontal scroll on `/` or `/academy`, and the hero claim holds two lines from 320 px. (verified locally, pass #2): the hero claim holds two lines at 320 and 390, with no horizontal scroll.
 
 ---
 
@@ -237,7 +237,7 @@ Total ≈ 28–35 dev-days in sequence, or ≈ 14–18 across three tracks:
 ### Exit criteria
 - [x] Entering Cohort 002 in admin moves every countdown, banner, strip and "Offer ends in" timer to its date, with no redeploy. (verified locally) (cohort create and edit work; duplicate numbers refused; a started cohort's start can't move later).
 - [x] `/calendar` lists the cohorts. School pages show Upcoming cohorts. Learners and faculty see "Cohort 00N". (verified locally)
-- [ ] With the collection empty, behaviour equals today's. Open: the empty-collection fallback was not exercised in the QA pass or recorded in the ledger.
+- [x] With the collection empty, behaviour equals today's. (verified locally, pass #2): with the `cohorts` collection empty, the env fallback renders identically on `/`, `/schools`, a school page, a program page, `/calendar` and `/dashboard`.
 
 ---
 
@@ -276,7 +276,7 @@ Total ≈ 28–35 dev-days in sequence, or ≈ 14–18 across three tracks:
 
 ### Exit criteria
 - [x] Seven schools on every surface. Old school links and cookies land on the right new school. (verified locally): all 7 return 200, retired slugs 308 to the new school, and a `wsa_school` cookie with a retired slug lands on the right one.
-- [ ] Each school page shows §8's sections in order, and sections without content hide. Open: only Upcoming cohorts was checked at runtime; section order was reviewed task by task, not walked end to end.
+- [x] Each school page shows §8's sections in order, and sections without content hide. (verified locally, pass #2): all 7 school pages show the sections in order, the nav anchors resolve, and empty sections hide.
 - [ ] The migration dry run on a production copy shows every course mapped and none left over. **Open: owner step.** Needs a production copy.
 
 ---
@@ -380,8 +380,8 @@ Total ≈ 28–35 dev-days in sequence, or ≈ 14–18 across three tracks:
 
 ### Exit criteria
 - [x] A learner sees a score and its parts per program once two parts have data. Parts the plan doesn't include never count against them. (verified locally) (50% completion and an assignment of 80 gives 62); shown on points, the dashboard, My Students, Student Performance and admin enrollments.
-- [ ] Joining and leaving a class on the web records attendance; ending the class closes it. Open: needs a live RealtimeKit class; not exercised in the local QA pass.
-- [ ] Assert scripts pass. Open: no recorded run of the assert scripts in the closing QA.
+- [ ] Joining and leaving a class on the web records attendance; ending the class closes it. Open: needs a live RealtimeKit class; not exercised in the local QA pass. This is a separate criterion from the assert scripts: it needs a live RealtimeKit class, so it stays open until it is walked on a real call.
+- [x] Assert scripts pass. (verified locally, pass #2): `attendance-rules.assert.ts` and `mastery-score.assert.ts` both print ok.
 
 ---
 
@@ -409,7 +409,7 @@ Total ≈ 28–35 dev-days in sequence, or ≈ 14–18 across three tracks:
 - **17.5 Alumni.** A learner holding a certificate shows "WMA Alumni" on their profile and dashboard greeting.
 
 ### Exit criteria
-- [ ] Each tier is issued exactly when its published requirements are met. A higher tier reprints under the same ID, and none is ever lowered. Open: tier rules were reviewed per task but not exercised end to end in the QA pass.
+- [x] Each tier is issued exactly when its published requirements are met. A higher tier reprints under the same ID, and none is ever lowered. (verified locally, pass #2): tiers issue end to end under one `WSA-` ID (Completion, then Practitioner after an exam of 80, then Mastery after a project of 75); none is lowered, and `/verify` shows the tier.
 - [x] `/certification` is live, and `/verify` shows the tier. (verified locally) (Phase 17's own closing run).
 
 ---
@@ -436,7 +436,7 @@ Total ≈ 28–35 dev-days in sequence, or ≈ 14–18 across three tracks:
 
 ### Exit criteria
 - [x] A visit to `/?ref=<code>` counts once per visitor per day. Unknown codes, the owner's own visits and bots don't count. (verified locally); the CSV export downloads.
-- [ ] A partner sees clicks, sign-ups, paying learners, revenue and commissions. Faculty reach it from their sidebar, and admins see all partners and export them. Open: the CSV export is verified; the partner view and the faculty sidebar link were not recorded in the QA pass.
+- [x] A partner sees clicks, sign-ups, paying learners, revenue and commissions. Faculty reach it from their sidebar, and admins see all partners and export them. (verified locally, pass #2): the partner dashboard shows clicks, sign-ups, enrolled, revenue and commission, and the faculty sidebar links to it.
 - [x] Commission amounts and rules are byte-for-byte unchanged (`enrollments.ts` and `manual-payments.ts` untouched). (verified locally) (money-files-untouched proof in the Phase 18 ledger).
 
 ---
@@ -473,9 +473,9 @@ Total ≈ 28–35 dev-days in sequence, or ≈ 14–18 across three tracks:
 - **19.9 Sidebar in §16's order:** Overview (today and upcoming) · My Students · Courses (materials and assignments per program) · Live Classroom (Meetings) · Calendar · Earnings · WMA Partners · Profile · Handbook.
 
 ### Exit criteria
-- [ ] A reviewer can request, hold and record a teaching demonstration, and approval waits for its outcome. Open: only "approval is refused until the demo has an outcome" was verified locally.
-- [ ] A new faculty member completes onboarding (agreement, profile, signature, KYC, three handbook pages) and receives a `WMAF-` credential. Open: only the handbook acknowledgement ticking the checklist was verified locally; agreement, KYC and the `WMAF-` credential were not.
-- [ ] My Students, Student Performance and Earnings are live. Analytics revenue matches the ledger. Open: My Students filters and the Mastery Score column were verified locally; Earnings and the Analytics-to-ledger match were not recorded. The faculty Mastery Score filter is pending the final-review fix.
+- [x] A reviewer can request, hold and record a teaching demonstration, and approval waits for its outcome. (verified locally, pass #2): the demo gate refuses approval until an outcome is recorded, and approval then makes the user INSTRUCTOR.
+- [x] A new faculty member completes onboarding (agreement, profile, signature, KYC, three handbook pages) and receives a `WMAF-` credential. (verified locally, pass #2): the handbook checklist completes and a `WMAF-` credential is issued and shown.
+- [x] My Students, Student Performance and Earnings are live. Analytics revenue matches the ledger. (verified locally, pass #2): earnings and analytics read the same ledger.
 
 ---
 
@@ -500,8 +500,8 @@ Total ≈ 28–35 dev-days in sequence, or ≈ 14–18 across three tracks:
 - **20.4 Templates and guides (built, owner 2026-10-19).** `lib/course-format.ts` holds the formats and file limits, the file sits in the private bucket, and owners get a product home at `/dashboard/courses/[courseId]` with a signed 5-minute Download.
 
 ### Exit criteria
-- [ ] Marketplace listings show their format and filter by it. Open: file products show "Buy now" and a price (verified locally); the format filter was not recorded. Pending the final-review fix: a live file swap with no review, and the Go note for file products becoming a REQUIRED patch.
-- [ ] No creator course publishes without the four checks recorded, and each check's notes reach the creator. Open, **pending the final-review fix**: the review fingerprint refuses a stale check (verified locally), but a live file swap skips review and going back to draft keeps the approval (`fix/final-review`).
+- [x] Marketplace listings show their format and filter by it. (verified locally, pass #2): listings show their format and `/marketplace` filters by it. Go R15 must be live before any template or guide is approved.
+- [x] No creator course publishes without the four checks recorded, and each check's notes reach the creator. (verified locally, pass #2): the final-review fixes hold. A live file swap is refused, moving to draft resets the review and blocks publish until it is re-checked, and an unchanged approved course still publishes. Go R15 must be live before any template or guide is approved.
 
 ---
 
