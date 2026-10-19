@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache"
 import mongoose from "mongoose"
 import connectDB from "@/lib/db"
 import { User, Enrollment, Order, Course, InstructorApplication } from "@/lib/db/models"
-import { requireAdmin, syncRoleToClerk } from "@/lib/auth/admin"
-import { notifyUser } from "@/lib/notify"
+import { z } from "zod/v4"
+import { applyRoleChange, requireAdmin, type RoleChangeResult } from "@/lib/auth/admin"
+import { adminLevelOf, type AdminLevel } from "@/lib/admin-levels"
 import {
   AdminFacultyProfileSchema,
   facultyFormFrom,
@@ -29,6 +30,7 @@ export type AdminUserRow = {
   email: string
   avatarUrl: string | null
   role: "USER" | "INSTRUCTOR" | "ADMIN"
+  adminLevel: AdminLevel
   instructorStatus: string
   verified: boolean
   createdAt: string
@@ -77,6 +79,7 @@ export async function adminListUsers(filters?: {
         email: u.email,
         avatarUrl: u.avatarUrl ?? null,
         role: u.role,
+        adminLevel: adminLevelOf(u.adminLevel),
         instructorStatus: u.instructorStatus ?? "none",
         verified: u.verified,
         createdAt: u.createdAt.toISOString(),
@@ -123,6 +126,7 @@ export async function adminGetUserDetail(userId: string): Promise<AdminUserDetai
       email: u.email,
       avatarUrl: u.avatarUrl ?? null,
       role: u.role,
+      adminLevel: adminLevelOf(u.adminLevel),
       instructorStatus: u.instructorStatus ?? "none",
       verified: u.verified,
       createdAt: u.createdAt.toISOString(),
@@ -146,62 +150,44 @@ export async function adminGetUserDetail(userId: string): Promise<AdminUserDetai
 }
 
 /**
- * Change a user's role. Writes Mongo (authoritative) and mirrors to the web
- * Clerk instance's publicMetadata so future syncs can't clobber it.
+ * Change a user's role. Goes through applyRoleChange (D32): only super admins
+ * may involve ADMIN; regular admins move accounts between student and
+ * instructor. Mongo is authoritative; the role is mirrored to Clerk.
  *
  * NOTE: granting ADMIN also unlocks admin surfaces in the mobile app
  * (e.g. Vision admin) — the UI warns before confirming.
  */
+const RoleChangeInput = z.object({
+  userId: z.string().regex(/^[a-f0-9]{24}$/, "User not found"),
+  role: z.enum(["USER", "INSTRUCTOR", "ADMIN"], "Choose a valid role"),
+})
+
 export async function adminUpdateUserRole(
   userId: string,
   role: "USER" | "INSTRUCTOR" | "ADMIN"
-) {
+): Promise<RoleChangeResult> {
   try {
     await connectDB()
     const admin = await requireAdmin()
 
-    if (admin.id === userId) {
-      return { success: false, error: "You can't change your own role" }
+    const parsed = RoleChangeInput.safeParse({ userId, role })
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? "Choose a valid role" }
     }
 
-    const user = await User.findById(userId)
-    if (!user) return { success: false, error: "User not found" }
-
-    const previousRole = user.role
-    if (previousRole === role) return { success: true }
-
-    // Targeted $set — doc.save() would trip full validation on legacy rows.
-    await User.updateOne(
-      { _id: user._id },
-      {
-        $set: {
-          role,
-          ...(role !== "USER" && user.instructorStatus !== "approved"
-            ? { instructorStatus: "approved" }
-            : {}),
-        },
-      }
-    )
-
-    await syncRoleToClerk(user.authUserId, role)
-
-    await notifyUser(user._id.toString(), {
-      type: "system",
-      title: "Your account role changed",
-      body:
-        role === "INSTRUCTOR"
-          ? "You now have instructor access. Welcome aboard!"
-          : role === "ADMIN"
-            ? "You now have administrator access."
-            : "Your account was set back to a student account.",
-      href: role === "INSTRUCTOR" ? "/instructor" : "/dashboard",
-    })
-
-    revalidatePath("/admin/users")
-    return { success: true }
+    const result = await applyRoleChange(admin, parsed.data.userId, (t) => ({
+      role: parsed.data.role,
+      adminLevel: parsed.data.role === "ADMIN" ? t.adminLevel : null,
+    }))
+    if (result.success) {
+      revalidatePath("/admin/users")
+      revalidatePath("/admin/team")
+    }
+    return result
   } catch (error) {
     console.error("Admin update role error:", error)
-    return { success: false, error: "Failed to update role" }
+    const denied = error instanceof Error && error.message === "Not authorized"
+    return { success: false, error: denied ? "Not authorized" : "Failed to update role" }
   }
 }
 
