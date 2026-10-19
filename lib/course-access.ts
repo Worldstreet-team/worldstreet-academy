@@ -122,7 +122,7 @@ export async function instructorQaRefusal(
     const course = coursesById.get(e.course.toString())
     return course ? entitlementsFor(course, e).instructorQa : false
   })
-  return includesQa ? null : "Instructor Q&A isn't included in your package"
+  return includesQa ? null : "Instructor Q&A isn't included in your plan"
 }
 
 type LessonAccessRow = {

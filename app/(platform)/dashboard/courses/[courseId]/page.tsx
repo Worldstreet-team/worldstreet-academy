@@ -475,7 +475,7 @@ export default async function CourseDetailPage({
           <div className="mx-auto flex max-w-3xl items-center justify-between gap-4">
             <div className="min-w-0">
               <p className="text-[11px] text-ws-subtle">
-                {isEnrolled ? "Your package" : rail.note}
+                {isEnrolled ? "Your plan" : rail.note}
               </p>
               <p className="font-display text-xl font-semibold tabular-nums tracking-[-0.02em] text-ws-primary">
                 {isEnrolled ? rail.note : rail.headline}

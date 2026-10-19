@@ -174,7 +174,7 @@ export function SelectedOffer({ fromPrice }: { fromPrice: number }) {
         <div key={choosing ? "choose" : selected.key} className="ws-animate-fade mt-2.5 text-[13.5px] text-ws-muted">
           {choosing ? (
             <p>
-              <span className="tabular-nums">{packages.length}</span> packages · {PACKAGE_LABEL[packages[0].key]} to{" "}
+              <span className="tabular-nums">{packages.length}</span> plans · {PACKAGE_LABEL[packages[0].key]} to{" "}
               {PACKAGE_LABEL[packages[packages.length - 1].key]}
             </p>
           ) : multiTier ? (
@@ -189,7 +189,7 @@ export function SelectedOffer({ fromPrice }: { fromPrice: number }) {
                 onClick={jumpToPackages}
                 className="ml-auto shrink-0 rounded-sm pl-2 font-semibold text-ws-primary underline decoration-ws-hairline underline-offset-4 transition-colors duration-[var(--ws-motion-fast)] hover:decoration-current focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40"
               >
-                Change<span className="sr-only"> package</span>
+                Change<span className="sr-only"> plan</span>
               </a>
             </p>
           ) : (
@@ -201,7 +201,7 @@ export function SelectedOffer({ fromPrice }: { fromPrice: number }) {
       <div className="mt-5">
         {choosing ? (
           <a href="#packages" onClick={jumpToPackages} className={GOLD_CTA}>
-            Choose your package
+            Choose your plan
           </a>
         ) : (
           <CheckoutLink className={GOLD_CTA}>

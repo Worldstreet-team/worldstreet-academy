@@ -44,13 +44,13 @@ function stepsFor(firstName: string): Step[] {
     {
       id: "browse",
       title: "Find a program",
-      body: "Programs lists everything the Academy teaches, school by school. Open one to read its curriculum, meet the instructor and compare packages.",
+      body: "Programs lists everything the Academy teaches, school by school. Open one to read its curriculum, meet the instructor and compare plans.",
       targets: ["browse-nav", "browse-section"],
     },
     {
       id: "enrol",
       title: "Enrol from the program page",
-      body: "Choose a package and pay from your WorldStreet wallet at checkout. If the wallet is short, top it up first; enrolment is confirmed the moment the payment is.",
+      body: "Choose a plan and pay from your WorldStreet wallet at checkout. If the wallet is short, top it up first; enrolment is confirmed the moment the payment is.",
       targets: ["wallet-chip", "wallet-nav"],
       group: "account",
     },

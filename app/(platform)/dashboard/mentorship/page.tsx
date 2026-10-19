@@ -258,9 +258,9 @@ export default function MentorshipPage() {
             </CardShell>
           ) : programs.length === 0 && sessions.length === 0 ? (
             <div className="rounded-lg bg-ws-surface px-6 py-8">
-              <p className="text-[15px] font-semibold text-ws-primary">Mentorship comes with Executive packages</p>
+              <p className="text-[15px] font-semibold text-ws-primary">Mentorship comes with Executive plans</p>
               <p className="mt-1 text-[13px] text-ws-muted">
-                When you enrol in an Executive package, your mentor, roadmap and private sessions appear here.
+                When you enrol in an Executive plan, your mentor, roadmap and private sessions appear here.
               </p>
               <Link
                 href="/dashboard/courses"

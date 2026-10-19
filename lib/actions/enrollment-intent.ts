@@ -54,7 +54,7 @@ export async function saveEnrollmentIntent(input: SaveEnrollmentIntentInput): Pr
       // A program without a ladder has one synthesized tier; it carries no key.
       if (program.tierCount === 0) packageKey = null
       else if (packageKey && !program.packages.some((p) => p.key === packageKey)) {
-        return { success: false, error: "That package isn't on sale" }
+        return { success: false, error: "That plan isn't on sale" }
       }
     } else {
       packageKey = null

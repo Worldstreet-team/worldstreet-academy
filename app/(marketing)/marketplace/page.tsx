@@ -191,7 +191,7 @@ export default async function MarketplacePage({ searchParams }: Search) {
           </span>
           <p className="mt-4 font-display text-lg font-semibold text-ws-primary">No courses match these filters</p>
           <p className="mx-auto mt-2 max-w-md text-[14px] leading-relaxed text-ws-muted">
-            Try another topic or level, or search for a seller&rsquo;s name.
+            Try another topic or level, or search for a Marketplace Creator&rsquo;s name.
           </p>
           <Link
             href={marketplaceHref({})}
@@ -210,7 +210,7 @@ export default async function MarketplacePage({ searchParams }: Search) {
           <p className="mt-4 font-display text-xl font-semibold text-ws-primary">The first courses are in review</p>
           <p className="mx-auto mt-2 max-w-md text-[14px] leading-relaxed text-ws-muted">
             Every marketplace course is checked by our team before it goes live. While the shelf fills up, explore
-            the schools — or be one of the first sellers.
+            the schools — or be one of the first Marketplace Creators.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link
@@ -239,7 +239,7 @@ export default async function MarketplacePage({ searchParams }: Search) {
             Teach what you know
           </h2>
           <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-ws-muted">
-            Approved sellers keep {sharePercent(MARKETPLACE_SHARE_OWN_LINK)} of every sale through their own link
+            Approved Marketplace Creators keep {sharePercent(MARKETPLACE_SHARE_OWN_LINK)} of every sale through their own link
             and {sharePercent(MARKETPLACE_SHARE_ACADEMY)} of the sales we make for them.
           </p>
         </div>

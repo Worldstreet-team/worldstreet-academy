@@ -419,7 +419,7 @@ async function studentAssignmentGate(userId: string, assignmentId: string) {
   if (!assignment) return { ok: false as const, error: "Assignment not found" }
   const access = await getCourseAccess(userId, assignment.course.toString())
   if (!access) return { ok: false as const, error: "Assignment not found" }
-  if (!access.entitlements.assignments) return { ok: false as const, error: "Assignments aren't included in your package" }
+  if (!access.entitlements.assignments) return { ok: false as const, error: "Assignments aren't included in your plan" }
   return { ok: true as const, assignment, access }
 }
 

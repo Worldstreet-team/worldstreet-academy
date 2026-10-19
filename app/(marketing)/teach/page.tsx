@@ -81,7 +81,7 @@ const FAQS = [
   },
   {
     q: "Can I sell a pre-recorded course instead?",
-    a: "Yes — that's the marketplace. Approved sellers publish pre-recorded courses there after a quality review. See “Sell your course” for how it works.",
+    a: "Yes — that's the marketplace. Approved Marketplace Creators publish pre-recorded courses there after a quality review. See “Sell your course” for how it works.",
   },
   {
     q: "What if I'm not approved?",
@@ -115,7 +115,7 @@ export default function TeachPage() {
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-4">
             <Link href={APPLY_HREF} className={GOLD_CTA}>
-              Apply to teach
+              Become a WMA Instructor
               <ArrowRightIcon size={16} aria-hidden />
             </Link>
             <Link
@@ -276,7 +276,7 @@ export default function TeachPage() {
             </p>
           </div>
           <Link href={APPLY_HREF} className={GOLD_CTA}>
-            Apply to teach
+            Become a WMA Instructor
             <ArrowRightIcon size={16} aria-hidden />
           </Link>
         </section>

@@ -99,7 +99,7 @@ export default async function SchoolsPage({ searchParams }: Search) {
             <CohortBanner
               variant="strip"
               cohort={calendar.next}
-              note="Choose your school below, then your program and package, and pay now to join."
+              note="Choose your school below, then your program and plan, and pay now to join."
             />
           ) : null
         }

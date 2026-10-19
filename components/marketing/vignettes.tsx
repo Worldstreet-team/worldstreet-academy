@@ -161,7 +161,7 @@ export function ClassroomVignette() {
         </motion.ul>
         <div className="shrink-0 border-t border-ws-hairline px-4 py-3">
           <div className="flex items-center justify-between text-[11px] text-ws-muted">
-            <span>Course progress</span>
+            <span>Program progress</span>
             <span className="text-ws-subtle">autosaves</span>
           </div>
           <div className="mt-2 h-1 overflow-hidden rounded-full bg-ws-track">
@@ -261,7 +261,7 @@ export function ProgramVignette() {
           Forex Trading Mastery
         </p>
         <div className="mt-2.5 flex flex-wrap gap-1.5">
-          {["Beginner to advanced", "3 packages", "Certificate"].map((chip) => (
+          {["Beginner to advanced", "3 plans", "Certificate"].map((chip) => (
             <span key={chip} className="rounded-full bg-ws-chip px-2 py-0.5 text-[10px] font-medium text-ws-muted">
               {chip}
             </span>
@@ -302,7 +302,7 @@ export function ProgramVignette() {
           </ul>
           <div className="mt-auto px-5 pb-4">
             <span className="inline-flex h-9 w-full items-center justify-center rounded-sm bg-ws-brand text-[12px] font-semibold text-ws-brand-on">
-              View packages
+              View plans
             </span>
           </div>
         </div>
@@ -329,7 +329,7 @@ export function PackagesVignette() {
           Choose your learning experience
         </p>
         <p className="mt-1 font-display text-[15px] font-semibold text-ws-primary md:text-lg">
-          Forex Trading Mastery · packages
+          Forex Trading Mastery · plans
         </p>
       </div>
       {/* Phones: three compact rows (name + price left, CTA right). sm+: three

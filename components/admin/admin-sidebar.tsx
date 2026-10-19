@@ -77,7 +77,7 @@ const manageItems: NavItem[] = [
     match: (p) => p.startsWith("/admin/courses"),
   },
   {
-    title: "Sellers",
+    title: "Marketplace Creators",
     href: "/admin/sellers",
     icon: Store,
     match: (p) => p.startsWith("/admin/sellers"),

@@ -575,7 +575,7 @@ export function CreateCourseMeetingModal({
                   className="h-11 text-sm bg-muted/20 border-ws-hairline rounded-lg"
                 />
                 <p className="text-[11px] text-ws-muted">
-                  Students whose package includes live classes see it on their dashboard and get a reminder before it starts.
+                  Students whose plan includes live classes see it on their dashboard and get a reminder before it starts.
                 </p>
                 {scheduleError && <p className="text-xs text-ws-danger">{scheduleError}</p>}
               </div>

@@ -83,7 +83,7 @@ export default function AdminSellersPage() {
       <div className="flex-1 px-4 sm:px-6 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-8 md:px-8 md:pb-12 lg:px-12">
         <div className="mx-auto w-full max-w-7xl space-y-8">
           <PageHeader
-            title="Sellers"
+            title="Marketplace Creators"
             subline="Approve the people who may sell on the marketplace. Their courses are reviewed separately, in Courses."
           />
 
@@ -204,7 +204,7 @@ export default function AdminSellersPage() {
                                 Reject…
                               </Button>
                               <Button size="sm" disabled={approve.isPending} onClick={() => approve.mutate(a.id)}>
-                                {approve.isPending && approve.variables === a.id ? "Approving…" : "Approve seller"}
+                                {approve.isPending && approve.variables === a.id ? "Approving…" : "Approve Marketplace Creator"}
                               </Button>
                             </div>
                           )}

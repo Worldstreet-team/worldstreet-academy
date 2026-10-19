@@ -371,7 +371,7 @@ export function InstructorsTile({ rows }: { rows: InstructorRow[] }) {
               />
             ) : (
               <span className="max-w-24 shrink-0 text-right text-[11.5px] leading-snug text-muted-foreground">
-                Q&amp;A isn&apos;t in your package
+                Q&amp;A isn&apos;t in your plan
               </span>
             )}
           </div>
@@ -411,7 +411,7 @@ export function SupportTile({ priority, communities }: { priority: boolean; comm
         <ListRow
           icon={HelpGlyph}
           title="Help center"
-          subtitle={priority ? "Your package includes priority support" : "Answers to common questions"}
+          subtitle={priority ? "Your plan includes priority support" : "Answers to common questions"}
           href="/dashboard/help"
           right={<Chevron />}
           className={TILE_ROW}

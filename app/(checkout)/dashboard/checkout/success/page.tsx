@@ -86,7 +86,7 @@ export default async function CheckoutSuccessPage({
           icon: PlayIcon,
           title: "Your lessons are open",
           body: !startLesson
-            ? "Everything your package includes is unlocked now."
+            ? "Everything your plan includes is unlocked now."
             : start.resumed
               ? `Pick up where you left off — “${startLesson.title}”.`
               : `Start with “${startLesson.title}” — or pick up anywhere in the program.`,

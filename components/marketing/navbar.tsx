@@ -67,7 +67,7 @@ export async function Navbar({ showFaculty }: { showFaculty: boolean }) {
     { href: "/#how-it-works", label: "How it works" },
     ...(user && !gated ? [{ href: "/dashboard", label: "My Learning" }] : []),
     ...(isInstructor ? [{ href: "/instructor", label: "Instructor Dashboard" }] : []),
-    ...(isSeller ? [{ href: SELLER_HOME, label: "Seller area" }] : []),
+    ...(isSeller ? [{ href: SELLER_HOME, label: "Creator area" }] : []),
   ]
   const sheetActions: MarketingNavLink[] = user
     ? []
@@ -128,7 +128,7 @@ export async function Navbar({ showFaculty }: { showFaculty: boolean }) {
           )}
           {isSeller && (
             <Link href={SELLER_HOME} className={cn(barLinkClass, "hidden xl:inline-flex")}>
-              Seller area
+              Creator area
             </Link>
           )}
         </nav>

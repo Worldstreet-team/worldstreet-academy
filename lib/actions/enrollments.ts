@@ -183,7 +183,7 @@ export async function purchaseCourse(input: { courseId: string; packageKey?: Pac
     const packaged = sellsPackages(course)
     const pkg = packaged ? packageFor(course, packageKey ?? null) : null
     if (packaged && !pkg) {
-      return { success: false, error: "Choose a package to continue", code: "package_required" }
+      return { success: false, error: "Choose a plan to continue", code: "package_required" }
     }
 
     const price = pkg ? pkg.price : course.pricing === "paid" ? course.price ?? 0 : 0
@@ -600,7 +600,7 @@ export async function completeLesson(
     const access = await getCourseAccess(userId, courseId)
     const locked = await lockedLessonIds(access)
     if (locked.has(lessonId)) {
-      return { success: false, error: "This lesson isn't included in your package", code: "package_locked" as const }
+      return { success: false, error: "This lesson isn't included in your plan", code: "package_locked" as const }
     }
 
     // Add lesson to completed if not already
@@ -680,7 +680,7 @@ export async function updateLastAccessed(
 
     // A lesson outside the student's package is never "where they left off".
     if (await isLessonLockedFor(userId, lessonId)) {
-      return { success: false, error: "This lesson isn't included in your package" }
+      return { success: false, error: "This lesson isn't included in your plan" }
     }
 
     await Enrollment.findOneAndUpdate(
@@ -1058,7 +1058,7 @@ export async function submitMentorshipIntake(
 
     const access = await getCourseAccess(user.id, courseId)
     if (!access || access.packageKey !== "executive" || !access.entitlements.mentorship) {
-      return { success: false, error: "Your package doesn't include mentorship" }
+      return { success: false, error: "Your plan doesn't include mentorship" }
     }
 
     const parsed = IntakeInput.safeParse(input)

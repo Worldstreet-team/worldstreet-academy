@@ -171,7 +171,7 @@ async function mentorshipSessionRefusal(
   }
   const access = await getCourseAccess(user.id, session.course.toString())
   if (!access || !includesMentorship(access.course, access)) {
-    return "Private mentorship isn't included in your package"
+    return "Private mentorship isn't included in your plan"
   }
   return null
 }
@@ -258,7 +258,7 @@ export async function joinMeeting(meetingId: string): Promise<{
         const access = await getCourseAccess(currentUser.id, meeting.courseId.toString())
         if (!access) return { success: false, error: "This live class is for students enrolled in the course" }
         if (!access.entitlements.liveClasses) {
-          return { success: false, error: "Live classes aren't included in your package" }
+          return { success: false, error: "Live classes aren't included in your plan" }
         }
       }
     }

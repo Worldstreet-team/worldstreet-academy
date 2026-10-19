@@ -72,7 +72,7 @@ const STEPS = [
   {
     id: "package",
     step: "03",
-    label: "Choose your package",
+    label: "Choose your plan",
     body: "Select the learning experience that fits your needs.",
     Vignette: PackagesVignette,
   },

@@ -577,7 +577,7 @@ export function AppSidebar() {
             className="group/teach my-2 flex items-center gap-3 rounded-[20px] border border-border bg-card p-3.5 outline-none transition-colors duration-[var(--ws-motion-fast)] hover:bg-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring dark:border-transparent"
           >
             <span className="min-w-0 flex-1">
-              <span className="block text-[13.5px] font-semibold text-foreground">Teach on Academy</span>
+              <span className="block text-[13.5px] font-semibold text-foreground">Become a WMA Instructor</span>
               <span className="mt-0.5 block text-[11.5px] leading-relaxed text-muted-foreground">
                 Share what you know and earn from your courses.
               </span>

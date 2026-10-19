@@ -206,7 +206,7 @@ export default async function ProgramPage({
     { id: "overview", label: "Overview" },
     curriculum.length > 0 ? { id: "curriculum", label: "Curriculum" } : null,
     FACULTY_PUBLIC ? { id: "instructor", label: "Instructor" } : null,
-    showLadder ? { id: "packages", label: multiTier ? "Packages" : "Pricing" } : null,
+    showLadder ? { id: "packages", label: multiTier ? "Plans" : "Pricing" } : null,
     hasReviews ? { id: "reviews", label: "Reviews" } : null,
     { id: "faq", label: "FAQ" },
   ].filter((link): link is SectionLink => link !== null)
@@ -318,7 +318,7 @@ export default async function ProgramPage({
                         cohort={calendar.next}
                         note={
                           multiTier
-                            ? "Choose your package below and pay now to take your seat in the live cohort."
+                            ? "Choose your plan below and pay now to take your seat in the live cohort."
                             : "Pay now to take your seat in the live cohort."
                         }
                         className="mb-10"

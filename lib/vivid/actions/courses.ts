@@ -225,7 +225,7 @@ export async function vividEnrollInCourse(p: { courseId: string }) {
       checkoutUrl: `/dashboard/checkout?courseId=${course._id}`,
       price: course.price,
       message: packaged
-        ? `This program comes in packages from $${course.price}. Opening checkout so you can choose one.`
+        ? `This program comes in plans from $${course.price}. Opening checkout so you can choose one.`
         : `This course costs $${course.price}. Redirecting to checkout.`,
     }
   } catch (error) {

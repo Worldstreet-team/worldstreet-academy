@@ -103,7 +103,7 @@ export function MarketplaceFilters({
           type="search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search courses, topics or sellers"
+          placeholder="Search courses, topics or Marketplace Creators"
           maxLength={80}
           className="h-12 w-full rounded-full border border-ws-hairline bg-ws-surface pl-11 pr-28 text-base text-ws-primary outline-none transition-colors duration-[var(--ws-motion-fast)] placeholder:text-ws-muted focus-visible:border-ws-muted/50 focus-visible:ring-2 focus-visible:ring-ws-brand/30 md:text-[15px] dark:border-transparent"
         />

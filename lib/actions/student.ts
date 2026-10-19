@@ -1217,7 +1217,7 @@ export async function markLessonComplete(
 
     const access = await getCourseAccess(user._id.toString(), courseId)
     const locked = await lockedLessonIds(access)
-    if (locked.has(lessonId)) return { success: false, error: "This lesson isn't included in your package" }
+    if (locked.has(lessonId)) return { success: false, error: "This lesson isn't included in your plan" }
 
     const newlyCompleted = !enrollment.completedLessons.some(
       (id: { toString(): string }) => id.toString() === lessonId

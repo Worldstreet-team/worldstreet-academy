@@ -210,7 +210,7 @@ export function MarketingCourseCard({
             )}
             <span className="flex items-center gap-2">
               {course.tierCount > 1 && (
-                <span className="text-[11px] tabular-nums text-ws-subtle">{course.tierCount} packages</span>
+                <span className="text-[11px] tabular-nums text-ws-subtle">{course.tierCount} plans</span>
               )}
               {course.rating !== null && (
                 <span className="inline-flex items-center gap-1 text-[12px] tabular-nums text-ws-muted">

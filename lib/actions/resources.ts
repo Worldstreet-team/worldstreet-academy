@@ -248,7 +248,7 @@ export async function getResourceDownloadUrl(
         return { success: false, error: "Enroll in this course to download its materials" }
       }
       if (resource.lesson && (await isLessonLockedFor(user.id, resource.lesson.toString()))) {
-        return { success: false, error: "This material belongs to a lesson outside your package" }
+        return { success: false, error: "This material belongs to a lesson outside your plan" }
       }
     }
 

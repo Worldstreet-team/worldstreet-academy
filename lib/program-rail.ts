@@ -26,7 +26,7 @@ export function programRail(input: {
   if (input.pricing === "free" || !input.price) return { headline: "Free", note: "Full access", buyLabel: "Enrol for free" }
   const usd = `$${input.price.toLocaleString("en-US")}`
   if (input.tierCount > 1) {
-    return { headline: `From ${usd}`, note: `${input.tierCount} packages`, buyLabel: "Choose your package" }
+    return { headline: `From ${usd}`, note: `${input.tierCount} plans`, buyLabel: "Choose your plan" }
   }
   return { headline: usd, note: "One-time purchase", buyLabel: "Enrol now" }
 }

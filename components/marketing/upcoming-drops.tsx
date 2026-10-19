@@ -32,7 +32,7 @@ export function UpcomingDrops({ drops }: { drops: BrowseCourse[] }) {
           </h2>
           <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-ws-muted">
             Scheduled releases. Where pre-enrollment is on, reserve a seat free
-            and get an email the moment the course goes live.
+            and get an email the moment the program goes live.
           </p>
         </RevealGroup>
 
@@ -79,7 +79,7 @@ export function UpcomingDrops({ drops }: { drops: BrowseCourse[] }) {
                       <span className="col-span-2 text-[13px] font-semibold text-ws-gold transition-opacity duration-[var(--ws-motion-fast)] group-hover:opacity-80 sm:col-span-1">
                         {course.preEnrollEnabled
                           ? "Pre-enroll free →"
-                          : "View course →"}
+                          : "View program →"}
                       </span>
                     </div>
                   </Link>

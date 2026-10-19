@@ -1534,10 +1534,10 @@ export async function sendNewSellerApplicationAdminEmail(
     const { error } = await resend.emails.send({
       from: FROM_EMAIL,
       to,
-      subject: `New seller application — ${data.applicantName}`,
+      subject: `New Marketplace Creator application — ${data.applicantName}`,
       react: React.createElement(SimplePipelineEmail, {
         preview: `${data.applicantName} applied to sell on the marketplace`,
-        title: "New seller application",
+        title: "New Marketplace Creator application",
         bodyText: `${data.applicantName} wants to sell a course on the marketplace: “${data.topic}” (${data.schoolName}).`,
         ctaLabel: "Review application",
         ctaUrl: data.reviewUrl,
@@ -1568,9 +1568,9 @@ export async function sendSellerDecisionEmail(data: {
     const { error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: data.to,
-      subject: data.approved ? "You're approved to sell on the marketplace" : "Your seller application",
+      subject: data.approved ? "You're approved to sell on the marketplace" : "Your Marketplace Creator application",
       react: React.createElement(SimplePipelineEmail, {
-        preview: data.approved ? "Create your first marketplace course" : "About your seller application",
+        preview: data.approved ? "Create your first marketplace course" : "About your Marketplace Creator application",
         title: data.approved ? "You're approved to sell" : "Application not approved",
         bodyText: data.approved
           ? `${who}welcome to the ${BRAND.name} marketplace. Create your course, add your lessons and submit it for review — we publish it once it meets the quality standards.`
@@ -1637,7 +1637,7 @@ export async function sendCourseReviewDecisionEmail(data: {
         preview: data.approved ? "Your course is live on the marketplace" : "A few changes before we can publish",
         title: data.approved ? "Your course is live" : "Changes requested",
         bodyText: data.approved
-          ? `${who}“${data.courseTitle}” passed review and is now on the marketplace. Share your own link from the seller area — sales through it earn you the larger share.`
+          ? `${who}“${data.courseTitle}” passed review and is now on the marketplace. Share your own link from the Creator area — sales through it earn you the larger share.`
           : `${who}“${data.courseTitle}” needs a few changes before we can publish it. Make them in the editor and submit it again.`,
         ctaLabel: data.approved ? "View your course" : "Edit your course",
         ctaUrl: data.ctaUrl,

@@ -759,7 +759,7 @@ export default function BecomeInstructorPage() {
             <Glyph icon={Mortarboard01Icon} className="size-6" />
           </div>
           <h1 className="font-display text-[28px] font-semibold tracking-[-0.02em] text-foreground">
-            Become an instructor
+            Become a WMA Instructor
           </h1>
           <p className="mx-auto max-w-md text-[15px] leading-relaxed text-muted-foreground">
             Teach crypto, trading and blockchain to thousands of WorldStreet students — and earn 85% of every

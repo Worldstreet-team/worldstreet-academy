@@ -289,7 +289,7 @@ export function SellerApplyPanel({
         title="You're approved to sell"
         action={
           <Button className="h-10 px-5" render={<Link href={SELLER_HOME} />}>
-            Open your seller area
+            Open your Creator area
           </Button>
         }
       >
