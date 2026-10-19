@@ -1,8 +1,10 @@
 import type { Metadata } from "next"
+import { MasteryCard } from "@/components/dashboard/mastery-card"
 import { Topbar } from "@/components/platform/topbar"
 import { CardHeader, CardShell, EmptyState, Eyebrow, PageHeader, Rise } from "@/components/ui/system"
 import { getCachedUser } from "@/lib/auth/cached"
 import connectDB from "@/lib/db"
+import { myMastery } from "@/lib/mastery-inputs"
 import {
   LEADERBOARD_SIZE,
   POINTS,
@@ -63,6 +65,13 @@ export default async function PointsPage() {
     console.error("Points page error:", error)
   }
 
+  const mastery = data
+    ? await myMastery(user.id).catch((error) => {
+        console.error("Mastery Score error:", error)
+        return null
+      })
+    : null
+
   return (
     <>
       <Topbar title="Points" breadcrumbOverrides={{ points: "Points" }} />
@@ -85,6 +94,16 @@ export default async function PointsPage() {
                   <Stat label="This week" value={`+${n(data.summary.thisWeek)}`} note="The last 7 days" />
                 </div>
               </Rise>
+
+              {mastery && mastery.length > 0 && (
+                <Rise delay={60}>
+                  <section id="mastery" aria-label="Mastery Score" className="flex scroll-mt-24 flex-col gap-6">
+                    {mastery.map((m) => (
+                      <MasteryCard key={m.enrollmentId} title={m.courseTitle} mastery={m} />
+                    ))}
+                  </section>
+                </Rise>
+              )}
 
               {data.boards.map((board, i) => (
                 <Rise key={board.courseId} delay={60 * (i + 1)}>

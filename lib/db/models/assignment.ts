@@ -8,6 +8,7 @@ import mongoose, { Schema, Document, Model, Types } from "mongoose"
  */
 
 export type AssignmentStatus = "draft" | "published"
+export type AssignmentKind = "assignment" | "project"
 
 export interface IAssignment extends Document {
   _id: Types.ObjectId
@@ -20,6 +21,8 @@ export interface IAssignment extends Document {
   /** Shown to students; never enforced in v1. */
   dueAt: Date | null
   status: AssignmentStatus
+  /** `project` grades feed the Mastery Score's Projects part, §12 "practical application"; a missing kind reads as `assignment`. */
+  kind: AssignmentKind
   createdAt: Date
   updatedAt: Date
 }
@@ -32,6 +35,7 @@ const AssignmentSchema = new Schema<IAssignment>(
     instructions: { type: String, default: "", maxlength: 5000 },
     dueAt: { type: Date, default: null },
     status: { type: String, enum: ["draft", "published"], default: "draft" },
+    kind: { type: String, enum: ["assignment", "project"], default: "assignment" },
   },
   { timestamps: true }
 )

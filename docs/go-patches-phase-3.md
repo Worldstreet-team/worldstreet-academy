@@ -231,3 +231,33 @@ The web requires the first five on every new application. Any wholesale applicat
 - Go never writes `adminLevel` or `adminAudit`. Any wholesale user write must carry them (write dotted `$set`s, or keep the fields).
 - If Go has any path that sets `users.role`, it must neither set nor clear `ADMIN`. Admin access is granted and removed only on the web, by a super admin, so it is audited.
 - If Go raises roles from Clerk metadata at sign-in, it must never raise an **existing** account to `ADMIN`. The web stopped doing so in Phase 21; otherwise a removed admin whose metadata is stale gets admin back.
+
+## 13. Phase 16 — Mastery Score and attendance (institutional blueprint §12)
+
+**No patch.** Go needs no patch: nothing it reads changed.
+
+**`attendances`** is a new web-only collection. Go may ignore it.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `meeting` | ObjectId | The class (`meetings._id`). |
+| `course` | ObjectId | The class's course. |
+| `user` | ObjectId | The learner. |
+| `firstJoinedAt` | Date | Written once, on the first join. |
+| `lastJoinedAt` | Date | The most recent join. |
+| `openSince` | Date \| null | The start of time not yet banked. `null` when the learner is not in the class. |
+| `seconds` | number | Banked attended seconds. |
+| `createdAt`, `updatedAt` | Date | Timestamps. |
+
+The unique index is on `{ meeting, user }`. The web writes rows only for course classes (`courseId` set, no `mentorshipSessionId`), and never for the host.
+
+**Optional R-A.** Mobile joins aren't counted until Go writes the same rows:
+- on a join, bank and reopen;
+- every 60 s while in the class, add `now − openSince` when it is ≤ 150 s, else 0, and set `openSince = now`;
+- on leave or kick, bank and set `openSince` to `null`;
+- on end, bank every open row at `endedAt`;
+- filter every update on the `openSince` value read, so two writers never double-count.
+
+**`assignments.kind`** is `"assignment" | "project"` (missing means `"assignment"`), on a web-only collection.
+
+**The Mastery Score** is computed on read from enrollments, submissions, meetings and attendances. Nothing is stored. If mobile ever shows it, it must use the weights in `lib/mastery-score.ts`.

@@ -18,6 +18,7 @@ import {
   type AttemptStatus,
   type ICoursePackage,
   type PackageKey,
+  type AssignmentKind,
 } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth/actions"
 import { notifyUser } from "@/lib/notify"
@@ -487,6 +488,8 @@ export type MyAssessment = {
   status: "not_started" | "in_progress" | "passed" | "failed" | "locked" | "submitted" | "graded"
   /** Assignments only: due date (ISO) when set. */
   dueAt: string | null
+  /** Assignments only: `project` or `assignment`; null for exams. */
+  kind: AssignmentKind | null
   href: string
 }
 
@@ -573,7 +576,7 @@ export async function getMyAssessments(): Promise<MyAssessment[]> {
         .select("exam status submittedAt createdAt")
         .lean(),
       Assignment.find({ course: { $in: assignmentCourseIds }, status: "published" })
-        .select("course title dueAt")
+        .select("course title dueAt kind")
         .lean(),
     ])
     const submissions = await Submission.find({ user: user.id, assignment: { $in: assignments.map((a) => a._id) } })
@@ -639,6 +642,7 @@ export async function getMyAssessments(): Promise<MyAssessment[]> {
         lessonId,
         status,
         dueAt: null,
+        kind: null,
         href: isQuiz ? `/dashboard/courses/${courseId}/learn/${lessonId}` : `/dashboard/courses/${courseId}/exam`,
       })
     }
@@ -656,6 +660,7 @@ export async function getMyAssessments(): Promise<MyAssessment[]> {
         lessonId: null,
         status: submissionStatus.get(id) ?? "not_started",
         dueAt: assignment.dueAt ? assignment.dueAt.toISOString() : null,
+        kind: assignment.kind ?? "assignment",
         href: `/dashboard/assignments/${id}`,
       })
     }

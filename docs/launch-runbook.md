@@ -337,3 +337,13 @@ Expect `acknowledged: true`, and note `modifiedCount` in your run log. **Those s
 | Replaced submission files | A resubmission replaces a submission's file list, but nothing is deleted: the files it drops, and uploads never submitted, stay in the private bucket under `worldstreet-academy/submissions/<assignmentId>/<userId>/`. | Leave them, or now and then delete objects under that prefix that no `submissions.files.key` references. |
 | RealtimeKit rooms from double confirms | When two confirms of one mentorship request race, both create a RealtimeKit room; the losing confirm deletes only its `meetings` row, so its remote room stays in the organization with no Academy record. | Leave them, or end them from the RealtimeKit dashboard (rooms named `Mentorship: <student name>` with no matching `meetings.meetingId`). |
 | Product debt | School intros, program curricula, thumbnails and instructor bios (Phase 2); the Academy signatory name and signature file (D9); a surface for §13's "LEARN. COMPLETE. GET RECOGNIZED." (Phase 6); real RealtimeKit scheduling run on staging (Phase 4). | Schedule with product. |
+
+---
+
+## Institutional blueprint phases — owner steps
+
+### Phase 16 — Mastery Score and attendance
+
+- No script, no env and no data migration. The `attendances` index builds itself at boot.
+- Smoke test after deploy: as a Standard learner, join a live class on the web for over two minutes and leave. Then check that `db.attendances.find({ user: <id> })` shows `seconds` > 0 and `openSince: null`.
+- Classes joined in the mobile app don't count until Go writes attendance rows (Go doc §12, R-A).

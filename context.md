@@ -152,3 +152,9 @@ Online education platform for cryptocurrency/trading courses. Instructor portal 
 - **Clerk:** metadata can no longer make an existing account an admin; it raises a `USER` to `INSTRUCTOR` only. A brand-new account still takes its claimed role (open risk, noted for the owner).
 - **Removal** restores the role held at grant time (the latest grant entry's `fromRole`). Granting `ADMIN` no longer sets `instructorStatus: "approved"`.
 - **Bootstrap:** `MONGODB_URI=<uri> node scripts/grant-admin.mjs <email> --super` (the explicit URI is required). `--revoke` refuses the last super admin.
+
+### 2026-10-19 — Mastery Score and attendance (institutional Phase 16)
+- **Mastery Score** (`lib/mastery-score.ts`, `lib/mastery-inputs.ts`): D24 weights (completion 30, assessment 25, assignments 20, projects 10, attendance 15) as a re-weighted mean over the parts a plan includes and that have data; no score until two parts do. Programs only (`courseKindOf(course) === "program"`). Computed on read, never stored.
+- **Attendance** (`lib/attendance-rules.ts`, `lib/attendance.ts`): a web-only `attendances` row per learner per course class, written only by `lib/attendance.ts` from the meeting actions (join, admit, leave, kick, end) and `MeetingProvider`'s 60 s heartbeat (`pingAttendance`). A gap over 150 s earns nothing, so a closed tab stops counting. A class is held once ended and at least 10 minutes long; attended means at least min(50% of the class, 1,800 s). The attendance part is null until a class has been held. Mobile joins don't count until Go R-A.
+- **Projects** are assignments with `Assignment.kind: "project"`; instructors toggle it in the editor, learners see a "Project" chip.
+- **Where it shows:** `/dashboard/points` (a card per program), the dashboard hero's "Mastery" cell, and a "Mastery" column on `/admin/enrollments`. Never on a public page; Basic learners see parts but no score.

@@ -22,11 +22,12 @@ export const ASSESSMENT_STATUS: Record<MyAssessment["status"], { label: string; 
   graded: { label: "Graded", className: "bg-credit-chip text-credit" },
 }
 
-/** "Final exam" · "Knowledge check" · "Assignment" (with its due date). */
+/** "Final exam" · "Knowledge check" · "Assignment" or "Project" (each with its due date). */
 export function assessmentKindLabel(assessment: MyAssessment): string {
   if (assessment.scope === "final") return "Final exam"
   if (assessment.scope === "lesson") return "Knowledge check"
-  return assessment.dueAt ? `Assignment · due ${formatDateTime(assessment.dueAt)}` : "Assignment"
+  const noun = assessment.kind === "project" ? "Project" : "Assignment"
+  return assessment.dueAt ? `${noun} · due ${formatDateTime(assessment.dueAt)}` : noun
 }
 
 const KIND_ICON: Record<MyAssessment["scope"], IconComponent> = {
