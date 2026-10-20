@@ -940,59 +940,6 @@ export async function preEnrollCourse(courseId: string): Promise<PreEnrollResult
   }
 }
 
-/**
- * Get course students (for instructor)
- */
-export async function getCourseStudents(
-  courseId: string,
-  instructorId: string
-) {
-  try {
-    await connectDB()
-
-    // Verify course ownership
-    const course = await Course.findOne({
-      _id: courseId,
-      instructor: instructorId,
-    })
-
-    if (!course) {
-      return { success: false, error: "Course not found or unauthorized" }
-    }
-
-    const enrollments = await Enrollment.find({ course: courseId })
-      .populate("user", "firstName lastName email")
-      .sort({ purchasedAt: -1 })
-      .lean()
-
-    return {
-      success: true,
-      data: enrollments.map((e) => {
-        const user = e.user as unknown as {
-          _id: { toString(): string }
-          firstName: string
-          lastName: string
-          email: string
-        }
-
-        return {
-          id: e._id.toString(),
-          userId: user._id.toString(),
-          name: `${user.firstName} ${user.lastName}`,
-          email: user.email,
-          progress: e.progress,
-          status: e.status,
-          enrolledAt: e.purchasedAt.toISOString(),
-          completedAt: e.completedAt?.toISOString() || null,
-        }
-      }),
-    }
-  } catch (error) {
-    console.error("Get course students error:", error)
-    return { success: false, error: "Failed to get students" }
-  }
-}
-
 // ============================================================================
 // CHECKOUT CONFIRMATION (spec §12, §17 "Enrollment confirmed")
 // ============================================================================
