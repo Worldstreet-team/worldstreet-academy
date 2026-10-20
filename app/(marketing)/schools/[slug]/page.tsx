@@ -23,7 +23,7 @@ import { CohortBanner } from "@/components/marketing/cohort-banner"
 import { PreviewProvider } from "@/components/programs/preview-player"
 import { SectionNav, type SectionLink } from "@/components/programs/section-nav"
 import { plural } from "@/components/programs/format"
-import { byLevel, levelsOf, toSchoolProgram, topicMap, type SchoolProgram } from "@/components/schools/model"
+import { byLevel, toSchoolProgram, topicMap, type SchoolProgram } from "@/components/schools/model"
 import type { SchoolCta } from "@/components/schools/cta"
 import { SchoolHero } from "@/components/schools/school-hero"
 import { SchoolPrograms } from "@/components/schools/school-programs"
@@ -94,7 +94,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
  *   faculty       hidden when none, and while FACULTY_PUBLIC is off
  *   cohorts       "Upcoming cohorts": the next cohort and the plans with
  *                 live classes; hidden with no next cohort or no such program
- *   pathways      2+ levels, beginner → advanced
+ *   pathways      the levels when 2+, else the §5 Mastery Journey
  *   free lessons  the shared preview player; hidden when none
  *   reviews       combined rating + the best written reviews; hidden when none
  *   FAQ · other schools · closing band · phone bar
@@ -139,7 +139,7 @@ export default async function SchoolPage({ params }: Params) {
     programs.map(({ program }) => ({ title: program.title, slug: program.slug }))
   )
   const hasTopics = topicMap(programs).total > 0
-  const hasPath = levelsOf(programs).length > 1
+  const hasPath = programs.length > 0
   const cohortRows = schoolCohortRows(programs)
   const hasReviews = reviews.summary !== null || reviews.reviews.length > 0
 
@@ -252,7 +252,7 @@ export default async function SchoolPage({ params }: Params) {
           <SchoolAreas areas={areas} />
           <SchoolFaculty members={facultyMembers} />
           <SchoolCohorts cohort={calendar.next} rows={cohortRows} />
-          <SchoolPath programs={programs} />
+          <SchoolPath programs={programs} schoolSlug={school.slug} />
           <SchoolFreeLessons previews={previews} />
           <SchoolReviews data={reviews} />
           <div className="pt-6 md:pt-10">
