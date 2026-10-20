@@ -22,8 +22,9 @@ import { getCurrentUser } from "@/lib/auth/actions"
 import { courseAvailability } from "@/lib/types/course"
 import { sendEnrollmentConfirmationEmail } from "@/lib/email"
 import { sendWelcomeOnce } from "@/lib/welcome-email"
-import { notifyAdmins, notifyUser } from "@/lib/notify"
+import { notifyAdmins, notifyUser, notifyUsers } from "@/lib/notify"
 import { getCourseAccess, isLessonLockedFor, lockedLessonIds } from "@/lib/course-access"
+import { courseTeacherIds } from "@/lib/teaching"
 import { saveWithCertificateId } from "@/lib/certificate-id"
 import { POINTS, awardPoints, pointKey } from "@/lib/points"
 import { PACKAGE_KEYS, packageFor, sellsPackages } from "@/lib/entitlements"
@@ -1075,13 +1076,18 @@ export async function submitMentorshipIntake(
     if (!updated) return { success: false, error: "You've already sent your intake" }
 
     const buyer = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.email
-    void notifyUser(access.course.instructorId, {
-      type: "course",
-      title: "Executive intake received",
-      body: `${buyer}: ${parsed.data.goals}`.slice(0, 500),
-      href: `/instructor/courses/${courseId}`,
-      courseId: String(courseId),
-    })
+    // The owner and the program's assigned faculty, who run its mentorship.
+    void courseTeacherIds(access.course.id)
+      .catch(() => [access.course.instructorId])
+      .then((ids) =>
+        notifyUsers(ids, {
+          type: "course",
+          title: "Executive intake received",
+          body: `${buyer}: ${parsed.data.goals}`.slice(0, 500),
+          href: `/instructor/courses/${courseId}`,
+          courseId: String(courseId),
+        })
+      )
 
     revalidatePath("/dashboard/checkout/success")
     return { success: true }

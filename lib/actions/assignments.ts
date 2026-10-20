@@ -11,7 +11,7 @@ import { getCourseAccess } from "@/lib/course-access"
 import { entitlementsFor } from "@/lib/entitlements"
 import { POINTS, awardPoints, gradePoints, pointKey } from "@/lib/points"
 import { ensureCertificateTier } from "@/lib/certificate-standing"
-import { teachesCourse, teachingFilter } from "@/lib/teaching"
+import { courseTeacherIds, teachesCourse, teachingFilter } from "@/lib/teaching"
 import {
   generatePresignedDownloadUrl,
   generatePresignedUploadUrl,
@@ -710,13 +710,18 @@ export async function submitAssignment(input: {
       })
     }
 
-    void notifyUser(gate.access.course.instructorId, {
-      type: "course",
-      title: "New assignment submission",
-      body: `${fullName(user, "A student")} submitted ${gate.assignment.title}.`.slice(0, 500),
-      href: `/instructor/courses/${gate.assignment.course.toString()}/assignments`,
-      courseId: gate.assignment.course.toString(),
-    })
+    // The owner and the program's assigned faculty all grade it.
+    void courseTeacherIds(gate.assignment.course.toString())
+      .catch(() => [gate.access.course.instructorId])
+      .then((ids) =>
+        notifyUsers(ids, {
+          type: "course",
+          title: "New assignment submission",
+          body: `${fullName(user, "A student")} submitted ${gate.assignment.title}.`.slice(0, 500),
+          href: `/instructor/courses/${gate.assignment.course.toString()}/assignments`,
+          courseId: gate.assignment.course.toString(),
+        })
+      )
 
     revalidatePath(`/dashboard/assignments/${parsed.data.assignmentId}`)
     revalidatePath(`/instructor/courses/${gate.assignment.course.toString()}/assignments`)
