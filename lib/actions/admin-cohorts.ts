@@ -68,7 +68,7 @@ function viewOf(c: { number: number; startsAt: Date; endsAt: Date | null }): Coh
 }
 
 export async function adminListCohorts(): Promise<
-  Result<{ cohorts: AdminCohortRow[]; fallback: CohortView | null }>
+  Result<{ cohorts: AdminCohortRow[]; fallback: (CohortView & { status: CohortStatus }) | null }>
 > {
   try {
     await connectDB()
@@ -76,15 +76,13 @@ export async function adminListCohorts(): Promise<
 
     const rows = (await Cohort.find().sort({ number: -1 }).lean()) as unknown as CohortLean[]
     if (rows.length === 0) {
+      const fallback = fallbackCohort(
+        process.env.NEXT_PUBLIC_COHORT_STARTS_AT,
+        process.env.NEXT_PUBLIC_COHORT_NUMBER
+      )
       return {
         success: true,
-        data: {
-          cohorts: [],
-          fallback: fallbackCohort(
-            process.env.NEXT_PUBLIC_COHORT_STARTS_AT,
-            process.env.NEXT_PUBLIC_COHORT_NUMBER
-          ),
-        },
+        data: { cohorts: [], fallback: { ...fallback, status: cohortStatus(fallback, [fallback], Date.now()) } },
       }
     }
 

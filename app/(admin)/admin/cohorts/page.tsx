@@ -123,9 +123,11 @@ export default function AdminCohortsPage() {
               icon={CalendarDays}
               title="No cohorts yet"
               description={
-                fallback
-                  ? `Until you add one, the site counts down to ${fallback.name}, starting ${cohortDateFull(fallback.startsAt)} (NEXT_PUBLIC_COHORT_STARTS_AT).`
-                  : "Add the first cohort to start the countdown."
+                !fallback
+                  ? "Add the first cohort to start the countdown."
+                  : fallback.status === "upcoming"
+                    ? `Until you add one, the site counts down to ${fallback.name}, starting ${cohortDateFull(fallback.startsAt)} (NEXT_PUBLIC_COHORT_STARTS_AT).`
+                    : `${fallback.name} started ${cohortDateFull(fallback.startsAt)}. Add the next cohort to bring back the countdown.`
               }
             />
           ) : (
