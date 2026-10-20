@@ -96,7 +96,7 @@ The academic structure becomes the seven schools of the institutional blueprint 
    - `$SITE/schools/entrepreneurship-wealth-creation` returns `200`.
 7. **Catalogue dry run (§6), from a Phase 13 checkout.** Every MATCH prints `school: X -> X`. **Never run `mastery-catalogue.mjs` from an older checkout after this step.** It would move the 12 programs back to retired slugs.
 8. **Rollback.** The apply log lists every `MOVED` document, old → new. The mapping is many-to-one, so reverse it from the pre-migration export, restoring only the fields the script rewrote: `school` and `category` on `courses`, `school` on `enrollmentintents`, and (also rewritten) `school` on `sellerapplications` and `answers.school` on `instructorapplications`. Do not `mongorestore` whole collections: that would also revert unrelated writes made since the backup. Or reverse the logged lines by hand. Reverting only the web deploy leaves programs under schools the old code doesn't know.
-9. **Owed by product:** sign off each school's copy in `lib/schools.ts` (entries marked `DRAFT: owner sign-off pending`), and the two placeholder covers.
+9. **Owed by product:** sign off each school's copy in `lib/schools.ts` (entries marked `DRAFT: owner sign-off pending`), and the Entrepreneurship and Leadership covers (rendered 2026-10-20, `scripts/art/scenes/schools.js`).
 
 ## Plans to the blueprint — Phase 14 (2026-10-19)
 
