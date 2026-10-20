@@ -24,6 +24,7 @@ import { REVIEW_CHECKS } from "@/lib/review-checks"
 import { uploadThumbnail, deleteFromCloudinary } from "@/lib/cloudinary"
 import type { CourseLevel, CoursePricing, CourseStatus } from "@/lib/types"
 import { getCurrentUser } from "@/lib/auth"
+import { taughtCourseIds } from "@/lib/teaching"
 import { SCHOOL_BY_SLUG, isSchoolSlug, schoolSlugOf, type SchoolSlug } from "@/lib/schools"
 import { canAccessLesson, PACKAGE_LABEL, isPackageKey, pricingFromPackages } from "@/lib/entitlements"
 import { courseKindOf } from "@/lib/course-kind"
@@ -442,6 +443,49 @@ export async function fetchInstructorCourses(): Promise<InstructorCourseItem[]> 
     }))
   } catch (error) {
     console.error("Fetch instructor courses error:", error)
+    return []
+  }
+}
+
+// ---- Programs you teach (assigned by an admin, owned by someone else) ----
+export type TaughtProgramItem = {
+  id: string
+  title: string
+  thumbnailUrl: string | null
+  schoolName: string | null
+  status: string
+  enrolledCount: number
+}
+
+/**
+ * My Courses' "Programs you teach": programs an admin assigned the caller to
+ * teach that they don't own (lib/teaching.ts). Teaching links only — no
+ * editor, price or earnings. Faculty only; archived programs are left out.
+ */
+export async function fetchTaughtPrograms(): Promise<TaughtProgramItem[]> {
+  try {
+    const user = await getCurrentUser()
+    if (!user) return []
+    await connectDB()
+    const ids = await taughtCourseIds(user)
+    if (ids.length === 0) return []
+    const courses = await Course.find({ _id: { $in: ids }, instructor: { $ne: user.id }, status: { $ne: "archived" } })
+      .select("title thumbnailUrl school status enrolledCount")
+      .sort({ title: 1 })
+      .lean()
+    return courses.map((c) => {
+      const school = schoolSlugOf(c.school)
+      return {
+        id: c._id.toString(),
+        title: c.title,
+        thumbnailUrl: c.thumbnailUrl ?? null,
+        schoolName: school ? SCHOOL_BY_SLUG[school].short : null,
+        status: c.status,
+        enrolledCount: c.enrolledCount || 0,
+      }
+    })
+  } catch (error) {
+    console.error("Fetch taught programs error:", error)
     return []
   }
 }
