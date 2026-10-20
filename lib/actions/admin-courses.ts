@@ -6,7 +6,7 @@ import connectDB from "@/lib/db"
 import { Course, Review, User, type CourseKind, type CourseReviewStatus } from "@/lib/db/models"
 import { requireAdmin } from "@/lib/auth/admin"
 import { notifyUser } from "@/lib/notify"
-import { courseKindOf } from "@/lib/course-kind"
+import { PROGRAM_KIND_FILTER, courseKindOf } from "@/lib/course-kind"
 import { courseFormatOf, hasDeliverable, isFileFormat, type CourseFormat } from "@/lib/course-format"
 import { creatorPublishRefusal } from "@/lib/course-review"
 
@@ -322,6 +322,167 @@ export async function adminSetReviewFeatured(reviewId: string, featured: boolean
   } catch (error) {
     console.error("Admin feature review error:", error)
     return { success: false, error: "Failed to update review" }
+  }
+}
+
+/* ═══════════════════ teaching faculty (owner, 2026-10-19) ═══════════════════ */
+
+/*
+ * An admin assigns faculty to teach a school program: they run its classes,
+ * mentorship and grading (lib/teaching.ts). The program's owner and its sales
+ * share don't change, and nothing here touches money.
+ */
+
+const OBJECT_ID = /^[a-f0-9]{24}$/
+const NOT_A_PROGRAM = "Only school programs have teaching faculty"
+
+const AddTeachingInput = z.object({
+  courseId: z.string().regex(OBJECT_ID, "Program not found"),
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .max(254, "Enter a full email address")
+    .regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Enter a full email address"),
+})
+
+const RemoveTeachingInput = z.object({
+  courseId: z.string().regex(OBJECT_ID, "Program not found"),
+  userId: z.string().regex(OBJECT_ID, "Faculty member not found"),
+})
+
+export type TeachingFacultyMember = {
+  id: string
+  name: string
+  email: string
+  avatarUrl: string | null
+  /** False once their role is no longer INSTRUCTOR or ADMIN: still listed, but not teaching. */
+  teaching: boolean
+}
+
+type TeachingResult<T> = { success: true; data: T } | { success: false; error: string }
+
+function personName(u: { firstName?: string | null; lastName?: string | null; email?: string | null }): string {
+  return `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || u.email || "Faculty member"
+}
+
+/** A program's assigned teaching faculty, in the order they were added. */
+export async function adminListTeachingFaculty(courseId: string): Promise<TeachingResult<TeachingFacultyMember[]>> {
+  try {
+    await connectDB()
+    await requireAdmin()
+    if (typeof courseId !== "string" || !OBJECT_ID.test(courseId)) return { success: false, error: "Program not found" }
+
+    const course = await Course.findById(courseId).select("teachingFaculty").lean()
+    if (!course) return { success: false, error: "Program not found" }
+    const ids = (course.teachingFaculty ?? []).map((id) => id.toString())
+    if (ids.length === 0) return { success: true, data: [] }
+
+    const users = await User.find({ _id: { $in: ids } }).select("firstName lastName email avatarUrl role").lean()
+    const byId = new Map(users.map((u) => [u._id.toString(), u]))
+    return {
+      success: true,
+      data: ids.flatMap((id) => {
+        const u = byId.get(id)
+        if (!u) return []
+        return [
+          {
+            id,
+            name: personName(u),
+            email: u.email,
+            avatarUrl: u.avatarUrl ?? null,
+            teaching: u.role === "INSTRUCTOR" || u.role === "ADMIN",
+          },
+        ]
+      }),
+    }
+  } catch (error) {
+    console.error("Admin list teaching faculty error:", error)
+    return { success: false, error: "Couldn't load this program's faculty" }
+  }
+}
+
+/** Assign an approved faculty member (INSTRUCTOR or ADMIN) to teach a program, by email. */
+export async function adminAddTeachingFaculty(courseId: string, email: string): Promise<TeachingResult<{ userId: string }>> {
+  try {
+    await connectDB()
+    await requireAdmin()
+    const parsed = AddTeachingInput.safeParse({ courseId, email })
+    if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Check the form and try again" }
+
+    const course = await Course.findById(parsed.data.courseId).select("title kind instructor teachingFaculty").lean()
+    if (!course) return { success: false, error: "Program not found" }
+    if (courseKindOf(course) !== "program") return { success: false, error: NOT_A_PROGRAM }
+
+    const user = await User.findOne({ email: parsed.data.email }).select("role").lean()
+    if (!user) {
+      return { success: false, error: "No account uses that email. They need to sign in to the Academy once first." }
+    }
+    if (user._id.toString() === course.instructor.toString()) return { success: false, error: "They already own this program." }
+    if (user.role !== "INSTRUCTOR" && user.role !== "ADMIN") {
+      return { success: false, error: "Only approved faculty can teach a program. Approve their instructor application first." }
+    }
+    if ((course.teachingFaculty ?? []).some((id) => id.toString() === user._id.toString())) {
+      return { success: false, error: "They already teach this program." }
+    }
+
+    // Targeted write, filtered to programs again: a kind change since the read can't slip one through.
+    const updated = await Course.updateOne(
+      { _id: course._id, ...PROGRAM_KIND_FILTER },
+      { $addToSet: { teachingFaculty: user._id } }
+    )
+    if (updated.matchedCount === 0) return { success: false, error: NOT_A_PROGRAM }
+
+    if (updated.modifiedCount > 0) {
+      await notifyUser(user._id.toString(), {
+        type: "system",
+        title: `You're teaching ${course.title}`,
+        body: "An administrator added you to this program's teaching faculty. Its classes, mentorship and grading are in your instructor dashboard.",
+        href: "/instructor",
+        courseId: course._id.toString(),
+      })
+    }
+
+    revalidatePath(`/admin/courses/${course._id.toString()}/edit`)
+    revalidatePath("/instructor")
+    return { success: true, data: { userId: user._id.toString() } }
+  } catch (error) {
+    console.error("Admin add teaching faculty error:", error)
+    return { success: false, error: "Couldn't add them to this program" }
+  }
+}
+
+/** Take a faculty member off a program's teaching faculty. Their access ends on their next request. */
+export async function adminRemoveTeachingFaculty(courseId: string, userId: string): Promise<TeachingResult<{ userId: string }>> {
+  try {
+    await connectDB()
+    await requireAdmin()
+    const parsed = RemoveTeachingInput.safeParse({ courseId, userId })
+    if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Check the form and try again" }
+
+    const course = await Course.findById(parsed.data.courseId).select("title").lean()
+    if (!course) return { success: false, error: "Program not found" }
+
+    const updated = await Course.updateOne(
+      { _id: course._id, teachingFaculty: parsed.data.userId },
+      { $pull: { teachingFaculty: parsed.data.userId } }
+    )
+    if (updated.modifiedCount === 0) return { success: false, error: "They don't teach this program." }
+
+    await notifyUser(parsed.data.userId, {
+      type: "system",
+      title: `You're no longer teaching ${course.title}`,
+      body: "An administrator removed you from this program's teaching faculty.",
+      href: "/instructor",
+      courseId: course._id.toString(),
+    })
+
+    revalidatePath(`/admin/courses/${course._id.toString()}/edit`)
+    revalidatePath("/instructor")
+    return { success: true, data: { userId: parsed.data.userId } }
+  } catch (error) {
+    console.error("Admin remove teaching faculty error:", error)
+    return { success: false, error: "Couldn't remove them from this program" }
   }
 }
 
