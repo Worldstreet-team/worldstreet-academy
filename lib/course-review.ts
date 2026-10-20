@@ -19,7 +19,7 @@ export const REVIEW_QUEUE_PATH = "/admin/courses?review=pending"
 export async function courseReviewFingerprint(courseId: string): Promise<string | null> {
   const [course, lessons, resources] = await Promise.all([
     Course.findById(courseId)
-      .select("title shortDescription description thumbnailUrl level school kind format pricing price whatYouWillLearn communityUrl productFile")
+      .select("title shortDescription description thumbnailUrl level school kind format pricing price whatYouWillLearn requirements targetAudience communityUrl productFile")
       .lean(),
     Lesson.find({ course: courseId })
       .sort({ order: 1 })
@@ -42,6 +42,8 @@ export async function courseReviewFingerprint(courseId: string): Promise<string 
     pricing: course.pricing,
     price: course.price,
     whatYouWillLearn: course.whatYouWillLearn,
+    requirements: course.requirements,
+    targetAudience: course.targetAudience,
     communityUrl: course.communityUrl,
     productFileKey: course.productFile?.key ?? null,
     lessons,

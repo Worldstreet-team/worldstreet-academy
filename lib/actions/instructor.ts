@@ -510,6 +510,8 @@ export async function fetchCourseForEdit(courseId: string) {
         category: course.category ?? "",
         school: schoolSlugOf(course.school),
         whatYouWillLearn: course.whatYouWillLearn ?? [],
+        requirements: course.requirements ?? [],
+        targetAudience: course.targetAudience ?? [],
         availableAt: course.availableAt ? course.availableAt.toISOString() : null,
         preEnrollEnabled: course.preEnrollEnabled ?? true,
         packages: (course.packages ?? []).map(
@@ -610,6 +612,8 @@ export async function createCourse(
   const school = formData.get("school") as SchoolSlug
   const lessonsJson = formData.get("lessons") as string
   const whatYouWillLearn = parseStringArray(formData.get("whatYouWillLearn"))
+  const requirements = parseStringArray(formData.get("requirements"))
+  const targetAudience = parseStringArray(formData.get("targetAudience"))
   const availableAt = parseAvailableAt(formData.get("availableAt"))
   const preEnrollEnabled = formData.get("preEnrollEnabled") !== "false"
 
@@ -706,6 +710,8 @@ export async function createCourse(
       format: product.format,
       productFile: product.productFile,
       whatYouWillLearn,
+      requirements,
+      targetAudience,
       availableAt: availableAt === "invalid" ? null : availableAt,
       preEnrollEnabled,
       publishedAt: requestedStatus === "published" ? new Date() : null,
@@ -793,6 +799,8 @@ export async function updateCourse(
   const school = formData.get("school") as SchoolSlug
   const lessonsJson = formData.get("lessons") as string
   const whatYouWillLearn = parseStringArray(formData.get("whatYouWillLearn"))
+  const requirements = parseStringArray(formData.get("requirements"))
+  const targetAudience = parseStringArray(formData.get("targetAudience"))
   const availableAt = parseAvailableAt(formData.get("availableAt"))
   const preEnrollEnabled = formData.get("preEnrollEnabled") !== "false"
 
@@ -936,6 +944,9 @@ export async function updateCourse(
       format: product.format,
       productFile: product.productFile,
       whatYouWillLearn,
+      // A form without the fields (an older editor tab) leaves them alone.
+      ...(formData.has("requirements") ? { requirements } : {}),
+      ...(formData.has("targetAudience") ? { targetAudience } : {}),
       availableAt: availableAt === "invalid" ? existingCourse.availableAt : availableAt,
       preEnrollEnabled,
       // First transition to published stamps the moment; later republishes keep it.

@@ -1,7 +1,7 @@
 "use client"
 import { CheckIcon, ChevronDownIcon, ChevronLeftIcon, CopyIcon, EyeIcon, FileIcon, PlusIcon, SendIcon, SquarePenIcon, Trash2Icon, VideoIcon } from "@/components/icons"
 
-import { useActionState, useState } from "react"
+import { useActionState, useState, type Dispatch, type SetStateAction } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -78,6 +78,8 @@ type EditableCourse = {
   status: CourseStatus
   school: SchoolSlug | null
   whatYouWillLearn?: string[]
+  requirements?: string[]
+  targetAudience?: string[]
   availableAt?: string | null
   preEnrollEnabled?: boolean
   packages?: ICoursePackage[]
@@ -123,6 +125,54 @@ const PRICING_ITEMS = [
 
 function formatDay(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", { dateStyle: "medium" })
+}
+
+/** An editable list of short lines: what students learn, requirements, who it is for. */
+function LineListField({
+  label,
+  helper,
+  item,
+  items,
+  setItems,
+}: {
+  label: string
+  helper?: string
+  /** One line's name, e.g. "Objective": the placeholder, remove label and add button use it. */
+  item: string
+  items: string[]
+  setItems: Dispatch<SetStateAction<string[]>>
+}) {
+  const noun = item.toLowerCase()
+  return (
+    <div className="space-y-1.5">
+      <Label>{label}</Label>
+      {helper && <p className="text-[10px] text-muted-foreground">{helper}</p>}
+      <div className="space-y-2">
+        {items.map((value, i) => (
+          <div className="flex items-center gap-2" key={i}>
+            <Input
+              value={value}
+              placeholder={`${item} ${i + 1}`}
+              onChange={(e) => setItems((prev) => prev.map((o, j) => (j === i ? e.target.value : o)))}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`Remove ${noun}`}
+              onClick={() => setItems((prev) => prev.filter((_, j) => j !== i))}
+            >
+              <Trash2Icon size={14} />
+            </Button>
+          </div>
+        ))}
+        <Button type="button" variant="outline" size="sm" onClick={() => setItems((prev) => [...prev, ""])}>
+          <PlusIcon size={14} />
+          Add {noun}
+        </Button>
+      </div>
+    </div>
+  )
 }
 
 /** "Your link" with a copy button — sales through it pay the seller the larger share. */
@@ -327,6 +377,8 @@ export function CourseEditor({
   const [price, setPrice] = useState(course?.price?.toString() ?? "")
   const [status, setStatus] = useState(course?.status ?? "draft")
   const [objectives, setObjectives] = useState<string[]>(course?.whatYouWillLearn ?? [])
+  const [requirements, setRequirements] = useState<string[]>(course?.requirements ?? [])
+  const [audience, setAudience] = useState<string[]>(course?.targetAudience ?? [])
   const [availableAtLocal, setAvailableAtLocal] = useState(isoToLocalInput(course?.availableAt))
   const [preEnrollEnabled, setPreEnrollEnabled] = useState(course?.preEnrollEnabled ?? true)
   const [packages, setPackages] = useState<EditorPackage[]>(
@@ -481,6 +533,8 @@ export function CourseEditor({
             <input type="hidden" name="packages" value={JSON.stringify(packages.map(toCoursePackage))} />
             <input type="hidden" name="status" value={status} />
             <input type="hidden" name="whatYouWillLearn" value={JSON.stringify(objectives)} />
+            <input type="hidden" name="requirements" value={JSON.stringify(requirements)} />
+            <input type="hidden" name="targetAudience" value={JSON.stringify(audience)} />
             <input type="hidden" name="availableAt" value={localInputToIso(availableAtLocal)} />
             <input type="hidden" name="preEnrollEnabled" value={preEnrollEnabled ? "true" : "false"} />
             <input type="hidden" name="returnTo" value={returnTo} />
@@ -713,40 +767,15 @@ export function CourseEditor({
             )}
           </div>
 
-          <div className="space-y-1.5">
-            <Label>What students will learn</Label>
-            <div className="space-y-2">
-              {objectives.map((obj, i) => (
-                <div className="flex items-center gap-2" key={i}>
-                  <Input
-                    value={obj}
-                    placeholder={`Objective ${i + 1}`}
-                    onChange={(e) =>
-                      setObjectives((prev) => prev.map((o, j) => (j === i ? e.target.value : o)))
-                    }
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label="Remove objective"
-                    onClick={() => setObjectives((prev) => prev.filter((_, j) => j !== i))}
-                  >
-                    <Trash2Icon size={14} />
-                  </Button>
-                </div>
-              ))}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setObjectives((prev) => [...prev, ""])}
-              >
-                <PlusIcon size={14} />
-                Add objective
-              </Button>
-            </div>
-          </div>
+          <LineListField label="What students will learn" item="Objective" items={objectives} setItems={setObjectives} />
+          <LineListField
+            label="Requirements"
+            helper="What a learner needs before starting"
+            item="Requirement"
+            items={requirements}
+            setItems={setRequirements}
+          />
+          <LineListField label="Who this program is for" item="Audience line" items={audience} setItems={setAudience} />
 
           <SectionDivider label="Community" />
 
