@@ -162,7 +162,7 @@ mongosh "$PROD_URI" --quiet --eval 'print("db " + db.getName()); print("publishe
 
 Every Go rule reads a missing field as full access, so the patches are safe against today's data. They must be live before the web app sells packages, or mobile opens what a package doesn't include.
 
-1. Deploy the Go release with R1–R11 from `docs/go-patches-phase-3.md` — including R10's category change: once §6 runs, `courses.category` holds school labels, so a mobile filter on the old strings must already use `courses.school`.
+1. Deploy the Go release with R1–R11 from `docs/go-patches-phase-3.md` — including R10's category change: once §6 runs, `courses.category` holds school labels, so a mobile filter on the old strings must already use `courses.school`. The later Go patches have their own gates, listed in that document's §0 (release order): ESPEE, referrals, admin levels (R14), the school migration (R12) and templates and guides (R15).
 2. **Check:** in the mobile app, a legacy enrollment still opens all of its lessons and the course list loads. The full matrix runs in §8, once the catalogue exists.
 
 ## 3. Coolify environment (academy app)

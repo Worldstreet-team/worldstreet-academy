@@ -267,7 +267,7 @@ Total ≈ 28–35 dev-days in sequence, or ≈ 14–18 across three tracks:
   5. Available programs, then the study areas (new `school-areas.tsx`, D22)
   6. Faculty (behind `FACULTY_PUBLIC`, D31)
   7. Upcoming cohorts (12.7)
-  8. Learning pathways (existing `SchoolPath`)
+  8. Learning pathways (existing `SchoolPath`; with programs at one level, §5's 5-stage Mastery Journey)
   9. The program cards lead to the plans
 
   The existing reviews, FAQ and other-schools sections follow after.
@@ -483,7 +483,7 @@ Total ≈ 28–35 dev-days in sequence, or ≈ 14–18 across three tracks:
 
 **Goal:** approved Marketplace Creators sell courses, masterclasses and workshops (§17), and each submission passes the staged quality checks before it publishes.
 
-**Depends on:** nothing (Phase 11 did the vocabulary). **Decision:** D30 (file products ⛔). **Go:** a note. `courses.format` and `courses.review.checks` are additive; Go still publishes creator courses only through review (§9 there).
+**Depends on:** nothing (Phase 11 did the vocabulary). **Decision:** D30 (file products ⛔). **Go:** R15 is REQUIRED before any template or guide is approved or published (go-patches §0 step 7, §9). `courses.format` and `courses.review.checks` are additive; Go never publishes a creator's course (§9 there).
 
 ### Tasks
 - **20.1 Format.**
