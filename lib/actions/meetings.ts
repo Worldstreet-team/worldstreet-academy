@@ -13,6 +13,7 @@ import { entitlementsFor, includesMentorship } from "@/lib/entitlements"
 import { HOST_EARLY_START_MS } from "@/lib/class-schedule"
 import { announceClassLive } from "@/lib/class-live"
 import { openAttendance, closeAttendance, closeAllAttendance } from "@/lib/attendance"
+import { teachesCourse, teachingFilter } from "@/lib/teaching"
 
 // ── Helpers ──
 
@@ -199,6 +200,16 @@ export async function joinMeeting(meetingId: string): Promise<{
 
     // Host already has access — use currentUser directly (skip DB lookup)
     if (meeting.hostId.toString() === currentUser.id) {
+      // A course class's host must still teach the course: an assigned faculty
+      // member who was removed or demoted can't open the room (lib/teaching.ts).
+      if (
+        meeting.courseId &&
+        !meeting.mentorshipSessionId &&
+        currentUser.role !== "ADMIN" &&
+        !(await Course.exists({ _id: meeting.courseId, ...teachingFilter(currentUser) }))
+      ) {
+        return { success: false, error: "You no longer teach this course" }
+      }
       // A scheduled course class or mentorship session can't be started more than
       // HOST_EARLY_START_MS ahead — a reminder tap a day early must not open the
       // room. Interviews keep starting whenever the host joins. The refusal text
@@ -250,11 +261,12 @@ export async function joinMeeting(meetingId: string): Promise<{
       }
     }
 
-    // Course classes: admins, direct invitees, and students whose package
-    // includes live classes. A class link is not a way into paid content.
+    // Course classes: admins, direct invitees, the course's teaching faculty
+    // (as staff, never through a plan), and students whose package includes
+    // live classes. A class link is not a way into paid content.
     if (meeting.courseId && currentUser.role !== "ADMIN") {
       const invited = (meeting.invites ?? []).some((inv) => inv.userId?.toString() === currentUser.id)
-      if (!invited) {
+      if (!invited && !(await teachesCourse(currentUser, meeting.courseId.toString()))) {
         const access = await getCourseAccess(currentUser.id, meeting.courseId.toString())
         if (!access) return { success: false, error: "This live class is for students enrolled in the course" }
         if (!access.entitlements.liveClasses) {
@@ -1866,13 +1878,9 @@ export async function createCourseMeeting(
     // (which email and notify every buyer) are a faculty tool.
     if (currentUser.role !== "INSTRUCTOR" && currentUser.role !== "ADMIN") return { success: false, error: "Only faculty can run live classes" }
 
-    // Verify instructor owns this course
-    const course = await Course.findOne({
-      _id: courseId,
-      instructor: new Types.ObjectId(currentUser.id),
-      status: "published",
-    }).lean()
-    if (!course) return { success: false, error: "Course not found" }
+    // The caller must teach this course: its owner or its assigned faculty (lib/teaching.ts).
+    const course = await teachesCourse(currentUser, courseId, "title thumbnailUrl packages format status")
+    if (!course || course.status !== "published") return { success: false, error: "Course not found" }
 
     // Create the RTK room up front — for a scheduled class too, like interviews,
     // so the host's join at start time is instant (joinMeeting flips it live).
@@ -2383,10 +2391,8 @@ export async function getInstructorCoursesForMeeting(): Promise<{
     if (!currentUser) return { success: false, error: "Unauthorized" }
     if (currentUser.role !== "INSTRUCTOR" && currentUser.role !== "ADMIN") return { success: true, courses: [] }
 
-    const courses = await Course.find({
-      instructor: new Types.ObjectId(currentUser.id),
-      status: "published",
-    })
+    // Owned and assigned programs alike (lib/teaching.ts).
+    const courses = await Course.find({ ...teachingFilter(currentUser), status: "published" })
       .select("title thumbnailUrl enrolledCount")
       .sort({ createdAt: -1 })
       .lean()

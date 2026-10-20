@@ -10,13 +10,15 @@ import { getCourseAccess } from "@/lib/course-access"
 import { entitlementsFor, recordingsAllowed } from "@/lib/entitlements"
 import { generatePresignedDownloadUrl, hasPrivateResourceBucket } from "@/lib/r2"
 import { programArt } from "@/lib/school-art"
+import { taughtCourseIds, teachingFilter } from "@/lib/teaching"
 
 /*
  * Class recordings (owner, 2026-10-03): every course class is recorded and
  * copied to the private bucket (/api/cron/recordings). Students whose plan
  * includes recorded classes (`recordingsAllowed`) watch them in their dashboard; they can't download
- * them. Course staff (the instructor, the class host, admins) see them too and
- * may rename or hide one. Playback is a 10-minute signed GET minted only after
+ * them. Course staff (whoever teaches the course — its instructor or assigned
+ * faculty, lib/teaching.ts — the class host, admins) see them too and may
+ * rename or hide one. Playback is a 10-minute signed GET minted only after
  * access is re-checked here.
  */
 
@@ -51,14 +53,13 @@ export type InstructorRecordingView = RecordingView & {
 
 const recordingIdSchema = z.string().regex(OBJECT_ID, "Recording not found")
 
-/** "staff" (admin, course instructor, class host), "student" (plan includes recorded classes: `recordingsAllowed`), or no access. */
+/** "staff" (admin, whoever teaches the course, class host), "student" (plan includes recorded classes: `recordingsAllowed`), or no access. */
 async function recordingAccess(
   user: Viewer,
   rec: { course: Types.ObjectId; host: Types.ObjectId }
 ): Promise<"staff" | "student" | null> {
   if (user.role === "ADMIN" || rec.host.toString() === user.id) return "staff"
-  const course = await Course.findById(rec.course).select("instructor").lean()
-  if (course?.instructor?.toString() === user.id) return "staff"
+  if (await Course.exists({ _id: rec.course, ...teachingFilter(user) })) return "staff"
   const access = await getCourseAccess(user.id, rec.course.toString())
   return access && recordingsAllowed(access.entitlements) ? "student" : null
 }
@@ -71,7 +72,7 @@ async function listableCourseIds(user: Viewer): Promise<Types.ObjectId[] | null>
     Enrollment.find({ user: userId, status: { $in: ["active", "completed"] } })
       .select("course packageKey")
       .lean(),
-    Course.find({ instructor: userId }).select("_id").lean(),
+    Course.find(teachingFilter(user)).select("_id").lean(),
   ])
   const courses = enrollments.length
     ? await Course.find({ _id: { $in: enrollments.map((e) => e.course) } }).select("packages format").lean()
@@ -143,9 +144,9 @@ export async function listMyRecordings(input: { courseId?: string } = {}): Promi
     let filter: Record<string, unknown>
     if (parsed.data.courseId) {
       const courseId = new Types.ObjectId(parsed.data.courseId)
-      const course = await Course.findById(courseId).select("instructor").lean()
+      const course = await Course.findById(courseId).select("_id").lean()
       if (!course) return { success: true, data: [] }
-      const staff = user.role === "ADMIN" || course.instructor?.toString() === user.id
+      const staff = user.role === "ADMIN" || Boolean(await Course.exists({ _id: courseId, ...teachingFilter(user) }))
       if (!staff) {
         const access = await getCourseAccess(user.id, parsed.data.courseId)
         if (!access || !recordingsAllowed(access.entitlements)) return { success: true, data: [] }
@@ -218,8 +219,8 @@ export async function listInstructorRecordings(): Promise<Result<InstructorRecor
     if (user.role !== "INSTRUCTOR" && user.role !== "ADMIN") return { success: false, error: "Instructors only" }
 
     const userId = new Types.ObjectId(user.id)
-    const taught = await Course.find({ instructor: userId }).select("_id").lean()
-    const rows = await Recording.find({ $or: [{ host: userId }, { course: { $in: taught.map((c) => c._id) } }] })
+    const taught = await taughtCourseIds(user)
+    const rows = await Recording.find({ $or: [{ host: userId }, { course: { $in: taught } }] })
       .sort({ recordedAt: -1 })
       .limit(LIST_LIMIT)
       .select(ROW_FIELDS)
