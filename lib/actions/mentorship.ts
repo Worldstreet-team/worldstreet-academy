@@ -19,6 +19,7 @@ import { notifyUser } from "@/lib/notify"
 import { formatUtcDateTime, sendMentorshipEmail } from "@/lib/email"
 import { APP_URL } from "@/lib/app-url"
 import { createMeeting as createRTKMeeting, addParticipant } from "@/lib/realtime"
+import { taughtCourseIds, teachesCourse, teachingFilter } from "@/lib/teaching"
 
 /*
  * Executive mentorship (spec §6): the student proposes times, the course
@@ -333,8 +334,12 @@ export async function cancelMentorshipSession(
     if (!session) return { success: false, error: "Session not found" }
     const isStudent = session.student.toString() === user.id
     // The instructor path needs a current staff role: a demoted instructor's raw POST can't act.
+    // A request is also answered by anyone who teaches the course (lib/teaching.ts); a
+    // confirmed session stays with the one who runs it (`instructor`).
     const isInstructor =
-      session.instructor.toString() === user.id && (user.role === "INSTRUCTOR" || user.role === "ADMIN")
+      (user.role === "INSTRUCTOR" || user.role === "ADMIN") &&
+      (session.instructor.toString() === user.id ||
+        (session.status === "requested" && Boolean(await teachesCourse(user, session.course.toString()))))
     if (!isStudent && !isInstructor) return { success: false, error: "Session not found" }
     if (session.status !== "requested" && session.status !== "confirmed") {
       return { success: false, error: "This session is already closed" }
@@ -435,7 +440,9 @@ export async function getMentorshipQueue(): Promise<MentorshipQueue> {
     const user = await getCurrentUser()
     if (!user || (user.role !== "INSTRUCTOR" && user.role !== "ADMIN")) return empty
 
-    const courses = await Course.find({ instructor: user.id }).select("title packages").lean()
+    // Owned and assigned programs (lib/teaching.ts). Requests are found by course too;
+    // a confirmed session is listed for the one who runs it (`instructor`).
+    const courses = await Course.find(teachingFilter(user)).select("title packages").lean()
     const [enrollments, requested, confirmed] = await Promise.all([
       Enrollment.find({
         course: { $in: courses.map((c) => c._id) },
@@ -447,7 +454,13 @@ export async function getMentorshipQueue(): Promise<MentorshipQueue> {
         .lean(),
       // Separate queries, each with its own limit: confirmed sessions never leave "confirmed"
       // (past is derived), so one shared list would push new requests past the limit.
-      MentorshipSession.find({ instructor: user.id, status: "requested" }).sort({ createdAt: 1 }).limit(100).lean(),
+      MentorshipSession.find({
+        $or: [{ instructor: user.id }, { course: { $in: courses.map((c) => c._id) } }],
+        status: "requested",
+      })
+        .sort({ createdAt: 1 })
+        .limit(100)
+        .lean(),
       MentorshipSession.find({
         instructor: user.id,
         status: "confirmed",
@@ -519,7 +532,11 @@ export async function confirmMentorshipSession(
       return { success: false, error: parsed.error.issues[0]?.message ?? "Check the form and try again" }
     }
 
-    const session = await MentorshipSession.findOne({ _id: parsed.data.sessionId, instructor: user.id }).lean()
+    // The session's instructor, or anyone who teaches its course (lib/teaching.ts).
+    const session = await MentorshipSession.findOne({
+      _id: parsed.data.sessionId,
+      $or: [{ instructor: user.id }, { course: { $in: await taughtCourseIds(user) } }],
+    }).lean()
     if (!session) return { success: false, error: "Session not found" }
     if (session.status !== "requested") return { success: false, error: "This request was already answered" }
 
@@ -592,9 +609,11 @@ export async function confirmMentorshipSession(
       },
     })
 
+    // Whoever confirms runs the session: `instructor` moves to them in the same
+    // filtered claim, so it keeps meaning "who runs it" (cancel and the lists read it).
     const claimed = await MentorshipSession.findOneAndUpdate(
       { _id: session._id, status: "requested" },
-      { $set: { status: "confirmed", scheduledAt, meetingId: meeting._id } },
+      { $set: { status: "confirmed", scheduledAt, meetingId: meeting._id, instructor: new Types.ObjectId(user.id) } },
       { new: true }
     )
     if (!claimed) {
@@ -651,8 +670,11 @@ export async function saveMentorRoadmap(
 
     const enrollment = await Enrollment.findById(parsed.data.enrollmentId).select("user course packageKey status").lean()
     if (!enrollment) return { success: false, error: "Student not found" }
-    const course = await Course.findById(enrollment.course).select("instructor packages title").lean()
-    if (!course || course.instructor.toString() !== user.id) return { success: false, error: "Student not found" }
+    // Its owner or its teaching faculty (lib/teaching.ts).
+    const course = await Course.findOne({ _id: enrollment.course, ...teachingFilter(user) })
+      .select("instructor packages title")
+      .lean()
+    if (!course) return { success: false, error: "Student not found" }
     if ((enrollment.status !== "active" && enrollment.status !== "completed") || !includesMentorship(course, enrollment)) {
       return { success: false, error: "This student's plan doesn't include mentorship" }
     }
