@@ -30,6 +30,7 @@ import { isoOrNull } from "@/lib/faculty-format"
 import { isFileFormat } from "@/lib/course-format"
 import { canAccessLesson, includesMentorship } from "@/lib/entitlements"
 import { cohortsFor, masteryFor, type CohortTag, type MasteryResult, type SeamEnrollment } from "@/lib/faculty-seams"
+import { taughtCourseIds, teachesCourse } from "@/lib/teaching"
 
 /*
  * My Students: every active or completed learner in the programs the caller
@@ -90,9 +91,9 @@ const timeOf = (d: Date | null | undefined): number => {
 }
 
 /**
- * The one scoped read behind My Students and Student Performance. Ownership
- * comes from the signed-in user: faculty see the courses they own, of any
- * kind; an admin sees every course.
+ * The one scoped read behind My Students and Student Performance. Scope
+ * comes from the signed-in user: faculty see the courses they teach — own, of
+ * any kind, or are assigned to (lib/teaching.ts); an admin sees every course.
  */
 async function loadScoped(
   filters: FacultyStudentFilters
@@ -108,9 +109,7 @@ async function loadScoped(
   })
 
   const admin = me.role === "ADMIN"
-  const scopeIds = admin
-    ? null
-    : (await Course.find({ instructor: me.id }).select("_id").lean()).map((c) => c._id)
+  const scopeIds = admin ? null : await taughtCourseIds(me)
 
   const all: LeanEnrollment[] =
     scopeIds && scopeIds.length === 0
@@ -378,9 +377,14 @@ export async function getStudentPerformance(
 
     const enrollment = await Enrollment.findById(enrollmentId).lean()
     if (!enrollment) return NOT_FOUND
-    const course = await Course.findById(enrollment.course).select("title instructor packages examRequired").lean()
+    const fields = "title instructor packages examRequired"
+    const course =
+      me.role === "ADMIN"
+        ? await Course.findById(enrollment.course).select(fields).lean()
+        : await teachesCourse(me, enrollment.course.toString(), fields)
     if (!course) return NOT_FOUND
-    if (me.role !== "ADMIN" && course.instructor?.toString() !== me.id) return NOT_FOUND
+    // Only the owner (or an admin) has a course page; assigned faculty grade from the program's assignments.
+    const owned = me.role === "ADMIN" || course.instructor?.toString() === me.id
 
     const row: SeamEnrollment = enrollment as unknown as SeamEnrollment
     const [learner, lessons, attempts, finalExam, assignments, classes, cohortMap, masteryMap] = await Promise.all([
@@ -423,7 +427,11 @@ export async function getStudentPerformance(
           name: learner ? `${learner.firstName} ${learner.lastName}`.trim() || "Learner" : "Learner",
           avatarUrl: learner?.avatarUrl ?? null,
         },
-        program: { id: course._id.toString(), title: course.title, manageHref: `/instructor/courses/${course._id}` },
+        program: {
+          id: course._id.toString(),
+          title: course.title,
+          manageHref: owned ? `/instructor/courses/${course._id}` : `/instructor/courses/${course._id}/assignments`,
+        },
         plan: planOf(enrollment.packageKey),
         status: enrollment.status,
         cohort: cohortMap.get(id) ?? null,

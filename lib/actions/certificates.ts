@@ -9,6 +9,7 @@ import { entitlementsFor } from "@/lib/entitlements"
 import { schoolFromSlug } from "@/lib/schools"
 import { ensureCertificateId, normalizeCertificateId } from "@/lib/certificate-id"
 import { ensureCertificateTier } from "@/lib/certificate-standing"
+import { teachesCourse, teachingFilter } from "@/lib/teaching"
 import type { CertificateTier, NextTier } from "@/lib/certificate-tier"
 
 // ============================================================================
@@ -333,10 +334,8 @@ export async function fetchInstructorCertificateStats(): Promise<InstructorCerti
     // (and the buyers' emails they carry) are a faculty tool.
     if (!currentUser || (currentUser.role !== "INSTRUCTOR" && currentUser.role !== "ADMIN")) return []
 
-    // Get instructor's courses
-    const courses = await Course.find({
-      instructor: currentUser.id,
-    })
+    // The courses they teach: owned or assigned (lib/teaching.ts)
+    const courses = await Course.find(teachingFilter(currentUser))
       .select("title thumbnailUrl rating packages format")
       .lean()
 
@@ -383,11 +382,8 @@ export async function fetchCourseCertificates(
     const currentUser = await getCurrentUser()
     if (!currentUser || (currentUser.role !== "INSTRUCTOR" && currentUser.role !== "ADMIN")) return { courseTitle: "", certificates: [] }
 
-    // Verify the instructor owns the course
-    const course = await Course.findOne({
-      _id: courseId,
-      instructor: currentUser.id,
-    }).lean()
+    // Verify the caller teaches the course: its owner or its assigned faculty (lib/teaching.ts)
+    const course = await teachesCourse(currentUser, courseId, "title packages format")
 
     if (!course) return { courseTitle: "", certificates: [] }
 
