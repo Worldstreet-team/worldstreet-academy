@@ -173,6 +173,13 @@ export interface ICourse extends Document {
   format: CourseFormat | null
   /** Templates and guides: their one file, in the PRIVATE resources bucket. A key, never a URL. */
   productFile: ICourseProductFile | null
+  /**
+   * Faculty an admin assigned to teach this program (owner, 2026-10-19). They
+   * run its classes, mentorship and grading; ownership and the sales share stay
+   * with `instructor`. Programs only; missing on most rows (= []). Read through
+   * lib/teaching.ts, which counts an assignment only while the person is faculty.
+   */
+  teachingFaculty: Types.ObjectId[]
   createdAt: Date
   updatedAt: Date
 }
@@ -364,6 +371,11 @@ const CourseSchema = new Schema<ICourse>(
     liveNotifiedAt: {
       type: Date,
       default: null,
+    },
+    teachingFaculty: {
+      type: [{ type: Schema.Types.ObjectId, ref: "User" }],
+      default: [],
+      index: true,
     },
   },
   {
