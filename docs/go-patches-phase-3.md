@@ -17,7 +17,7 @@ Required, in launch order:
 6. **Before `scripts/migrate-schools-v2.mjs --apply`:** R12 (§15).
 7. **Before any template or guide is approved or published:** R15 (§9).
 
-Optional, any time: R9's ID stamping on Go completions, R13's tier names on mobile certificates, R-A attendance (§13, recommended before the first certificate tiers are awarded), points (§11), the welcome email (§14), intents (§6) and cohorts (§18).
+Optional, any time: R9's ID stamping on Go completions, R13's tier names on mobile certificates, R-A attendance (§13, recommended before the first certificate tiers are awarded), points (§11), the welcome email (§14), intents (§6), cohorts (§18) and teaching faculty (§20).
 
 ---
 
@@ -393,3 +393,17 @@ Go needs no patch to keep working: everything is additive.
   - Only the web writes them, and it never lowers the tier. Go must not write them. Any wholesale enrollment write must carry them, alongside R9's `certificateId` and R11's `mentorRoadmap` (use dotted paths).
 - **Rendering on mobile.** Print the tier's name: "WMA Certificate of Completion", "WMA Certified Practitioner" or "WMA Mastery Certification". When the tier is null, print "WMA Certificate of Completion". R9's ID rules are unchanged: one `WSA-` ID per enrollment, and a higher tier reprints under the same ID.
 - **Who decides.** The web computes the tier from completion, the final exam, the Mastery Score and a graded project, as published at `/certification`. A completion made through Go gets its tier the next time the learner opens their certificates on the web. Go needs no tier logic.
+
+## 20. Teaching faculty (owner, 2026-10-19)
+
+Go needs no patch to keep working: the change is additive, and Go can ignore it.
+
+The Academy keeps owning each program and keeps its sales share. An admin assigns one or more faculty members to teach a program: they run its classes, mentorship and grading, and see its students. Their pay stays outside the app, and no money rule changes.
+
+- **`courses.teachingFaculty`** is an array of `users` ObjectIds. A missing value means `[]`. It is written only by the web (the admin's program edit page), with `$addToSet` and `$pull`, and only on school programs (`kind` missing or `"program"`). Readers count it only on a program.
+- **Wholesale course writes must keep the field.** A Go write that replaces a whole `courses` document must carry `teachingFaculty` across, or use dotted `$set` paths.
+- **An assignment counts only while the person's role is `INSTRUCTOR` or `ADMIN`.** A faculty member demoted to `USER` stops teaching at once, even while still listed.
+- **Permission checks.** If Go checks who may act as a course's instructor, it treats assigned faculty like the owner for teaching actions only: live classes (create, start, join as staff), mentorship (list, confirm, decline, roadmap), assignments and grading, and rosters (students, performance, certificates). Never for content, lessons, exams, prices, plans, publishing, earnings, referrals or the public faculty credit, which stay with `courses.instructor`.
+- **R7 (instructor Q&A) counts them too.** "Someone who teaches courses the user is enrolled in" includes a program's assigned faculty while they hold a faculty role. So a learner reaches them under the same `instructorQa` rule, and a learner without `instructorQa` is refused exactly as for the owner.
+- **`mentorshipsessions.instructor` still means "who runs it".** A request is created with the program's owner, as before. Any teacher of the program may answer it. The one who confirms becomes the room's host, and the web moves `instructor` to them in the same filtered update that claims the request (`{ _id, status: "requested" }`).
+- **Web source of truth:** `lib/teaching.ts` (`teachingFilter`, `taughtCourseIds`, `teachesCourse`).
