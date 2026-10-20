@@ -2,12 +2,13 @@ import mongoose, { Schema, Document, Model, Types } from "mongoose"
 
 /**
  * One Executive mentorship session (spec §6 "Private 1-on-1 coaching"). The
- * student proposes up to three times; the course instructor confirms one,
+ * student proposes up to three times; anyone who teaches the program (its
+ * owner or assigned faculty, lib/teaching.ts) confirms one,
  * which creates an interview-shaped scheduled Meeting — deliberately without
  * courseId, which would reach every live-class student — linked back through
  * Meeting.mentorshipSessionId.
  *
- *   requested → confirmed | declined (instructor) | cancelled (either party)
+ *   requested → confirmed | declined (its teachers) | cancelled (either party)
  *   confirmed → cancelled (either party, while the room is still unstarted)
  *
  * "Upcoming" vs "past" is derived at read time from the linked meeting and the
@@ -19,7 +20,7 @@ export type MentorshipSessionStatus = "requested" | "confirmed" | "declined" | "
 export interface IMentorshipSession extends Document {
   _id: Types.ObjectId
   student: Types.ObjectId
-  /** The course instructor when the request was made. */
+  /** Who runs the session: the course owner when it was requested, then the faculty member who confirmed it. */
   instructor: Types.ObjectId
   course: Types.ObjectId
   enrollment: Types.ObjectId
@@ -67,6 +68,8 @@ const MentorshipSessionSchema = new Schema<IMentorshipSession>(
 
 MentorshipSessionSchema.index({ instructor: 1, status: 1, createdAt: 1 })
 MentorshipSessionSchema.index({ student: 1, createdAt: -1 })
+// Requests by course: anyone who teaches the program may answer them (lib/teaching.ts).
+MentorshipSessionSchema.index({ course: 1, status: 1 })
 // One open request per enrollment, race-safe (the InstructorApplication precedent).
 MentorshipSessionSchema.index(
   { enrollment: 1 },
