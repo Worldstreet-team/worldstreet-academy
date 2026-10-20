@@ -32,6 +32,7 @@ import { isCountryCode } from "@/lib/countries"
 import { FACULTY_ROLES, isFacultyRole, safeWebUrl } from "@/lib/faculty"
 import { facultySinceLabel } from "@/lib/faculty-credential"
 import { cohortsForEnrollments } from "@/lib/cohort-calendar"
+import { assignedFacultyFor, type ProgramTeacher } from "@/lib/teaching"
 import { PROGRAM_KIND_FILTER, courseKindOf } from "@/lib/course-kind"
 import { FORMAT_LABEL, courseFormatOf, isFileFormat, productTypeLabel, type CourseFormat } from "@/lib/course-format"
 
@@ -121,6 +122,11 @@ export type StudentEnrollment = {
   packageName: string | null
   instructorId: string
   instructorHeadline: string | null
+  /**
+   * The program's assigned faculty who still hold a faculty role (lib/teaching.ts).
+   * When there are any, the learner sees and messages them instead of the owner.
+   */
+  faculty: ProgramTeacher[]
   /** What the package includes. Legacy rows read FULL_ACCESS — that is access, never a label. */
   entitlements: IPackageEntitlements
   /** True only when `packageKey` is set AND the course still has that package. Badges require it. */
@@ -967,6 +973,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
           courseKindOf(e.course as unknown as PopulatedCourse) === "program"
       )
     )
+    const facultyByCourse = await assignedFacultyFor(courseIds)
 
     return enrollments.map((enrollment) => {
       const course = enrollment.course as unknown as PopulatedCourse
@@ -1034,6 +1041,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
         packageName: enrollment.packageName ?? null,
         instructorId: course.instructor._id.toString(),
         instructorHeadline: course.instructor.instructorProfile?.headline || null,
+        faculty: facultyByCourse.get(courseId) ?? [],
         entitlements,
         explicitPackage: packageKey !== null && packages.some((p) => p.key === packageKey),
         openLessons: openIds.size,
