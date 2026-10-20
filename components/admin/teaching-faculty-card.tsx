@@ -165,7 +165,8 @@ export function TeachingFacultyCard({ courseId, courseTitle }: { courseId: strin
                 <DialogTitle>{`Remove ${removing.name} from ${courseTitle}?`}</DialogTitle>
                 <DialogDescription>
                   They stop teaching it straight away: its classes, mentorship, grading and students leave their
-                  dashboard, and they&apos;re told. You can add them again later.
+                  dashboard, and they&apos;re told. Their scheduled classes on this program are cancelled. You can
+                  add them again later.
                 </DialogDescription>
               </DialogHeader>
               {removeError && <p className="text-xs text-ws-danger">{removeError}</p>}

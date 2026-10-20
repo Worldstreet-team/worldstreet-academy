@@ -23,6 +23,19 @@ async function initAction() {
   return currentUser
 }
 
+/**
+ * A course class's host must still teach its course (lib/teaching.ts): a
+ * removed or demoted faculty member can't open, start or invite to it.
+ * Admins, interviews and mentorship rooms pass.
+ */
+async function hostTeachesClass(
+  meeting: { courseId?: Types.ObjectId | null; mentorshipSessionId?: Types.ObjectId | null },
+  user: { id: string; role: string }
+): Promise<boolean> {
+  if (!meeting.courseId || meeting.mentorshipSessionId || user.role === "ADMIN") return true
+  return Boolean(await Course.exists({ _id: meeting.courseId, ...teachingFilter(user) }))
+}
+
 /** Fire-and-forget: schedule DB write without blocking the response */
 function backgroundSave(promise: Promise<unknown>) {
   promise.catch((err) => console.error("[Meeting] Background save failed:", err))
@@ -200,14 +213,7 @@ export async function joinMeeting(meetingId: string): Promise<{
 
     // Host already has access — use currentUser directly (skip DB lookup)
     if (meeting.hostId.toString() === currentUser.id) {
-      // A course class's host must still teach the course: an assigned faculty
-      // member who was removed or demoted can't open the room (lib/teaching.ts).
-      if (
-        meeting.courseId &&
-        !meeting.mentorshipSessionId &&
-        currentUser.role !== "ADMIN" &&
-        !(await Course.exists({ _id: meeting.courseId, ...teachingFilter(currentUser) }))
-      ) {
+      if (!(await hostTeachesClass(meeting, currentUser))) {
         return { success: false, error: "You no longer teach this course" }
       }
       // A scheduled course class or mentorship session can't be started more than
@@ -693,6 +699,9 @@ export async function startMeeting(meetingId: string): Promise<{
     if (!meeting) return { success: false, error: "Meeting not found" }
     if (meeting.hostId.toString() !== currentUser.id) {
       return { success: false, error: "Only host can start meeting" }
+    }
+    if (!(await hostTeachesClass(meeting, currentUser))) {
+      return { success: false, error: "You no longer teach this course" }
     }
 
     meeting.status = "active"
@@ -2031,6 +2040,8 @@ export async function inviteByEmail(
     if (!meeting) return { success: false, status: "error", email, error: "Meeting not found" }
     if (meeting.hostId.toString() !== currentUser.id)
       return { success: false, status: "error", email, error: "Only the host can invite" }
+    if (!(await hostTeachesClass(meeting, currentUser)))
+      return { success: false, status: "error", email, error: "You no longer teach this course" }
 
     // Find user by email
     const invitee = await User.findOne({ email: email.toLowerCase().trim() })

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { z } from "zod/v4"
 import connectDB from "@/lib/db"
-import { Course, Review, User, type CourseKind, type CourseReviewStatus } from "@/lib/db/models"
+import { Course, Meeting, Review, User, type CourseKind, type CourseReviewStatus } from "@/lib/db/models"
 import { requireAdmin } from "@/lib/auth/admin"
 import { notifyUser } from "@/lib/notify"
 import { PROGRAM_KIND_FILTER, courseKindOf } from "@/lib/course-kind"
@@ -469,10 +469,32 @@ export async function adminRemoveTeachingFaculty(courseId: string, userId: strin
     )
     if (updated.modifiedCount === 0) return { success: false, error: "They don't teach this program." }
 
+    // Their classes on this program that haven't started are cancelled the way a
+    // host's "Cancel class" does it (endMeeting): ended, the admitted host row left.
+    // That drops them from students' upcoming classes and the reminder cron; as
+    // on a host's cancel, students get no notice. An unstarted class has no
+    // attendance to close. Live classes stay with their host to end.
+    const endedAt = new Date()
+    const cancelled = await Meeting.updateMany(
+      { courseId: course._id, hostId: parsed.data.userId, status: "scheduled", mentorshipSessionId: null },
+      {
+        $set: {
+          status: "ended",
+          endedAt,
+          "participants.$[admitted].status": "left",
+          "participants.$[admitted].leftAt": endedAt,
+        },
+      },
+      { arrayFilters: [{ "admitted.status": "admitted" }] }
+    )
+
     await notifyUser(parsed.data.userId, {
       type: "system",
       title: `You're no longer teaching ${course.title}`,
-      body: "An administrator removed you from this program's teaching faculty.",
+      body:
+        cancelled.modifiedCount > 0
+          ? `An administrator removed you from this program's teaching faculty. Your ${cancelled.modifiedCount === 1 ? "scheduled class on it was" : `${cancelled.modifiedCount} scheduled classes on it were`} cancelled.`
+          : "An administrator removed you from this program's teaching faculty.",
       href: "/instructor",
       courseId: course._id.toString(),
     })
