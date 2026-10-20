@@ -289,34 +289,32 @@ export async function requestMentorshipSession(input: {
       throw error
     }
 
-    const [course, instructor] = await Promise.all([
+    // Everyone who teaches the program may answer it: its owner and its assigned faculty.
+    const teacherIds = await courseTeacherIds(access.course.id).catch(() => [access.course.instructorId])
+    const [course, teachers] = await Promise.all([
       Course.findById(access.course.id).select("title").lean(),
-      User.findById(access.course.instructorId).select("firstName email").lean(),
+      User.find({ _id: { $in: teacherIds } }).select("firstName email").lean(),
     ])
     const courseTitle = course?.title ?? "their program"
     const studentName = fullName(user, user.email)
     const proposed = times.map((t) => formatUtcDateTime(new Date(t))).join("; ")
 
-    // Everyone who teaches the program may answer it: its owner and its assigned faculty.
-    void courseTeacherIds(access.course.id)
-      .catch(() => [access.course.instructorId])
-      .then((ids) =>
-        notifyUsers(ids, {
-          type: "meeting",
-          title: "Mentorship session requested",
-          body: `${studentName} (${courseTitle}) proposed: ${proposed}.`.slice(0, 500),
-          href: INSTRUCTOR_PATH,
-          courseId: access.course.id,
-        })
-      )
-    if (mailable(instructor?.email)) {
-      void sendMentorshipEmail(instructor.email, {
+    void notifyUsers(teacherIds, {
+      type: "meeting",
+      title: "Mentorship session requested",
+      body: `${studentName} (${courseTitle}) proposed: ${proposed}.`.slice(0, 500),
+      href: INSTRUCTOR_PATH,
+      courseId: access.course.id,
+    })
+    for (const teacher of teachers) {
+      if (!mailable(teacher.email)) continue
+      void sendMentorshipEmail(teacher.email, {
         subject: "New mentorship session request",
         title: "A student asked for a session",
         bodyText: `${studentName} (${courseTitle}) proposed: ${proposed}. Confirm one from Meetings.`,
         ctaLabel: "Review request",
         ctaUrl: `${APP_URL}${INSTRUCTOR_PATH}`,
-        recipientName: instructor.firstName || undefined,
+        recipientName: teacher.firstName || undefined,
       })
     }
 

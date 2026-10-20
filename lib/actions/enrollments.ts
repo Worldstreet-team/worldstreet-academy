@@ -1031,7 +1031,8 @@ export async function submitMentorshipIntake(
           type: "course",
           title: "Executive intake received",
           body: `${buyer}: ${parsed.data.goals}`.slice(0, 500),
-          href: `/instructor/courses/${courseId}`,
+          // The student's page: the owner and assigned faculty can both open it.
+          href: `/instructor/students/${access.enrollmentId}`,
           courseId: String(courseId),
         })
       )
