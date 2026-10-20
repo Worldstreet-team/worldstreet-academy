@@ -166,16 +166,18 @@ function Cohort({ card, now, nextCohort }: { card: CohortCard; now: number; next
             Class community
             <ExternalLink size={13} strokeWidth={2} aria-hidden />
           </a>
-        ) : (
+        ) : card.owned ? (
           <Link href={`${card.manageHref}/edit`} className="text-muted-foreground transition-colors hover:text-foreground">
             Add a class community
           </Link>
+        ) : (
+          <span className="text-muted-foreground">You teach this program</span>
         )}
         <Link
           href={card.manageHref}
           className="inline-flex shrink-0 items-center gap-1 font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
-          Manage
+          {card.owned ? "Manage" : "Assignments"}
           <ArrowRight size={13} strokeWidth={2} aria-hidden />
         </Link>
       </div>
