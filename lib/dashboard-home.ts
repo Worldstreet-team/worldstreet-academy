@@ -119,22 +119,32 @@ export type InstructorRow = {
   isMentor: boolean
 }
 
-/** One row per distinct instructor across the student's access-granting enrollments. */
+/**
+ * One row per distinct instructor across the student's access-granting
+ * enrollments. A program with assigned faculty is taught by them, so they
+ * stand in for its owner; otherwise the owner is the program's instructor.
+ */
 export function instructorRows(enrollments: StudentEnrollment[]): InstructorRow[] {
   const rows = new Map<string, InstructorRow>()
   for (const e of enrollments) {
     if (!grantsAccess(e)) continue
-    const row = rows.get(e.instructorId) ?? {
-      instructorId: e.instructorId,
-      name: e.instructorName,
-      avatarUrl: e.instructorAvatarUrl,
-      headline: e.instructorHeadline,
-      canMessage: false,
-      isMentor: false,
+    const people =
+      e.faculty.length > 0
+        ? e.faculty
+        : [{ id: e.instructorId, name: e.instructorName, avatarUrl: e.instructorAvatarUrl, headline: e.instructorHeadline }]
+    for (const person of people) {
+      const row = rows.get(person.id) ?? {
+        instructorId: person.id,
+        name: person.name,
+        avatarUrl: person.avatarUrl,
+        headline: person.headline,
+        canMessage: false,
+        isMentor: false,
+      }
+      row.canMessage = row.canMessage || e.entitlements.instructorQa
+      row.isMentor = row.isMentor || isMentorEnrollment(e)
+      rows.set(person.id, row)
     }
-    row.canMessage = row.canMessage || e.entitlements.instructorQa
-    row.isMentor = row.isMentor || isMentorEnrollment(e)
-    rows.set(e.instructorId, row)
   }
   return [...rows.values()]
 }

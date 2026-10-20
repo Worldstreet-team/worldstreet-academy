@@ -6,6 +6,7 @@ import {
   Course,
   Enrollment,
   Lesson,
+  User,
   type ICoursePackage,
   type IPackageEntitlements,
   type PackageKey,
@@ -13,6 +14,7 @@ import {
 import { canAccessLesson, entitlementsFor } from "@/lib/entitlements"
 import type { CourseFormat } from "@/lib/course-format"
 import { safeWebUrl } from "@/lib/faculty"
+import { teachingFilter } from "@/lib/teaching"
 
 /**
  * Package-aware access for one student on one course — the single lookup the
@@ -96,9 +98,12 @@ export async function getCourseAccess(userId: string, courseId: string): Promise
 /**
  * Instructor Q&A gate for opening a NEW conversation. A student (role USER)
  * whose access-granting enrollments with this person all lack `instructorQa`
- * can't start a thread with them. Existing threads, staff, and people with no
- * enrollment with that instructor are unaffected. Returns the refusal message,
- * or null when the thread may be created.
+ * can't start a thread with them. "With this person" means a course they
+ * teach: one they own or, while faculty, one they are assigned to
+ * (lib/teaching.ts) — assigned faculty are gated exactly like the owner.
+ * Existing threads, staff, and people with no enrollment with that instructor
+ * are unaffected. Returns the refusal message, or null when the thread may be
+ * created.
  */
 export async function instructorQaRefusal(
   user: { id: string; role: string },
@@ -107,7 +112,11 @@ export async function instructorQaRefusal(
   if (user.role !== "USER") return null
   if (!mongoose.isValidObjectId(recipientId)) return null
   await connectDB()
-  const taught = await Course.find({ instructor: recipientId }).select("_id packages format").lean()
+  // Their role decides whether assignments count (an unknown account owns at most).
+  const recipient = await User.findById(recipientId).select("role").lean()
+  const taught = await Course.find(teachingFilter({ id: recipientId, role: recipient?.role ?? "USER" }))
+    .select("_id packages format")
+    .lean()
   if (taught.length === 0) return null
   const enrollments = await Enrollment.find({
     user: user.id,

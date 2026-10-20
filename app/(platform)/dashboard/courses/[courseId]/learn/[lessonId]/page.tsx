@@ -26,6 +26,7 @@ import { FinishCourseButton } from "@/components/learn/finish-course-button"
 import { CourseResources } from "@/components/learn/course-resources"
 import { PackageLockNotice } from "@/components/learn/package-lock-notice"
 import { PACKAGE_LABEL } from "@/lib/entitlements"
+import { assignedFacultyFor } from "@/lib/teaching"
 
 export default async function LessonPage({
   params,
@@ -63,7 +64,7 @@ export default async function LessonPage({
   const prevLesson = currentIndex > 0 ? lessons[currentIndex - 1] : null
   const nextLesson = currentIndex < lessons.length - 1 ? lessons[currentIndex + 1] : null
 
-  const [otherCourses, completedLessonIds, ratingSummary, userReview, watchProgress, communityUrl] = await Promise.all([
+  const [otherCourses, completedLessonIds, ratingSummary, userReview, watchProgress, communityUrl, facultyByCourse] = await Promise.all([
     fetchOtherCourses(courseId),
     getCompletedLessons(courseId),
     getCourseRatingSummary(courseId),
@@ -71,7 +72,11 @@ export default async function LessonPage({
     getCourseWatchProgress(courseId),
     // The class community is a private group: learners only, never staff previewing.
     classCommunityUrl(access),
+    assignedFacultyFor([courseId]),
   ])
+  // Who teaches it: the program's assigned faculty when it has any, else its owner (lib/teaching.ts).
+  const assigned = facultyByCourse.get(courseId)
+  const teachers = assigned ?? [{ id: course.instructorId, name: course.instructorName, avatarUrl: course.instructorAvatarUrl }]
 
   // Build a map of lessonId -> watch percent
   const watchProgressMap: Record<string, number> = {}
@@ -312,17 +317,18 @@ export default async function LessonPage({
             {/* Instructor & Course Interaction */}
             <Separator />
             <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
-              {/* Instructor */}
-              <div className="flex items-center gap-3">
+              {/* Instructor(s) */}
+              {teachers.map((teacher) => (
+              <div key={teacher.id} className="flex items-center gap-3">
                 <Avatar size="lg">
-                  {course.instructorAvatarUrl && (
+                  {teacher.avatarUrl && (
                     <AvatarImage
-                      src={course.instructorAvatarUrl}
-                      alt={course.instructorName}
+                      src={teacher.avatarUrl}
+                      alt={teacher.name}
                     />
                   )}
                   <AvatarFallback>
-                    {course.instructorName
+                    {teacher.name
                       .split(" ")
                       .map((n) => n[0])
                       .join("")}
@@ -330,20 +336,21 @@ export default async function LessonPage({
                 </Avatar>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm">
-                    {course.instructorName}
+                    {teacher.name}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     Course Instructor
                   </p>
                 </div>
                 {course.entitlements.instructorQa ? (
-                  <MessageInstructorButton instructorId={course.instructorId} />
+                  <MessageInstructorButton instructorId={teacher.id} />
                 ) : (
                   <p className="max-w-40 text-right text-[11px] leading-snug text-ws-muted">
                     Instructor Q&amp;A isn&apos;t in your plan
                   </p>
                 )}
               </div>
+              ))}
               
               {/* Rating */}
               <div className="pt-2 border-t">

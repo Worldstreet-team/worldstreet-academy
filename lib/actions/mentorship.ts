@@ -15,10 +15,11 @@ import {
 import { getCurrentUser } from "@/lib/auth/actions"
 import { getCourseAccess } from "@/lib/course-access"
 import { includesMentorship } from "@/lib/entitlements"
-import { notifyUser } from "@/lib/notify"
+import { notifyUser, notifyUsers } from "@/lib/notify"
 import { formatUtcDateTime, sendMentorshipEmail } from "@/lib/email"
 import { APP_URL } from "@/lib/app-url"
 import { createMeeting as createRTKMeeting, addParticipant } from "@/lib/realtime"
+import { assignedFacultyFor, courseTeacherIds, taughtCourseIds, teachesCourse, teachingFilter } from "@/lib/teaching"
 
 /*
  * Executive mentorship (spec §6): the student proposes times, the course
@@ -35,6 +36,8 @@ const MAX_AHEAD_MS = 60 * 24 * 3600_000
 /** A confirmed session the host never started reads "upcoming" this long past its time, then "past". */
 const SESSION_GRACE_MS = 2 * 3600_000
 const STUDENT_PATH = "/dashboard/mentorship"
+/** Who a student's unconfirmed request is with: never a name, since any of the program's faculty may answer it. */
+const REQUESTED_MENTOR = "Your program's faculty"
 const INSTRUCTOR_PATH = "/instructor/meetings"
 
 /* ═══════════════════ shared ═══════════════════ */
@@ -44,6 +47,7 @@ export type MentorshipSessionView = {
   courseId: string
   courseTitle: string
   studentName: string
+  /** Who runs it once confirmed; a neutral label while it is only requested. */
   instructorName: string
   status: "requested" | "upcoming" | "past" | "declined" | "cancelled"
   /** ISO times the student proposed. */
@@ -140,7 +144,10 @@ async function toViews(sessions: SessionLean[]): Promise<MentorshipSessionView[]
       courseId: s.course.toString(),
       courseTitle: titlesById.get(s.course.toString()) ?? "",
       studentName: fullName(usersById.get(s.student.toString()), "Student"),
-      instructorName: fullName(usersById.get(s.instructor.toString()), "Your mentor"),
+      // A request isn't anyone's yet (anyone who teaches the program may answer it);
+      // once confirmed, `instructor` is the one who runs the session.
+      instructorName:
+        s.status === "requested" ? REQUESTED_MENTOR : fullName(usersById.get(s.instructor.toString()), "Your mentor"),
       status,
       proposedSlots: (s.proposedSlots ?? []).map((slot) => slot.at.toISOString()),
       scheduledAt: s.scheduledAt ? s.scheduledAt.toISOString() : null,
@@ -157,6 +164,7 @@ async function toViews(sessions: SessionLean[]): Promise<MentorshipSessionView[]
 export type MentorshipProgram = {
   courseId: string
   courseTitle: string
+  /** The program's assigned faculty (lib/teaching.ts) when it has any, else its owner. */
   instructorName: string
   roadmap: { text: string; updatedAt: string } | null
   /** An unanswered request exists — the form stays closed until it's answered. */
@@ -191,10 +199,20 @@ export async function getMyMentorship(): Promise<MyMentorship> {
       const course = coursesById.get(enrollment.course.toString())
       return course && includesMentorship(course, enrollment) ? [{ enrollment, course }] : []
     })
-    const instructors = await User.find({ _id: { $in: mentored.map((m) => m.course.instructor) } })
-      .select("firstName lastName")
-      .lean()
+    const [instructors, faculty] = await Promise.all([
+      User.find({ _id: { $in: mentored.map((m) => m.course.instructor) } })
+        .select("firstName lastName")
+        .lean(),
+      // A program with assigned faculty is mentored by them, not its owner (lib/teaching.ts).
+      assignedFacultyFor(mentored.map((m) => m.course._id.toString())),
+    ])
     const instructorsById = new Map(instructors.map((u) => [u._id.toString(), u]))
+    const mentorName = (course: (typeof mentored)[number]["course"]) => {
+      const members = faculty.get(course._id.toString())
+      return members
+        ? members.map((m) => m.name).join(", ")
+        : fullName(instructorsById.get(course.instructor.toString()), "Your mentor")
+    }
     const openRequests = new Set(
       sessions.filter((s) => s.status === "requested").map((s) => s.enrollment.toString())
     )
@@ -203,7 +221,7 @@ export async function getMyMentorship(): Promise<MyMentorship> {
       programs: mentored.map(({ enrollment, course }) => ({
         courseId: course._id.toString(),
         courseTitle: course.title,
-        instructorName: fullName(instructorsById.get(course.instructor.toString()), "Your mentor"),
+        instructorName: mentorName(course),
         roadmap: enrollment.mentorRoadmap
           ? { text: enrollment.mentorRoadmap.text, updatedAt: enrollment.mentorRoadmap.updatedAt.toISOString() }
           : null,
@@ -271,29 +289,32 @@ export async function requestMentorshipSession(input: {
       throw error
     }
 
-    const [course, instructor] = await Promise.all([
+    // Everyone who teaches the program may answer it: its owner and its assigned faculty.
+    const teacherIds = await courseTeacherIds(access.course.id).catch(() => [access.course.instructorId])
+    const [course, teachers] = await Promise.all([
       Course.findById(access.course.id).select("title").lean(),
-      User.findById(access.course.instructorId).select("firstName email").lean(),
+      User.find({ _id: { $in: teacherIds } }).select("firstName email").lean(),
     ])
     const courseTitle = course?.title ?? "their program"
     const studentName = fullName(user, user.email)
     const proposed = times.map((t) => formatUtcDateTime(new Date(t))).join("; ")
 
-    void notifyUser(access.course.instructorId, {
+    void notifyUsers(teacherIds, {
       type: "meeting",
       title: "Mentorship session requested",
       body: `${studentName} (${courseTitle}) proposed: ${proposed}.`.slice(0, 500),
       href: INSTRUCTOR_PATH,
       courseId: access.course.id,
     })
-    if (mailable(instructor?.email)) {
-      void sendMentorshipEmail(instructor.email, {
+    for (const teacher of teachers) {
+      if (!mailable(teacher.email)) continue
+      void sendMentorshipEmail(teacher.email, {
         subject: "New mentorship session request",
         title: "A student asked for a session",
         bodyText: `${studentName} (${courseTitle}) proposed: ${proposed}. Confirm one from Meetings.`,
         ctaLabel: "Review request",
         ctaUrl: `${APP_URL}${INSTRUCTOR_PATH}`,
-        recipientName: instructor.firstName || undefined,
+        recipientName: teacher.firstName || undefined,
       })
     }
 
@@ -333,8 +354,12 @@ export async function cancelMentorshipSession(
     if (!session) return { success: false, error: "Session not found" }
     const isStudent = session.student.toString() === user.id
     // The instructor path needs a current staff role: a demoted instructor's raw POST can't act.
+    // A request is also answered by anyone who teaches the course (lib/teaching.ts); a
+    // confirmed session stays with the one who runs it (`instructor`).
     const isInstructor =
-      session.instructor.toString() === user.id && (user.role === "INSTRUCTOR" || user.role === "ADMIN")
+      (user.role === "INSTRUCTOR" || user.role === "ADMIN") &&
+      (session.instructor.toString() === user.id ||
+        (session.status === "requested" && Boolean(await teachesCourse(user, session.course.toString()))))
     if (!isStudent && !isInstructor) return { success: false, error: "Session not found" }
     if (session.status !== "requested" && session.status !== "confirmed") {
       return { success: false, error: "This session is already closed" }
@@ -435,7 +460,9 @@ export async function getMentorshipQueue(): Promise<MentorshipQueue> {
     const user = await getCurrentUser()
     if (!user || (user.role !== "INSTRUCTOR" && user.role !== "ADMIN")) return empty
 
-    const courses = await Course.find({ instructor: user.id }).select("title packages").lean()
+    // Owned and assigned programs (lib/teaching.ts). Requests are found by course too;
+    // a confirmed session is listed for the one who runs it (`instructor`).
+    const courses = await Course.find(teachingFilter(user)).select("title packages").lean()
     const [enrollments, requested, confirmed] = await Promise.all([
       Enrollment.find({
         course: { $in: courses.map((c) => c._id) },
@@ -447,7 +474,13 @@ export async function getMentorshipQueue(): Promise<MentorshipQueue> {
         .lean(),
       // Separate queries, each with its own limit: confirmed sessions never leave "confirmed"
       // (past is derived), so one shared list would push new requests past the limit.
-      MentorshipSession.find({ instructor: user.id, status: "requested" }).sort({ createdAt: 1 }).limit(100).lean(),
+      MentorshipSession.find({
+        $or: [{ instructor: user.id }, { course: { $in: courses.map((c) => c._id) } }],
+        status: "requested",
+      })
+        .sort({ createdAt: 1 })
+        .limit(100)
+        .lean(),
       MentorshipSession.find({
         instructor: user.id,
         status: "confirmed",
@@ -519,7 +552,12 @@ export async function confirmMentorshipSession(
       return { success: false, error: parsed.error.issues[0]?.message ?? "Check the form and try again" }
     }
 
-    const session = await MentorshipSession.findOne({ _id: parsed.data.sessionId, instructor: user.id }).lean()
+    // The session's instructor, or anyone who teaches its course (lib/teaching.ts).
+    const taught = await taughtCourseIds(user)
+    const session = await MentorshipSession.findOne({
+      _id: parsed.data.sessionId,
+      $or: [{ instructor: user.id }, { course: { $in: taught } }],
+    }).lean()
     if (!session) return { success: false, error: "Session not found" }
     if (session.status !== "requested") return { success: false, error: "This request was already answered" }
 
@@ -592,9 +630,13 @@ export async function confirmMentorshipSession(
       },
     })
 
+    // Whoever confirms runs the session: `instructor` moves to them in the same
+    // filtered claim, so it keeps meaning "who runs it" (cancel and the lists read it).
+    // The claim itself also requires a course the confirmer teaches, so a removal or
+    // demotion since the read can't slip a confirmation through.
     const claimed = await MentorshipSession.findOneAndUpdate(
-      { _id: session._id, status: "requested" },
-      { $set: { status: "confirmed", scheduledAt, meetingId: meeting._id } },
+      { _id: session._id, status: "requested", course: { $in: taught } },
+      { $set: { status: "confirmed", scheduledAt, meetingId: meeting._id, instructor: new Types.ObjectId(user.id) } },
       { new: true }
     )
     if (!claimed) {
@@ -651,8 +693,11 @@ export async function saveMentorRoadmap(
 
     const enrollment = await Enrollment.findById(parsed.data.enrollmentId).select("user course packageKey status").lean()
     if (!enrollment) return { success: false, error: "Student not found" }
-    const course = await Course.findById(enrollment.course).select("instructor packages title").lean()
-    if (!course || course.instructor.toString() !== user.id) return { success: false, error: "Student not found" }
+    // Its owner or its teaching faculty (lib/teaching.ts).
+    const course = await Course.findOne({ _id: enrollment.course, ...teachingFilter(user) })
+      .select("instructor packages title")
+      .lean()
+    if (!course) return { success: false, error: "Student not found" }
     if ((enrollment.status !== "active" && enrollment.status !== "completed") || !includesMentorship(course, enrollment)) {
       return { success: false, error: "This student's plan doesn't include mentorship" }
     }

@@ -68,7 +68,7 @@ function RequestForm({ program, onSent }: { program: MentorshipProgram; onSent: 
       }}
     >
       <p className="text-[13px] text-ws-muted">
-        Propose up to three times that suit you. {program.instructorName} confirms one.
+        Propose up to three times that suit you. Your mentor confirms one.
       </p>
       <div className="grid gap-4 sm:grid-cols-3">
         {slots.map((value, i) => (
@@ -148,7 +148,7 @@ function ProgramCard({ program, onChanged }: { program: MentorshipProgram; onCha
         </h3>
         {program.hasOpenRequest ? (
           <p className="text-[13px] text-ws-muted">
-            Your request is with {program.instructorName}. You&apos;ll get a notification when they confirm a time.
+            Waiting for your program&apos;s faculty to confirm a time. You&apos;ll get a notification when they do.
           </p>
         ) : (
           <RequestForm program={program} onSent={onChanged} />

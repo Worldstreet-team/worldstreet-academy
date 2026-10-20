@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation"
 import { fetchCourseForEdit } from "@/lib/actions/instructor"
 import { CourseEditor } from "@/components/instructor/course-editor"
+import { TeachingFacultyCard } from "@/components/admin/teaching-faculty-card"
 
 /**
  * Admin course editing. fetchCourseForEdit is ownership-scoped for
@@ -31,11 +32,20 @@ export default async function AdminEditCoursePage({
   }))
 
   return (
-    <CourseEditor
-      adminMode
-      returnTo="/admin/courses"
-      course={data.course}
-      existingLessons={lessons}
-    />
+    <>
+      <CourseEditor
+        adminMode
+        returnTo="/admin/courses"
+        course={data.course}
+        existingLessons={lessons}
+      />
+      {data.course.kind === "program" && (
+        <div className="px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-8 sm:px-6 md:px-8 md:pb-12 lg:px-12">
+          <div className="mx-auto w-full max-w-3xl">
+            <TeachingFacultyCard courseId={courseId} courseTitle={data.course.title} />
+          </div>
+        </div>
+      )}
+    </>
   )
 }

@@ -22,8 +22,9 @@ import { getCurrentUser } from "@/lib/auth/actions"
 import { courseAvailability } from "@/lib/types/course"
 import { sendEnrollmentConfirmationEmail } from "@/lib/email"
 import { sendWelcomeOnce } from "@/lib/welcome-email"
-import { notifyAdmins, notifyUser } from "@/lib/notify"
+import { notifyAdmins, notifyUser, notifyUsers } from "@/lib/notify"
 import { getCourseAccess, isLessonLockedFor, lockedLessonIds } from "@/lib/course-access"
+import { courseTeacherIds } from "@/lib/teaching"
 import { saveWithCertificateId } from "@/lib/certificate-id"
 import { POINTS, awardPoints, pointKey } from "@/lib/points"
 import { PACKAGE_KEYS, packageFor, sellsPackages } from "@/lib/entitlements"
@@ -939,59 +940,6 @@ export async function preEnrollCourse(courseId: string): Promise<PreEnrollResult
   }
 }
 
-/**
- * Get course students (for instructor)
- */
-export async function getCourseStudents(
-  courseId: string,
-  instructorId: string
-) {
-  try {
-    await connectDB()
-
-    // Verify course ownership
-    const course = await Course.findOne({
-      _id: courseId,
-      instructor: instructorId,
-    })
-
-    if (!course) {
-      return { success: false, error: "Course not found or unauthorized" }
-    }
-
-    const enrollments = await Enrollment.find({ course: courseId })
-      .populate("user", "firstName lastName email")
-      .sort({ purchasedAt: -1 })
-      .lean()
-
-    return {
-      success: true,
-      data: enrollments.map((e) => {
-        const user = e.user as unknown as {
-          _id: { toString(): string }
-          firstName: string
-          lastName: string
-          email: string
-        }
-
-        return {
-          id: e._id.toString(),
-          userId: user._id.toString(),
-          name: `${user.firstName} ${user.lastName}`,
-          email: user.email,
-          progress: e.progress,
-          status: e.status,
-          enrolledAt: e.purchasedAt.toISOString(),
-          completedAt: e.completedAt?.toISOString() || null,
-        }
-      }),
-    }
-  } catch (error) {
-    console.error("Get course students error:", error)
-    return { success: false, error: "Failed to get students" }
-  }
-}
-
 // ============================================================================
 // CHECKOUT CONFIRMATION (spec §12, §17 "Enrollment confirmed")
 // ============================================================================
@@ -1075,13 +1023,19 @@ export async function submitMentorshipIntake(
     if (!updated) return { success: false, error: "You've already sent your intake" }
 
     const buyer = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.email
-    void notifyUser(access.course.instructorId, {
-      type: "course",
-      title: "Executive intake received",
-      body: `${buyer}: ${parsed.data.goals}`.slice(0, 500),
-      href: `/instructor/courses/${courseId}`,
-      courseId: String(courseId),
-    })
+    // The owner and the program's assigned faculty, who run its mentorship.
+    void courseTeacherIds(access.course.id)
+      .catch(() => [access.course.instructorId])
+      .then((ids) =>
+        notifyUsers(ids, {
+          type: "course",
+          title: "Executive intake received",
+          body: `${buyer}: ${parsed.data.goals}`.slice(0, 500),
+          // The student's page: the owner and assigned faculty can both open it.
+          href: `/instructor/students/${access.enrollmentId}`,
+          courseId: String(courseId),
+        })
+      )
 
     revalidatePath("/dashboard/checkout/success")
     return { success: true }

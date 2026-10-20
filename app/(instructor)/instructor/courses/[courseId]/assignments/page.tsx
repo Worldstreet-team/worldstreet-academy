@@ -313,11 +313,11 @@ export default function InstructorAssignmentsPage() {
       <div className="flex-1 px-4 sm:px-6 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-8 md:px-8 md:pb-12 lg:px-12">
         <div className="mx-auto w-full max-w-4xl space-y-6">
           <Link
-            href={`/instructor/courses/${courseId}`}
+            href={data && !data.owned ? "/instructor/courses" : `/instructor/courses/${courseId}`}
             className="inline-flex h-10 items-center gap-1.5 text-[13px] font-medium text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:text-ws-primary"
           >
             <ArrowLeft size={14} strokeWidth={2} aria-hidden />
-            Back to course
+            {data && !data.owned ? "Back to courses" : "Back to course"}
           </Link>
           <PageHeader
             title="Assignments"

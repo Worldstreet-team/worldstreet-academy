@@ -11,6 +11,7 @@ import { getCourseAccess } from "@/lib/course-access"
 import { entitlementsFor } from "@/lib/entitlements"
 import { POINTS, awardPoints, gradePoints, pointKey } from "@/lib/points"
 import { ensureCertificateTier } from "@/lib/certificate-standing"
+import { courseTeacherIds, teachesCourse, teachingFilter } from "@/lib/teaching"
 import {
   generatePresignedDownloadUrl,
   generatePresignedUploadUrl,
@@ -33,16 +34,15 @@ const MAX_SUBMISSION_FILES = 3
 type Viewer = { id: string; role: string }
 
 /**
- * The course instructor or an admin — the authoring and grading gate.
+ * Whoever teaches the course (its instructor or its assigned faculty,
+ * lib/teaching.ts) or an admin — the authoring and grading gate.
  * Faculty only: a marketplace seller owns courses too, but assignments are a
  * faculty tool.
  */
 async function courseStaff(user: Viewer, courseId: string) {
   if (user.role !== "INSTRUCTOR" && user.role !== "ADMIN") return null
-  const course = await Course.findById(courseId).select("instructor title").lean()
-  if (!course) return null
-  if (course.instructor.toString() !== user.id && user.role !== "ADMIN") return null
-  return course
+  if (user.role === "ADMIN") return Course.findById(courseId).select("instructor title").lean()
+  return teachesCourse(user, courseId, "instructor title")
 }
 
 function fullName(person: { firstName?: string | null; lastName?: string | null } | null | undefined, fallback: string) {
@@ -76,7 +76,12 @@ export type InstructorAssignment = {
   submissions: InstructorSubmission[]
 }
 
-export type CourseAssignments = { courseTitle: string; assignments: InstructorAssignment[] }
+export type CourseAssignments = {
+  courseTitle: string
+  /** The caller owns the course or is an admin, so its course page opens; assigned faculty go back to My Courses. */
+  owned: boolean
+  assignments: InstructorAssignment[]
+}
 
 export async function getCourseAssignments(courseId: string): Promise<CourseAssignments | null> {
   try {
@@ -118,6 +123,7 @@ export async function getCourseAssignments(courseId: string): Promise<CourseAssi
 
     return {
       courseTitle: course.title,
+      owned: user.role === "ADMIN" || course.instructor.toString() === user.id,
       assignments: assignments.map((a) => ({
         id: a._id.toString(),
         title: a.title,
@@ -163,7 +169,7 @@ export async function getMyAssignments(): Promise<
     if (!user) return { success: false, error: "You need to be signed in" }
     if (user.role !== "INSTRUCTOR" && user.role !== "ADMIN") return { success: false, error: "Instructors only" }
 
-    const courses = await Course.find({ instructor: user.id }).select("title").lean()
+    const courses = await Course.find(teachingFilter(user)).select("title").lean()
     if (courses.length === 0) return { success: true, data: { programs: 0, rows: [] } }
     const titleOf = new Map(courses.map((c) => [c._id.toString(), c.title as string]))
 
@@ -704,13 +710,18 @@ export async function submitAssignment(input: {
       })
     }
 
-    void notifyUser(gate.access.course.instructorId, {
-      type: "course",
-      title: "New assignment submission",
-      body: `${fullName(user, "A student")} submitted ${gate.assignment.title}.`.slice(0, 500),
-      href: `/instructor/courses/${gate.assignment.course.toString()}/assignments`,
-      courseId: gate.assignment.course.toString(),
-    })
+    // The owner and the program's assigned faculty all grade it.
+    void courseTeacherIds(gate.assignment.course.toString())
+      .catch(() => [gate.access.course.instructorId])
+      .then((ids) =>
+        notifyUsers(ids, {
+          type: "course",
+          title: "New assignment submission",
+          body: `${fullName(user, "A student")} submitted ${gate.assignment.title}.`.slice(0, 500),
+          href: `/instructor/courses/${gate.assignment.course.toString()}/assignments`,
+          courseId: gate.assignment.course.toString(),
+        })
+      )
 
     revalidatePath(`/dashboard/assignments/${parsed.data.assignmentId}`)
     revalidatePath(`/instructor/courses/${gate.assignment.course.toString()}/assignments`)

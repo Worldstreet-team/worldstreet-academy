@@ -25,6 +25,7 @@ import type { CohortView } from "@/lib/cohort-rules"
 import { safeWebUrl } from "@/lib/faculty"
 import { referralSummary } from "@/lib/referrals"
 import { schoolFromSlug } from "@/lib/schools"
+import { teachingFilter } from "@/lib/teaching"
 
 /*
  * The tutor home (/instructor) in one read: the class to start next (or the
@@ -101,6 +102,8 @@ export type CohortCard = {
   communityUrl: string | null
   /** Program courses only: learners per cohort (D20), ascending by cohort number, zeros left out. */
   cohortCounts: { name: string; count: number }[]
+  /** False for a program you're assigned to teach (lib/teaching.ts): no course page or editor, so the card links to its assignments. */
+  owned: boolean
   manageHref: string
 }
 
@@ -195,13 +198,13 @@ export async function getTeachingHome(input: {
     const windowFrom = new Date(Math.min(weekStart.getTime(), now - LATE_HOST_GRACE_MS))
     const lateCutoff = new Date(now - LATE_HOST_GRACE_MS)
 
-    // Every read is scoped to the caller — by hostId or instructor, never by an id from the browser.
+    // Every read is scoped to the caller — by hostId, instructor or teaching (lib/teaching.ts), never by an id from the browser.
     const me = new Types.ObjectId(user.id)
 
-    const [courses, meetings, nextByCourse, requestsByCourse, earningGroups, referrals] = await Promise.all([
-      Course.find({ instructor: me })
-        .select("title slug school kind status thumbnailUrl enrolledCount communityUrl packages format")
-        .lean(),
+    const courses = await Course.find(teachingFilter(user))
+      .select("instructor title slug school kind status thumbnailUrl enrolledCount communityUrl packages format")
+      .lean()
+    const [meetings, nextByCourse, requestsByCourse, earningGroups, referrals] = await Promise.all([
       // The week's classes and sessions, plus anything live right now.
       Meeting.find({
         hostId: me,
@@ -235,9 +238,9 @@ export async function getTeachingHome(input: {
           },
         },
       ]),
-      // Unanswered mentorship requests — getMentorshipQueue's "requests".
+      // Unanswered mentorship requests — getMentorshipQueue's "requests" (theirs, or on a course they teach).
       MentorshipSession.aggregate<{ _id: Types.ObjectId; count: number; oldest: Date }>([
-        { $match: { instructor: me, status: "requested" } },
+        { $match: { $or: [{ instructor: me }, { course: { $in: courses.map((c) => c._id) } }], status: "requested" } },
         { $group: { _id: "$course", count: { $sum: 1 }, oldest: { $min: "$createdAt" } } },
       ]),
       // The ledger getMyInstructorEarnings totals, grouped once.
@@ -260,6 +263,7 @@ export async function getTeachingHome(input: {
     ])
 
     const courseById = new Map(courses.map((c) => [c._id.toString(), c]))
+    const isOwned = (c: (typeof courses)[number]) => c.instructor.toString() === user.id
     const taught = courses.filter((c) => c.status !== "draft" && c.status !== "archived")
     const taughtIds = taught.map((c) => c._id)
 
@@ -476,7 +480,8 @@ export async function getTeachingHome(input: {
           latestRecording: recording ? { status: recording.status, recordedAt: recording.recordedAt.toISOString() } : null,
           communityUrl: safeWebUrl(c.communityUrl),
           cohortCounts: [...(countsByCourse.get(id) ?? [])].sort(([a], [b]) => a - b).map(([, tally]) => tally),
-          manageHref: `/instructor/courses/${id}`,
+          owned: isOwned(c),
+          manageHref: isOwned(c) ? `/instructor/courses/${id}` : `/instructor/courses/${id}/assignments`,
         }
       })
       .sort((a, b) => {
@@ -539,7 +544,7 @@ export async function getTeachingHome(input: {
         hero,
         week,
         cohorts,
-        draftCount: courses.filter((c) => c.status === "draft").length,
+        draftCount: courses.filter((c) => c.status === "draft" && isOwned(c)).length,
         teachesProgram: taught.some((c) => courseKindOf(c) === "program"),
         nextCohort: calendar.next,
         todo,

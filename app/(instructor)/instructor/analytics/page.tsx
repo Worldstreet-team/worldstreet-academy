@@ -18,10 +18,13 @@ import { formatMinor } from "@/lib/teaching-home"
 
 export default function AnalyticsPage() {
   const { data: courses = [], isLoading } = useInstructorCourses()
-  const { data: certStats = [], isLoading: isLoadingStats } = useQuery({
+  const { data: taughtStats = [], isLoading: isLoadingStats } = useQuery({
     queryKey: ["instructor", "certificates"],
     queryFn: () => fetchInstructorCertificateStats(),
   })
+  // Analytics covers the courses you own; programs you're assigned to teach list on Certificates.
+  const ownedIds = new Set(courses.map((c) => c.id))
+  const certStats = taughtStats.filter((c) => ownedIds.has(c.courseId))
   const { data: earnings } = useQuery({
     queryKey: ["instructor", "earnings"],
     queryFn: () => getMyInstructorEarnings(),

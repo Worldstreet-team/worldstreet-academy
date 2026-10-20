@@ -25,6 +25,8 @@ import { courseAvailability } from "@/lib/types/course"
 import { getCurrentUser } from "@/lib/auth"
 import { LessonPreviewAccordion } from "@/components/courses/lesson-preview-accordion"
 import { AboutInstructor } from "@/components/courses/about-instructor"
+import { ProgramFaculty } from "@/components/courses/program-faculty"
+import { assignedFacultyFor } from "@/lib/teaching"
 import { BookmarkButton } from "@/components/courses/bookmark-button"
 import { CourseResources } from "@/components/learn/course-resources"
 import { RecordingsList } from "@/components/recordings/recordings-list"
@@ -92,13 +94,16 @@ export default async function CourseDetailPage({
   const waiting = isEnrolled && !start
 
   // Fetch instructor courses + recommendations in parallel
-  const [instructorCourses, enrolledFromInstructor, otherCourses, program, calendar] = await Promise.all([
+  const [instructorCourses, enrolledFromInstructor, otherCourses, program, calendar, facultyByCourse] = await Promise.all([
     fetchInstructorPublicCourses(course.instructorId),
     fetchEnrolledCoursesFromInstructor(course.instructorId).catch(() => []),
     fetchOtherCourses(courseId),
     fetchProgramById(courseId),
     getCohortCalendar(),
+    // Assigned faculty teach the program, so they stand in for its owner here (lib/teaching.ts).
+    assignedFacultyFor([courseId]),
   ])
+  const faculty = facultyByCourse.get(courseId) ?? []
 
   // Q&A follows the package; visitors without an enrollment keep today's behaviour.
   const courseAccess = currentUser ? await getCourseAccess(currentUser.id, courseId) : null
@@ -446,7 +451,13 @@ export default async function CourseDetailPage({
             {/* Recordings of past live classes — only when the plan includes recorded classes (checked server-side). */}
             {(isEnrolled || isStaff) && <RecordingsList courseId={course.id} />}
 
-            {/* About Instructor */}
+            {/* About Instructor — the program's assigned faculty when it has any, else its owner */}
+            {faculty.length > 0 ? (
+              <ProgramFaculty
+                members={faculty}
+                canMessage={courseAccess ? courseAccess.entitlements.instructorQa : true}
+              />
+            ) : (
             <AboutInstructor
               instructorId={course.instructorId}
               instructorName={course.instructorName}
@@ -459,6 +470,7 @@ export default async function CourseDetailPage({
               averageRating={instructorAvgRating}
               canMessage={courseAccess ? courseAccess.entitlements.instructorQa : true}
             />
+            )}
           </div>
 
           {/* Related courses */}
