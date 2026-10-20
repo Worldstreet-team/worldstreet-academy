@@ -4,18 +4,15 @@ import { schoolSlugOf, type SchoolSlug } from "@/lib/schools"
  * Cover art for the seven schools: static, code-owned files under
  * `public/art/schools/`. A slug missing here has no cover yet and every
  * surface falls back to the school's icon, so art lands one file at a time.
- * Add an entry only in the same commit as its file. Two covers are
- * placeholders until real renders land (content debt): Entrepreneurship &
- * Wealth Creation reuses the data-analytics growth chart, Leadership &
- * Personal Development the cybersecurity padlock.
+ * Add an entry only in the same commit as its file.
  */
 export const SCHOOL_COVERS: Partial<Record<SchoolSlug, string>> = {
   "trading-financial-markets": "/art/schools/trading-financial-markets.webp",
   "technology-ai": "/art/schools/ai-automation.webp",
   "digital-business": "/art/schools/digital-business-remote-careers.webp",
-  "entrepreneurship-wealth-creation": "/art/schools/data-analytics.webp",
+  "entrepreneurship-wealth-creation": "/art/schools/entrepreneurship-wealth-creation.webp",
   "creative-economy": "/art/schools/digital-media-creative.webp",
-  "leadership-personal-development": "/art/schools/cybersecurity.webp",
+  "leadership-personal-development": "/art/schools/leadership-personal-development.webp",
   "emerging-technologies": "/art/schools/blockchain-web3.webp",
 }
 
