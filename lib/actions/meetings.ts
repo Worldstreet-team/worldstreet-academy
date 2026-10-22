@@ -41,6 +41,30 @@ function backgroundSave(promise: Promise<unknown>) {
   promise.catch((err) => console.error("[Meeting] Background save failed:", err))
 }
 
+/**
+ * Who hears an in-room event (chat, poll, vote, reaction, hand): the host and
+ * every admitted participant, minus the sender. null when the sender is
+ * neither: only people in the room speak into it, and the server, never a
+ * client-sent list, picks the audience.
+ */
+async function roomAudience(meetingId: string, senderId: string): Promise<string[] | null> {
+  if (!Types.ObjectId.isValid(meetingId)) return null
+  const meeting = await Meeting.findById(meetingId).select("participants.userId participants.status hostId").lean()
+  if (!meeting) return null
+  const hostId = meeting.hostId.toString()
+  const admitted = meeting.participants.filter((p) => p.status === "admitted").map((p) => p.userId.toString())
+  if (senderId !== hostId && !admitted.includes(senderId)) return null
+  return [...new Set([hostId, ...admitted])].filter((id) => id !== senderId)
+}
+
+/** The meeting when the caller hosts it and `targetId` is admitted to it — for host-only controls. */
+async function hostedRoomWith(meetingId: string, hostId: string, targetId: string) {
+  if (!Types.ObjectId.isValid(meetingId)) return null
+  const meeting = await Meeting.findById(meetingId).select("participants.userId participants.status hostId").lean()
+  if (!meeting || meeting.hostId.toString() !== hostId) return null
+  return meeting.participants.some((p) => p.userId.toString() === targetId && p.status === "admitted") ? meeting : null
+}
+
 // ── Types ──
 
 export type MeetingRole = "host" | "co-host" | "participant" | "guest"
@@ -1195,23 +1219,18 @@ export async function removeFromStage(
 // ── Request to join stage (guest only) ──
 
 export async function requestStage(
-  meetingId: string,
-  cachedParticipantIds?: string[]
+  meetingId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
 
-    let hostId: string
-    if (cachedParticipantIds) {
-      // We still need hostId even with cache
-      const meeting = await Meeting.findById(meetingId).select("hostId").lean()
-      if (!meeting) return { success: false, error: "Meeting not found" }
-      hostId = meeting.hostId.toString()
-    } else {
-      const meeting = await Meeting.findById(meetingId).select("hostId participants").lean()
-      if (!meeting) return { success: false, error: "Meeting not found" }
-      hostId = meeting.hostId.toString()
+    if (!Types.ObjectId.isValid(meetingId)) return { success: false, error: "Meeting not found" }
+    const meeting = await Meeting.findById(meetingId).select("hostId participants.userId participants.status").lean()
+    if (!meeting) return { success: false, error: "Meeting not found" }
+    const hostId = meeting.hostId.toString()
+    if (!meeting.participants.some((p) => p.userId.toString() === currentUser.id && p.status === "admitted")) {
+      return { success: false, error: "You're not in this meeting" }
     }
 
     const eventPayload: MeetingEventPayload = {
@@ -1466,34 +1485,15 @@ export async function deleteMeetingHistory(
 
 export async function toggleHandRaise(
   meetingId: string,
-  raised: boolean,
-  /** Pass from client state to skip DB lookup entirely */
-  cachedParticipantIds?: string[]
+  raised: boolean
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
 
-    let targetIds: string[]
-
-    if (cachedParticipantIds?.length) {
-      // Use client-provided IDs — skip DB read entirely (~50-200ms saved)
-      targetIds = cachedParticipantIds.filter((id) => id !== currentUser.id)
-    } else {
-      // Fallback: lightweight projection query
-      const meeting = await Meeting.findById(meetingId)
-        .select("participants.userId participants.status hostId")
-        .lean()
-      if (!meeting) return { success: false, error: "Meeting not found" }
-
-      targetIds = meeting.participants
-        .filter((p) => p.status === "admitted" && p.userId.toString() !== currentUser.id)
-        .map((p) => p.userId.toString())
-      const hostId = meeting.hostId.toString()
-      if (hostId !== currentUser.id && !targetIds.includes(hostId)) {
-        targetIds.push(hostId)
-      }
-    }
+    // The client's cached participant list is ignored: the audience comes from the meeting.
+    const targetIds = await roomAudience(meetingId, currentUser.id)
+    if (!targetIds) return { success: false, error: "You're not in this meeting" }
 
     const eventPayload: MeetingEventPayload = {
       type: raised ? "meeting:hand-raised" : "meeting:hand-lowered",
@@ -1516,33 +1516,15 @@ export async function toggleHandRaise(
 
 export async function sendReaction(
   meetingId: string,
-  emoji: string,
-  /** Pass from client state to skip DB lookup entirely */
-  cachedParticipantIds?: string[]
+  emoji: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
 
-    let targetIds: string[]
-
-    if (cachedParticipantIds?.length) {
-      // Use client-provided IDs — skip DB read entirely
-      targetIds = cachedParticipantIds.filter((id) => id !== currentUser.id)
-    } else {
-      // Fallback: lightweight projection query
-      const meeting = await Meeting.findById(meetingId)
-        .select("participants.userId participants.status hostId")
-        .lean()
-      if (!meeting) return { success: false, error: "Meeting not found" }
-
-      targetIds = meeting.participants
-        .filter((p) => p.status === "admitted" && p.userId.toString() !== currentUser.id)
-        .map((p) => p.userId.toString())
-      if (meeting.hostId.toString() !== currentUser.id && !targetIds.includes(meeting.hostId.toString())) {
-        targetIds.push(meeting.hostId.toString())
-      }
-    }
+    // The client's cached participant list is ignored: the audience comes from the meeting.
+    const targetIds = await roomAudience(meetingId, currentUser.id)
+    if (!targetIds) return { success: false, error: "You're not in this meeting" }
 
     const eventPayload: MeetingEventPayload = {
       type: "meeting:reaction",
@@ -1613,28 +1595,15 @@ export async function sendMeetingChat(
   meetingId: string,
   message: string,
   imageUrl?: string,
-  videoUrl?: string,
-  cachedParticipantIds?: string[]
+  videoUrl?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
 
-    let targetIds: string[]
-    if (cachedParticipantIds?.length) {
-      targetIds = cachedParticipantIds.filter((id) => id !== currentUser.id)
-    } else {
-      const meeting = await Meeting.findById(meetingId)
-        .select("participants.userId participants.status hostId")
-        .lean()
-      if (!meeting) return { success: false, error: "Meeting not found" }
-      targetIds = meeting.participants
-        .filter((p) => p.status === "admitted" && p.userId.toString() !== currentUser.id)
-        .map((p) => p.userId.toString())
-      if (meeting.hostId.toString() !== currentUser.id && !targetIds.includes(meeting.hostId.toString())) {
-        targetIds.push(meeting.hostId.toString())
-      }
-    }
+    // The client's cached participant list is ignored: the audience comes from the meeting.
+    const targetIds = await roomAudience(meetingId, currentUser.id)
+    if (!targetIds) return { success: false, error: "You're not in this meeting" }
 
     const eventPayload: MeetingEventPayload = {
       type: "meeting:chat",
@@ -1663,28 +1632,15 @@ export async function createMeetingPoll(
   meetingId: string,
   question: string,
   options: string[],
-  cachedParticipantIds?: string[],
   clientPollId?: string,
 ): Promise<{ success: boolean; pollId?: string; error?: string }> {
   try {
     const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
 
-    let targetIds: string[]
-    if (cachedParticipantIds?.length) {
-      targetIds = cachedParticipantIds.filter((id) => id !== currentUser.id)
-    } else {
-      const meeting = await Meeting.findById(meetingId)
-        .select("participants.userId participants.status hostId")
-        .lean()
-      if (!meeting) return { success: false, error: "Meeting not found" }
-      targetIds = meeting.participants
-        .filter((p) => p.status === "admitted" && p.userId.toString() !== currentUser.id)
-        .map((p) => p.userId.toString())
-      if (meeting.hostId.toString() !== currentUser.id && !targetIds.includes(meeting.hostId.toString())) {
-        targetIds.push(meeting.hostId.toString())
-      }
-    }
+    // The client's cached participant list is ignored: the audience comes from the meeting.
+    const targetIds = await roomAudience(meetingId, currentUser.id)
+    if (!targetIds) return { success: false, error: "You're not in this meeting" }
 
     const pollId = clientPollId || `poll-${Date.now()}-${currentUser.id}`
     const eventPayload: MeetingEventPayload = {
@@ -1713,28 +1669,15 @@ export async function createMeetingPoll(
 export async function voteMeetingPoll(
   meetingId: string,
   pollId: string,
-  optionIndex: number,
-  cachedParticipantIds?: string[]
+  optionIndex: number
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
 
-    let targetIds: string[]
-    if (cachedParticipantIds?.length) {
-      targetIds = cachedParticipantIds.filter((id) => id !== currentUser.id)
-    } else {
-      const meeting = await Meeting.findById(meetingId)
-        .select("participants.userId participants.status hostId")
-        .lean()
-      if (!meeting) return { success: false, error: "Meeting not found" }
-      targetIds = meeting.participants
-        .filter((p) => p.status === "admitted" && p.userId.toString() !== currentUser.id)
-        .map((p) => p.userId.toString())
-      if (meeting.hostId.toString() !== currentUser.id && !targetIds.includes(meeting.hostId.toString())) {
-        targetIds.push(meeting.hostId.toString())
-      }
-    }
+    // The client's cached participant list is ignored: the audience comes from the meeting.
+    const targetIds = await roomAudience(meetingId, currentUser.id)
+    if (!targetIds) return { success: false, error: "You're not in this meeting" }
 
     const eventPayload: MeetingEventPayload = {
       type: "meeting:poll-vote",
@@ -1766,6 +1709,9 @@ export async function muteParticipant(
   try {
     const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
+    if (!(await hostedRoomWith(meetingId, currentUser.id, userId))) {
+      return { success: false, error: "Only the host can mute participants" }
+    }
 
     const eventPayload: MeetingEventPayload = {
       type: "meeting:mute-participant",
@@ -1795,6 +1741,9 @@ export async function toggleScreenSharePermission(
   try {
     const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
+    if (!(await hostedRoomWith(meetingId, currentUser.id, userId))) {
+      return { success: false, error: "Only the host can change screen sharing" }
+    }
 
     const eventPayload: MeetingEventPayload = {
       type: "meeting:screen-share-permission",
@@ -1829,6 +1778,10 @@ export async function broadcastSpeakingLevel(
     if (!meeting) return { success: false, error: "Meeting not found" }
 
     const participants = (meeting.participants ?? []) as unknown as IMeetingParticipant[]
+    const inRoom =
+      meeting.hostId.toString() === currentUser.id ||
+      participants.some((p) => p.status === "admitted" && p.userId.toString() === currentUser.id)
+    if (!inRoom) return { success: false, error: "You're not in this meeting" }
     const admitted = participants.filter(
       (p) => p.status === "admitted" && p.userId.toString() !== currentUser.id
     )
@@ -2122,6 +2075,10 @@ export async function inviteByEmail(
 
 // ── Search users by email (for invite autocomplete) ──
 
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
 export async function searchUsersByEmail(
   query: string,
   meetingId: string,
@@ -2140,11 +2097,18 @@ export async function searchUsersByEmail(
     const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
     if (!query.trim() || query.length < 3) return { success: true, users: [] }
+    if (!Types.ObjectId.isValid(meetingId)) return { success: false, error: "Meeting not found" }
+
+    // Only the host searches, to invite to their own room (as inviteByEmail).
+    const host = await Meeting.findById(meetingId).select("hostId courseId mentorshipSessionId").lean()
+    if (!host || host.hostId.toString() !== currentUser.id || !(await hostTeachesClass(host, currentUser))) {
+      return { success: false, error: "Only the host can invite people" }
+    }
 
     const [meeting, users] = await Promise.all([
       Meeting.findById(meetingId).select("participants invites").lean(),
       User.find({
-        email: { $regex: query.trim(), $options: "i" },
+        email: { $regex: escapeRegex(query.trim()), $options: "i" },
         _id: { $ne: new Types.ObjectId(currentUser.id) },
       })
         .select("firstName lastName email avatarUrl")

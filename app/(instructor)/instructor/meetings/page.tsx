@@ -1333,7 +1333,7 @@ export default function InstructorMeetingsPage() {
     const q = pollQuestion
     setPollQuestion("")
     setPollOptions(["", ""])
-    await createMeetingPoll(activeMeeting.id, q, opts, undefined, pollId)
+    await createMeetingPoll(activeMeeting.id, q, opts, pollId)
   }
 
   async function handleVotePoll(pollId: string, optionIndex: number) {

@@ -283,6 +283,10 @@ export async function sendMessage(
   }
 }
 
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
 // Search users to start a conversation with
 export async function searchUsers(query: string): Promise<{
   success: boolean
@@ -300,13 +304,16 @@ export async function searchUsers(query: string): Promise<{
       return { success: true, users: [] }
     }
 
+    // Typed text is matched literally (never as a pattern), and an email only
+    // in full — a partial one would list who has an account.
+    const rx = new RegExp(escapeRegex(query.trim()), "i")
     const users = await User.find({
       _id: { $ne: new Types.ObjectId(currentUser.id) },
       $or: [
-        { firstName: { $regex: query, $options: "i" } },
-        { lastName: { $regex: query, $options: "i" } },
-        { username: { $regex: query, $options: "i" } },
-        { email: { $regex: query, $options: "i" } },
+        { firstName: rx },
+        { lastName: rx },
+        { username: rx },
+        { email: query.trim().toLowerCase() },
       ],
     })
       .limit(10)

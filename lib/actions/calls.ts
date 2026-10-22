@@ -458,6 +458,14 @@ export async function getCallHistory(conversationId: string): Promise<{
     const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
 
+    if (!Types.ObjectId.isValid(conversationId)) return { success: false, error: "Conversation not found" }
+    // Only a participant reads a conversation's calls.
+    const inConversation = await Conversation.exists({
+      _id: conversationId,
+      participants: new Types.ObjectId(currentUser.id),
+    })
+    if (!inConversation) return { success: false, error: "Conversation not found" }
+
     const calls = await Call.find({
       conversationId: new Types.ObjectId(conversationId),
     })
@@ -559,7 +567,9 @@ export async function getCallStatus(callId: string): Promise<{
     if (!currentUser) return { success: false, error: "Unauthorized" }
 
     // Force fresh read - findOne creates a new query each time
-    const call = await Call.findOne({ _id: callId })
+    if (!Types.ObjectId.isValid(callId)) return { success: false, error: "Call not found" }
+    const me = new Types.ObjectId(currentUser.id)
+    const call = await Call.findOne({ _id: callId, $or: [{ callerId: me }, { receiverId: me }] })
     if (!call) return { success: false, error: "Call not found" }
 
     console.log(`[GetCallStatus] Call ${callId} status: ${call.status}`)
