@@ -44,6 +44,7 @@ import { referralPath } from "@/lib/referral-link"
 import { ensureReferralCode } from "@/lib/referrals"
 import { sellerSplitNote } from "@/lib/marketplace"
 import { creatorPublishRefusal, requestCourseReview, requestLiveCourseReview } from "@/lib/course-review"
+import { lessonVideoUrlError } from "@/lib/lesson-video"
 
 const PackageSchema = z
   .object({
@@ -1203,6 +1204,9 @@ export async function addLesson(
   }
   if (type === "video" && !videoUrl) {
     fieldErrors.videoUrl = "Video URL is required for video lessons"
+  } else if (type === "video") {
+    const videoUrlError = lessonVideoUrlError(videoUrl.trim())
+    if (videoUrlError) fieldErrors.videoUrl = videoUrlError
   }
 
   if (Object.keys(fieldErrors).length > 0) {

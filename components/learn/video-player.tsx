@@ -113,6 +113,19 @@ export function VideoPlayer({
   // Buffering state
   const [isBuffering, setIsBuffering] = useState(false)
 
+  // The src the browser couldn't play (a page link, a missing file). Keyed on
+  // src so moving to another lesson clears it without an effect.
+  const [failedSrc, setFailedSrc] = useState<string | null>(null)
+  const playbackFailed = failedSrc === src
+
+  // The server-rendered <video> starts loading before hydration, so a link that
+  // fails at once can fire "error" before onError is attached. Catch that here.
+  useEffect(() => {
+    if (!videoRef.current?.error) return
+    const frame = requestAnimationFrame(() => setFailedSrc(src))
+    return () => cancelAnimationFrame(frame)
+  }, [src])
+
   const router = useRouter()
 
   /* ---- OSD flash ---- */
@@ -593,6 +606,11 @@ export function VideoPlayer({
         onPlay={() => { setIsPlaying(true); resetHideTimer() }}
         onCanPlay={() => setIsBuffering(false)}
         onSeeked={() => setIsBuffering(false)}
+        onError={() => {
+          setFailedSrc(src)
+          setIsBuffering(false)
+          setIsPlaying(false)
+        }}
         preload="auto"
         playsInline
         // Watch, don't download (owner, 2026-10-03): no native download item,
@@ -671,8 +689,22 @@ export function VideoPlayer({
         )}
       </AnimatePresence>
 
+      {/* ---- Can't play: say so instead of showing a dead 0:00 player ---- */}
+      {playbackFailed && (
+        <div
+          role="alert"
+          className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 bg-black px-6 text-center"
+        >
+          <p className="text-sm font-semibold text-white md:text-base">This video can&apos;t be played</p>
+          <p className="max-w-sm text-xs text-white/70 md:text-sm">
+            The lesson&apos;s video link doesn&apos;t point to a playable file. Your instructor has to update it — you can
+            message them below.
+          </p>
+        </div>
+      )}
+
       {/* ---- Center play button (paused state) ---- */}
-      {!isPlaying && !showOverlay && (
+      {!isPlaying && !showOverlay && !playbackFailed && (
         <button
           onClick={togglePlay}
           className="absolute inset-0 flex items-center justify-center bg-black/20 transition-opacity"

@@ -71,17 +71,38 @@ const crumbAliases: Record<string, { label: string; href: string }> = {
   "/dashboard/courses": { label: "My programs", href: "/dashboard/my-courses" },
 }
 
+/**
+ * A record id means nothing to a reader. Until the page names it (an override),
+ * it reads as the kind of thing it is, from the segment before it.
+ */
+const OBJECT_ID = /^[a-f0-9]{24}$/i
+const idLabelMap: Record<string, string> = {
+  courses: "Program",
+  certificates: "Program",
+  learn: "Lesson",
+  assignments: "Assignment",
+  applications: "Application",
+  students: "Student",
+  espee: "Payment",
+  instructor: "Instructor",
+}
+
 function buildCrumbs(pathname: string, overrides?: Record<string, string>) {
   const segments = pathname.split("/").filter(Boolean)
   const crumbs: { label: string; href: string }[] = []
 
   let href = ""
-  for (const seg of segments) {
+  segments.forEach((seg, i) => {
     href += `/${seg}`
     // Check overrides first, then labelMap, then format the segment
-    const label = overrides?.[seg] ?? labelMap[seg] ?? seg.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+    const label =
+      overrides?.[seg] ??
+      labelMap[seg] ??
+      (OBJECT_ID.test(seg)
+        ? (idLabelMap[segments[i - 1]] ?? "Details")
+        : seg.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()))
     crumbs.push(crumbAliases[href] ?? { label, href })
-  }
+  })
   return crumbs
 }
 

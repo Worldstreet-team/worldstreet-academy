@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { getStudentExamStatus } from "@/lib/actions/exams"
 import { markCourseComplete, markLessonComplete } from "@/lib/actions/student"
 import { queryKeys } from "@/lib/hooks/queries/keys"
+import { useInvalidateEnrollments } from "@/lib/hooks/queries/use-enrollments"
 
 interface FinishCourseButtonProps {
   courseId: string
@@ -20,6 +21,7 @@ export function FinishCourseButton({
 }: FinishCourseButtonProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  const invalidateEnrollments = useInvalidateEnrollments()
 
   // Exam-required courses route to the final exam instead of the celebration
   // page — completion is withheld until a passing attempt anyway.
@@ -44,6 +46,7 @@ export function FinishCourseButton({
       // read once the student clicks Finish.
       if (pendingLessonId) await markLessonComplete(courseId, pendingLessonId)
       const res = await markCourseComplete(courseId)
+      void invalidateEnrollments()
       if (res.success && res.requiresExam) {
         router.push(`/dashboard/courses/${courseId}/exam`)
       } else if (res.success) {

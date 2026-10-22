@@ -4,6 +4,7 @@ import { Check, CircleCheck } from "@/components/icons"
 import { useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { markLessonComplete } from "@/lib/actions/student"
+import { useInvalidateEnrollments } from "@/lib/hooks/queries/use-enrollments"
 
 type MarkCompleteButtonProps = {
   courseId: string
@@ -23,6 +24,9 @@ export function MarkCompleteButton({
 }: MarkCompleteButtonProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  // The sidebar's progress card reads the enrollments cache, which
+  // router.refresh() doesn't touch.
+  const invalidateEnrollments = useInvalidateEnrollments()
 
   if (completed) {
     return (
@@ -46,6 +50,7 @@ export function MarkCompleteButton({
       onClick={() =>
         startTransition(async () => {
           await markLessonComplete(courseId, lessonId)
+          void invalidateEnrollments()
           router.refresh()
         })
       }

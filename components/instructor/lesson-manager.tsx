@@ -41,6 +41,7 @@ import { ArtCourses } from "@/components/shared/illustrations"
 import type { Lesson } from "@/lib/types"
 import type { PackageKey } from "@/lib/db/models"
 import { PACKAGE_LABEL } from "@/lib/entitlements"
+import { lessonVideoUrlError } from "@/lib/lesson-video"
 import {
   addLesson,
   deleteLesson,
@@ -180,6 +181,9 @@ export function LessonManager({
   const [state, formAction, isPending] = useActionState(addLesson, initialState)
   const [lessonType, setLessonType] = useState("video")
   const [dialogOpen, setDialogOpen] = useState(false)
+  // Checked here before submitting: a refused submit would reset the form and
+  // lose what the instructor typed. addLesson checks the link again.
+  const [videoUrlError, setVideoUrlError] = useState<string | null>(null)
   const items = [
     { value: "everyone", label: "Everyone" },
     ...tiers.map((k) => ({ value: k, label: `${PACKAGE_LABEL[k]} and up` })),
@@ -278,7 +282,17 @@ export function LessonManager({
           <DialogHeader>
             <DialogTitle>Add New Lesson</DialogTitle>
           </DialogHeader>
-          <form action={formAction} className="space-y-4">
+          <form
+            action={formAction}
+            onSubmit={(e) => {
+              if (lessonType !== "video") return
+              const videoUrl = String(new FormData(e.currentTarget).get("videoUrl") ?? "").trim()
+              const problem = videoUrl ? lessonVideoUrlError(videoUrl) : "Video URL is required for video lessons"
+              setVideoUrlError(problem)
+              if (problem) e.preventDefault()
+            }}
+            className="space-y-4"
+          >
             <input type="hidden" name="courseId" value={courseId} />
 
             <div className="space-y-1.5">
@@ -343,10 +357,11 @@ export function LessonManager({
                   name="videoUrl"
                   type="url"
                   placeholder="https://..."
+                  onChange={() => setVideoUrlError(null)}
                 />
-                {state.fieldErrors.videoUrl && (
+                {(videoUrlError ?? state.fieldErrors.videoUrl) && (
                   <p className="text-xs text-ws-danger">
-                    {state.fieldErrors.videoUrl}
+                    {videoUrlError ?? state.fieldErrors.videoUrl}
                   </p>
                 )}
               </div>

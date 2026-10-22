@@ -762,8 +762,8 @@ export default function BecomeInstructorPage() {
             Become a WMA Instructor
           </h1>
           <p className="mx-auto max-w-md text-[15px] leading-relaxed text-muted-foreground">
-            Teach crypto, trading and blockchain to thousands of WorldStreet students — and earn 85% of every
-            sale.{" "}
+            Teach what you know to thousands of WorldStreet students, in any of our seven schools — and earn 85%
+            of every sale.{" "}
             <Link href="/teach" className="font-medium text-foreground underline underline-offset-4">
               How teaching here works
             </Link>

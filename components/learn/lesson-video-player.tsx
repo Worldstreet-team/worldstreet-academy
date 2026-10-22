@@ -5,6 +5,7 @@ import { useTransition, useEffect, useState } from "react"
 import { VideoPlayer } from "@/components/learn/video-player"
 import { markLessonComplete } from "@/lib/actions/student"
 import { getLessonWatchProgress } from "@/lib/actions/watch-progress"
+import { useInvalidateEnrollments } from "@/lib/hooks/queries/use-enrollments"
 
 type Lesson = {
   id: string
@@ -30,6 +31,7 @@ export function LessonVideoPlayer({
 }: LessonVideoPlayerProps) {
   const router = useRouter()
   const [, startTransition] = useTransition()
+  const invalidateEnrollments = useInvalidateEnrollments()
   const [initialTime, setInitialTime] = useState<number | undefined>(undefined)
   
   // Fetch saved watch position on mount
@@ -44,6 +46,7 @@ export function LessonVideoPlayer({
   const handleComplete = () => {
     startTransition(async () => {
       await markLessonComplete(courseId, lessonId)
+      void invalidateEnrollments()
       router.refresh()
     })
   }

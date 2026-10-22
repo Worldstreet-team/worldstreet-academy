@@ -300,12 +300,16 @@ export async function saveAssignment(input: {
   }
 }
 
-/** Tell the course's active students whose package includes assignments that a new one is open. */
+/**
+ * Tell the course's students whose package includes assignments that a new one
+ * is open. Completed learners still open the course and can hand it in (the
+ * same statuses `getCourseAccess` lets through), so they hear about it too.
+ */
 async function announceAssignment(courseId: string, assignmentId: string, title: string, dueAt: Date | null) {
   try {
     const [course, enrollments] = await Promise.all([
       Course.findById(courseId).select("title packages format status").lean(),
-      Enrollment.find({ course: courseId, status: "active" }).select("user packageKey").lean(),
+      Enrollment.find({ course: courseId, status: { $in: ["active", "completed"] } }).select("user packageKey").lean(),
     ])
     if (!course || course.status !== "published") return
     const recipients = enrollments

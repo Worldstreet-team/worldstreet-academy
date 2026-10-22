@@ -84,6 +84,8 @@ export type InstructorQuestion = {
 export type InstructorExam = {
   id: string
   courseId: string
+  /** The program's title, for the breadcrumb. */
+  courseTitle: string
   scope: "final" | "lesson"
   lessonId: string | null
   title: string
@@ -112,6 +114,7 @@ export async function getCourseExamForInstructor(
     return {
       id: exam._id.toString(),
       courseId,
+      courseTitle: course.title,
       scope: (exam.scope ?? "final") as "final" | "lesson",
       lessonId: exam.lesson ? exam.lesson.toString() : null,
       title: exam.title,
@@ -380,6 +383,8 @@ async function examPackageLock(
 export type StudentExamStatus = {
   hasExam: boolean
   examRequired: boolean
+  /** The program's title, for the breadcrumb. */
+  courseTitle: string
   title: string
   instructions: string
   durationMinutes: number
@@ -408,7 +413,7 @@ export async function getStudentExamStatus(
     if (!user) return null
 
     const [course, exam, enrollment] = await Promise.all([
-      Course.findById(courseId).select("examRequired packages format").lean(),
+      Course.findById(courseId).select("title examRequired packages format").lean(),
       Exam.findOne({ ...examFilter(courseId, lessonId), status: "published" }).lean(),
       Enrollment.findOne({ user: user.id, course: courseId, status: { $in: ["active", "completed"] } }).lean(),
     ])
@@ -422,6 +427,7 @@ export async function getStudentExamStatus(
       return {
         hasExam: !!exam,
         examRequired,
+        courseTitle: course.title,
         title: exam?.title ?? "",
         instructions: exam?.instructions ?? "",
         durationMinutes: exam?.settings.durationMinutes ?? 0,
@@ -453,6 +459,7 @@ export async function getStudentExamStatus(
     return {
       hasExam: true,
       examRequired,
+      courseTitle: course.title,
       title: exam.title,
       instructions: exam.instructions ?? "",
       durationMinutes: exam.settings.durationMinutes,

@@ -364,7 +364,18 @@ export function CourseEditor({
   const sellerMode = user.role === "USER"
   const isEdit = !!course
   const action = isEdit ? updateCourse : createCourse
-  const [state, formAction, isPending] = useActionState(action, initialFormState)
+  const [status, setStatus] = useState(course?.status ?? "draft")
+  const [state, formAction, isPending] = useActionState(
+    async (prev: CourseFormState, formData: FormData) => {
+      const result = await action(prev, formData)
+      // A save that went through redirects; one that comes back was refused,
+      // so the course keeps its saved status — the badge mustn't claim
+      // "Published" for a course that is still a draft.
+      if (!result.success) setStatus(course?.status ?? "draft")
+      return result
+    },
+    initialFormState
+  )
 
   /* Course fields */
   const [title, setTitle] = useState(course?.title ?? "")
@@ -375,7 +386,6 @@ export function CourseEditor({
   const [school, setSchool] = useState<SchoolSlug | "">(course?.school ?? "")
   const [pricing, setPricing] = useState(course?.pricing ?? "free")
   const [price, setPrice] = useState(course?.price?.toString() ?? "")
-  const [status, setStatus] = useState(course?.status ?? "draft")
   const [objectives, setObjectives] = useState<string[]>(course?.whatYouWillLearn ?? [])
   const [requirements, setRequirements] = useState<string[]>(course?.requirements ?? [])
   const [audience, setAudience] = useState<string[]>(course?.targetAudience ?? [])

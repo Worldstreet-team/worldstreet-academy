@@ -169,13 +169,15 @@ export function SignatureCanvas({
         throw new Error("Failed to get upload URL")
       }
 
-      await fetch(result.uploadUrl, {
+      const upload = await fetch(result.uploadUrl, {
         method: "PUT",
         body: file,
         headers: { "Content-Type": file.type },
       })
+      if (!upload.ok) throw new Error(`Upload failed (HTTP ${upload.status})`)
 
-      await saveSignature(result.publicUrl)
+      const saved = await saveSignature(result.publicUrl)
+      if (!saved.success) throw new Error(saved.error ?? "Failed to save signature")
       onSave(result.publicUrl)
     } catch (error) {
       console.error("Signature save error:", error)
@@ -192,12 +194,14 @@ export function SignatureCanvas({
       if (!result.success || !result.uploadUrl || !result.publicUrl) {
         throw new Error("Failed to get upload URL")
       }
-      await fetch(result.uploadUrl, {
+      const upload = await fetch(result.uploadUrl, {
         method: "PUT",
         body: file,
         headers: { "Content-Type": file.type },
       })
-      await saveSignature(result.publicUrl)
+      if (!upload.ok) throw new Error(`Upload failed (HTTP ${upload.status})`)
+      const saved = await saveSignature(result.publicUrl)
+      if (!saved.success) throw new Error(saved.error ?? "Failed to save signature")
       onSave(result.publicUrl)
     } catch (error) {
       console.error("Signature upload error:", error)

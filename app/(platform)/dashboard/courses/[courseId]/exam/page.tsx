@@ -310,7 +310,7 @@ function CourseExamPageInner() {
 
   return (
     <>
-      <Topbar />
+      <Topbar breadcrumbOverrides={status ? { [courseId]: status.courseTitle } : undefined} />
       <div className="p-4 sm:p-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6">
         {runner ? (
           <ExamRunner runner={runner} onFinished={finish} />

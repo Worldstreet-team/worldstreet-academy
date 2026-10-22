@@ -1,6 +1,6 @@
 import "server-only"
 
-import { Types } from "mongoose"
+import { Error as MongooseError, Types } from "mongoose"
 import connectDB from "@/lib/db"
 import { User, type IUser } from "@/lib/db/models"
 import { adminLevelOf, type AdminLevel } from "@/lib/admin-levels"
@@ -95,6 +95,18 @@ export type LocalUser = {
  * Returns the local user with MongoDB _id
  */
 export async function syncUserToLocal(authUser: AuthUser, updateNames = true): Promise<LocalUser> {
+  try {
+    return await syncOnce(authUser, updateNames)
+  } catch (err) {
+    // A page's parallel first requests load the same row: the first save wins
+    // and the rest fail on its old version (or on the unique email when both
+    // create it). One more pass reads the row that was just written.
+    if (!(err instanceof MongooseError.VersionError) && (err as { code?: unknown })?.code !== 11000) throw err
+    return await syncOnce(authUser, updateNames)
+  }
+}
+
+async function syncOnce(authUser: AuthUser, updateNames: boolean): Promise<LocalUser> {
   await connectDB()
 
   // Resolve by primary id OR a previously linked one (mobile/dev Clerk

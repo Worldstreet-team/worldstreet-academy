@@ -15,8 +15,19 @@ function getAblyClient(): Ably.Realtime {
     _ablyClient = new Ably.Realtime({
       authCallback: async (_data, callback) => {
         try {
-          const tokenDetails = await getAblyTokenAction()
-          callback(null, tokenDetails)
+          const result = await getAblyTokenAction()
+          if (result.success) {
+            callback(null, result.data)
+            return
+          }
+          // A 403 moves the connection to "failed", which stops the retries: a
+          // missing key or a signed-out user won't fix itself in a second.
+          // Anything else stays a 500, which Ably retries with backoff.
+          const permanent = result.code !== "unavailable"
+          callback(
+            { message: result.error, name: "AuthError", code: permanent ? 40300 : 40000, statusCode: permanent ? 403 : 500 },
+            null
+          )
         } catch (err) {
           const msg = err instanceof Error ? err.message : "Token request failed"
           callback({ message: msg, name: "AuthError", code: 40000, statusCode: 500 }, null)

@@ -1031,7 +1031,10 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
         instructorAvatarUrl: course.instructor.avatarUrl,
         progress: enrollment.progress,
         totalLessons: course.totalLessons || 0,
-        lastAccessedAt: enrollment.lastAccessedAt?.toISOString() || new Date().toISOString(),
+        // Never opened: fall back to when it was created, not to "now" — a
+        // program nobody has started must not outrank the one being studied in
+        // "Continue learning".
+        lastAccessedAt: (enrollment.lastAccessedAt ?? enrollment.createdAt ?? new Date()).toISOString(),
         status: enrollment.status,
         courseAvailableAt: course.availableAt ? new Date(course.availableAt).toISOString() : null,
         firstLessonId: firstLesson?._id.toString() || null,
