@@ -248,8 +248,14 @@ export async function refundEnrollment(enrollmentId: string, reason: string) {
 
     await refundWalletCharge(studentAuthId, enrollment.transactionId, reason || "course refund")
 
-    enrollment.status = "refunded"
-    await enrollment.save()
+    // Claim the refund atomically: of two clicks that both got past the status
+    // check above, only one runs the clawbacks and counters below. (The wallet
+    // refund itself is idempotent, so the second click moved no money.)
+    const claimed = await Enrollment.findOneAndUpdate(
+      { _id: enrollment._id, status: { $ne: "refunded" } },
+      { $set: { status: "refunded" } }
+    )
+    if (!claimed) return { success: true, alreadyRefunded: true }
 
     const order = await Order.findOne({ chargeId: enrollment.transactionId })
     if (order) {

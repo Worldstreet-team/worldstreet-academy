@@ -23,7 +23,7 @@ import { courseAvailability } from "@/lib/types/course"
 import { sendEnrollmentConfirmationEmail } from "@/lib/email"
 import { sendWelcomeOnce } from "@/lib/welcome-email"
 import { notifyAdmins, notifyUser, notifyUsers } from "@/lib/notify"
-import { getCourseAccess, isLessonLockedFor, lockedLessonIds } from "@/lib/course-access"
+import { getCourseAccess, isLessonLockedFor, lockedLessonIds, openPublishedLessonIds } from "@/lib/course-access"
 import { courseTeacherIds } from "@/lib/teaching"
 import { saveWithCertificateId } from "@/lib/certificate-id"
 import { POINTS, awardPoints, pointKey } from "@/lib/points"
@@ -330,6 +330,18 @@ export async function purchaseCourse(input: { courseId: string; packageKey?: Pac
         )
         if (!enrollment) {
           throw Object.assign(new Error("enrollment row changed concurrently"), { code: 11000 })
+        }
+        // The kept completed lessons now count against this purchase's plan,
+        // which may open more lessons (or fewer) than the old one did — as an
+        // admin plan change does (adminSetEnrollmentPackage).
+        const reopened = await getCourseAccess(user.id, courseId)
+        if (reopened) {
+          const open = await openPublishedLessonIds(reopened)
+          const done = enrollment.completedLessons.filter((id: Types.ObjectId) => open.has(id.toString())).length
+          const progress = open.size > 0 ? Math.min(100, Math.round((done / open.size) * 100)) : 0
+          if (progress !== enrollment.progress) {
+            enrollment = (await Enrollment.findByIdAndUpdate(enrollment._id, { $set: { progress } }, { new: true })) ?? enrollment
+          }
         }
       } else {
         enrollment = await Enrollment.create({

@@ -13,8 +13,16 @@ export function useEnrollments() {
   })
 }
 
-/** Imperatively refresh enrollments (e.g. after a new enrollment) */
+/**
+ * Imperatively refresh enrollments (e.g. after a new enrollment or a completed
+ * lesson). Exam status goes with them: whether the final exam is unlocked
+ * depends on the enrollment's progress.
+ */
 export function useInvalidateEnrollments() {
   const qc = useQueryClient()
-  return () => qc.invalidateQueries({ queryKey: queryKeys.enrollments })
+  return () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: queryKeys.enrollments }),
+      qc.invalidateQueries({ queryKey: ["exam-status"] }),
+    ])
 }
