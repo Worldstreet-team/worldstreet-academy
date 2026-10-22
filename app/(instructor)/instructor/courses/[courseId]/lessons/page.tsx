@@ -37,7 +37,8 @@ export default async function CourseLessonsPage({
     minPackageKey: l.minPackageKey,
   }))
 
-  const totalMinutes = lessons.reduce((s, l) => s + (l.duration ?? 0), 0)
+  // Lesson durations are stored in seconds.
+  const totalMinutes = Math.round(lessons.reduce((s, l) => s + (l.duration ?? 0), 0) / 60)
   // Tiers this course sells, in ladder order — the only valid lesson tiers.
   const tiers = PACKAGE_KEYS.filter((k) => course.packages.some((p) => p.enabled && p.key === k))
 

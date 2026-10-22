@@ -178,9 +178,17 @@ export function LessonManager({
   /** Enabled package keys in ladder order — the only tiers a lesson may require. Empty hides the tier controls. */
   tiers: PackageKey[]
 }) {
-  const [state, formAction, isPending] = useActionState(addLesson, initialState)
-  const [lessonType, setLessonType] = useState("video")
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [state, formAction, isPending] = useActionState(
+    async (prev: CourseFormState, formData: FormData) => {
+      const result = await addLesson(prev, formData)
+      // Added: close, so the new lesson shows in the list behind the dialog.
+      if (result.success) setDialogOpen(false)
+      return result
+    },
+    initialState
+  )
+  const [lessonType, setLessonType] = useState("video")
   // Checked here before submitting: a refused submit would reset the form and
   // lose what the instructor typed. addLesson checks the link again.
   const [videoUrlError, setVideoUrlError] = useState<string | null>(null)
@@ -229,7 +237,7 @@ export function LessonManager({
                         <span className="rounded-full bg-ws-chip px-1.5 py-px text-[9px] font-medium capitalize">
                           {lesson.type}
                         </span>
-                        {lesson.duration && <span className="tabular-nums">{lesson.duration} min</span>}
+                        {lesson.duration ? <span className="tabular-nums">{Math.max(1, Math.round(lesson.duration / 60))} min</span> : null}
                         {lesson.isFree && (
                           <span className="rounded-full border border-ws-hairline px-1.5 py-px text-[9px] font-medium">
                             Free Preview
@@ -400,6 +408,12 @@ export function LessonManager({
             </div>
 
             <div className="h-px bg-ws-hairline" />
+
+            {state.error && (
+              <p role="alert" className="text-sm text-ws-danger">
+                {state.error}
+              </p>
+            )}
 
             <DialogFooter>
               <DialogClose render={<Button variant="outline" />}>

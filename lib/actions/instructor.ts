@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import type mongoose from "mongoose"
+import { Types } from "mongoose"
 import { z } from "zod/v4"
 import connectDB from "@/lib/db"
 import {
@@ -827,6 +828,18 @@ export async function createCourse(
   redirect(editorReturnPath(formData))
 }
 
+/** Keep the course's lesson count and duration (minutes; lessons store seconds) in step with its lessons. */
+async function syncLessonTotals(courseId: string) {
+  const [totals] = await Lesson.aggregate<{ count: number; seconds: number }>([
+    { $match: { course: new Types.ObjectId(courseId) } },
+    { $group: { _id: null, count: { $sum: 1 }, seconds: { $sum: { $ifNull: ["$videoDuration", 0] } } } },
+  ])
+  await Course.findByIdAndUpdate(courseId, {
+    totalLessons: totals?.count ?? 0,
+    totalDuration: Math.ceil((totals?.seconds ?? 0) / 60),
+  })
+}
+
 // ---- Update Course ----
 export async function updateCourse(
   _prevState: CourseFormState,
@@ -900,7 +913,9 @@ export async function updateCourse(
     } else if (
       instructor.role !== "ADMIN" &&
       status !== existingCourse.status &&
-      !INSTRUCTOR_STATUSES.includes(status)
+      // Both ends: an instructor moves a course between draft and published,
+      // and never back out of a status an admin set (suspended, closed, archived).
+      (!INSTRUCTOR_STATUSES.includes(status) || !INSTRUCTOR_STATUSES.includes(existingCourse.status))
     ) {
       return { success: false, error: "Only admins can set that course status", fieldErrors: {} }
     }
@@ -1013,36 +1028,51 @@ export async function updateCourse(
         const lessons = JSON.parse(lessonsJson)
         console.log("[Update Course] Parsed lessons:", lessons)
         if (Array.isArray(lessons)) {
-          // Delete existing lessons and recreate (simple approach)
+          // Lessons keep their ids: an existing lesson (the editor sends its id
+          // as tempId) is updated in place, a new one is inserted, and only the
+          // ones the editor dropped are deleted. Recreating them all would orphan
+          // every learner's completed lessons, resume positions, bookmarks and
+          // lesson quizzes on each save.
+          const existingLessons = await Lesson.find({ course: courseId }).select("_id title isPublished").lean()
+          const existingIds = new Set(existingLessons.map((l) => l._id.toString()))
           // Lesson titles students could already see on a live course — anything
           // published beyond them is news (a renamed lesson counts as new).
           const announcedBefore =
             existingCourse.status === "published"
-              ? new Set((await Lesson.find({ course: courseId, isPublished: true }).select("title").lean()).map((l) => l.title))
+              ? new Set(existingLessons.filter((l) => l.isPublished).map((l) => l.title))
               : null
           let freshLessons: FreshLesson[] = []
-          await Lesson.deleteMany({ course: courseId })
-          
-          if (lessons.length > 0) {
-            const sold = soldTierKeys(pricingFields.packages ?? existingCourse.packages)
-            const created = await Lesson.insertMany(
-              lessons.map((l: { tempId?: string; title: string; description?: string; type?: string; thumbnailUrl?: string; videoUrl?: string; content?: string; duration?: string; isFree?: boolean; minPackageKey?: string | null }, idx: number) => ({
-                course: courseId,
-                title: l.title,
-                description: l.description || null,
-                type: l.type || "video",
-                videoUrl: l.videoUrl || null,
-                videoThumbnailUrl: l.thumbnailUrl || null,
-                content: l.content || null,
-                videoDuration: l.duration ? parseInt(l.duration) : null,
-                isFree: l.isFree || false,
-                minPackageKey: lessonTier(l.minPackageKey, sold),
-                order: idx,
-                isPublished: status === "published",
-              }))
+          const sold = soldTierKeys(pricingFields.packages ?? existingCourse.packages)
+          const rows: { id: string; fields: LessonFields }[] = lessons.map((l: { tempId?: string; title: string; description?: string; type?: string; thumbnailUrl?: string; videoUrl?: string; content?: string; duration?: string; isFree?: boolean; minPackageKey?: string | null }, idx: number) => ({
+            id: l.tempId && existingIds.has(l.tempId) ? l.tempId : new Types.ObjectId().toString(),
+            fields: {
+              title: l.title,
+              description: l.description || null,
+              type: l.type || "video",
+              videoUrl: l.videoUrl || null,
+              videoThumbnailUrl: l.thumbnailUrl || null,
+              content: l.content || null,
+              videoDuration: l.duration ? parseInt(l.duration) : null,
+              isFree: l.isFree || false,
+              minPackageKey: lessonTier(l.minPackageKey, sold),
+              order: idx,
+              isPublished: status === "published",
+            },
+          }))
+          await Lesson.deleteMany({ course: courseId, _id: { $nin: rows.map((r) => r.id) } })
+
+          if (rows.length > 0) {
+            await Lesson.bulkWrite(
+              rows.map((r) =>
+                existingIds.has(r.id)
+                  ? { updateOne: { filter: { _id: r.id, course: courseId }, update: { $set: r.fields } } }
+                  : { insertOne: { document: { _id: r.id, course: courseId, ...r.fields } } }
+              )
             )
             if (announcedBefore && status === "published") {
-              freshLessons = created.filter((l) => l.isPublished && !announcedBefore.has(l.title))
+              freshLessons = rows
+                .filter((r) => !announcedBefore.has(r.fields.title))
+                .map((r) => ({ _id: r.id, ...r.fields }))
             }
           }
 
@@ -1084,6 +1114,20 @@ export async function updateCourse(
   }
 
   redirect(editorReturnPath(formData))
+}
+
+type LessonFields = {
+  title: string
+  description: string | null
+  type: string
+  videoUrl: string | null
+  videoThumbnailUrl: string | null
+  content: string | null
+  videoDuration: number | null
+  isFree: boolean
+  minPackageKey: PackageKey | null
+  order: number
+  isPublished: boolean
 }
 
 type FreshLesson = { _id: { toString(): string }; title: string } & Parameters<typeof canAccessLesson>[1]
@@ -1248,9 +1292,7 @@ export async function addLesson(
       isPublished: course.status === "published",
     })
     
-    // Update course lesson count
-    const totalLessons = await Lesson.countDocuments({ course: courseId })
-    await Course.findByIdAndUpdate(courseId, { totalLessons })
+    await syncLessonTotals(courseId)
 
     revalidatePath(`/instructor/courses/${courseId}/lessons`)
     return { success: true, error: null, fieldErrors: {} }
@@ -1331,8 +1373,7 @@ export async function deleteLesson(formData: FormData): Promise<void> {
       await lesson.deleteOne()
       
       // Update course lesson count
-      const totalLessons = await Lesson.countDocuments({ course: courseId })
-      await Course.findByIdAndUpdate(courseId, { totalLessons })
+      await syncLessonTotals(courseId)
     }
 
     revalidatePath(`/instructor/courses/${courseId}/lessons`)
