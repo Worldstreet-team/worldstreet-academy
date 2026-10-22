@@ -16,6 +16,10 @@ export interface IReview extends Document {
   // Helpfulness
   helpfulCount: number
   reportCount: number
+  /** Who marked it helpful, so each signed-in user counts once. */
+  helpfulBy: Types.ObjectId[]
+  /** One report per user; the reason is kept for moderators. */
+  reports: { user: Types.ObjectId; reason: string; reportedAt: Date }[]
   createdAt: Date
   updatedAt: Date
 }
@@ -73,6 +77,23 @@ const ReviewSchema = new Schema<IReview>(
     reportCount: {
       type: Number,
       default: 0,
+    },
+    helpfulBy: {
+      type: [{ type: Schema.Types.ObjectId, ref: "User" }],
+      default: [],
+      select: false,
+    },
+    reports: {
+      type: [
+        {
+          _id: false,
+          user: { type: Schema.Types.ObjectId, ref: "User", required: true },
+          reason: { type: String, trim: true, maxlength: 200, required: true },
+          reportedAt: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
+      select: false,
     },
   },
   {

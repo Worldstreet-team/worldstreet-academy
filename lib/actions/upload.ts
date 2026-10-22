@@ -1,6 +1,7 @@
 "use server"
 
-import { generatePresignedUploadUrl, generateFileKey, deleteFromR2 } from "@/lib/r2"
+import { getCurrentUser } from "@/lib/auth"
+import { generatePresignedUploadUrl, generateFileKey } from "@/lib/r2"
 
 export type PresignedUrlResponse = {
   success: boolean
@@ -18,6 +19,8 @@ export async function getImageUploadUrl(
   contentType: string
 ): Promise<PresignedUrlResponse> {
   try {
+    if (!(await getCurrentUser())) return { success: false, error: "Sign in to upload files." }
+
     if (!contentType.startsWith("image/")) {
       return { success: false, error: "Invalid file type. Please upload an image." }
     }
@@ -40,6 +43,8 @@ export async function getVideoUploadUrl(
   contentType: string
 ): Promise<PresignedUrlResponse> {
   try {
+    if (!(await getCurrentUser())) return { success: false, error: "Sign in to upload files." }
+
     if (!contentType.startsWith("video/")) {
       return { success: false, error: "Invalid file type. Please upload a video." }
     }
@@ -62,6 +67,8 @@ export async function getAudioUploadUrl(
   contentType: string
 ): Promise<PresignedUrlResponse> {
   try {
+    if (!(await getCurrentUser())) return { success: false, error: "Sign in to upload files." }
+
     if (!contentType.startsWith("audio/")) {
       return { success: false, error: "Invalid file type. Please upload an audio file." }
     }
@@ -85,6 +92,8 @@ export async function getDocumentUploadUrl(
   contentType: string
 ): Promise<PresignedUrlResponse> {
   try {
+    if (!(await getCurrentUser())) return { success: false, error: "Sign in to upload files." }
+
     if (contentType !== "application/pdf") {
       return { success: false, error: "Invalid file type. Please upload a PDF." }
     }
@@ -98,21 +107,5 @@ export async function getDocumentUploadUrl(
   } catch (error) {
     console.error("Document upload URL error:", error)
     return { success: false, error: "Failed to prepare upload. Please try again." }
-  }
-}
-
-/**
- * Delete a file from R2
- */
-export async function deleteUploadedFile(key: string): Promise<{ success: boolean; error?: string }> {
-  try {
-    const result = await deleteFromR2(key)
-    if (result) {
-      return { success: true }
-    }
-    return { success: false, error: "Failed to delete file" }
-  } catch (error) {
-    console.error("Error deleting file:", error)
-    return { success: false, error: "Failed to delete file" }
   }
 }

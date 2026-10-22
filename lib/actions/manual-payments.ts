@@ -727,6 +727,10 @@ export async function adminApproveEspeePayment(paymentId: string): Promise<Espee
 
     const proof = await ManualPayment.findById(paymentId).lean()
     if (!proof) return { success: false, error: "Payment not found" }
+    // Four eyes on money: no admin approves the proof that enrolls themselves.
+    if (proof.user.toString() === admin.id) {
+      return { success: false, error: "Another admin has to approve your own payment" }
+    }
     const resuming = isStrandedApproval(proof, Date.now())
     if (proof.status !== "submitted" && !resuming) {
       return { success: false, error: `This payment was already ${proof.status}` }

@@ -125,11 +125,14 @@ export function generateFileKey(
  * but that is defence in depth, not the control: the control is the private
  * bucket + signed URLs (see R2_RESOURCE_BUCKET).
  */
+/** Every paid-resource key starts here (the private bucket also holds submissions, payment proofs and recordings). */
+export const RESOURCE_KEY_PREFIX = "worldstreet-academy/resources/"
+
 export function generateResourceKey(originalFilename: string): string {
   const timestamp = Date.now()
   const randomId = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10)
   const extension = originalFilename.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "bin"
-  return `worldstreet-academy/resources/${timestamp}-${randomId}.${extension}`
+  return `${RESOURCE_KEY_PREFIX}${timestamp}-${randomId}.${extension}`
 }
 
 /**

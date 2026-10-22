@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import connectDB from "@/lib/db"
-import { Course, Enrollment, Lesson, Resource, ResourceDownload } from "@/lib/db/models"
+import { Course, Enrollment, Lesson, Resource, ResourceDownload, User } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth/actions"
 import {
   generatePresignedUploadUrl,
@@ -11,6 +11,7 @@ import {
   deleteFromR2,
   resourceBucketIsPublic,
   R2_RESOURCE_BUCKET,
+  RESOURCE_KEY_PREFIX,
 } from "@/lib/r2"
 import type { ResourceKind } from "@/lib/db/models/resource"
 import { getCourseAccess, isLessonLockedFor, lockedLessonIds } from "@/lib/course-access"
@@ -59,6 +60,11 @@ async function assertCourseOwner(courseId: string) {
   const course = await Course.findById(courseId).select("instructor")
   if (!course) return { error: "Course not found" as const }
   if (course.instructor.toString() !== user.id && user.role !== "ADMIN") {
+    return { error: "You don't own this course" as const }
+  }
+  // Owning a course isn't enough once the role is gone: a demoted instructor
+  // (now a plain USER who isn't an approved seller) can't author resources.
+  if (user.role === "USER" && (await User.findById(user.id).select("sellerStatus").lean())?.sellerStatus !== "approved") {
     return { error: "You don't own this course" as const }
   }
   return { user, course }
@@ -121,8 +127,16 @@ export async function addResource(input: {
     if (!input.title?.trim()) return { success: false, error: "Give the resource a title" }
     if (input.kind === "link") {
       if (!input.externalUrl?.trim()) return { success: false, error: "A link resource needs a URL" }
+      if (!/^https?:\/\//i.test(input.externalUrl.trim())) return { success: false, error: "Enter the full link, starting with https://" }
     } else if (!input.storageKey) {
       return { success: false, error: "Upload a file first" }
+    } else if (!input.storageKey.startsWith(RESOURCE_KEY_PREFIX) || input.storageKey.includes("..")) {
+      // Only a key getResourceUploadUrl issued: never a submission, payment
+      // proof or recording that shares the private bucket.
+      return { success: false, error: "Upload the file again" }
+    }
+    if (input.lessonId && !(await Lesson.exists({ _id: input.lessonId, course: input.courseId }))) {
+      return { success: false, error: "That lesson isn't part of this course" }
     }
 
     const count = await Resource.countDocuments({ course: input.courseId })

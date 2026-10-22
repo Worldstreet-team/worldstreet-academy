@@ -53,12 +53,16 @@ export type InstructorRecordingView = RecordingView & {
 
 const recordingIdSchema = z.string().regex(OBJECT_ID, "Recording not found")
 
-/** "staff" (admin, whoever teaches the course, class host), "student" (plan includes recorded classes: `recordingsAllowed`), or no access. */
+/**
+ * "staff" (admin, whoever teaches the course), "student" (plan includes
+ * recorded classes: `recordingsAllowed`), or no access. Hosting the class gives
+ * nothing on its own: a host removed from the program or demoted loses it.
+ */
 async function recordingAccess(
   user: Viewer,
   rec: { course: Types.ObjectId; host: Types.ObjectId }
 ): Promise<"staff" | "student" | null> {
-  if (user.role === "ADMIN" || rec.host.toString() === user.id) return "staff"
+  if (user.role === "ADMIN") return "staff"
   if (await Course.exists({ _id: rec.course, ...teachingFilter(user) })) return "staff"
   const access = await getCourseAccess(user.id, rec.course.toString())
   return access && recordingsAllowed(access.entitlements) ? "student" : null

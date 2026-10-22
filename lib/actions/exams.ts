@@ -3,6 +3,7 @@
 import { randomUUID } from "crypto"
 import { revalidatePath } from "next/cache"
 import { Types, type HydratedDocument } from "mongoose"
+import { z } from "zod/v4"
 import connectDB from "@/lib/db"
 import {
   Exam,
@@ -70,6 +71,19 @@ function examFilter(courseId: string, lessonId?: string | null) {
 /* ═══════════════════ instructor: exam builder ═══════════════════ */
 
 export type ExamSettingsInput = Partial<IExamSettings>
+
+// The model's bounds, checked here: an update doesn't run schema validators.
+const ExamSettingsSchema = z
+  .object({
+    durationMinutes: z.number().int().min(5).max(240),
+    passMarkPercent: z.number().int().min(1).max(100),
+    maxAttempts: z.number().int().min(0).max(20),
+    shuffleQuestions: z.boolean(),
+    shuffleOptions: z.boolean(),
+    showResults: z.boolean(),
+  })
+  .partial()
+  .strict()
 
 export type InstructorQuestion = {
   id: string
@@ -149,6 +163,10 @@ export async function upsertExam(
 
     const title = input.title?.trim()
     if (!title || title.length < 3) return { success: false, error: "Give the exam a title" }
+    const settings = input.settings ? ExamSettingsSchema.safeParse(input.settings) : null
+    if (settings && !settings.success) {
+      return { success: false, error: "Check the settings: 5–240 minutes, a pass mark of 1–100% and up to 20 attempts" }
+    }
 
     if (input.lessonId) {
       const { Lesson } = await import("@/lib/db/models")
@@ -162,9 +180,9 @@ export async function upsertExam(
         $set: {
           title,
           instructions: input.instructions?.trim() ?? "",
-          ...(input.settings
+          ...(settings?.success
             ? Object.fromEntries(
-                Object.entries(input.settings).map(([k, v]) => [`settings.${k}`, v])
+                Object.entries(settings.data).map(([k, v]) => [`settings.${k}`, v])
               )
             : {}),
         },

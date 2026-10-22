@@ -207,10 +207,15 @@ export async function deleteReview(userId: string, reviewId: string) {
 export async function markReviewHelpful(reviewId: string) {
   try {
     await connectDB()
+    const user = await getCurrentUser()
+    if (!user) return { success: false, error: "Sign in to mark a review helpful" }
+    if (!mongoose.isValidObjectId(reviewId)) return { success: false, error: "Review not found" }
 
-    await Review.findByIdAndUpdate(reviewId, {
-      $inc: { helpfulCount: 1 },
-    })
+    // Once per user: the filter only matches while this user isn't counted yet.
+    await Review.updateOne(
+      { _id: reviewId, helpfulBy: { $ne: user.id } },
+      { $inc: { helpfulCount: 1 }, $addToSet: { helpfulBy: user.id } }
+    )
 
     return { success: true }
   } catch (error) {
@@ -225,11 +230,17 @@ export async function markReviewHelpful(reviewId: string) {
 export async function reportReview(reviewId: string, reason: string) {
   try {
     await connectDB()
+    const user = await getCurrentUser()
+    if (!user) return { success: false, error: "Sign in to report a review" }
+    if (!mongoose.isValidObjectId(reviewId)) return { success: false, error: "Review not found" }
+    const parsed = z.string().trim().min(1).max(200).safeParse(reason)
+    if (!parsed.success) return { success: false, error: "Choose a reason" }
 
-    await Review.findByIdAndUpdate(reviewId, {
-      $inc: { reportCount: 1 },
-      $push: { reports: { reason, reportedAt: new Date() } },
-    })
+    // One report per user, so the admin queue's count means distinct people.
+    await Review.updateOne(
+      { _id: reviewId, "reports.user": { $ne: user.id } },
+      { $inc: { reportCount: 1 }, $push: { reports: { user: user.id, reason: parsed.data, reportedAt: new Date() } } }
+    )
 
     return { success: true }
   } catch (error) {

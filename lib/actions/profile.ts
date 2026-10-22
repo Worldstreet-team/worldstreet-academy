@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth"
 import { revalidatePath } from "next/cache"
 import { z } from "zod/v4"
 import { COUNTRY_CODES } from "@/lib/countries"
+import { R2_PUBLIC_URL } from "@/lib/r2"
 import {
   FACULTY_LIMITS,
   FacultyProfileSchema,
@@ -15,6 +16,13 @@ import {
   isFacultyRole,
   type FacultyProfileForm,
 } from "@/lib/faculty"
+
+// An avatar is shown to other people and in emails, so it may only be an
+// image we uploaded (a link into our public bucket), as signatures are.
+const AvatarUrl = z
+  .url({ protocol: /^https$/ })
+  .max(2048)
+  .refine((url) => Boolean(R2_PUBLIC_URL) && url.startsWith(`${R2_PUBLIC_URL}/`))
 
 /**
  * Update the current user's avatar URL
@@ -27,7 +35,10 @@ export async function updateAvatar(
     const currentUser = await getCurrentUser()
     if (!currentUser) return { success: false, error: "Not authenticated" }
 
-    await User.findByIdAndUpdate(currentUser.id, { avatarUrl })
+    const parsed = AvatarUrl.safeParse(avatarUrl)
+    if (!parsed.success) return { success: false, error: "Upload the photo again" }
+
+    await User.findByIdAndUpdate(currentUser.id, { avatarUrl: parsed.data })
 
     revalidatePath("/dashboard/profile")
     revalidatePath("/instructor/settings")
