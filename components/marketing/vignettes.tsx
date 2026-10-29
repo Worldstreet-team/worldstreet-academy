@@ -4,6 +4,7 @@ import { CheckIcon, LockIcon, PlayIcon } from "@/components/icons"
 import * as React from "react"
 import { motion } from "motion/react"
 import { SCHOOLS } from "@/lib/schools"
+import { PROGRAM_PRICE_LIST } from "@/lib/entitlements"
 import { SchoolIcon } from "@/components/shared/school-icon"
 import { EASE_INERTIA, EASE_LUX } from "@/components/marketing/motion/ease"
 import { useMotionOK } from "@/components/marketing/motion/bus"
@@ -313,11 +314,11 @@ export function ProgramVignette() {
 
 /* ── 03 Choose your package ──────────────────────────────────────────────── */
 
-/** The real Forex ladder from the Phase 0 catalogue (spec §6). */
+/** The plan ladder every program sells, at the Academy's price list. */
 const TIERS = [
-  { name: "Basic", price: 49, highlight: false, lines: ["Full curriculum", "Self-paced lessons", "Progress tracking"] },
-  { name: "Standard", price: 199, highlight: true, lines: ["Everything in Basic", "Live classes and Q&A", "Signed certificate"] },
-  { name: "Executive", price: 999, highlight: false, lines: ["Everything in Standard", "1:1 mentorship", "Priority support"] },
+  { name: "Basic", price: PROGRAM_PRICE_LIST.basic, highlight: false, lines: ["Full curriculum", "Self-paced lessons", "Progress tracking"] },
+  { name: "Standard", price: PROGRAM_PRICE_LIST.standard, highlight: true, lines: ["Everything in Basic", "Live classes and Q&A", "Signed certificate"] },
+  { name: "Executive", price: PROGRAM_PRICE_LIST.executive, highlight: false, lines: ["Everything in Standard", "1:1 mentorship", "Priority support"] },
 ]
 
 export function PackagesVignette() {

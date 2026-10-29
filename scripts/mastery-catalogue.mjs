@@ -38,13 +38,13 @@
  * never touches thumbnailUrl, status, instructor, enrolledCount or rating on
  * an existing row, and never deletes or archives anything.
  *
- * Plans (institutional blueprint §9, decision D23; prices from the owner
- * meeting, 2026-10-03): every one of the 12 programs sells the same three
- * plans — Basic "Foundation" $49 (was $300, 4 weeks), Standard "Mastery" $199
- * (was $1,000, 8–12 weeks, the highlighted "most popular") and Executive
- * "Personalized Mastery" $999 (was $10,000, Flexible schedule). `price` is
- * what checkout charges; `listPrice` is the original, shown struck through
- * until the live cohort starts (lib/cohort.ts). Basic = recorded classes,
+ * Plans (institutional blueprint §9, decision D23; prices from Owen,
+ * 2026-10-28, replacing the 2026-10-03 49/199/999 ladder): every one of the
+ * 12 programs sells the same three plans — Basic "Foundation" $49 (4 weeks),
+ * Standard "Mastery" $99 (8–12 weeks, the highlighted "most popular") and
+ * Executive "Personalized Mastery" $199 (Flexible schedule). `price` is what
+ * checkout charges. `listPrice` (a struck-through "was" price) is null: the
+ * blueprint's $300/$1,000/$10,000 fees are not used, so no plan shows one. Basic = recorded classes,
  * assignments, assessments and the certificate (BASIC_TIER) — no live classes
  * and no instructor Q&A; Standard is STANDARD_TIER; Executive is FULL. Every
  * program gets the one §9 feature list per plan (BASIC_FEATURES,
@@ -53,7 +53,7 @@
  * group". Plan names stay program-specific ("Forex Foundation").
  *
  * Price: every program's scalar `price` and `pricing` are DERIVED from its
- * plans — `price` = the cheapest *enabled* plan (49, Basic), `pricing` =
+ * plans — `price` = the cheapest *enabled* plan ($49, Basic), `pricing` =
  * "paid" while that is above 0 — the same rule as pricingFromPackages in
  * lib/entitlements.ts, and $set on MATCH too, so a stale scalar self-heals.
  * Before 2026-10-03 only Forex, Crypto and AI derived theirs; the other 9
@@ -77,7 +77,7 @@
  * - PRICE: applying this changes what existing programs charge and what
  *   each price buys — e.g. a single-package program at 99 (full access)
  *   becomes Basic 49 (recorded classes, assignments, assessments and the
- *   certificate, but no live classes or Q&A), Standard 199 and Executive 999 (full access) — see the boxed WARNING printed
+ *   certificate, but no live classes or Q&A), Standard 99 and Executive 199 (full access) — see the boxed WARNING printed
  *   at the top of every run, which lists each program's scalar price and
  *   enabled plan prices, current -> new. Any --apply that would change an
  *   *existing* row's scalar price OR its enabled plan prices (mock DBs
@@ -180,7 +180,7 @@ function minEnabledPrice(packages) {
 // Ladder order, as lib/entitlements.ts PACKAGE_RANK.
 const RANK = { basic: 1, standard: 2, executive: 3 }
 
-/** "49/199/999" — a row's enabled package prices in ladder order; "none" when it sells none. */
+/** "49/99/199" — a row's enabled package prices in ladder order; "none" when it sells none. */
 function ladderPrices(packages) {
   const enabled = (packages ?? [])
     .filter((p) => p.enabled !== false)
@@ -189,9 +189,9 @@ function ladderPrices(packages) {
 }
 
 // ---------------------------------------------------------------------------
-// The three plans every program sells. Prices are the owner's (2026-10-03):
-// `price` is the launch "pay now" price checkout charges; `listPrice` the
-// original, struck through on the program page until the live cohort starts.
+// The three plans every program sells. Prices are Owen's (2026-10-28):
+// `price` is what checkout charges; `listPrice` stays null (no struck-through
+// "was" price — the blueprint's $300/$1,000/$10,000 fees are not used).
 // Everything else is institutional blueprint §9 and decision D23: Foundation
 // (4 weeks), Mastery (8–12 weeks), Personalized Mastery (Flexible schedule).
 // Basic = recorded classes, assignments, assessments and the certificate, with
@@ -216,9 +216,9 @@ const EXECUTIVE_FEATURES = [
 ]
 
 const PLAN = {
-  basic: { label: "Basic", tagline: "Foundation", price: 49, listPrice: 300, duration: "4 weeks", entitlements: BASIC_TIER, features: BASIC_FEATURES, highlight: false, ctaLabel: null },
-  standard: { label: "Standard", tagline: "Mastery", price: 199, listPrice: 1000, duration: "8–12 weeks", entitlements: STANDARD_TIER, features: STANDARD_FEATURES, highlight: true, ctaLabel: null },
-  executive: { label: "Executive", tagline: "Personalized Mastery", price: 999, listPrice: 10000, duration: "Flexible schedule", entitlements: FULL, features: EXECUTIVE_FEATURES, highlight: false, ctaLabel: "Apply / Enrol for $999" },
+  basic: { label: "Basic", tagline: "Foundation", price: 49, listPrice: null, duration: "4 weeks", entitlements: BASIC_TIER, features: BASIC_FEATURES, highlight: false, ctaLabel: null },
+  standard: { label: "Standard", tagline: "Mastery", price: 99, listPrice: null, duration: "8–12 weeks", entitlements: STANDARD_TIER, features: STANDARD_FEATURES, highlight: true, ctaLabel: null },
+  executive: { label: "Executive", tagline: "Personalized Mastery", price: 199, listPrice: null, duration: "Flexible schedule", entitlements: FULL, features: EXECUTIVE_FEATURES, highlight: false, ctaLabel: "Apply / Enrol for $199" },
 }
 
 /** A program's three plans from its plan names: `{ basic, standard, executive }`; everything else comes from PLAN. */
@@ -580,8 +580,8 @@ console.log(
     boxed([
       "WARNING — price-derivation script",
       "",
-      "Every program is set to the owner's three plans (2026-10-03):",
-      `  ${["basic", "standard", "executive"].map((k) => `${PLAN[k].label} ${usd(PLAN[k].price)} (was ${usd(PLAN[k].listPrice)})`).join(" · ")}`,
+      "Every program is set to Owen's three plans (2026-10-28):",
+      `  ${["basic", "standard", "executive"].map((k) => `${PLAN[k].label} ${usd(PLAN[k].price)}`).join(" · ")}`,
       "and its scalar price is derived from them (the cheapest enabled plan).",
       "Basic now includes recorded classes, assignments, assessments and the",
       "certificate, but no live classes or instructor Q&A (full access = Executive).",

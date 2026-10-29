@@ -27,7 +27,14 @@ import type { CourseLevel, CoursePricing, CourseStatus } from "@/lib/types"
 import { getCurrentUser } from "@/lib/auth"
 import { taughtCourseIds } from "@/lib/teaching"
 import { SCHOOL_BY_SLUG, isSchoolSlug, schoolSlugOf, type SchoolSlug } from "@/lib/schools"
-import { canAccessLesson, PACKAGE_LABEL, isPackageKey, pricingFromPackages } from "@/lib/entitlements"
+import {
+  canAccessLesson,
+  PACKAGE_LABEL,
+  PROGRAM_PRICE_LIST,
+  PROGRAM_PRICE_LIST_LINE,
+  isPackageKey,
+  pricingFromPackages,
+} from "@/lib/entitlements"
 import { courseKindOf } from "@/lib/course-kind"
 import {
   COURSE_FORMATS,
@@ -605,9 +612,11 @@ export async function fetchCourseForEdit(courseId: string) {
 
 /**
  * Price fields for a save. A school program prices from its packages when
- * they are sent (the cheapest enabled tier). Marketplace and New Economy
- * courses sell at ONE price (owner, 2026-10-05), so they carry no ladder —
- * and a New Economy course is always free.
+ * they are sent (the cheapest enabled tier), and every plan sells at the
+ * Academy's price list whatever was posted (PROGRAM_PRICE_LIST, Owen
+ * 2026-10-28); an original price no higher than the list price is dropped.
+ * Marketplace and New Economy courses sell at ONE price (owner, 2026-10-05),
+ * so they carry no ladder — and a New Economy course is always free.
  */
 function coursePricing(
   kind: CourseKind,
@@ -618,12 +627,27 @@ function coursePricing(
   if (kind === "new-economy") return { pricing: "free", price: 0, packages: [] }
   const scalar = { pricing, price: pricing === "paid" ? parseFloat(price) : 0 }
   if (kind === "marketplace") return { ...scalar, packages: [] }
-  const override = packages ? pricingFromPackages(packages) : null
+  const listed = packages?.map((p) => {
+    const listPrice = PROGRAM_PRICE_LIST[p.key]
+    return { ...p, price: listPrice, listPrice: p.listPrice !== null && p.listPrice > listPrice ? p.listPrice : null }
+  })
+  const override = listed ? pricingFromPackages(listed) : null
   return {
     ...scalar,
-    ...(packages ? { packages } : {}),
+    ...(listed ? { packages: listed } : {}),
     ...(override ? { pricing: override.pricing, price: override.price } : {}),
   }
+}
+
+/**
+ * A paid school program sells only through its plans at the price list, so
+ * one with no plan turned on can be free but not paid. Null when the plans
+ * weren't posted (an older editor tab): the stored ladder is left alone.
+ */
+function programPriceRefusal(kind: CourseKind, pricing: CoursePricing, packages: ICoursePackage[] | null): string | null {
+  if (kind !== "program" || pricing !== "paid" || packages === null) return null
+  if (packages.some((p) => p.enabled)) return null
+  return `Academy programs sell through their plans at the price list (${PROGRAM_PRICE_LIST_LINE}). Turn on a plan, or make the program free.`
 }
 
 /** School and category: the school's for programs and marketplace topics; none for New Economy. */
@@ -685,7 +709,8 @@ export async function createCourse(
   if (extras.submitForReview && !sentLessons && !isFileFormat(extras.format)) {
     fieldErrors.lessons = "Add at least one lesson before submitting for review"
   }
-  if (pricing === "paid" && (!price || parseFloat(price) <= 0)) {
+  // A program whose plans were posted is priced by them (programPriceRefusal below).
+  if (pricing === "paid" && !(extras.kind === "program" && packages !== null) && (!price || parseFloat(price) <= 0)) {
     fieldErrors.price = "Please enter a valid price"
   }
   if (availableAt === "invalid") {
@@ -719,6 +744,8 @@ export async function createCourse(
     if (kind !== "new-economy" && !isSchoolSlug(school)) {
       return { success: false, error: null, fieldErrors: { school: "Choose a school" } }
     }
+    const priceRefusal = programPriceRefusal(kind, pricing, packages)
+    if (priceRefusal) return { success: false, error: null, fieldErrors: { packages: priceRefusal } }
     const product = resolveProduct({
       kind,
       extras,
@@ -874,7 +901,8 @@ export async function updateCourse(
     fieldErrors.description = "Description must be at least 10 characters"
   }
   // The school is checked once the kind is known (New Economy has none).
-  if (pricing === "paid" && (!price || parseFloat(price) <= 0)) {
+  // A program whose plans were posted is priced by them (programPriceRefusal below).
+  if (pricing === "paid" && !(extras.kind === "program" && packages !== null) && (!price || parseFloat(price) <= 0)) {
     fieldErrors.price = "Please enter a valid price"
   }
   if (availableAt === "invalid") {
@@ -924,6 +952,8 @@ export async function updateCourse(
     if (kind !== "new-economy" && !isSchoolSlug(school)) {
       return { success: false, error: null, fieldErrors: { school: "Choose a school" } }
     }
+    const priceRefusal = programPriceRefusal(kind, pricing, packages)
+    if (priceRefusal) return { success: false, error: null, fieldErrors: { packages: priceRefusal } }
     const product = resolveProduct({
       kind,
       extras,

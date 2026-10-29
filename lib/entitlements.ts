@@ -134,6 +134,19 @@ export const PACKAGE_LABEL: Record<PackageKey, string> = {
   executive: "Executive",
 }
 
+/**
+ * The Academy's price list (Owen, 2026-10-28): every plan of every school
+ * program sells at these whole-USD prices, and faculty don't set their own.
+ * The editor shows them read-only and createCourse/updateCourse write them
+ * whatever is posted. Marketplace courses keep their creator's single price;
+ * New Economy courses are free. scripts/mastery-catalogue.mjs carries the same
+ * figures literally (a script can't import this module) — keep both equal.
+ */
+export const PROGRAM_PRICE_LIST: Record<PackageKey, number> = { basic: 49, standard: 99, executive: 199 }
+
+/** "Basic $49 · Standard $99 · Executive $199" */
+export const PROGRAM_PRICE_LIST_LINE = PACKAGE_KEYS.map((key) => `${PACKAGE_LABEL[key]} $${PROGRAM_PRICE_LIST[key]}`).join(" · ")
+
 /** Lowest enabled tier whose package includes `flag` — the package a lock notice names. null when none does. */
 export function lowestPackageWith(course: PackagesLike, flag: keyof IPackageEntitlements): PackageKey | null {
   return PACKAGE_KEYS.find((key) => packageFor(course, key)?.entitlements[flag]) ?? null

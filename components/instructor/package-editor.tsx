@@ -15,22 +15,23 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import type { ICoursePackage, IPackageEntitlements, PackageKey } from "@/lib/db/models"
-import { PACKAGE_KEYS, PACKAGE_LABEL, recordingsAllowed } from "@/lib/entitlements"
+import { PACKAGE_KEYS, PACKAGE_LABEL, PROGRAM_PRICE_LIST, recordingsAllowed } from "@/lib/entitlements"
+import { packagePriceLabel } from "@/lib/program-price"
 
 
 /**
  * Editor-side row for one package. Mirrors ICoursePackage except that
- * `features` is edited as one textarea (a line per feature) and `price`,
- * `listPrice` and `duration` are the raw input strings ("" = not set, for the
- * optional two); `toCoursePackage` converts back before submit.
- * `uid` is the React key (the tier key can be changed in place).
+ * `features` is edited as one textarea (a line per feature), `listPrice` and
+ * `duration` are the raw input strings ("" = not set) and there is no price:
+ * every plan sells at the Academy's price list (PROGRAM_PRICE_LIST, Owen
+ * 2026-10-28), so the tier key decides it. `toCoursePackage` converts back
+ * before submit. `uid` is the React key (the tier key can be changed in place).
  */
 export type EditorPackage = {
   uid: string
   key: PackageKey
   name: string
   tagline: string
-  price: string
   listPrice: string
   duration: string
   featuresText: string
@@ -69,7 +70,6 @@ export function toEditorPackage(p: ICoursePackage): EditorPackage {
     key: p.key,
     name: p.name,
     tagline: p.tagline ?? "",
-    price: String(p.price),
     listPrice: p.listPrice == null ? "" : String(p.listPrice),
     duration: p.duration ?? "",
     featuresText: (p.features ?? []).join("\n"),
@@ -80,7 +80,7 @@ export function toEditorPackage(p: ICoursePackage): EditorPackage {
   }
 }
 
-/** "" or non-numeric → null. No rounding or clamping: the server rejects null, decimals and negatives with a message. */
+/** "" or non-numeric → null. No rounding or clamping: the server rejects decimals and negatives with a message. */
 function parsePrice(raw: string): number | null {
   const trimmed = raw.trim()
   if (trimmed === "") return null
@@ -88,8 +88,8 @@ function parsePrice(raw: string): number | null {
   return Number.isFinite(n) ? n : null
 }
 
-/** What the editor posts: an ICoursePackage whose price may still be invalid (null) — the server is the authority. */
-export type PackagePayload = Omit<ICoursePackage, "price"> & { price: number | null }
+/** What the editor posts: an ICoursePackage whose original price may still be invalid — the server is the authority. */
+export type PackagePayload = ICoursePackage
 
 export function toCoursePackage(p: EditorPackage): PackagePayload {
   const ctaLabel = p.ctaLabel.trim()
@@ -98,7 +98,7 @@ export function toCoursePackage(p: EditorPackage): PackagePayload {
     key: p.key,
     name: p.name.trim(),
     tagline: p.tagline.trim(),
-    price: parsePrice(p.price),
+    price: PROGRAM_PRICE_LIST[p.key],
     listPrice: parsePrice(p.listPrice),
     duration: duration === "" ? null : duration,
     features: p.featuresText
@@ -118,7 +118,6 @@ export function emptyPackage(key: PackageKey): EditorPackage {
     key,
     name: "",
     tagline: "",
-    price: "",
     listPrice: "",
     duration: "",
     featuresText: "",
@@ -129,12 +128,9 @@ export function emptyPackage(key: PackageKey): EditorPackage {
   }
 }
 
-/** Cheapest ENABLED tier in whole dollars, or null when no tier is enabled (the course then sells at its own price). */
+/** Cheapest ENABLED tier in whole dollars, or null when no tier is enabled (the program is then free or unsellable). */
 export function ladderPrice(packages: EditorPackage[]): number | null {
-  const prices = packages
-    .filter((p) => p.enabled)
-    .map((p) => parsePrice(p.price))
-    .filter((n): n is number => n !== null)
+  const prices = packages.filter((p) => p.enabled).map((p) => PROGRAM_PRICE_LIST[p.key])
   return prices.length === 0 ? null : Math.min(...prices)
 }
 
@@ -177,8 +173,9 @@ export function PackageEditor({
   return (
     <div className="space-y-3">
       <p className="text-[10px] text-muted-foreground">
-        Up to three plans — Basic, Standard and Executive. While any plan is enabled the
-        course sells from the cheapest enabled plan and the Pricing section below follows it.
+        Up to three plans — Basic, Standard and Executive. Every Academy program sells them at the
+        price list, so the tier sets the price. While any plan is enabled the course sells from the
+        cheapest enabled plan and the Pricing section below follows it.
       </p>
 
       {value.map((pkg) => (
@@ -237,14 +234,14 @@ export function PackageEditor({
               <Label htmlFor={`pkg-price-${pkg.uid}`}>Price (USD)</Label>
               <Input
                 id={`pkg-price-${pkg.uid}`}
-                type="number"
-                min="0"
-                step="1"
-                placeholder="49"
-                value={pkg.price}
-                onChange={(e) => patch(pkg.uid, { price: e.target.value })}
+                readOnly
+                aria-describedby={`pkg-price-note-${pkg.uid}`}
+                className="tabular-nums"
+                value={packagePriceLabel(PROGRAM_PRICE_LIST[pkg.key])}
               />
-              <p className="text-[10px] text-muted-foreground">Required. Enter 0 only when this is the program&apos;s single plan.</p>
+              <p id={`pkg-price-note-${pkg.uid}`} className="text-[10px] text-muted-foreground">
+                Set by the Academy&apos;s price list for {PACKAGE_LABEL[pkg.key]}.
+              </p>
             </div>
           </div>
 
@@ -314,7 +311,7 @@ export function PackageEditor({
             </Label>
             <Input
               id={`pkg-cta-${pkg.uid}`}
-              placeholder="Apply / Enrol for $999"
+              placeholder={`Apply / Enrol for $${PROGRAM_PRICE_LIST[pkg.key]}`}
               maxLength={40}
               value={pkg.ctaLabel}
               onChange={(e) => patch(pkg.uid, { ctaLabel: e.target.value })}

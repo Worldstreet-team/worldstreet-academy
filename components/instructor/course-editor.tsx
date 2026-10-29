@@ -55,7 +55,7 @@ import {
   type ProductFileValue,
 } from "@/lib/course-format"
 import { ProductFileField } from "@/components/instructor/product-file-field"
-import { PACKAGE_KEYS, PACKAGE_LABEL } from "@/lib/entitlements"
+import { PACKAGE_KEYS, PACKAGE_LABEL, PROGRAM_PRICE_LIST_LINE } from "@/lib/entitlements"
 import { isoToLocalInput, localInputToIso } from "@/lib/datetime-local"
 import {
   PackageEditor,
@@ -961,7 +961,8 @@ export function CourseEditor({
           ) : derivedPrice !== null ? (
             <p className="rounded-md border p-3 text-[11px] text-muted-foreground">
               Set by plans: this course sells {derivedPrice > 0 ? `from $${derivedPrice}` : "free"} — the
-              cheapest enabled tier. Disable every tier to price the course directly.
+              cheapest enabled tier, at the Academy&apos;s price list. With every tier disabled the program can
+              only be free.
             </p>
           ) : (
           <div className="space-y-3">
@@ -981,7 +982,13 @@ export function CourseEditor({
               </SelectContent>
             </Select>
 
-            {pricing === "paid" && (
+            {pricing === "paid" && ladderActive && (
+              <p className="text-[11px] text-ws-warning">
+                Academy programs sell through their plans at the price list ({PROGRAM_PRICE_LIST_LINE}).
+                Turn on a plan above, or choose Free.
+              </p>
+            )}
+            {pricing === "paid" && !ladderActive && (
               <div className="space-y-1.5">
                 <Label htmlFor="ed-price">Price (USD)</Label>
                 <div className="relative max-w-[180px]">
