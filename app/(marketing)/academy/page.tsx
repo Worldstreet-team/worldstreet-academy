@@ -57,6 +57,9 @@ export default function AcademyPage() {
             >
               {BRAND.tagline}
             </h1>
+            <p className="mt-4 font-display text-[clamp(1.125rem,2vw,1.375rem)] font-semibold tracking-[-0.01em] text-ws-brand">
+              {BRAND.promise}
+            </p>
             <p className={`mt-6 ${BODY}`}>{DEFINITION}</p>
           </RevealGroup>
         </div>

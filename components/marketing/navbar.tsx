@@ -24,7 +24,7 @@ const barLinkClass =
   "inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-full px-2 text-sm font-medium xl:px-3 text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-chip hover:text-ws-primary"
 
 /**
- * The bar's one gold button: "Get started" for guests, "Go to dashboard" once
+ * The bar's one gold button: "Join WMA" for guests, "Go to dashboard" once
  * signed in. Below 360px the lockup, the button and the menu need ~300px of a
  * 272px row, so the button yields to the sheet (which carries the same path)
  * rather than pushing the menu off-screen.
@@ -56,15 +56,20 @@ export async function Navbar({ showFaculty }: { showFaculty: boolean }) {
   const counts: SchoolCounts = published.length > 0 ? countProgramsBySchool(published) : null
 
   // Below lg every destination lives in the sheet (in journey order, spec
-  // §17); "How it works" is a landing anchor, so it lives only there.
+  // §17); "How it works" is a landing anchor, so it lives only there. Cohorts
+  // and the two ways to teach follow the corrections brief's menu (§3,
+  // 2026-10-28): Academy faculty apply at /teach, anyone sells at /sell.
   const sheetLinks: MarketingNavLink[] = [
     { href: "/academy", label: "The Academy" },
     { href: "/schools", label: "All schools" },
     { href: "/programs", label: "All programs" },
+    { href: "/calendar", label: "Cohorts" },
     { href: "/marketplace", label: "Marketplace" },
     { href: "/new-economy", label: "New Economy — free" },
     ...(showFaculty ? [{ href: "/faculty", label: "Faculty" }] : []),
     { href: "/#how-it-works", label: "How it works" },
+    { href: "/teach", label: "Become an Instructor" },
+    { href: "/sell", label: "Sell on the marketplace" },
     ...(user && !gated ? [{ href: "/dashboard", label: "My Learning" }] : []),
     ...(isInstructor ? [{ href: "/instructor", label: "Instructor Dashboard" }] : []),
     ...(isSeller ? [{ href: SELLER_HOME, label: "Creator area" }] : []),
@@ -73,7 +78,7 @@ export async function Navbar({ showFaculty }: { showFaculty: boolean }) {
     ? []
     : [
         { href: LOGIN_URL, label: "Sign in", external: true },
-        { href: REGISTER_URL, label: "Create an account", external: true },
+        { href: REGISTER_URL, label: "Join WMA", external: true },
       ]
 
   return (
@@ -164,7 +169,7 @@ export async function Navbar({ showFaculty }: { showFaculty: boolean }) {
               Sign in
             </Button>
             <a href={REGISTER_URL} className={primaryClass}>
-              Get started
+              Join {BRAND.shortName}
             </a>
           </>
         )}

@@ -24,6 +24,8 @@ export const BRAND = {
   eyebrow: "Mastery Academy",
   shortName: "WMA",
   tagline: "The Academy of the New Economy",
+  /** The brand promise (corrections brief §2, 2026-10-28). */
+  promise: "Learn. Master. Build Wealth.",
   descriptor:
     "The world's premier institution for skills, innovation and wealth liquefaction.",
   supportEmail: "support@worldstreetgold.com",

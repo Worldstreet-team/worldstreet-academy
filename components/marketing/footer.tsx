@@ -31,6 +31,7 @@ export function Footer({ showFaculty }: { showFaculty: boolean }) {
             <p className="text-sm text-muted-foreground">
               {BRAND.tagline}
             </p>
+            <p className="mt-2 text-sm font-semibold text-foreground">{BRAND.promise}</p>
           </div>
           <div>
             <h4 className="text-sm font-semibold mb-3">Academy</h4>
