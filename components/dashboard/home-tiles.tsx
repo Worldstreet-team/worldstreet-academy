@@ -335,14 +335,21 @@ export function InstructorsTile({ rows }: { rows: InstructorRow[] }) {
             </Avatar>
             <div className="flex min-w-0 flex-1 flex-col">
               {/* The chip has its own line: beside the name it cut a ten-letter
-                  name to "Sarah C…" in the narrow slot. */}
-              <Link
-                href={`/dashboard/instructor/${row.instructorId}`}
-                title={row.name}
-                className="truncate text-[14px] font-medium underline-offset-2 outline-none hover:underline focus-visible:underline"
-              >
-                {row.name}
-              </Link>
+                  name to "Sarah C…" in the narrow slot. The Academy's faculty
+                  is no one person, so it has no profile to open. */}
+              {row.academy ? (
+                <span title={row.name} className="truncate text-[14px] font-medium">
+                  {row.name}
+                </span>
+              ) : (
+                <Link
+                  href={`/dashboard/instructor/${row.instructorId}`}
+                  title={row.name}
+                  className="truncate text-[14px] font-medium underline-offset-2 outline-none hover:underline focus-visible:underline"
+                >
+                  {row.name}
+                </Link>
+              )}
               {row.isMentor && (
                 <span className="my-0.5 flex">
                   <StatusChip>Your mentor</StatusChip>

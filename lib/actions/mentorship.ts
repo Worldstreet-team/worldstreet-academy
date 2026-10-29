@@ -10,11 +10,14 @@ import {
   Meeting,
   MentorshipSession,
   User,
+  type CourseKind,
   type MentorshipSessionStatus,
 } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth/actions"
 import { getCourseAccess } from "@/lib/course-access"
 import { includesMentorship } from "@/lib/entitlements"
+import { courseKindOf } from "@/lib/course-kind"
+import { ACADEMY_FACULTY, creditsAcademy } from "@/lib/faculty"
 import { notifyUser, notifyUsers } from "@/lib/notify"
 import { formatUtcDateTime, sendMentorshipEmail } from "@/lib/email"
 import { APP_URL } from "@/lib/app-url"
@@ -83,6 +86,22 @@ function fullName(
   return name || fallback
 }
 
+/**
+ * Who a learner sees mentoring them. A program's owner account is the Academy
+ * itself (`creditsAcademy`), so it reads as the Academy's faculty; assigned
+ * faculty keep their names.
+ */
+function mentorLabel(
+  course: { kind?: CourseKind | null; instructor: { toString(): string } } | null | undefined,
+  mentorId: string,
+  mentor: { firstName?: string | null; lastName?: string | null; role?: string | null } | null | undefined
+): string {
+  if (course && course.instructor.toString() === mentorId && creditsAcademy(courseKindOf(course), mentor?.role)) {
+    return ACADEMY_FACULTY
+  }
+  return fullName(mentor, "Your mentor")
+}
+
 /** Placeholder addresses minted for mobile sign-ups never get mail (the reminders cron's rule). */
 function mailable(email: string | null | undefined): email is string {
   return typeof email === "string" && email !== "" && !email.endsWith("@users.noemail")
@@ -111,12 +130,12 @@ async function toViews(sessions: SessionLean[]): Promise<MentorshipSessionView[]
   const courseIds = [...new Set(sessions.map((s) => s.course.toString()))]
   const meetingIds = sessions.flatMap((s) => (s.meetingId ? [s.meetingId.toString()] : []))
   const [users, courses, meetings] = await Promise.all([
-    User.find({ _id: { $in: userIds } }).select("firstName lastName").lean(),
-    Course.find({ _id: { $in: courseIds } }).select("title").lean(),
+    User.find({ _id: { $in: userIds } }).select("firstName lastName role").lean(),
+    Course.find({ _id: { $in: courseIds } }).select("title kind instructor").lean(),
     Meeting.find({ _id: { $in: meetingIds } }).select("status").lean(),
   ])
   const usersById = new Map(users.map((u) => [u._id.toString(), u]))
-  const titlesById = new Map(courses.map((c) => [c._id.toString(), c.title]))
+  const coursesById = new Map(courses.map((c) => [c._id.toString(), c]))
   const meetingStatusById = new Map(meetings.map((m) => [m._id.toString(), m.status]))
   const now = Date.now()
   const statuses = sessions.map((s) =>
@@ -142,12 +161,14 @@ async function toViews(sessions: SessionLean[]): Promise<MentorshipSessionView[]
     return {
       id: s._id.toString(),
       courseId: s.course.toString(),
-      courseTitle: titlesById.get(s.course.toString()) ?? "",
+      courseTitle: coursesById.get(s.course.toString())?.title ?? "",
       studentName: fullName(usersById.get(s.student.toString()), "Student"),
       // A request isn't anyone's yet (anyone who teaches the program may answer it);
       // once confirmed, `instructor` is the one who runs the session.
       instructorName:
-        s.status === "requested" ? REQUESTED_MENTOR : fullName(usersById.get(s.instructor.toString()), "Your mentor"),
+        s.status === "requested"
+          ? REQUESTED_MENTOR
+          : mentorLabel(coursesById.get(s.course.toString()), s.instructor.toString(), usersById.get(s.instructor.toString())),
       status,
       proposedSlots: (s.proposedSlots ?? []).map((slot) => slot.at.toISOString()),
       scheduledAt: s.scheduledAt ? s.scheduledAt.toISOString() : null,
@@ -164,7 +185,7 @@ async function toViews(sessions: SessionLean[]): Promise<MentorshipSessionView[]
 export type MentorshipProgram = {
   courseId: string
   courseTitle: string
-  /** The program's assigned faculty (lib/teaching.ts) when it has any, else its owner. */
+  /** The program's assigned faculty (lib/teaching.ts) when it has any, else its owner (the Academy's faculty for a program). */
   instructorName: string
   roadmap: { text: string; updatedAt: string } | null
   /** An unanswered request exists — the form stays closed until it's answered. */
@@ -192,7 +213,7 @@ export async function getMyMentorship(): Promise<MyMentorship> {
       MentorshipSession.find({ student: user.id }).sort({ createdAt: -1 }).limit(50).lean(),
     ])
     const courses = await Course.find({ _id: { $in: enrollments.map((e) => e.course) } })
-      .select("title packages instructor")
+      .select("title packages instructor kind")
       .lean()
     const coursesById = new Map(courses.map((c) => [c._id.toString(), c]))
     const mentored = enrollments.flatMap((enrollment) => {
@@ -201,7 +222,7 @@ export async function getMyMentorship(): Promise<MyMentorship> {
     })
     const [instructors, faculty] = await Promise.all([
       User.find({ _id: { $in: mentored.map((m) => m.course.instructor) } })
-        .select("firstName lastName")
+        .select("firstName lastName role")
         .lean(),
       // A program with assigned faculty is mentored by them, not its owner (lib/teaching.ts).
       assignedFacultyFor(mentored.map((m) => m.course._id.toString())),
@@ -211,7 +232,7 @@ export async function getMyMentorship(): Promise<MyMentorship> {
       const members = faculty.get(course._id.toString())
       return members
         ? members.map((m) => m.name).join(", ")
-        : fullName(instructorsById.get(course.instructor.toString()), "Your mentor")
+        : mentorLabel(course, course.instructor.toString(), instructorsById.get(course.instructor.toString()))
     }
     const openRequests = new Set(
       sessions.filter((s) => s.status === "requested").map((s) => s.enrollment.toString())
@@ -576,11 +597,11 @@ export async function confirmMentorshipSession(
 
     const [student, course] = await Promise.all([
       User.findById(session.student).select("firstName lastName email").lean(),
-      Course.findById(session.course).select("title").lean(),
+      Course.findById(session.course).select("title kind instructor").lean(),
     ])
     if (!student) return { success: false, error: "Session not found" }
     const studentName = fullName(student, "Student")
-    const hostName = fullName(user, "Your mentor")
+    const hostName = mentorLabel(course, user.id, user)
     const courseTitle = course?.title ?? "the program"
     const scheduledAt = picked.at
 

@@ -117,12 +117,15 @@ export type InstructorRow = {
   /** Some access-granting enrollment with this instructor includes Q&A — the getOrCreateConversation gate. */
   canMessage: boolean
   isMentor: boolean
+  /** The Academy's faculty, not a person (`creditsAcademy`): no profile to link to. */
+  academy: boolean
 }
 
 /**
  * One row per distinct instructor across the student's access-granting
  * enrollments. A program with assigned faculty is taught by them, so they
- * stand in for its owner; otherwise the owner is the program's instructor.
+ * stand in for its owner; otherwise the row is the owner's credit — the
+ * Academy's faculty for a program (`creditsAcademy`), the creator otherwise.
  */
 export function instructorRows(enrollments: StudentEnrollment[]): InstructorRow[] {
   const rows = new Map<string, InstructorRow>()
@@ -130,8 +133,16 @@ export function instructorRows(enrollments: StudentEnrollment[]): InstructorRow[
     if (!grantsAccess(e)) continue
     const people =
       e.faculty.length > 0
-        ? e.faculty
-        : [{ id: e.instructorId, name: e.instructorName, avatarUrl: e.instructorAvatarUrl, headline: e.instructorHeadline }]
+        ? e.faculty.map((f) => ({ ...f, academy: false }))
+        : [
+            {
+              id: e.instructorId,
+              name: e.instructorName,
+              avatarUrl: e.instructorAvatarUrl,
+              headline: e.instructorHeadline,
+              academy: e.instructorIsAcademy,
+            },
+          ]
     for (const person of people) {
       const row = rows.get(person.id) ?? {
         instructorId: person.id,
@@ -140,6 +151,7 @@ export function instructorRows(enrollments: StudentEnrollment[]): InstructorRow[
         headline: person.headline,
         canMessage: false,
         isMentor: false,
+        academy: person.academy,
       }
       row.canMessage = row.canMessage || e.entitlements.instructorQa
       row.isMentor = row.isMentor || isMentorEnrollment(e)

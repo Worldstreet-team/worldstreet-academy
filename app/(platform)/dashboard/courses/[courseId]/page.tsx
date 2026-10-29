@@ -25,7 +25,7 @@ import { courseAvailability } from "@/lib/types/course"
 import { getCurrentUser } from "@/lib/auth"
 import { LessonPreviewAccordion } from "@/components/courses/lesson-preview-accordion"
 import { AboutInstructor } from "@/components/courses/about-instructor"
-import { ProgramFaculty } from "@/components/courses/program-faculty"
+import { AcademyFaculty, ProgramFaculty } from "@/components/courses/program-faculty"
 import { assignedFacultyFor } from "@/lib/teaching"
 import { BookmarkButton } from "@/components/courses/bookmark-button"
 import { CourseResources } from "@/components/learn/course-resources"
@@ -451,10 +451,16 @@ export default async function CourseDetailPage({
             {/* Recordings of past live classes — only when the plan includes recorded classes (checked server-side). */}
             {(isEnrolled || isStaff) && <RecordingsList courseId={course.id} />}
 
-            {/* About Instructor — the program's assigned faculty when it has any, else its owner */}
+            {/* About Instructor — the program's assigned faculty when it has any; else the
+                Academy's faculty for an Academy course, or the marketplace creator */}
             {faculty.length > 0 ? (
               <ProgramFaculty
                 members={faculty}
+                canMessage={courseAccess ? courseAccess.entitlements.instructorQa : true}
+              />
+            ) : course.creditsAcademy ? (
+              <AcademyFaculty
+                ownerId={course.instructorId}
                 canMessage={courseAccess ? courseAccess.entitlements.instructorQa : true}
               />
             ) : (

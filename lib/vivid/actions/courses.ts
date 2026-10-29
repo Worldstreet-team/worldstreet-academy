@@ -3,6 +3,8 @@
 import { Course, Enrollment, Lesson } from "@/lib/db/models"
 import { Types } from "mongoose"
 import { sellsPackages } from "@/lib/entitlements"
+import { courseKindOf } from "@/lib/course-kind"
+import { courseCredit } from "@/lib/faculty"
 import { initAction, type Doc } from "./helpers"
 
 export async function vividSearchCourses(p: {
@@ -34,7 +36,7 @@ export async function vividSearchCourses(p: {
     else if (p.sortBy === "price-high") sort = { price: -1 }
 
     const courses = await Course.find(query)
-      .populate("instructor", "firstName lastName avatarUrl")
+      .populate("instructor", "firstName lastName avatarUrl role")
       .sort(sort)
       .limit(p.limit || 8)
       .lean()
@@ -53,8 +55,9 @@ export async function vividSearchCourses(p: {
         enrolledCount: c.enrolledCount,
         rating: c.rating?.average || 0,
         totalLessons: c.totalLessons,
-        instructorName: `${(c.instructor as Doc)?.firstName || ""} ${(c.instructor as Doc)?.lastName || ""}`.trim(),
-        instructorAvatar: (c.instructor as Doc)?.avatarUrl || null,
+        // The Academy's faculty for an Academy course, never the account that owns it (creditsAcademy).
+        instructorName: courseCredit(courseKindOf(c), c.instructor as Doc).name,
+        instructorAvatar: courseCredit(courseKindOf(c), c.instructor as Doc).avatarUrl,
       })),
     }
   } catch (error) {
@@ -69,7 +72,7 @@ export async function vividGetCourseDetails(p: { courseId: string }) {
     if (!currentUser) return { success: false, error: "Not authenticated" }
 
     const course = await Course.findById(p.courseId)
-      .populate("instructor", "firstName lastName avatarUrl bio")
+      .populate("instructor", "firstName lastName avatarUrl bio role")
       .lean()
 
     if (!course) return { success: false, error: "Course not found" }
@@ -106,8 +109,8 @@ export async function vividGetCourseDetails(p: { courseId: string }) {
         whatYouWillLearn: course.whatYouWillLearn,
         requirements: course.requirements,
         category: course.category,
-        instructorName: `${(course.instructor as Doc)?.firstName || ""} ${(course.instructor as Doc)?.lastName || ""}`.trim(),
-        instructorAvatar: (course.instructor as Doc)?.avatarUrl,
+        instructorName: courseCredit(courseKindOf(course), course.instructor as Doc).name,
+        instructorAvatar: courseCredit(courseKindOf(course), course.instructor as Doc).avatarUrl,
         isEnrolled: !!enrollment,
         enrollmentStatus: enrollment?.status,
         enrollmentProgress: enrollment?.progress || 0,
@@ -162,7 +165,7 @@ export async function vividGetUserEnrollments(p: { status?: string }) {
     if (p.status && p.status !== "all") query.status = p.status
 
     const enrollments = await Enrollment.find(query)
-      .populate({ path: "course", populate: { path: "instructor", select: "firstName lastName" } })
+      .populate({ path: "course", populate: { path: "instructor", select: "firstName lastName role" } })
       .sort({ lastAccessedAt: -1 })
       .limit(10)
       .lean()
@@ -176,9 +179,7 @@ export async function vividGetUserEnrollments(p: { status?: string }) {
           courseId: course?._id?.toString(),
           courseTitle: course?.title || "Unknown",
           courseThumbnail: course?.thumbnailUrl,
-          instructorName: course?.instructor
-            ? `${course.instructor.firstName} ${course.instructor.lastName}`.trim()
-            : "Unknown",
+          instructorName: course?.instructor ? courseCredit(courseKindOf(course), course.instructor).name : "Unknown",
           progress: e.progress,
           completedLessons: e.completedLessons?.length || 0,
           totalLessons: course?.totalLessons || 0,

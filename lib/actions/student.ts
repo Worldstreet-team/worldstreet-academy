@@ -29,7 +29,7 @@ import {
 import { saveWithCertificateId } from "@/lib/certificate-id"
 import { POINTS, awardPoints, pointKey } from "@/lib/points"
 import { isCountryCode } from "@/lib/countries"
-import { FACULTY_ROLES, isFacultyRole, safeWebUrl } from "@/lib/faculty"
+import { FACULTY_ROLES, courseCredit, creditsAcademy, isFacultyRole, safeWebUrl } from "@/lib/faculty"
 import { facultySinceLabel } from "@/lib/faculty-credential"
 import { cohortsForEnrollments } from "@/lib/cohort-calendar"
 import { assignedFacultyFor, type ProgramTeacher } from "@/lib/teaching"
@@ -75,10 +75,10 @@ export type BrowseCourse = {
   /** Marketplace items only, via courseFormatOf: never null on a marketplace item, always null otherwise. */
   format: CourseFormat | null
   /**
-   * Who a marketplace course credits: the seller's name when an approved
-   * seller (not faculty) sells it. null credits the Academy's faculty —
-   * every program and New Economy course, and the marketplace courses the
-   * Academy itself owns (owner, 2026-10-05).
+   * Who a marketplace course credits: its creator's name, whether an outside
+   * seller or a faculty member selling their own course (`creditsAcademy`,
+   * Owen 2026-10-28). null credits the Academy's faculty — every program and
+   * New Economy course, and the marketplace courses an admin owns.
    */
   sellerName: string | null
   /** First publication, ISO; null on legacy rows. The marketplace's "Newest" sort. */
@@ -90,7 +90,7 @@ function sellerNameOf(
   kind: CourseKind,
   owner: { role?: string | null; firstName?: string | null; lastName?: string | null } | null
 ): string | null {
-  if (kind !== "marketplace" || !owner || isFacultyRole(owner.role)) return null
+  if (!owner || creditsAcademy(kind, owner.role)) return null
   return `${owner.firstName ?? ""} ${owner.lastName ?? ""}`.trim() || null
 }
 
@@ -122,6 +122,8 @@ export type StudentEnrollment = {
   packageName: string | null
   instructorId: string
   instructorHeadline: string | null
+  /** The course credits the Academy, not its owner (`creditsAcademy`): there is no person's profile to open. */
+  instructorIsAcademy: boolean
   /**
    * The program's assigned faculty who still hold a faculty role (lib/teaching.ts).
    * When there are any, the learner sees and messages them instead of the owner.
@@ -273,6 +275,7 @@ export async function fetchBrowseCourses(options?: {
         role: string
       }
       const courseKind = courseKindOf(course)
+      const credit = courseCredit(courseKind, instructor)
 
       return {
         id: course._id.toString(),
@@ -282,8 +285,8 @@ export async function fetchBrowseCourses(options?: {
         shortDescription: course.shortDescription ?? null,
         thumbnailUrl: programArt(course),
         instructorId: instructor._id.toString(),
-        instructorName: `${instructor.firstName} ${instructor.lastName}`,
-        instructorAvatarUrl: instructor.avatarUrl,
+        instructorName: credit.name,
+        instructorAvatarUrl: credit.avatarUrl,
         level: course.level as "beginner" | "intermediate" | "advanced",
         category: course.category || "",
         school: schoolSlugOf(course.school),
@@ -410,6 +413,8 @@ export type PublicCourse = {
   instructorBio: string | null
   instructorHeadline: string | null
   instructorTotalStudents: number
+  /** The course credits the Academy, not its owner (`creditsAcademy`): the instructor fields name the Academy's faculty. */
+  creditsAcademy: boolean
   level: "beginner" | "intermediate" | "advanced"
   pricing: "free" | "paid"
   price: number | null
@@ -436,26 +441,28 @@ export async function fetchPublicCourse(courseId: string): Promise<PublicCourse 
       _id: courseId,
       status: "published",
     })
-      .populate("instructor", "firstName lastName avatarUrl bio instructorProfile")
+      .populate("instructor", "firstName lastName avatarUrl bio role instructorProfile")
       .lean()
-    
+
     if (!course) return null
-    
+
     const instructor = course.instructor as unknown as {
       _id: string
       firstName: string
       lastName?: string
       avatarUrl: string | null
       bio: string | null
+      role?: string
       instructorProfile?: {
         headline: string | null
         totalStudents: number
       }
     } | null
-    
+
     // Guard against missing instructor (deleted user, etc.)
     if (!instructor) return null
-    
+    const credit = courseCredit(courseKindOf(course), instructor)
+
     // Fetch lessons for this course with all needed fields
     const lessons = await Lesson.find({ course: courseId })
       .sort({ order: 1 })
@@ -468,11 +475,12 @@ export async function fetchPublicCourse(courseId: string): Promise<PublicCourse 
       description: course.description,
       thumbnailUrl: programArt(course),
       instructorId: instructor._id.toString(),
-      instructorName: `${instructor.firstName} ${instructor.lastName || ""}`.trim(),
-      instructorAvatarUrl: instructor.avatarUrl,
-      instructorBio: instructor.bio,
-      instructorHeadline: instructor.instructorProfile?.headline || null,
-      instructorTotalStudents: instructor.instructorProfile?.totalStudents || 0,
+      instructorName: credit.name,
+      instructorAvatarUrl: credit.avatarUrl,
+      instructorBio: credit.academy ? null : instructor.bio,
+      instructorHeadline: credit.academy ? null : instructor.instructorProfile?.headline || null,
+      instructorTotalStudents: credit.academy ? 0 : instructor.instructorProfile?.totalStudents || 0,
+      creditsAcademy: credit.academy,
       level: course.level as "beginner" | "intermediate" | "advanced",
       pricing: course.pricing as "free" | "paid",
       price: course.price,
@@ -574,6 +582,7 @@ async function findProgram(filter: { slug: string } | { _id: string }): Promise<
 
   // Guard against missing instructor (deleted user, etc.)
   if (!instructor) return null
+  const credit = courseCredit(courseKindOf(course), instructor)
 
   const format = courseFormatOf({ kind: courseKindOf(course), format: course.format })
   const fileFormat = isFileFormat(format) ? format : null
@@ -619,8 +628,8 @@ async function findProgram(filter: { slug: string } | { _id: string }): Promise<
     shortDescription: course.shortDescription ?? null,
     thumbnailUrl: programArt(course),
     instructorId: instructor._id.toString(),
-    instructorName: `${instructor.firstName} ${instructor.lastName || ""}`.trim(),
-    instructorAvatarUrl: instructor.avatarUrl,
+    instructorName: credit.name,
+    instructorAvatarUrl: credit.avatarUrl,
     level: course.level as "beginner" | "intermediate" | "advanced",
     category: course.category || "",
     school: schoolSlugOf(course.school),
@@ -643,11 +652,12 @@ async function findProgram(filter: { slug: string } | { _id: string }): Promise<
     whatYouWillLearn,
     requirements: course.requirements ?? [],
     targetAudience: course.targetAudience ?? [],
-    instructorHeadline: instructor.instructorProfile?.headline || null,
-    instructorBio: instructor.bio,
-    instructorTotalStudents: instructor.instructorProfile?.totalStudents || 0,
-    // The course is published, so an INSTRUCTOR/ADMIN teaching it is faculty.
-    instructorUsername: isFacultyRole(instructor.role) ? instructor.username : null,
+    instructorHeadline: credit.academy ? null : instructor.instructorProfile?.headline || null,
+    instructorBio: credit.academy ? null : instructor.bio,
+    instructorTotalStudents: credit.academy ? 0 : instructor.instructorProfile?.totalStudents || 0,
+    // The course is published, so an INSTRUCTOR/ADMIN teaching it is faculty —
+    // but an Academy-credited course links to no one's profile.
+    instructorUsername: !credit.academy && isFacultyRole(instructor.role) ? instructor.username : null,
     packages,
     productFile:
       fileFormat && course.productFile
@@ -757,7 +767,7 @@ export async function fetchCourseForLearning(courseId: string): Promise<LearnCou
     const { getCurrentUser } = await import("@/lib/auth/actions")
 
     const course = await Course.findById(courseId)
-      .populate("instructor", "firstName lastName avatarUrl")
+      .populate("instructor", "firstName lastName avatarUrl role")
       .lean()
 
     if (!course) return null
@@ -788,7 +798,9 @@ export async function fetchCourseForLearning(courseId: string): Promise<LearnCou
       firstName: string
       lastName: string
       avatarUrl: string
+      role: string
     }
+    const credit = courseCredit(courseKindOf(course), instructor)
 
     const lessons = await Lesson.find({ course: courseId })
       .sort({ order: 1 })
@@ -800,8 +812,8 @@ export async function fetchCourseForLearning(courseId: string): Promise<LearnCou
       id: course._id.toString(),
       title: course.title,
       instructorId: instructor._id.toString(),
-      instructorName: `${instructor.firstName} ${instructor.lastName}`,
-      instructorAvatarUrl: instructor.avatarUrl,
+      instructorName: credit.name,
+      instructorAvatarUrl: credit.avatarUrl,
       rating: course.rating?.average || null,
       slug: course.slug,
       packageKey: enrollment?.packageKey ?? null,
@@ -860,6 +872,7 @@ export async function fetchOtherCourses(excludeCourseId: string): Promise<Browse
         role: string
       }
       const courseKind = courseKindOf(course)
+      const credit = courseCredit(courseKind, instructor)
             
       return {
         id: course._id.toString(),
@@ -869,8 +882,8 @@ export async function fetchOtherCourses(excludeCourseId: string): Promise<Browse
         shortDescription: course.shortDescription ?? null,
         thumbnailUrl: programArt(course),
         instructorId: instructor._id.toString(),
-        instructorName: `${instructor.firstName} ${instructor.lastName}`,
-        instructorAvatarUrl: instructor.avatarUrl,
+        instructorName: credit.name,
+        instructorAvatarUrl: credit.avatarUrl,
         level: course.level as "beginner" | "intermediate" | "advanced",
         category: course.category || "",
         school: schoolSlugOf(course.school),
@@ -915,7 +928,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
         select: "slug title thumbnailUrl kind format instructor totalLessons availableAt status packages examRequired school communityUrl",
         populate: {
           path: "instructor",
-          select: "firstName lastName avatarUrl instructorProfile.headline",
+          select: "firstName lastName avatarUrl role instructorProfile.headline",
         },
       })
       .sort({ lastAccessedAt: -1 })
@@ -939,6 +952,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
         firstName: string
         lastName: string
         avatarUrl: string | null
+        role?: string
         instructorProfile?: { headline?: string | null }
       }
     }
@@ -982,6 +996,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
       const firstLesson = courseLessons[0]
       const packages = course.packages ?? []
       const packageKey = enrollment.packageKey ?? null
+      const credit = courseCredit(courseKindOf(course), course.instructor)
       const resumeLessonId =
         enrollment.lastAccessedLesson?.toString() ?? firstLesson?._id.toString() ?? null
 
@@ -1027,8 +1042,8 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
         courseTitle: course.title,
         courseThumbnail: programArt(course),
         format: courseFormatOf({ kind: courseKindOf(course), format: course.format }),
-        instructorName: `${course.instructor.firstName} ${course.instructor.lastName}`,
-        instructorAvatarUrl: course.instructor.avatarUrl,
+        instructorName: credit.name,
+        instructorAvatarUrl: credit.avatarUrl,
         progress: enrollment.progress,
         totalLessons: course.totalLessons || 0,
         // Never opened: fall back to when it was created, not to "now" — a
@@ -1043,7 +1058,8 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
         packageKey,
         packageName: enrollment.packageName ?? null,
         instructorId: course.instructor._id.toString(),
-        instructorHeadline: course.instructor.instructorProfile?.headline || null,
+        instructorHeadline: credit.academy ? null : course.instructor.instructorProfile?.headline || null,
+        instructorIsAcademy: credit.academy,
         faculty: facultyByCourse.get(courseId) ?? [],
         entitlements,
         explicitPackage: packageKey !== null && packages.some((p) => p.key === packageKey),
@@ -1092,10 +1108,10 @@ export async function fetchMyBookmarks(): Promise<StudentBookmark[]> {
       .populate({
         path: "course",
         match: { status: "published" },
-        select: "title thumbnailUrl instructor level pricing price rating enrolledCount school slug",
+        select: "title thumbnailUrl instructor kind level pricing price rating enrolledCount school slug",
         populate: {
           path: "instructor",
-          select: "firstName lastName avatarUrl",
+          select: "firstName lastName avatarUrl role",
         },
       })
       .sort({ createdAt: -1 })
@@ -1110,7 +1126,8 @@ export async function fetchMyBookmarks(): Promise<StudentBookmark[]> {
           thumbnailUrl: string
           school?: string | null
           slug: string
-          instructor: { firstName: string; lastName: string; avatarUrl: string | null }
+          kind?: CourseKind | null
+          instructor: { firstName: string; lastName: string; avatarUrl: string | null; role?: string }
           level: string
           pricing: string
           price: number
@@ -1123,8 +1140,8 @@ export async function fetchMyBookmarks(): Promise<StudentBookmark[]> {
           courseId: course._id.toString(),
           courseTitle: course.title,
           courseThumbnail: programArt(course),
-          instructorName: `${course.instructor.firstName} ${course.instructor.lastName}`,
-          instructorAvatarUrl: course.instructor.avatarUrl,
+          instructorName: courseCredit(courseKindOf(course), course.instructor).name,
+          instructorAvatarUrl: courseCredit(courseKindOf(course), course.instructor).avatarUrl,
           level: course.level,
           pricing: course.pricing,
           price: course.price,

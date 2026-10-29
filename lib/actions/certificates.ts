@@ -6,6 +6,9 @@ import connectDB from "@/lib/db"
 import { Enrollment, Course, User, type ICoursePackage } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth"
 import { entitlementsFor } from "@/lib/entitlements"
+import { courseKindOf } from "@/lib/course-kind"
+import { courseCredit } from "@/lib/faculty"
+import type { CourseKind } from "@/lib/db/models"
 import { schoolFromSlug } from "@/lib/schools"
 import { ensureCertificateId, normalizeCertificateId } from "@/lib/certificate-id"
 import { ensureCertificateTier } from "@/lib/certificate-standing"
@@ -95,7 +98,7 @@ export async function fetchCertificate(courseId: string): Promise<CertificateDat
     if (!enrollment || !enrollment.completedAt) return null
 
     const course = await Course.findById(courseId)
-      .populate("instructor", "firstName lastName signatureUrl")
+      .populate("instructor", "firstName lastName role signatureUrl")
       .lean()
 
     if (!course) return null
@@ -108,6 +111,7 @@ export async function fetchCertificate(courseId: string): Promise<CertificateDat
     const instructor = course.instructor as unknown as {
       firstName?: string | null
       lastName?: string | null
+      role?: string | null
       signatureUrl?: string | null
     } | null
 
@@ -123,7 +127,8 @@ export async function fetchCertificate(courseId: string): Promise<CertificateDat
       id: enrollment._id.toString(),
       studentName: [user.firstName, user.lastName].filter(Boolean).join(" "),
       courseTitle: course.title,
-      instructorName: instructor ? [instructor.firstName, instructor.lastName].filter(Boolean).join(" ") : "",
+      // An Academy program is signed for by the account that holds it, in the Academy's name (creditsAcademy).
+      instructorName: instructor ? courseCredit(courseKindOf(course), instructor).name : "",
       completedAt: enrollment.completedAt.toISOString(),
       courseId: courseId,
       instructorSignatureUrl: instructor?.signatureUrl ?? null,
@@ -155,10 +160,10 @@ export async function fetchMyCertificates(): Promise<StudentCertificate[]> {
     })
       .populate({
         path: "course",
-        select: "title thumbnailUrl instructor packages format",
+        select: "title thumbnailUrl kind instructor packages format",
         populate: {
           path: "instructor",
-          select: "firstName lastName avatarUrl",
+          select: "firstName lastName avatarUrl role",
         },
       })
       .sort({ completedAt: -1 })
@@ -179,20 +184,23 @@ export async function fetchMyCertificates(): Promise<StudentCertificate[]> {
           _id: { toString(): string }
           title: string
           thumbnailUrl: string | null
+          kind?: CourseKind | null
           instructor: {
             firstName: string
             lastName: string
             avatarUrl: string | null
+            role?: string
           }
         }
+        const credit = courseCredit(courseKindOf(course), course.instructor)
 
         return {
           id: enrollment._id.toString(),
           courseId: course._id.toString(),
           courseTitle: course.title,
           courseThumbnail: course.thumbnailUrl,
-          instructorName: `${course.instructor.firstName} ${course.instructor.lastName}`,
-          instructorAvatarUrl: course.instructor.avatarUrl,
+          instructorName: credit.name,
+          instructorAvatarUrl: credit.avatarUrl,
           completedAt: enrollment.completedAt!.toISOString(),
           tier: standing?.tier ?? enrollment.certificateTier ?? "completion",
           next: standing?.next ?? null,
@@ -292,8 +300,8 @@ export async function verifyCertificate(
 
     const [course, student] = await Promise.all([
       Course.findById(enrollment.course)
-        .select("title school packages format instructor")
-        .populate("instructor", "firstName lastName")
+        .select("title school kind packages format instructor")
+        .populate("instructor", "firstName lastName role")
         .lean(),
       User.findById(enrollment.user).select("firstName lastName").lean(),
     ])
@@ -302,7 +310,7 @@ export async function verifyCertificate(
     // The same gate as fetchCertificate: packages without the certificate never certify.
     if (!entitlementsFor(course, enrollment).certificate) return null
 
-    const instructor = course.instructor as unknown as { firstName?: string; lastName?: string } | null
+    const instructor = course.instructor as unknown as { firstName?: string; lastName?: string; role?: string } | null
 
     return {
       certificateId: enrollment.certificateId,
@@ -310,7 +318,7 @@ export async function verifyCertificate(
       programName: course.title,
       schoolName: schoolFromSlug(course.school)?.name ?? null,
       completedAt: enrollment.completedAt.toISOString(),
-      instructorName: instructor ? `${instructor.firstName ?? ""} ${instructor.lastName ?? ""}`.trim() : "",
+      instructorName: instructor ? courseCredit(courseKindOf(course), instructor).name : "",
       tier: enrollment.certificateTier ?? "completion",
     }
   } catch (error) {

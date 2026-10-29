@@ -1,6 +1,8 @@
 import Link from "next/link"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { AcademyMark } from "@/components/shared/academy-mark"
 import { MessageInstructorButton } from "@/app/(platform)/dashboard/instructor/[instructorId]/message-instructor-button"
+import { ACADEMY_FACULTY } from "@/lib/faculty"
 import type { ProgramTeacher } from "@/lib/teaching"
 
 /*
@@ -52,6 +54,36 @@ export function ProgramFaculty({ members, canMessage }: { members: ProgramTeache
             )}
           </div>
         ))}
+      </div>
+    </section>
+  )
+}
+
+/*
+ * A program no faculty member has been assigned to yet (Owen, 2026-10-28:
+ * faculty is the Academy only). It is the Academy's, so it credits the
+ * Academy's faculty, never the account that owns the row, and links to no
+ * profile. Message reaches that account under the same Q&A gate as before.
+ */
+export function AcademyFaculty({ ownerId, canMessage }: { ownerId: string; canMessage: boolean }) {
+  return (
+    <section aria-labelledby="academy-faculty-heading" className="space-y-5">
+      <h2 id="academy-faculty-heading" className="text-base font-semibold">
+        Instructor
+      </h2>
+      <div className="flex flex-wrap items-center gap-4 rounded-lg bg-muted/30 p-5">
+        <AcademyMark size={48} />
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-[15px] font-semibold">{ACADEMY_FACULTY}</h3>
+          <p className="line-clamp-1 text-[13px] text-muted-foreground">Taught by the Academy&apos;s own faculty</p>
+        </div>
+        {canMessage ? (
+          <MessageInstructorButton instructorId={ownerId} label="Message" variant="outline" ariaLabel={`Message ${ACADEMY_FACULTY}`} />
+        ) : (
+          <p className="max-w-40 text-right text-[11px] leading-snug text-ws-muted">
+            Instructor Q&amp;A isn&apos;t in your plan
+          </p>
+        )}
       </div>
     </section>
   )

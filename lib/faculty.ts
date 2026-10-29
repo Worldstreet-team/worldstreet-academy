@@ -1,6 +1,7 @@
 import { z } from "zod/v4"
 import { BRAND } from "@/lib/brand"
 import { isCountryCode } from "@/lib/countries"
+import type { CourseKind } from "@/lib/db/models"
 
 /**
  * Whether people (instructors' names, photos and profiles) appear on the
@@ -19,6 +20,39 @@ export const FACULTY_PUBLIC: boolean = false
 export const ACADEMY_FACULTY = `${BRAND.name} faculty`
 /** The same credit where a card has no room for the full name. */
 export const ACADEMY_FACULTY_SHORT = `${BRAND.eyebrow} faculty`
+/**
+ * The gold wsa-mark as an avatar, wherever a course credits the Academy rather
+ * than a person: wsa-mark.png centred at 168px wide on a transparent 256×256
+ * square, so a round, cover-cropped avatar shows the whole mark.
+ */
+export const ACADEMY_AVATAR = "/brand/wsa-mark-avatar.png"
+
+/**
+ * Whether a course credits the Academy rather than a person (Owen,
+ * 2026-10-28: faculty is the Academy only; the marketplace is open to
+ * anyone). School programs and New Economy courses are the Academy's whoever
+ * owns the row, so the account that holds the catalogue is never shown as a
+ * tutor. A marketplace course is its creator's and carries their name —
+ * faculty selling their own course included — unless an admin owns it (the
+ * Academy selling its own). The faculty an admin assigned to a program
+ * (lib/teaching.ts) are still named where learners meet their teachers.
+ */
+export function creditsAcademy(kind: CourseKind, ownerRole: string | null | undefined): boolean {
+  return kind !== "marketplace" || ownerRole === "ADMIN"
+}
+
+/** The name and avatar a learner sees for a course's owner (`creditsAcademy`). */
+export function courseCredit(
+  kind: CourseKind,
+  owner: { role?: string | null; firstName?: string | null; lastName?: string | null; avatarUrl?: string | null } | null
+): { name: string; avatarUrl: string | null; academy: boolean } {
+  if (creditsAcademy(kind, owner?.role)) return { name: ACADEMY_FACULTY, avatarUrl: ACADEMY_AVATAR, academy: true }
+  return {
+    name: `${owner?.firstName ?? ""} ${owner?.lastName ?? ""}`.trim() || "Marketplace Creator",
+    avatarUrl: owner?.avatarUrl ?? null,
+    academy: false,
+  }
+}
 
 /**
  * Faculty (spec §10): the rules both profile editors share. Pure and
