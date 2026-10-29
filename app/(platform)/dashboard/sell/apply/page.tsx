@@ -31,8 +31,8 @@ export default async function SellApplyPage() {
             Sell on the marketplace
           </h1>
           <p className="mx-auto max-w-md text-[15px] leading-relaxed text-muted-foreground">
-            Apply once. When you&apos;re approved, you build your course, we review it and it goes live beside the
-            Academy&apos;s own.
+            Anyone can sell. Tell us what you&apos;ll teach and start straight away: you build your course, we review
+            it and it goes live beside the Academy&apos;s own.
           </p>
         </header>
 

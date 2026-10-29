@@ -26,7 +26,7 @@ const GOLD_CTA =
 const STEPS = [
   {
     title: "Application",
-    body: "Apply in ten minutes: what you'll teach, a sample of your work and your agreement to the standards. Once you're approved as a Marketplace Creator, build your listing in the editor and submit it.",
+    body: "Open to anyone, in ten minutes: what you'll teach, a sample of your work and your agreement to the standards. Your Creator area opens straight away; build your listing in the editor and submit it.",
   },
   ...REVIEW_CHECKS.map((key) => {
     const d = REVIEW_CHECK_DETAILS[key]
@@ -40,9 +40,9 @@ const STEPS = [
  * `/sell` — the pitch to sellers (owner, 2026-10-05): who the marketplace is
  * for, the split (the larger share through the seller's own link), the
  * quality criteria every course is reviewed against and how review works.
- * One gold action, "Apply to sell", at the top and again at the foot; it
- * leads to the signed-in application (the hub's sign-in comes first for a
- * guest).
+ * One gold action, "Start selling", at the top and again at the foot; it
+ * leads to the signed-in form, which opens the Creator area at once (open
+ * marketplace, Owen 2026-10-28; the hub's sign-in comes first for a guest).
  */
 export default function SellPage() {
   const own = sharePercent(MARKETPLACE_SHARE_OWN_LINK)
@@ -66,7 +66,7 @@ export default function SellPage() {
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-4">
             <Link href={APPLY_HREF} className={GOLD_CTA}>
-              Apply to sell
+              Start selling
               <ArrowRightIcon size={16} aria-hidden />
             </Link>
             <Link
@@ -193,12 +193,12 @@ export default function SellPage() {
               Ready to sell your course?
             </h2>
             <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-ws-muted">
-              Apply today. You&rsquo;ll need a WorldStreet account, a sample of your teaching and a topic that fits one
-              of the {SCHOOLS.length} schools.
+              Anyone can sell. You&rsquo;ll need a WorldStreet account, a sample of your teaching and a topic that
+              fits one of the {SCHOOLS.length} schools.
             </p>
           </div>
           <Link href={APPLY_HREF} className={GOLD_CTA}>
-            Apply to sell
+            Start selling
             <ArrowRightIcon size={16} aria-hidden />
           </Link>
         </section>

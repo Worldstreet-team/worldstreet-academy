@@ -38,7 +38,8 @@ import { formatDateTime, StatusBadge, FilterChips, Pagination } from "@/componen
  */
 export default function AdminSellersPage() {
   const queryClient = useQueryClient()
-  const [status, setStatus] = React.useState<SellerApplicationStatus>("submitted")
+  // Selling is self-serve (2026-10-28), so new creators land as approved; "To review" holds older applications.
+  const [status, setStatus] = React.useState<SellerApplicationStatus>("approved")
   const [page, setPage] = React.useState(1)
   const [openId, setOpenId] = React.useState<string | null>(null)
   const [rejectTarget, setRejectTarget] = React.useState<AdminSellerApplicationRow | null>(null)
@@ -84,7 +85,7 @@ export default function AdminSellersPage() {
         <div className="mx-auto w-full max-w-7xl space-y-8">
           <PageHeader
             title="Marketplace Creators"
-            subline="Approve the people who may sell on the marketplace. Their courses are reviewed separately, in Courses."
+            subline="Anyone may sell on the marketplace: creators are approved as they join. Their courses are reviewed in Courses before they go live."
           />
 
           <FilterChips

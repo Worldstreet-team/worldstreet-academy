@@ -19,12 +19,16 @@ import { isFacultyRole, safeWebUrl } from "@/lib/faculty"
 import { SELLER_HOME } from "@/lib/marketplace"
 
 /**
- * Seller applications (owner, 2026-10-05: approved sellers only). A person
- * applies at /dashboard/sell/apply; an admin approves or rejects at
- * /admin/sellers. Approval sets `User.sellerStatus = "approved"`, which opens
- * the trimmed instructor area for marketplace courses — never a role change.
- * Faculty (INSTRUCTOR/ADMIN) may already put courses on the marketplace and
- * don't apply.
+ * Seller applications. Owen, 2026-10-28: the marketplace is open to anyone
+ * (it was approved sellers only from 2026-10-05). Submitting the form at
+ * /dashboard/sell/apply approves the account at once and sets
+ * `User.sellerStatus = "approved"`, which opens the trimmed instructor area
+ * for marketplace courses — never a role change. Quality is held at the
+ * course instead: every marketplace course still passes the four recorded
+ * reviews before it is published (lib/actions/admin-course-review.ts). Admins
+ * see each new seller at /admin/sellers; rows submitted before the change can
+ * still be approved or rejected there. Faculty (INSTRUCTOR/ADMIN) may already
+ * put courses on the marketplace and don't apply.
  */
 
 type Result<T> = { success: true; data: T } | { success: false; error: string }
@@ -132,6 +136,19 @@ export async function getMySellerApplication(): Promise<MySellerApplication | nu
       User.findById(user.id).select("sellerStatus").lean(),
       SellerApplication.findOne({ user: user.id }).sort({ createdAt: -1 }).lean(),
     ])
+    // Open marketplace: an application still waiting from before 2026-10-28 is
+    // approved the first time its applicant looks, as a new one would be.
+    if (latest?.status === "submitted") {
+      const approved = await SellerApplication.findOneAndUpdate(
+        { _id: latest._id, status: "submitted" },
+        { $set: { status: "approved", reviewedBy: null, reviewedAt: new Date(), reason: null } },
+        { new: true }
+      ).lean()
+      if (approved) {
+        await User.updateOne({ _id: user.id }, { $set: { sellerStatus: "approved" } })
+        return { sellerStatus: "approved", isFaculty: isFacultyRole(user.role), application: toView(approved) }
+      }
+    }
     return {
       sellerStatus: me?.sellerStatus ?? "none",
       isFaculty: isFacultyRole(user.role),
@@ -163,10 +180,14 @@ export async function submitSellerApplication(input: SellerApplicationInput): Pr
     const open = await SellerApplication.exists({ user: user.id, status: "submitted" })
     if (open) return { success: false, error: "Your application is already in review" }
 
+    // Open marketplace: the application is its own approval (reviewedBy null
+    // marks it self-serve). A rejected applicant may sell after applying again.
     const now = new Date()
     const application = await SellerApplication.create({
       user: user.id,
-      status: "submitted",
+      status: "approved",
+      reviewedBy: null,
+      reviewedAt: now,
       fullName: answers.fullName,
       school: answers.school,
       topic: answers.topic,
@@ -175,14 +196,15 @@ export async function submitSellerApplication(input: SellerApplicationInput): Pr
       pitch: answers.pitch,
       agreedAt: now,
     })
-    await User.updateOne({ _id: user.id }, { $set: { sellerStatus: "applied" } })
+    await User.updateOne({ _id: user.id }, { $set: { sellerStatus: "approved" } })
 
-    // Fire-and-forget: the bell and an email for every admin.
+    // Fire-and-forget: the bell and an email for every admin, so they know who
+    // joined — their courses reach the review queue when submitted.
     const schoolName = SCHOOL_BY_SLUG[answers.school].name
     void notifyAdmins({
       type: "application",
-      title: "New Marketplace Creator application",
-      body: `${answers.fullName} wants to sell “${answers.topic}” (${SCHOOL_BY_SLUG[answers.school].short}).`.slice(0, 500),
+      title: "New Marketplace Creator",
+      body: `${answers.fullName} joined the marketplace to sell “${answers.topic}” (${SCHOOL_BY_SLUG[answers.school].short}).`.slice(0, 500),
       href: "/admin/sellers",
     })
     void (async () => {
@@ -204,6 +226,7 @@ export async function submitSellerApplication(input: SellerApplicationInput): Pr
 
     revalidatePath("/dashboard/sell/apply")
     revalidatePath("/admin/sellers")
+    revalidatePath("/instructor", "layout")
     return { success: true, data: { id: application._id.toString() } }
   } catch (error) {
     // Unique-index race: two tabs submitting at once.

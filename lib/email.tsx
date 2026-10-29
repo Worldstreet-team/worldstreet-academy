@@ -1534,12 +1534,12 @@ export async function sendNewSellerApplicationAdminEmail(
     const { error } = await resend.emails.send({
       from: FROM_EMAIL,
       to,
-      subject: `New Marketplace Creator application — ${data.applicantName}`,
+      subject: `New Marketplace Creator — ${data.applicantName}`,
       react: React.createElement(SimplePipelineEmail, {
-        preview: `${data.applicantName} applied to sell on the marketplace`,
-        title: "New Marketplace Creator application",
-        bodyText: `${data.applicantName} wants to sell a course on the marketplace: “${data.topic}” (${data.schoolName}).`,
-        ctaLabel: "Review application",
+        preview: `${data.applicantName} joined the marketplace as a creator`,
+        title: "New Marketplace Creator",
+        bodyText: `${data.applicantName} joined the marketplace to sell “${data.topic}” (${data.schoolName}). Their courses reach the review queue when they submit them.`,
+        ctaLabel: "View creators",
         ctaUrl: data.reviewUrl,
         avatarUrl: data.applicantAvatarUrl,
         avatarName: data.applicantName,

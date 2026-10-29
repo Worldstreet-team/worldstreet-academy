@@ -132,7 +132,7 @@ function ApplicationForm({
     <form onSubmit={submit} className={`${PANEL} space-y-6 p-6 sm:p-8`} noValidate>
       <div className="space-y-1">
         <h2 className="font-display text-[20px] font-semibold tracking-[-0.01em] text-foreground">Your application</h2>
-        <p className="text-[14px] text-muted-foreground">An admin reads every application. We&apos;ll email you the decision.</p>
+        <p className="text-[14px] text-muted-foreground">Your Creator area opens as soon as you send this. Every course is reviewed before it goes live.</p>
       </div>
 
       <Field label="Your full name" htmlFor={ids.name} hint="The name on your course cards: “by …”.">
@@ -239,7 +239,7 @@ function ApplicationForm({
 
       <div className="flex justify-end">
         <Button type="submit" className="h-11 px-6 md:h-10" disabled={pending}>
-          {pending ? "Sending…" : "Apply to sell"}
+          {pending ? "Sending…" : "Start selling"}
         </Button>
       </div>
     </form>
@@ -247,10 +247,11 @@ function ApplicationForm({
 }
 
 /**
- * The seller application at /dashboard/sell/apply (owner, 2026-10-05): the
- * form, or where an application stands — in review, approved (the way into
- * the seller area) or not approved (the reason, and Apply again). Faculty
- * don't apply: they can already put courses on the marketplace.
+ * The seller application at /dashboard/sell/apply: the form, or where an
+ * application stands. Sending it approves the account at once (Owen,
+ * 2026-10-28: the marketplace is open to anyone), so "in review" and "not
+ * approved" only show for applications sent before then. Faculty don't
+ * apply: they can already put courses on the marketplace.
  */
 export function SellerApplyPanel({
   data,

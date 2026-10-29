@@ -1,9 +1,11 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose"
 
 /**
- * Seller application — the door to the Academy Marketplace (owner,
- * 2026-10-05: approved sellers only). A person applies, an admin approves,
- * and only then may they create marketplace courses. Sellers are not faculty:
+ * Seller application — the door to the Academy Marketplace. Approved sellers
+ * only from 2026-10-05; open to anyone from 2026-10-28 (Owen): a new
+ * application is stored already "approved" (reviewedBy null), and an
+ * earlier one still "submitted" approves itself when its applicant next opens
+ * /dashboard/sell/apply (an admin may also decide it first). Sellers are not faculty:
  * approval sets `User.sellerStatus = "approved"` and never touches `role`.
  *
  *   submitted → approved | rejected        (a rejected applicant may apply again)
