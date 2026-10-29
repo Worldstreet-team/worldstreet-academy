@@ -16,8 +16,10 @@ Required, in launch order:
 5. **Before the Phase 21 deploy, if Go writes `users.role` or maps Clerk roles at sign-in:** R14 (§12).
 6. **Before `scripts/migrate-schools-v2.mjs --apply`:** R12 (§15).
 7. **Before any template or guide is approved or published:** R15 (§9).
+8. **Before `scripts/move-tutor-courses.mjs --apply`:** §9's `kind` filter (step 2), so the moved tutor courses leave mobile program lists too (§21).
+9. **If Go writes `courses.packages` or hardcodes a plan price:** R16, the price list (§21), in the release after this web push.
 
-Optional, any time: R9's ID stamping on Go completions, R13's tier names on mobile certificates, R-A attendance (§13, recommended before the first certificate tiers are awarded), points (§11), the welcome email (§14), intents (§6), cohorts (§18) and teaching faculty (§20).
+Optional, any time: R9's ID stamping on Go completions, R13's tier names on mobile certificates, R-A attendance (§13, recommended before the first certificate tiers are awarded), points (§11), the welcome email (§14), intents (§6), cohorts (§18), teaching faculty (§20) and R17, the Academy credit (§21, recommended: without it mobile keeps naming the catalogue's owner account on every program).
 
 ---
 
@@ -407,3 +409,41 @@ The Academy keeps owning each program and keeps its sales share. An admin assign
 - **R7 (instructor Q&A) counts them too.** "Someone who teaches courses the user is enrolled in" includes a program's assigned faculty while they hold a faculty role. So a learner reaches them under the same `instructorQa` rule, and a learner without `instructorQa` is refused exactly as for the owner.
 - **`mentorshipsessions.instructor` still means "who runs it".** A request is created with the program's owner, as before. Any teacher of the program may answer it. The one who confirms becomes the room's host, and the web moves `instructor` to them in the same filtered update that claims the request (`{ _id, status: "requested" }`).
 - **Web source of truth:** `lib/teaching.ts` (`teachingFilter`, `taughtCourseIds`, `teachesCourse`).
+
+## 21. Academy-only faculty, an open marketplace and the price list (Owen, 2026-10-28)
+
+Owen's corrections: faculty is the Academy only; the tutors' marketplace is open to anyone; outside tutors (Nwakwesi Milash) move to the marketplace; every faculty course sells Basic $49, Standard $99 and Executive $199; payments must work. Nothing is renamed and no enum value is added. The handoff for this release, with the wallet and production steps, is `docs/backend-handoff-2026-10-29.md`.
+
+**R16 — The price list. REQUIRED only if Go writes `courses.packages` or hardcodes a plan price.**
+- Every plan of a school program (`kind` missing or `"program"`) sells at the price list: `basic` 49, `standard` 99, `executive` 199, whole USD (`PROGRAM_PRICE_LIST`, `lib/entitlements.ts`). The web writes these prices whatever its editor posts, and refuses a paid program with no enabled plan (it can still be free).
+- After `scripts/mastery-catalogue.mjs --apply --allow-price-change`, every catalogue program's `packages[].price` holds them, `courses.price` is 49 and `listPrice` is `null` (no struck-through price).
+- Go charges `package.price × 100` (R5), so it needs no change for the data. It does need one if it has its own plan-price table, prints prices from copy, or lets an instructor save plan prices (question 6 in §4): write the list prices, never posted ones.
+- Marketplace courses keep their creator's single price (`packages: []`). New Economy courses stay free.
+
+**R17 — Who a course credits. Recommended: without it, mobile still names the catalogue's owner account on every program and certificate.**
+- A school program or a New Economy course credits **"WorldStreet Mastery Academy faculty"**, with the Academy's gold mark as the avatar, never `courses.instructor`'s name. The 12 programs belong to one account (`samsonrichfield@gmail.com`, named "Thy Richfield"); learners must not see it as a tutor.
+- Where a learner meets their teachers (course detail, lesson page, "your instructor", Executive mentorship), show the program's assigned faculty (§20) by name when it has any. Otherwise the owner account reads as the Academy's faculty there too, including on a mentorship session it confirmed.
+- A marketplace course credits its creator by name, whether a `USER` seller or faculty selling their own course. The one exception is a course owned by an `ADMIN`, which credits the Academy.
+- Certificates and `/verify` print the same credit as the instructor line. The instructor signature image is still the owner account's.
+- Messages still go to `courses.instructor`; only the displayed name and avatar change. A live class still names the person hosting it.
+- Web: `creditsAcademy` and `courseCredit` in `lib/faculty.ts`.
+
+**Open marketplace (no Go patch).**
+- A seller application now approves itself: new `sellerapplications` rows are written `status: "approved"`, with `reviewedBy: null` (that marks them self-serve) and `reviewedAt` set to the submit time. `users.sellerStatus` becomes `"approved"` at the same moment.
+- A row submitted before this change approves itself, with the same fields, the first time its applicant opens `/dashboard/sell/apply` (an admin may still decide it first at `/admin/sellers`).
+- §9 is unchanged: Go never publishes a `USER`-owned course and never writes `review.*`. Quality is held at the course: every creator's course still passes the four recorded checks before it goes live.
+
+**Tutor courses moved out of the programs (`scripts/move-tutor-courses.mjs`, owner-run).** Every program-kind course whose title is not one of the 12 programs and whose owner is not the catalogue's owner account is rewritten. In production that is Milash's two courses. Each row gets:
+- `kind: "marketplace"` and `format: "course"`;
+- `status: "archived"` if it was published, until an admin approves it (approval publishes it);
+- `review.status: "pending"`, with `review.submittedAt` and `review.note` set;
+- `packages: []` (a marketplace course sells at one price; `price` is unchanged).
+
+The owner's `users.sellerStatus` becomes `"approved"`. Their `role` is never written; an admin moves them to `USER` on the web.
+
+What Go must get right:
+- **Program lists.** §9's `kind: { $nin: ["marketplace", "new-economy"] }` filter must be live first (§0 step 8).
+- **Buyers keep access.** Enrollments are untouched. A `packageKey` that no longer exists on the course reads as full access (R1, "not found"). A learner enrolled in an archived course must still be able to open it on mobile, as on the web (the learn page doesn't filter on `status`).
+- **Credit.** Until the owner's role changes, R17's rule still credits them by name on the marketplace, never as Academy faculty.
+
+**Earnings (no rule change; please confirm).** A program sale still books the seller's share, 85%, to `courses.instructor` as a `kind: "sale"` earning. For all 12 programs that is the catalogue's owner account, and `/api/cron/earnings` credits it to that account's wallet after 7 days. Confirm that wallet is the Academy's own before the first paid sale; the handoff lists the options if it isn't.
