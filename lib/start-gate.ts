@@ -13,15 +13,18 @@ export type StartGateInput = {
 
 /**
  * Reachable without paying: the retired picker URL (now a redirect), the
- * till, the wallet (so a learner can top up to pay), the instructor door,
- * invite links, referrals (owner, 2026-10-05: anyone signed in can share
- * their code) and the seller application (a marketplace seller needn't be
- * enrolled anywhere — owner, 2026-10-05).
+ * till, the wallet (so a learner can top up to pay), their payments (a
+ * failed or in-review purchase stays visible — corrections brief,
+ * 2026-10-28), the instructor door, invite links, referrals (owner,
+ * 2026-10-05: anyone signed in can share their code) and the seller
+ * application (a marketplace seller needn't be enrolled anywhere — owner,
+ * 2026-10-05).
  */
 const EXEMPT_PREFIXES = [
   "/dashboard/start",
   "/dashboard/checkout",
   "/dashboard/wallet",
+  "/dashboard/payments",
   "/dashboard/become-instructor",
   "/dashboard/meetings",
   "/dashboard/referrals",

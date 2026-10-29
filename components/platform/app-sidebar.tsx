@@ -1,5 +1,5 @@
 "use client"
-import { Glyph, ArrowDown01Icon, ArrowRight01Icon, BookOpen01Icon, Bookmark02Icon, Brain01Icon, Calendar03Icon, Certificate01Icon, ChampionIcon, ClipboardCheckIcon, ChartUpIcon, DashboardSquare01Icon, DollarCircleIcon, EyeIcon, GameController01Icon, GiftIcon, HelpCircleIcon, Inbox, LinkSquare02Icon, Logout01Icon, MentoringIcon, Message01Icon, Store01Icon, Task01Icon, TeachingIcon, UserGroup02Icon, UserMultiple02Icon, Video01Icon, VideoReplayIcon, Wallet01Icon } from "@/components/icons"
+import { Glyph, ArrowDown01Icon, ArrowRight01Icon, BookOpen01Icon, Bookmark02Icon, Brain01Icon, Calendar03Icon, Certificate01Icon, ChampionIcon, ClipboardCheckIcon, ChartUpIcon, DashboardSquare01Icon, DollarCircleIcon, EyeIcon, GameController01Icon, GiftIcon, HelpCircleIcon, Inbox, LinkSquare02Icon, Logout01Icon, MentoringIcon, Message01Icon, ReceiptTextIcon, Store01Icon, Task01Icon, TeachingIcon, UserGroup02Icon, UserMultiple02Icon, Video01Icon, VideoReplayIcon, Wallet01Icon } from "@/components/icons"
 
 import * as React from "react"
 import Image from "next/image"
@@ -150,6 +150,7 @@ const connectItems: NavItem[] = [
 /** Low-frequency destinations. Reachable, but not competing for attention. */
 const accountItems: NavItem[] = [
   { title: "Wallet", href: "/dashboard/wallet", icon: Wallet01Icon, match: (p) => p.startsWith("/dashboard/wallet") },
+  { title: "Payments", href: "/dashboard/payments", icon: ReceiptTextIcon, match: (p) => p === "/dashboard/payments" },
   {
     title: "WMA Partners",
     href: "/dashboard/referrals",
