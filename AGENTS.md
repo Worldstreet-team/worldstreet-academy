@@ -45,7 +45,7 @@ Imports use `@/*` → repo root. Zod is imported as `import { z } from "zod/v4"`
 - `lib/school-art.ts` — school covers, `PROGRAM_ART` and `programArt` (the program's own uploaded thumbnail → its `PROGRAM_ART` file → its school's cover). Student and public read models apply it; instructor ones deliberately do not.
 - `lib/program-rail.ts` — what the student program page may print about price and size (an enrolled learner is never quoted a price; a ladder reads "From"; zeros are omitted).
 
-**Local-dev switch.** A `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` starting with `pk_test_` selects local `/login`; otherwise Clerk runs in satellite mode against `worldstreetgold.com`. This branch is repeated in `middleware.ts`, `app/layout.tsx`, and every authed layout — mirror it in any new auth redirect.
+**Local-dev switch.** A `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` starting with `pk_test_` selects local `/login`; otherwise sign-in lives on the hub (`www.worldstreetgold.com/login`) and the Academy shares its Clerk session as a subdomain — **not** satellite mode (never set `isSatellite`/`domain`: the Academy is not a registered satellite, and clerk-js then sends every signed-out visitor to a `/v1/client/sync` that fails). This branch is repeated in `middleware.ts`, `app/layout.tsx`, and every authed layout — mirror it in any new auth redirect.
 
 **Auth.** Clerk is the identity provider; **MongoDB is authoritative for `role`**. `lib/auth/sync.ts` resolves a Clerk id via `authUserId` *or* `linkedAuthIds` (mobile and dev Clerk instances mint different ids per human), and on an email match it **links** the new id — never overwrite `authUserId`, it is the wallet subject. Clerk metadata may only upgrade a `USER`, never demote.
 

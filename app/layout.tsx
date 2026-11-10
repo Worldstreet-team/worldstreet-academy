@@ -79,7 +79,7 @@ export const metadata: Metadata = {
   },
 };
 
-// Detect local development vs production satellite mode
+// Detect local development vs production (sign-in lives on the hub)
 const isLocalDev = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_")
 
 export default function RootLayout({
@@ -91,8 +91,7 @@ export default function RootLayout({
     <ClerkProvider
       {...(!isLocalDev
         ? {
-            domain: "worldstreetgold.com",
-            isSatellite: true,
+            // No `isSatellite`/`domain`: see the note in middleware.ts.
             signInUrl: "https://www.worldstreetgold.com/login",
             signUpUrl: "https://www.worldstreetgold.com/register",
             signInFallbackRedirectUrl: "https://academy.worldstreetgold.com/dashboard",
