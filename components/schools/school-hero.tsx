@@ -4,6 +4,7 @@ import Link from "next/link"
 import { SCHOOLS, type School } from "@/lib/schools"
 import type { CourseRatingSummary } from "@/lib/actions/reviews"
 import { packagePriceLabel } from "@/lib/program-price"
+import { PackageDiscount } from "@/components/programs/package-offer"
 import { ACADEMY_FACULTY, FACULTY_PUBLIC } from "@/lib/faculty"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -176,9 +177,11 @@ function HeroFacts({
   if (programs.length === 0) return null
 
   const levels = levelsOf(programs)
-  const prices = programs.map(({ program }) => (program.pricing === "free" ? 0 : (program.price ?? null)))
-  const known = prices.filter((p): p is number => p !== null)
-  const cheapest = known.length > 0 ? Math.min(...known) : null
+  // The cheapest way in and the regular price it is discounted from (every listed program is on sale).
+  const cheapest = programs.reduce<{ price: number; listPrice: number | null } | null>((low, { program }) => {
+    if (program.price === null) return low
+    return low === null || program.price < low.price ? { price: program.price, listPrice: program.listPrice } : low
+  }, null)
   const freeLessons = programs.reduce((sum, p) => sum + p.facts.previews, 0)
   const learners = programs.reduce((sum, p) => sum + p.program.enrolledCount, 0)
   const instructors = [
@@ -216,7 +219,22 @@ function HeroFacts({
         ),
     },
     ...(cheapest !== null
-      ? [{ key: "price", label: "Starting at", value: <span className="tabular-nums">{packagePriceLabel(cheapest)}</span> }]
+      ? [
+          {
+            key: "price",
+            label: "Starting at",
+            value: (
+              <span className="inline-flex flex-wrap items-baseline gap-x-2 tabular-nums">
+                {packagePriceLabel(cheapest.price)}
+                <PackageDiscount
+                  pkg={cheapest}
+                  chipClassName="hidden"
+                  className={cn("text-[14px] font-normal", onArt && "lg:[&_s]:text-white/55")}
+                />
+              </span>
+            ),
+          },
+        ]
       : []),
     ...(freeLessons > 0
       ? [{ key: "free", label: "Free lessons", value: <span className="tabular-nums">{freeLessons}</span> }]

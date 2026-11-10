@@ -898,6 +898,47 @@ export async function sendTeachingDemoInviteEmail(to: string, data: InterviewEma
 }
 
 /**
+ * Send the invitation to an in-person staff tutor interview at the office
+ * (owner, 2026-11-05). There is no room to join, so the email carries the
+ * address and links to the applicant's status page. Pass `ics` to attach a
+ * calendar file.
+ */
+export async function sendOfficeInterviewInviteEmail(
+  to: string,
+  data: Omit<InterviewEmailData, "joinUrl"> & { location: string; statusUrl: string },
+  ics?: string
+) {
+  const when = formatUtcDateTime(data.scheduledAt, "full")
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to,
+      subject: "Your staff tutor interview is scheduled",
+      react: React.createElement(SimplePipelineEmail, {
+        preview: "Your interview at our office is scheduled",
+        title: "Interview at our office",
+        bodyText: `${data.applicantName}, ${data.hostName} will interview you in person on ${when}, at: ${data.location}. Please bring a photo ID and arrive a few minutes early.`,
+        ctaLabel: "View your application",
+        ctaUrl: data.statusUrl,
+        avatarUrl: data.applicantAvatarUrl,
+        avatarName: data.applicantName,
+      }),
+      ...(ics
+        ? { attachments: [{ filename: "interview.ics", content: Buffer.from(ics).toString("base64") }] }
+        : {}),
+    })
+    if (error) {
+      console.error("[Email] Office interview invite failed:", error)
+      return { success: false, error: error.message }
+    }
+    return { success: true }
+  } catch (err) {
+    console.error("[Email] Office interview invite error:", err)
+    return { success: false, error: "Failed to send email" }
+  }
+}
+
+/**
  * Send the instructor application decision (approved / rejected).
  */
 export async function sendApplicationDecisionEmail(to: string, data: ApplicationEmailData) {
@@ -1322,7 +1363,7 @@ export async function sendFinishEnrollingEmail(data: FinishEnrollingEmailData) {
   }
 }
 
-/* ─── Pay with ESPEE (owner meeting, 2026-10-03) ─── */
+/* ─── Paying by transfer: ESPEE (owner meeting, 2026-10-03), bank and USDT (2026-11-05) ─── */
 
 /** One message, one button — the learner-facing ESPEE notices. */
 function PaymentNoticeEmail({
@@ -1366,10 +1407,12 @@ function PaymentNoticeEmail({
   )
 }
 
-/** New ESPEE proof to review — one per admin. */
+/** New transfer proof (ESPEE, bank or USDT) to review — one per admin. */
 export async function sendEspeePaymentAdminEmail(
   to: string,
   data: {
+    /** "ESPEES", "Bank transfer", "USDT (TRC20)" … */
+    methodLabel: string
     learnerName: string
     learnerAvatarUrl?: string
     courseTitle: string
@@ -1383,10 +1426,10 @@ export async function sendEspeePaymentAdminEmail(
     const { error } = await resend.emails.send({
       from: FROM_EMAIL,
       to,
-      subject: `New ESPEE payment to review — ${data.learnerName}`,
+      subject: `New ${data.methodLabel} payment to review — ${data.learnerName}`,
       react: React.createElement(SimplePipelineEmail, {
         preview: `${data.learnerName} sent ${data.amountLabel}`,
-        title: "New ESPEE payment to review",
+        title: `New ${data.methodLabel} payment to review`,
         bodyText: `${data.learnerName} sent ${data.amountLabel} for ${data.courseTitle}${
           data.packageName ? ` — ${data.packageName}` : ""
         }. Transfer reference: ${data.transferReference}. Check the receipt, then approve or reject it.`,
@@ -1405,6 +1448,8 @@ export async function sendEspeePaymentAdminEmail(
 }
 
 export type EspeeLearnerEmailData = {
+  /** "ESPEES", "Bank transfer", "USDT (TRC20)" … */
+  methodLabel: string
   to: string
   firstName: string
   courseTitle: string
@@ -1423,7 +1468,7 @@ export async function sendEspeeProofReceivedEmail(data: EspeeLearnerEmailData) {
       subject: `We received your payment proof: ${data.courseTitle}`,
       react: (
         <PaymentNoticeEmail
-          preview={`Your ${data.amountLabel} transfer is being checked`}
+          preview={`Your ${data.methodLabel} payment of ${data.amountLabel} is being checked`}
           title="We received your proof"
           ctaLabel="View payment status"
           ctaUrl={statusUrl}
@@ -1463,13 +1508,13 @@ export async function sendEspeePaymentRejectedEmail(
       subject: `Payment not confirmed: ${data.courseTitle}`,
       react: (
         <PaymentNoticeEmail
-          preview={`We couldn't confirm your ${data.amountLabel} transfer`}
+          preview={`We couldn't confirm your ${data.methodLabel} payment of ${data.amountLabel}`}
           title="Payment not confirmed"
           ctaLabel="Try again"
           ctaUrl={data.checkoutUrl}
         >
           <Text style={sub}>
-            {data.firstName ? `${data.firstName}, we` : "We"} couldn&apos;t confirm your ESPEE payment of{" "}
+            {data.firstName ? `${data.firstName}, we` : "We"} couldn&apos;t confirm your {data.methodLabel} payment of{" "}
             <strong>{data.amountLabel}</strong> for <strong>{data.courseTitle}</strong>
             {data.packageName ? ` — ${data.packageName}` : ""}.
           </Text>
@@ -1500,6 +1545,62 @@ export async function sendEspeePaymentRejectedEmail(
     return { success: true }
   } catch (err) {
     console.error("[Email] ESPEE rejection error:", err)
+    return { success: false, error: "Failed to send email" }
+  }
+}
+
+/**
+ * "Your place is ready": an admin recorded a payment the learner made outside
+ * the platform (team, 2026-11-06), and no Academy account has their email yet.
+ * Sign-in stays on the hub (owner, 2026-11-03), so it never carries a
+ * password: it names the address to sign in or sign up with.
+ */
+export async function sendAccessReadyEmail(data: {
+  to: string
+  name: string
+  courseTitle: string
+  packageName: string | null
+  /** The hub's sign-up link back to the Academy (registerUrl). */
+  registerHref: string
+}) {
+  if (!data.to) return { success: false, error: "No recipient" }
+  const academyUrl = appUrl("/dashboard")
+  const registerHref = data.registerHref.startsWith("/") ? `${APP_URL}${data.registerHref}` : data.registerHref
+  const program = `${data.courseTitle}${data.packageName ? ` — ${data.packageName}` : ""}`
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: data.to,
+      subject: `Your place is ready: ${data.courseTitle}`,
+      react: (
+        <PaymentNoticeEmail
+          preview={`${data.courseTitle} is ready for you. You won't pay again.`}
+          title="Your place is ready"
+          ctaLabel="Open the Academy"
+          ctaUrl={academyUrl}
+        >
+          <Text style={sub}>
+            {data.name ? `${data.name}, we` : "We"} have recorded your payment for <strong>{program}</strong>. Your
+            place is ready, and you won&apos;t be asked to pay again.
+          </Text>
+          <Text style={sub}>
+            Sign in to the Academy with your WorldStreet account for <strong>{data.to}</strong>. Your program opens
+            as soon as you do.
+          </Text>
+          <Text style={{ ...muted, marginTop: "12px" }}>
+            No WorldStreet account yet? <Link href={registerHref}>Create one with this email address</Link>, then
+            come back to the Academy.
+          </Text>
+        </PaymentNoticeEmail>
+      ),
+    })
+    if (error) {
+      console.error("[Email] Access ready failed:", error)
+      return { success: false, error: error.message }
+    }
+    return { success: true }
+  } catch (err) {
+    console.error("[Email] Access ready error:", err)
     return { success: false, error: "Failed to send email" }
   }
 }

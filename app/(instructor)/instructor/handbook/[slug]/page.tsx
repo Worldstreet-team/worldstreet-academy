@@ -8,7 +8,7 @@ import {
   INSTRUCTOR_REVENUE_SHARE,
   MARKETPLACE_SHARE_ACADEMY,
   MARKETPLACE_SHARE_OWN_LINK,
-  REFERRAL_COMMISSION_RATE,
+  REFERRAL_RATE_BY_PLAN,
 } from "@/lib/db/models"
 import { HANDBOOK_APPROVED, handbookPageBySlug, handbookSections } from "@/lib/faculty-handbook"
 
@@ -22,7 +22,7 @@ export default async function HandbookPageView({ params }: { params: Promise<{ s
     facultyShare: INSTRUCTOR_REVENUE_SHARE,
     creatorShareOwnLink: MARKETPLACE_SHARE_OWN_LINK,
     creatorShareAcademy: MARKETPLACE_SHARE_ACADEMY,
-    referralRate: REFERRAL_COMMISSION_RATE,
+    referralRates: REFERRAL_RATE_BY_PLAN,
     clearingDays: EARNINGS_CLEARING_DAYS,
   })
 

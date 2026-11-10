@@ -14,5 +14,5 @@ export const PROGRAM_KIND_FILTER = { kind: { $nin: ["marketplace", "new-economy"
 export const COURSE_KIND_LABEL: Record<CourseKind, string> = {
   program: "School program",
   marketplace: "Marketplace course",
-  "new-economy": "New Economy (free)",
+  "new-economy": "New Economy",
 }

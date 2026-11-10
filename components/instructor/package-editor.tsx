@@ -15,16 +15,17 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import type { ICoursePackage, IPackageEntitlements, PackageKey } from "@/lib/db/models"
-import { PACKAGE_KEYS, PACKAGE_LABEL, PROGRAM_PRICE_LIST, recordingsAllowed } from "@/lib/entitlements"
+import { PACKAGE_KEYS, PACKAGE_LABEL, PROGRAM_PRICE_LIST, PROGRAM_REGULAR_PRICE, recordingsAllowed } from "@/lib/entitlements"
 import { packagePriceLabel } from "@/lib/program-price"
 
 
 /**
  * Editor-side row for one package. Mirrors ICoursePackage except that
- * `features` is edited as one textarea (a line per feature), `listPrice` and
- * `duration` are the raw input strings ("" = not set) and there is no price:
- * every plan sells at the Academy's price list (PROGRAM_PRICE_LIST, Owen
- * 2026-10-28), so the tier key decides it. `toCoursePackage` converts back
+ * `features` is edited as one textarea (a line per feature), `duration` is
+ * the raw input string ("" = not set) and there is no price or regular price:
+ * every plan sells at the Academy's price list with its regular price struck
+ * through (PROGRAM_PRICE_LIST and PROGRAM_REGULAR_PRICE, Owen 2026-10-28 and
+ * 2026-11-03), so the tier key decides both. `toCoursePackage` converts back
  * before submit. `uid` is the React key (the tier key can be changed in place).
  */
 export type EditorPackage = {
@@ -32,7 +33,6 @@ export type EditorPackage = {
   key: PackageKey
   name: string
   tagline: string
-  listPrice: string
   duration: string
   featuresText: string
   highlight: boolean
@@ -70,7 +70,6 @@ export function toEditorPackage(p: ICoursePackage): EditorPackage {
     key: p.key,
     name: p.name,
     tagline: p.tagline ?? "",
-    listPrice: p.listPrice == null ? "" : String(p.listPrice),
     duration: p.duration ?? "",
     featuresText: (p.features ?? []).join("\n"),
     highlight: Boolean(p.highlight),
@@ -80,15 +79,7 @@ export function toEditorPackage(p: ICoursePackage): EditorPackage {
   }
 }
 
-/** "" or non-numeric → null. No rounding or clamping: the server rejects decimals and negatives with a message. */
-function parsePrice(raw: string): number | null {
-  const trimmed = raw.trim()
-  if (trimmed === "") return null
-  const n = Number(trimmed)
-  return Number.isFinite(n) ? n : null
-}
-
-/** What the editor posts: an ICoursePackage whose original price may still be invalid — the server is the authority. */
+/** What the editor posts: an ICoursePackage — the server is the authority. */
 export type PackagePayload = ICoursePackage
 
 export function toCoursePackage(p: EditorPackage): PackagePayload {
@@ -99,7 +90,7 @@ export function toCoursePackage(p: EditorPackage): PackagePayload {
     name: p.name.trim(),
     tagline: p.tagline.trim(),
     price: PROGRAM_PRICE_LIST[p.key],
-    listPrice: parsePrice(p.listPrice),
+    listPrice: PROGRAM_REGULAR_PRICE[p.key],
     duration: duration === "" ? null : duration,
     features: p.featuresText
       .split("\n")
@@ -118,7 +109,6 @@ export function emptyPackage(key: PackageKey): EditorPackage {
     key,
     name: "",
     tagline: "",
-    listPrice: "",
     duration: "",
     featuresText: "",
     highlight: false,
@@ -128,7 +118,7 @@ export function emptyPackage(key: PackageKey): EditorPackage {
   }
 }
 
-/** Cheapest ENABLED tier in whole dollars, or null when no tier is enabled (the program is then free or unsellable). */
+/** Cheapest ENABLED tier in whole dollars, or null when no tier is enabled (the program then can't be saved — no course is free). */
 export function ladderPrice(packages: EditorPackage[]): number | null {
   const prices = packages.filter((p) => p.enabled).map((p) => PROGRAM_PRICE_LIST[p.key])
   return prices.length === 0 ? null : Math.min(...prices)
@@ -247,20 +237,16 @@ export function PackageEditor({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor={`pkg-list-price-${pkg.uid}`}>
-                Original price <span className="font-normal text-muted-foreground">(optional)</span>
-              </Label>
+              <Label htmlFor={`pkg-list-price-${pkg.uid}`}>Regular price (USD)</Label>
               <Input
                 id={`pkg-list-price-${pkg.uid}`}
-                type="number"
-                min="0"
-                step="1"
-                placeholder="300"
-                value={pkg.listPrice}
-                onChange={(e) => patch(pkg.uid, { listPrice: e.target.value })}
+                readOnly
+                aria-describedby={`pkg-list-price-note-${pkg.uid}`}
+                className="tabular-nums"
+                value={packagePriceLabel(PROGRAM_REGULAR_PRICE[pkg.key])}
               />
-              <p className="text-[10px] text-muted-foreground">
-                Shown struck through beside the price. Must be higher than the price.
+              <p id={`pkg-list-price-note-${pkg.uid}`} className="text-[10px] text-muted-foreground">
+                Shown struck through beside the price, with the saving.
               </p>
             </div>
             <div className="space-y-1.5">
@@ -269,7 +255,7 @@ export function PackageEditor({
               </Label>
               <Input
                 id={`pkg-duration-${pkg.uid}`}
-                placeholder="4 weeks"
+                placeholder="9 weeks"
                 maxLength={40}
                 value={pkg.duration}
                 onChange={(e) => patch(pkg.uid, { duration: e.target.value })}

@@ -9,8 +9,8 @@ import { getCachedUser } from "@/lib/auth/cached"
 import { MarketingCourseCard } from "@/components/marketing/course-card"
 
 export const metadata: Metadata = {
-  title: "New Economy — free courses",
-  description: `Free courses on the new economy from ${BRAND.name}: how to use each WorldStreet product, step by step.`,
+  title: "New Economy courses",
+  description: `Courses on the new economy from ${BRAND.name}: how to use each WorldStreet product, step by step.`,
   alternates: { canonical: appUrl("/new-economy") },
 }
 
@@ -21,10 +21,10 @@ export const revalidate = 0
 const PRODUCTS = ["Dashboard", "Wallet", "Shop", "Social", "Xstream", "Forex Trading", "Vivid AI", "Vision", "Arcade", "Prediction"]
 
 /**
- * `/new-economy` — free courses explaining how to use each WorldStreet
- * product (owner meeting 2026-10-03). Lists published `new-economy` courses
- * only; they are free by rule (the editor and the catalogue script both set
- * them free), so the cards read "Free".
+ * `/new-economy` — courses explaining how to use each WorldStreet product
+ * (owner meeting 2026-10-03). Lists published `new-economy` courses on sale
+ * only: like every course they are paid (owner, 2026-11-03), each at its own
+ * single price.
  */
 export default async function NewEconomyPage() {
   const [user, courses] = await Promise.all([getCachedUser(), fetchBrowseCourses({ kind: "new-economy" })])
@@ -33,17 +33,16 @@ export default async function NewEconomyPage() {
   return (
     <div className="mx-auto max-w-7xl px-6 pb-24 pt-10 md:pb-32 md:pt-16">
       <header className="max-w-3xl">
-        <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-ws-muted">New Economy · Free</p>
+        <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-ws-muted">New Economy</p>
         <h1
           className="mt-3 font-display font-semibold leading-[1.05] tracking-[-0.02em] text-ws-primary"
           style={{ fontSize: "clamp(2rem, 4.5vw, 3.5rem)" }}
         >
-          Free courses on the new economy
+          Courses on the new economy
         </h1>
         <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-ws-muted md:text-[17px]">
           How to use WorldStreet&rsquo;s products. Digital money, online markets and the tools to work them now sit in
-          one ecosystem — each short course walks you through one product, step by step, at your own pace. No charge,
-          ever.
+          one ecosystem — each short course walks you through one product, step by step, at your own pace.
         </p>
         <ul aria-label="Products covered" className="mt-6 flex flex-wrap gap-2">
           {PRODUCTS.map((product) => (
@@ -70,7 +69,7 @@ export default async function NewEconomyPage() {
           <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-ws-surface text-ws-muted">
             <SparklesIcon size={20} aria-hidden />
           </span>
-          <p className="mt-4 font-display text-xl font-semibold text-ws-primary">The first free courses are on the way</p>
+          <p className="mt-4 font-display text-xl font-semibold text-ws-primary">The first courses are on the way</p>
           <p className="mx-auto mt-2 max-w-md text-[14px] leading-relaxed text-ws-muted">
             One course per WorldStreet product is being recorded. In the meantime, explore the schools.
           </p>

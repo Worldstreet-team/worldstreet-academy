@@ -17,8 +17,9 @@ import {
 
 /**
  * The Academy's cohorts, read once per request (Phase 12, D20). While the
- * collection is empty (or the read fails) the calendar holds one cohort built
- * from today's env constants, so nothing changes until an admin adds a cohort.
+ * collection is empty (or the read fails) the calendar holds one hidden cohort
+ * built from the env constants: it places learners, but the website shows no
+ * countdown until an admin adds a cohort.
  */
 export const getCohortCalendar = cache(async (): Promise<CohortCalendar> => {
   // Ruling 4: first statement, outside the try. During a build `connection()`
@@ -29,12 +30,14 @@ export const getCohortCalendar = cache(async (): Promise<CohortCalendar> => {
   let list: CohortView[] = []
   try {
     await connectDB()
-    const rows = await Cohort.find().select("number startsAt endsAt").lean()
+    const rows = await Cohort.find().select("number startsAt endsAt hidden").lean()
     list = rows.map((r) => ({
       number: r.number,
       name: cohortName(r.number),
       startsAt: r.startsAt.toISOString(),
       endsAt: r.endsAt ? r.endsAt.toISOString() : null,
+      // `.lean()` skips schema defaults: a cohort saved before the switch has no field, and stays shown.
+      hidden: r.hidden === true,
     }))
   } catch (err) {
     console.error("[Cohorts] read failed:", err)

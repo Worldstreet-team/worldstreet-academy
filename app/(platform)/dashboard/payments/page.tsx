@@ -8,6 +8,7 @@ import connectDB from "@/lib/db"
 import { myPayments, type MyPayment, type MyPaymentStatus } from "@/lib/my-payments"
 import { formatMinor } from "@/lib/teaching-home"
 import { cn } from "@/lib/utils"
+import { transferLabel } from "@/lib/payment-channels"
 
 export const metadata: Metadata = {
   title: "Payments",
@@ -18,7 +19,7 @@ export const metadata: Metadata = {
 const STATUS: Record<MyPaymentStatus, { label: string; tone: "credit" | "debit" | "neutral"; detail: string | null }> = {
   paid: { label: "Paid", tone: "credit", detail: null },
   processing: { label: "Processing", tone: "neutral", detail: "We're confirming this payment with your wallet." },
-  in_review: { label: "In review", tone: "neutral", detail: "An admin is checking your ESPEE receipt." },
+  in_review: { label: "In review", tone: "neutral", detail: "An admin is checking your receipt." },
   refunding: { label: "Being refunded", tone: "neutral", detail: "This charge bought no access, so it's on its way back to your wallet." },
   refunded: { label: "Refunded", tone: "neutral", detail: "Returned to your wallet." },
   failed: { label: "Failed", tone: "debit", detail: "You weren't charged." },
@@ -26,7 +27,7 @@ const STATUS: Record<MyPaymentStatus, { label: string; tone: "credit" | "debit" 
   cancelled: { label: "Cancelled", tone: "neutral", detail: "You weren't charged." },
 }
 
-const METHOD: Record<MyPayment["method"], string> = { wallet: "Wallet", espee: "ESPEE" }
+const METHOD = (method: MyPayment["method"]): string => (method === "wallet" ? "Wallet" : transferLabel(method))
 
 function day(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })
@@ -134,7 +135,7 @@ function PaymentRow({ payment: p }: { payment: MyPayment }) {
           </span>
         )}
         <span className="truncate text-[12.5px] text-muted-foreground">
-          {[p.plan, METHOD[p.method], day(p.at)].filter(Boolean).join(" · ")}
+          {[p.plan, METHOD(p.method), day(p.at)].filter(Boolean).join(" · ")}
         </span>
         {detail && <span className="text-[12.5px] leading-snug text-muted-foreground">{detail}</span>}
       </span>

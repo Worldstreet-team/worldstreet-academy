@@ -53,6 +53,7 @@ async function requireCourseOwner(courseId: string) {
   const user = await initAction()
   if (!user) throw new Error("Not authenticated")
   if (user.role !== "INSTRUCTOR" && user.role !== "ADMIN") throw new Error("Not your course")
+  assertId(courseId)
   const course = await Course.findById(courseId).select("instructor title examRequired status")
   if (!course) throw new Error("Course not found")
   if (course.instructor.toString() !== user.id && user.role !== "ADMIN") {
@@ -61,8 +62,22 @@ async function requireCourseOwner(courseId: string) {
   return { user, course }
 }
 
+const OBJECT_ID = /^[a-f0-9]{24}$/
+
+/**
+ * Ids arrive from the browser untyped. An object such as {"$ne": null} would
+ * reach Mongo as an operator: the owner check would pass on one course while
+ * the exam query matched another's (its answers), or a learner could sit a
+ * course's exam against an enrollment in a different one.
+ */
+function assertId(value: unknown): asserts value is string {
+  if (typeof value !== "string" || !OBJECT_ID.test(value)) throw new Error("Not found")
+}
+
 /** Filter for the two exam flavors: course final vs per-lesson knowledge check. */
 function examFilter(courseId: string, lessonId?: string | null) {
+  assertId(courseId)
+  if (lessonId) assertId(lessonId)
   return lessonId
     ? { course: courseId, scope: "lesson" as const, lesson: lessonId }
     : { course: courseId, scope: "final" as const }
@@ -115,7 +130,7 @@ export type InstructorExam = {
 export async function getCourseExamForInstructor(
   courseId: string,
   lessonId?: string | null
-): Promise<InstructorExam | null> {
+): Promise<InstructorExam | null | "not_yours"> {
   try {
     const { course } = await requireCourseOwner(courseId)
     const exam = await Exam.findOne(examFilter(courseId, lessonId))
@@ -134,7 +149,15 @@ export async function getCourseExamForInstructor(
       title: exam.title,
       instructions: exam.instructions,
       status: exam.status,
-      settings: exam.settings,
+      // A plain copy: the Mongoose subdocument can't cross to a client component.
+      settings: {
+        durationMinutes: exam.settings.durationMinutes,
+        passMarkPercent: exam.settings.passMarkPercent,
+        maxAttempts: exam.settings.maxAttempts,
+        shuffleQuestions: exam.settings.shuffleQuestions,
+        shuffleOptions: exam.settings.shuffleOptions,
+        showResults: exam.settings.showResults,
+      },
       questionCount: exam.questionCount,
       totalPoints: exam.totalPoints,
       examRequired: !!course.examRequired,
@@ -143,12 +166,15 @@ export async function getCourseExamForInstructor(
         type: q.type,
         prompt: q.prompt,
         options: q.options.map((o) => ({ id: o.id, text: o.text })),
-        correctOptionIds: q.correctOptionIds,
+        correctOptionIds: [...q.correctOptionIds],
         points: q.points,
         order: q.order,
       })),
     }
   } catch (error) {
+    // Assigned faculty teach a program but don't edit its exam (OWNER scope):
+    // say so, rather than offer a "Create exam" form for an exam that exists.
+    if (error instanceof Error && error.message === "Not your course") return "not_yours"
     console.error("Get instructor exam error:", error)
     return null
   }

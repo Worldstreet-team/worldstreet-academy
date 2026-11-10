@@ -10,8 +10,10 @@ import { PROGRAM_KIND_FILTER } from "@/lib/course-kind"
  * and by the faculty an admin assigned to it (`Course.teachingFaculty`).
  * An assignment counts only on a school program, and only while the person's
  * role is INSTRUCTOR or ADMIN: a faculty member demoted to USER stops teaching
- * at once, even while still listed. Teaching never touches ownership, prices,
- * content or earnings — those stay with `instructor`.
+ * at once, even while still listed. Teaching includes the program's lessons
+ * (owner, 2026-11-04: "the tutor should be able to add the lessons";
+ * `lessonCourse` in lib/actions/instructor.ts) but never ownership, prices,
+ * the program's own copy, its exam or earnings — those stay with `instructor`.
  *
  * Admin access is not decided here: each call site keeps the admin rule it
  * already had.

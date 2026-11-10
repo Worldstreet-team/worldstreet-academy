@@ -35,6 +35,12 @@ import { BRAND } from "@/lib/brand"
 import { APPLICATION_STEPS, trackerFor } from "@/lib/application-tracker"
 import { SCHOOLS, type SchoolSlug } from "@/lib/schools"
 import type { ApplicationPassion } from "@/lib/db/models"
+import {
+  HIRING_OPEN,
+  INTERVIEW_PREFERENCES,
+  INTERVIEW_PREFERENCE_LABEL,
+  type InterviewPreference,
+} from "@/lib/careers"
 
 /* v2 surfaces: 20px cards on the card fill — no outline in dark, hairline in
    light — and a 44/40px control height shared by fields and their buttons. */
@@ -214,7 +220,7 @@ function StatusTracker({ status, demoRequested }: { status: string; demoRequeste
 const STEPS = [
   { title: "Your expertise", description: "How students will find you, and what you know best." },
   { title: "Experience & motivation", description: "Tell the review team about your background." },
-  { title: "Links & submit", description: "Optional — but a sample video or CV makes review much faster." },
+  { title: "Interview & submit", description: "How we can interview you, plus a sample video or CV." },
 ]
 
 function ApplicationForm({ onSubmitted }: { onSubmitted: () => void }) {
@@ -252,6 +258,7 @@ function ApplicationForm({ onSubmitted }: { onSubmitted: () => void }) {
   const [readyToCommit, setReadyToCommit] = React.useState(false)
   const [extraDocumentUrl, setExtraDocumentUrl] = React.useState("")
   const [termsAccepted, setTermsAccepted] = React.useState(false)
+  const [interviewPreference, setInterviewPreference] = React.useState<InterviewPreference | "">("")
 
   const submit = useMutation({
     mutationFn: (input: ApplicationAnswersInput) => submitInstructorApplication(input),
@@ -300,9 +307,11 @@ function ApplicationForm({ onSubmitted }: { onSubmitted: () => void }) {
                 : !readyToCommit
                   ? "Confirm you're ready to commit"
                   : null
-        : !termsAccepted
-          ? "Accept the instructor terms to submit"
-          : null
+        : !interviewPreference
+          ? "Choose how we can interview you"
+          : !termsAccepted
+            ? "Accept the instructor terms to submit"
+            : null
 
   return (
     <section className={`${PANEL} p-6 sm:p-8`}>
@@ -557,9 +566,36 @@ function ApplicationForm({ onSubmitted }: { onSubmitted: () => void }) {
           </>
         )}
 
-        {/* Step 2: links */}
+        {/* Step 2: interview, links and submit */}
         {step === 2 && (
           <>
+            <FormField label="How can we interview you?" required>
+              <div role="radiogroup" aria-label="How can we interview you?" className="flex flex-wrap gap-2.5">
+                {INTERVIEW_PREFERENCES.map((value) => {
+                  const selected = interviewPreference === value
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => setInterviewPreference(value)}
+                      className={`h-10 rounded-full border px-4 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 ${
+                        selected
+                          ? "border-foreground bg-foreground text-background"
+                          : "border-border text-muted-foreground hover:bg-accent hover:text-foreground"
+                      }`}
+                    >
+                      {INTERVIEW_PREFERENCE_LABEL[value]}
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="mt-2 text-[12.5px] leading-relaxed text-muted-foreground">
+                We interview every shortlisted applicant before deciding: in person at our office, or by video call
+                on the platform if you teach remotely.
+              </p>
+            </FormField>
             <UploadField
               label="Sample teaching video"
               accept="video/*"
@@ -693,6 +729,7 @@ function ApplicationForm({ onSubmitted }: { onSubmitted: () => void }) {
                   readyToCommit,
                   extraDocumentUrl: extraDocumentUrl || undefined,
                   termsAccepted,
+                  interviewPreference: interviewPreference || undefined,
                 })
               }
             >
@@ -759,14 +796,21 @@ export default function BecomeInstructorPage() {
             <Glyph icon={Mortarboard01Icon} className="size-6" />
           </div>
           <h1 className="font-display text-[28px] font-semibold tracking-[-0.02em] text-foreground">
-            Become a WMA Instructor
+            Apply to be a staff tutor
           </h1>
           <p className="mx-auto max-w-md text-[15px] leading-relaxed text-muted-foreground">
-            Teach what you know to thousands of WorldStreet students, in any of our seven schools — and earn 85%
-            of every sale.{" "}
-            <Link href="/teach" className="font-medium text-foreground underline underline-offset-4">
-              How teaching here works
+            This is a job application. The Academy employs only a few tutors to teach its official students, and we
+            interview every shortlisted applicant, at our office or online, before we decide.{" "}
+            <Link href="/careers" className="font-medium text-foreground underline underline-offset-4">
+              About the role
             </Link>
+          </p>
+          <p className="mx-auto max-w-md text-[13px] leading-relaxed text-muted-foreground">
+            Want to sell your own course instead? That&apos;s a separate sign-up on the{" "}
+            <Link href="/sell" className="font-medium text-foreground underline underline-offset-4">
+              marketplace
+            </Link>
+            , and it doesn&apos;t make you an Academy tutor.
           </p>
         </header>
 
@@ -809,6 +853,11 @@ export default function BecomeInstructorPage() {
                     Our team proposed {application.proposedSlots.length} time
                     {application.proposedSlots.length === 1 ? "" : "s"} — choose what works for you.
                   </p>
+                  <p className="text-[13px] text-muted-foreground">
+                    {application.plannedInterview.mode === "office"
+                      ? `In person at our office${application.plannedInterview.location ? `: ${application.plannedInterview.location}` : ""}.`
+                      : "By video call on the platform — you join from this page."}
+                  </p>
                 </div>
                 <div className="space-y-2">
                   {application.proposedSlots.map((slot) => (
@@ -834,7 +883,24 @@ export default function BecomeInstructorPage() {
                 {slotError && <p className="text-[13px] text-destructive">{slotError}</p>}
               </div>
             )}
-            {application.status === "interview_scheduled" && application.interview && (
+            {application.status === "interview_scheduled" && application.interview?.mode === "office" && (
+              <div className="space-y-1 rounded-[14px] border border-primary/25 bg-primary/5 p-4">
+                <p className="text-[14px] font-semibold text-foreground">Your interview at our office</p>
+                <p className="text-[13px] text-muted-foreground">
+                  {new Date(application.interview.scheduledAt).toLocaleString("en-US", {
+                    dateStyle: "full",
+                    timeStyle: "short",
+                  })}
+                </p>
+                <p className="whitespace-pre-wrap text-[13px] font-medium text-foreground">
+                  {application.interview.location}
+                </p>
+                <p className="text-[12.5px] text-muted-foreground">
+                  Please bring a photo ID and arrive a few minutes early.
+                </p>
+              </div>
+            )}
+            {application.status === "interview_scheduled" && application.interview?.mode === "online" && (
               <div className="flex flex-wrap items-center justify-between gap-4 rounded-[14px] border border-primary/25 bg-primary/5 p-4">
                 <div className="space-y-1">
                   <p className="text-[14px] font-semibold text-foreground">Your interview call</p>
@@ -891,17 +957,37 @@ export default function BecomeInstructorPage() {
                 {application.decisionNote}
               </p>
             )}
-            <p className="text-[14px] text-muted-foreground">You&apos;re welcome to apply again with more detail.</p>
-            <Button variant="outline" className="h-10 px-5" onClick={() => setReapplying(true)}>
-              Apply again
+            {HIRING_OPEN ? (
+              <>
+                <p className="text-[14px] text-muted-foreground">You&apos;re welcome to apply again with more detail.</p>
+                <Button variant="outline" className="h-10 px-5" onClick={() => setReapplying(true)}>
+                  Apply again
+                </Button>
+              </>
+            ) : (
+              <p className="text-[14px] text-muted-foreground">
+                We aren&apos;t hiring right now. You&apos;re welcome to apply when the next vacancy opens.
+              </p>
+            )}
+          </section>
+        ) : showForm && HIRING_OPEN ? (
+          <ApplicationForm onSubmitted={refresh} />
+        ) : showForm ? (
+          <section className={`${PANEL} space-y-4 p-8 text-center`}>
+            <div className="space-y-1.5">
+              <p className="text-[15px] font-semibold text-foreground">We aren&apos;t hiring staff tutors right now</p>
+              <p className="text-[14px] text-muted-foreground">
+                We hire only a few tutors at a time. When a vacancy opens, it&apos;s posted on our careers page.
+              </p>
+            </div>
+            <Button variant="outline" className="h-10 px-5" render={<Link href="/careers" />}>
+              Careers
             </Button>
           </section>
-        ) : showForm ? (
-          <ApplicationForm onSubmitted={refresh} />
         ) : null}
 
-        {/* How it works */}
-        {!isInstructor && (
+        {/* How it works — hidden while hiring is closed, unless an application is still moving. */}
+        {!isInstructor && (HIRING_OPEN || isActive) && (
           <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {APPLICATION_STEPS.map((item, i) => (
               <li key={item.title} className={`${PANEL} p-5`}>

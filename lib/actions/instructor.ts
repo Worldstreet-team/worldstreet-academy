@@ -25,13 +25,15 @@ import { REVIEW_CHECKS } from "@/lib/review-checks"
 import { uploadThumbnail, deleteFromCloudinary } from "@/lib/cloudinary"
 import type { CourseLevel, CoursePricing, CourseStatus } from "@/lib/types"
 import { getCurrentUser } from "@/lib/auth"
-import { taughtCourseIds } from "@/lib/teaching"
+import { taughtCourseIds, teachesCourse } from "@/lib/teaching"
 import { SCHOOL_BY_SLUG, isSchoolSlug, schoolSlugOf, type SchoolSlug } from "@/lib/schools"
 import {
   canAccessLesson,
   PACKAGE_LABEL,
   PROGRAM_PRICE_LIST,
   PROGRAM_PRICE_LIST_LINE,
+  PROGRAM_REGULAR_PRICE,
+  isOnSale,
   isPackageKey,
   pricingFromPackages,
 } from "@/lib/entitlements"
@@ -611,26 +613,22 @@ export async function fetchCourseForEdit(courseId: string) {
 }
 
 /**
- * Price fields for a save. A school program prices from its packages when
- * they are sent (the cheapest enabled tier), and every plan sells at the
- * Academy's price list whatever was posted (PROGRAM_PRICE_LIST, Owen
- * 2026-10-28); an original price no higher than the list price is dropped.
+ * Price fields for a save. Every course is paid (isOnSale; owner,
+ * 2026-11-03): a posted "free" is ignored. A school program prices from its
+ * packages when they are sent (the cheapest enabled tier), and every plan
+ * sells at the Academy's price list with its regular price struck through,
+ * whatever was posted (PROGRAM_PRICE_LIST and PROGRAM_REGULAR_PRICE).
  * Marketplace and New Economy courses sell at ONE price (owner, 2026-10-05),
- * so they carry no ladder — and a New Economy course is always free.
+ * so they carry no ladder. The caller refuses a result that isn't on sale.
  */
 function coursePricing(
   kind: CourseKind,
-  pricing: CoursePricing,
   price: string,
   packages: ICoursePackage[] | null
 ): { pricing: CoursePricing; price: number; packages?: ICoursePackage[] } {
-  if (kind === "new-economy") return { pricing: "free", price: 0, packages: [] }
-  const scalar = { pricing, price: pricing === "paid" ? parseFloat(price) : 0 }
-  if (kind === "marketplace") return { ...scalar, packages: [] }
-  const listed = packages?.map((p) => {
-    const listPrice = PROGRAM_PRICE_LIST[p.key]
-    return { ...p, price: listPrice, listPrice: p.listPrice !== null && p.listPrice > listPrice ? p.listPrice : null }
-  })
+  const scalar = { pricing: "paid" as const, price: parseFloat(price) }
+  if (kind !== "program") return { ...scalar, packages: [] }
+  const listed = packages?.map((p) => ({ ...p, price: PROGRAM_PRICE_LIST[p.key], listPrice: PROGRAM_REGULAR_PRICE[p.key] }))
   const override = listed ? pricingFromPackages(listed) : null
   return {
     ...scalar,
@@ -640,15 +638,18 @@ function coursePricing(
 }
 
 /**
- * A paid school program sells only through its plans at the price list, so
- * one with no plan turned on can be free but not paid. Null when the plans
- * weren't posted (an older editor tab): the stored ladder is left alone.
+ * A school program sells only through its plans at the price list, so one
+ * with no plan turned on can't be saved — no course is free. Null when the
+ * plans weren't posted (an older editor tab): the stored ladder is left alone.
  */
-function programPriceRefusal(kind: CourseKind, pricing: CoursePricing, packages: ICoursePackage[] | null): string | null {
-  if (kind !== "program" || pricing !== "paid" || packages === null) return null
+function programPriceRefusal(kind: CourseKind, packages: ICoursePackage[] | null): string | null {
+  if (kind !== "program" || packages === null) return null
   if (packages.some((p) => p.enabled)) return null
-  return `Academy programs sell through their plans at the price list (${PROGRAM_PRICE_LIST_LINE}). Turn on a plan, or make the program free.`
+  return `Academy programs sell through their plans at the price list (${PROGRAM_PRICE_LIST_LINE}). Turn on at least one plan.`
 }
+
+/** What a save that isn't on sale is told: a single-price course needs a price. */
+const PRICE_REQUIRED = "Enter a price. Every course on the Academy is paid."
 
 /** School and category: the school's for programs and marketplace topics; none for New Economy. */
 function courseHome(kind: CourseKind, school: string): { school: SchoolSlug | null; category: string } {
@@ -676,7 +677,6 @@ export async function createCourse(
   const shortDescription = (formData.get("shortDescription") as string) || ""
   const thumbnailUrl = formData.get("thumbnailUrl") as string
   const level = formData.get("level") as CourseLevel
-  const pricing = formData.get("pricing") as CoursePricing
   const price = formData.get("price") as string
   const status = formData.get("status") as CourseStatus
   const school = formData.get("school") as SchoolSlug
@@ -709,9 +709,10 @@ export async function createCourse(
   if (extras.submitForReview && !sentLessons && !isFileFormat(extras.format)) {
     fieldErrors.lessons = "Add at least one lesson before submitting for review"
   }
-  // A program whose plans were posted is priced by them (programPriceRefusal below).
-  if (pricing === "paid" && !(extras.kind === "program" && packages !== null) && (!price || parseFloat(price) <= 0)) {
-    fieldErrors.price = "Please enter a valid price"
+  // Every course is paid. A program whose plans were posted is priced by them
+  // (programPriceRefusal below); any other course needs its own price.
+  if (!(extras.kind === "program" && packages !== null) && !(parseFloat(price) > 0)) {
+    fieldErrors.price = PRICE_REQUIRED
   }
   if (availableAt === "invalid") {
     fieldErrors.availableAt = "Availability date could not be read"
@@ -744,7 +745,7 @@ export async function createCourse(
     if (kind !== "new-economy" && !isSchoolSlug(school)) {
       return { success: false, error: null, fieldErrors: { school: "Choose a school" } }
     }
-    const priceRefusal = programPriceRefusal(kind, pricing, packages)
+    const priceRefusal = programPriceRefusal(kind, packages)
     if (priceRefusal) return { success: false, error: null, fieldErrors: { packages: priceRefusal } }
     const product = resolveProduct({
       kind,
@@ -765,7 +766,9 @@ export async function createCourse(
         return { success: false, error: null, fieldErrors: { productFile: "Upload the file before publishing" } }
       }
     }
-    const pricingFields = coursePricing(kind, pricing, price, packages)
+    const pricingFields = coursePricing(kind, price, packages)
+    // No course is free: nothing is saved that isn't on sale.
+    if (!isOnSale(pricingFields)) return { success: false, error: null, fieldErrors: { price: PRICE_REQUIRED } }
 
     // Create the course
     const course = await Course.create({
@@ -878,7 +881,6 @@ export async function updateCourse(
   const shortDescription = (formData.get("shortDescription") as string) || ""
   const thumbnailUrl = formData.get("thumbnailUrl") as string
   const level = formData.get("level") as CourseLevel
-  const pricing = formData.get("pricing") as CoursePricing
   const price = formData.get("price") as string
   const status = formData.get("status") as CourseStatus
   const school = formData.get("school") as SchoolSlug
@@ -901,9 +903,10 @@ export async function updateCourse(
     fieldErrors.description = "Description must be at least 10 characters"
   }
   // The school is checked once the kind is known (New Economy has none).
-  // A program whose plans were posted is priced by them (programPriceRefusal below).
-  if (pricing === "paid" && !(extras.kind === "program" && packages !== null) && (!price || parseFloat(price) <= 0)) {
-    fieldErrors.price = "Please enter a valid price"
+  // Every course is paid. A program whose plans were posted is priced by them
+  // (programPriceRefusal below); any other course needs its own price.
+  if (!(extras.kind === "program" && packages !== null) && !(parseFloat(price) > 0)) {
+    fieldErrors.price = PRICE_REQUIRED
   }
   if (availableAt === "invalid") {
     fieldErrors.availableAt = "Availability date could not be read"
@@ -952,7 +955,7 @@ export async function updateCourse(
     if (kind !== "new-economy" && !isSchoolSlug(school)) {
       return { success: false, error: null, fieldErrors: { school: "Choose a school" } }
     }
-    const priceRefusal = programPriceRefusal(kind, pricing, packages)
+    const priceRefusal = programPriceRefusal(kind, packages)
     if (priceRefusal) return { success: false, error: null, fieldErrors: { packages: priceRefusal } }
     const product = resolveProduct({
       kind,
@@ -991,7 +994,9 @@ export async function updateCourse(
     } else if (submitting && (sentLessons ?? existingCourse.totalLessons ?? 0) === 0) {
       return { success: false, error: null, fieldErrors: { lessons: "Add at least one lesson before submitting for review" } }
     }
-    const pricingFields = coursePricing(kind, pricing, price, packages)
+    const pricingFields = coursePricing(kind, price, packages)
+    // No course is free: nothing is saved that isn't on sale.
+    if (!isOnSale(pricingFields)) return { success: false, error: null, fieldErrors: { price: PRICE_REQUIRED } }
     // A seller's live course: content edits go back to review (below), and the
     // price can't change at all — a course must not pass review at one price
     // and sell at another.
@@ -1257,74 +1262,151 @@ export async function deleteCourse(formData: FormData): Promise<void> {
   redirect(editorReturnPath(formData))
 }
 
+// ---- Lessons (TEACH scope) ----
+/**
+ * The course whose lessons this user may change, or null: a course they may
+ * edit (`courseScope` — the owner, a seller's own, or any for an admin), or a
+ * program they are assigned to teach (lib/teaching.ts). Lessons are the
+ * tutor's job (team call, 2026-11-04: "it is the instructor's job to place
+ * the lessons"; owner: "the tutor should be able to add the lessons and how
+ * many hours per video if recorded"). Everything else about a course — its
+ * title, copy, plans, prices, publishing and exam — stays with courseScope.
+ */
+async function lessonCourse(instructor: { _id: { toString(): string }; role?: string }, courseId: string) {
+  if (typeof courseId !== "string" || !Types.ObjectId.isValid(courseId)) return null
+  const fields = "_id status packages instructor"
+  const own = await Course.findOne({ _id: courseId, ...courseScope(instructor) }).select(fields).lean()
+  if (own) return own
+  return teachesCourse({ id: instructor._id.toString(), role: instructor.role ?? "USER" }, courseId, fields)
+}
+
+/** Whether this user may edit the course itself (its copy, plans and exam) — not only its lessons. */
+async function editsCourse(instructor: { _id: unknown; role?: string }, courseId: string): Promise<boolean> {
+  return Boolean(await Course.exists({ _id: courseId, ...courseScope(instructor) }))
+}
+
+const LESSON_TEXT_LIMIT = 200_000
+
+/**
+ * The lesson form (add and edit). A recorded video's length is typed as hours
+ * and minutes and stored in seconds (`videoDuration`); 0h 0m = not stated,
+ * so the program page leaves it out of its video total rather than guess.
+ */
+const LessonFormSchema = z
+  .object({
+    title: z.string().trim().min(2, "Title is required").max(150, "Title must be 150 characters or less"),
+    description: z.string().trim().max(2000, "Description must be 2,000 characters or less"),
+    type: z.enum(["video", "text"], { error: "Choose a lesson type" }),
+    videoUrl: z.string().trim().max(2000, "That link is too long"),
+    content: z.string().max(LESSON_TEXT_LIMIT, "The lesson text is too long"),
+    lengthHours: z.coerce.number({ error: "Hours must be a number" }).int("Whole hours only").min(0, "Hours can't be negative").max(24, "A video can't be longer than 24 hours"),
+    lengthMinutes: z.coerce.number({ error: "Minutes must be a number" }).int("Whole minutes only").min(0, "Minutes can't be negative").max(59, "Minutes go up to 59"),
+    isFree: z.boolean(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.type !== "video") return
+    const problem = v.videoUrl ? lessonVideoUrlError(v.videoUrl) : "Upload the video or paste its link"
+    if (problem) ctx.addIssue({ code: "custom", path: ["videoUrl"], message: problem })
+  })
+
+type LessonForm = z.infer<typeof LessonFormSchema>
+
+function parseLessonForm(formData: FormData): { data: LessonForm; fieldErrors: null } | { data: null; fieldErrors: Record<string, string> } {
+  const text = (name: string) => {
+    const value = formData.get(name)
+    return typeof value === "string" ? value : ""
+  }
+  const parsed = LessonFormSchema.safeParse({
+    title: text("title"),
+    description: text("description"),
+    type: text("type") || "video",
+    videoUrl: text("videoUrl"),
+    content: text("content"),
+    lengthHours: text("lengthHours") || "0",
+    lengthMinutes: text("lengthMinutes") || "0",
+    isFree: formData.get("isFree") === "true",
+  })
+  if (parsed.success) return { data: parsed.data, fieldErrors: null }
+  const fieldErrors: Record<string, string> = {}
+  for (const issue of parsed.error.issues) {
+    const key = String(issue.path[0] ?? "form")
+    fieldErrors[key] ??= issue.message
+  }
+  return { data: null, fieldErrors }
+}
+
+/**
+ * The stored fields a lesson form sets. The length is the video's, or a text
+ * lesson's reading time (the course editor's "Reading time" — the same field),
+ * so a text lesson keeps it.
+ */
+function lessonFields(form: LessonForm) {
+  const video = form.type === "video"
+  const seconds = form.lengthHours * 3600 + form.lengthMinutes * 60
+  return {
+    title: form.title,
+    description: form.description || null,
+    type: form.type,
+    videoUrl: video ? form.videoUrl : null,
+    content: video ? null : form.content.trim() || null,
+    videoDuration: seconds > 0 ? seconds : null,
+    isFree: form.isFree,
+  }
+}
+
+function revalidateLessons(courseId: string) {
+  revalidatePath(`/instructor/courses/${courseId}/lessons`)
+  revalidatePath(`/instructor/courses/${courseId}`)
+}
+
+/**
+ * A lesson change on a seller's own LIVE marketplace course sends it back to
+ * review, as an edit in the course editor does (`updateCourse`). A no-op for
+ * programs, drafts, admins and teaching faculty (`requestLiveCourseReview`
+ * matches only the seller's own published marketplace course).
+ */
+async function reviewLiveLessonEdit(courseId: string, instructor: Parameters<typeof sellerOf>[0]): Promise<void> {
+  await requestLiveCourseReview(courseId, sellerOf(instructor)).catch((err) =>
+    console.error("[Lessons] couldn't send the live course back to review:", err)
+  )
+}
+
 // ---- Add Lesson ----
 export async function addLesson(
   _prevState: CourseFormState,
   formData: FormData
 ): Promise<CourseFormState> {
   const courseId = formData.get("courseId") as string
-  const title = formData.get("title") as string
-  const description = formData.get("description") as string
-  const type = formData.get("type") as string
-  const videoUrl = formData.get("videoUrl") as string
-  const content = formData.get("content") as string
-  const duration = formData.get("duration") as string
-  const isFree = formData.get("isFree") === "true"
-
-  const fieldErrors: Record<string, string> = {}
-
-  if (!title || title.trim().length < 2) {
-    fieldErrors.title = "Title is required"
-  }
-  if (type === "video" && !videoUrl) {
-    fieldErrors.videoUrl = "Video URL is required for video lessons"
-  } else if (type === "video") {
-    const videoUrlError = lessonVideoUrlError(videoUrl.trim())
-    if (videoUrlError) fieldErrors.videoUrl = videoUrlError
-  }
-
-  if (Object.keys(fieldErrors).length > 0) {
-    return { success: false, error: null, fieldErrors }
-  }
+  const form = parseLessonForm(formData)
+  if (!form.data) return { success: false, error: null, fieldErrors: form.fieldErrors }
 
   try {
     await connectDB()
     const instructor = await getAuthenticatedInstructor()
-    
-    // Verify ownership
-    const course = await Course.findOne({
-      _id: courseId,
-      ...courseScope(instructor),
-    })
-    
+
+    const course = await lessonCourse(instructor, courseId)
     if (!course) {
       return { success: false, error: "Course not found", fieldErrors: {} }
     }
-    
+
     // Get next order
     const lastLesson = await Lesson.findOne({ course: courseId })
       .sort({ order: -1 })
       .select("order")
     const order = lastLesson ? lastLesson.order + 1 : 0
-    
-    // Create lesson
+
     await Lesson.create({
       course: courseId,
-      title,
-      description: description || null,
-      type: type || "video",
-      videoUrl: type === "video" ? videoUrl : null,
-      content: null,
-      videoDuration: duration ? parseInt(duration) * 60 : null,
-      isFree,
+      ...lessonFields(form.data),
       minPackageKey: lessonTier(formData.get("minPackageKey"), soldTierKeys(course.packages)),
       order,
       isPublished: course.status === "published",
     })
-    
-    await syncLessonTotals(courseId)
 
-    revalidatePath(`/instructor/courses/${courseId}/lessons`)
+    await syncLessonTotals(courseId)
+    await reviewLiveLessonEdit(courseId, instructor)
+
+    revalidateLessons(courseId)
     return { success: true, error: null, fieldErrors: {} }
   } catch (error) {
     console.error("Add lesson error:", error)
@@ -1332,11 +1414,126 @@ export async function addLesson(
   }
 }
 
+// ---- Edit Lesson ----
+/**
+ * Saves one lesson from the lesson manager's edit dialog: its title,
+ * description, type, video (upload or link) and length, text, plan and free
+ * preview. Its place in the course and its published state are left alone.
+ */
+export async function updateLesson(
+  _prevState: CourseFormState,
+  formData: FormData
+): Promise<CourseFormState> {
+  const courseId = formData.get("courseId") as string
+  const lessonId = formData.get("lessonId") as string
+  const form = parseLessonForm(formData)
+  if (!form.data) return { success: false, error: null, fieldErrors: form.fieldErrors }
+  if (typeof lessonId !== "string" || !Types.ObjectId.isValid(lessonId)) {
+    return { success: false, error: "Lesson not found", fieldErrors: {} }
+  }
+
+  try {
+    await connectDB()
+    const instructor = await getAuthenticatedInstructor()
+
+    const course = await lessonCourse(instructor, courseId)
+    if (!course) return { success: false, error: "Course not found", fieldErrors: {} }
+
+    const lesson = await Lesson.findOneAndUpdate(
+      { _id: lessonId, course: courseId },
+      {
+        $set: {
+          ...lessonFields(form.data),
+          minPackageKey: lessonTier(formData.get("minPackageKey"), soldTierKeys(course.packages)),
+        },
+      },
+      { new: true }
+    ).select("_id")
+    if (!lesson) return { success: false, error: "Lesson not found", fieldErrors: {} }
+
+    await syncLessonTotals(courseId)
+    await reviewLiveLessonEdit(courseId, instructor)
+
+    revalidateLessons(courseId)
+    return { success: true, error: null, fieldErrors: {} }
+  } catch (error) {
+    console.error("Update lesson error:", error)
+    return { success: false, error: "Failed to save the lesson", fieldErrors: {} }
+  }
+}
+
+/** A lesson as the lesson manager shows and edits it. */
+export type ManagedLesson = {
+  id: string
+  title: string
+  description: string | null
+  type: "video" | "live" | "text"
+  videoUrl: string | null
+  content: string | null
+  /** Seconds; null when not stated. */
+  duration: number | null
+  order: number
+  isFree: boolean
+  minPackageKey: PackageKey | null
+}
+
+/**
+ * The lessons page's data: a course whose lessons the caller may change
+ * (`lessonCourse` — so an assigned tutor too), its lessons, the tiers a
+ * lesson may require, and whether the caller may also edit the course itself
+ * (owner and admins), which shows "Edit Course" and the lesson quizzes.
+ */
+export async function fetchCourseLessons(courseId: string): Promise<{
+  course: { id: string; title: string; status: CourseStatus; tiers: PackageKey[] }
+  lessons: ManagedLesson[]
+  canEditCourse: boolean
+} | null> {
+  try {
+    await connectDB()
+    const instructor = await getAuthenticatedInstructor()
+    const scoped = await lessonCourse(instructor, courseId)
+    if (!scoped) return null
+
+    const [course, lessons, canEditCourse] = await Promise.all([
+      Course.findById(courseId).select("title status packages").lean(),
+      Lesson.find({ course: courseId }).sort({ order: 1 }).lean(),
+      editsCourse(instructor, courseId),
+    ])
+    if (!course) return null
+
+    const sold = soldTierKeys(course.packages)
+    return {
+      course: {
+        id: course._id.toString(),
+        title: course.title,
+        status: course.status as CourseStatus,
+        tiers: (["basic", "standard", "executive"] as const).filter((k) => sold.has(k)),
+      },
+      lessons: lessons.map((l, idx) => ({
+        id: l._id.toString(),
+        title: l.title,
+        description: l.description ?? null,
+        type: l.type,
+        videoUrl: l.videoUrl ?? null,
+        content: l.content ?? null,
+        duration: l.videoDuration ?? null,
+        order: idx,
+        isFree: Boolean(l.isFree),
+        minPackageKey: l.minPackageKey ?? null,
+      })),
+      canEditCourse,
+    }
+  } catch (error) {
+    console.error("Fetch course lessons error:", error)
+    return null
+  }
+}
+
 // ---- Lesson minimum package ----
 /**
  * Sets the lowest tier that can open a lesson (null = everyone). Called from
- * the lesson manager's per-row select; ownership-scoped like the other
- * lesson mutations (admins may edit any course).
+ * the lesson manager's per-row select; scoped like the other
+ * lesson mutations (lessonCourse: the owner, an admin or an assigned tutor).
  */
 export async function setLessonMinPackage(
   courseId: string,
@@ -1347,7 +1544,7 @@ export async function setLessonMinPackage(
     await connectDB()
     const instructor = await getAuthenticatedInstructor()
 
-    const course = await Course.findOne({ _id: courseId, ...courseScope(instructor) }).select("_id packages")
+    const course = await lessonCourse(instructor, courseId)
     if (!course) return { success: false, error: "Course not found" }
 
     // Only a tier the course sells may gate a lesson; null opens it to every enrolment.
@@ -1361,8 +1558,9 @@ export async function setLessonMinPackage(
       { new: true }
     ).select("_id")
     if (!lesson) return { success: false, error: "Lesson not found" }
+    await reviewLiveLessonEdit(courseId, instructor)
 
-    revalidatePath(`/instructor/courses/${courseId}/lessons`)
+    revalidateLessons(courseId)
     return { success: true, error: null }
   } catch (error) {
     console.error("Set lesson package error:", error)
@@ -1379,12 +1577,8 @@ export async function deleteLesson(formData: FormData): Promise<void> {
     await connectDB()
     const instructor = await getAuthenticatedInstructor()
     
-    // Verify ownership
-    const course = await Course.findOne({
-      _id: courseId,
-      ...courseScope(instructor),
-    })
-    
+    // The owner, an admin or the program's assigned tutor (lessonCourse).
+    const course = await lessonCourse(instructor, courseId)
     if (!course) {
       return // Just return without doing anything
     }
@@ -1401,12 +1595,13 @@ export async function deleteLesson(formData: FormData): Promise<void> {
       }
       
       await lesson.deleteOne()
-      
+
       // Update course lesson count
       await syncLessonTotals(courseId)
+      await reviewLiveLessonEdit(courseId, instructor)
     }
 
-    revalidatePath(`/instructor/courses/${courseId}/lessons`)
+    revalidateLessons(courseId)
   } catch (error) {
     console.error("Delete lesson error:", error)
   }

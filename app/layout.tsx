@@ -79,7 +79,12 @@ export const metadata: Metadata = {
   },
 };
 
-// Detect local development vs production (sign-in lives on the hub)
+// Local development (pk_test_, local /login) vs production. In production the
+// Academy is a plain subdomain of the hub's Clerk domain, like the shop: Clerk
+// shares the session across *.worldstreetgold.com by itself. It must NOT be a
+// satellite (`domain` + `isSatellite`): satellites are for other root domains,
+// and Clerk now answers a subdomain satellite's sync with 422/403, stranding
+// every signed-out visitor on clerk.worldstreetgold.com (2026-11-03).
 const isLocalDev = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_")
 
 export default function RootLayout({
@@ -91,7 +96,6 @@ export default function RootLayout({
     <ClerkProvider
       {...(!isLocalDev
         ? {
-            // No `isSatellite`/`domain`: see the note in middleware.ts.
             signInUrl: "https://www.worldstreetgold.com/login",
             signUpUrl: "https://www.worldstreetgold.com/register",
             signInFallbackRedirectUrl: "https://academy.worldstreetgold.com/dashboard",

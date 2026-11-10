@@ -1,5 +1,5 @@
 "use client"
-import { DownloadIcon, GraduationCapIcon, MoreHorizontal, XIcon } from "@/components/icons"
+import { DownloadIcon, GraduationCapIcon, MoreHorizontal, UserPlusIcon, XIcon } from "@/components/icons"
 
 import * as React from "react"
 import { Suspense } from "react"
@@ -49,6 +49,8 @@ import {
   adminExportEnrollments,
 } from "@/lib/actions/admin-enrollments"
 import { queryKeys } from "@/lib/hooks/queries/keys"
+import { useUser } from "@/components/providers/user-provider"
+import { isSuperAdmin } from "@/lib/admin-levels"
 import {
   formatDate,
   StatusBadge,
@@ -85,6 +87,9 @@ const PACKAGE_FILTERS = [
 
 function AdminEnrollmentsInner() {
   const queryClient = useQueryClient()
+  // Access without a WorldStreet payment (an outside payment, a plan change) is
+  // the super admin's alone (CTO, 2026-11-08); regular admins don't see those controls.
+  const superAdmin = isSuperAdmin(useUser())
   const searchParams = useSearchParams()
   const courseId = searchParams.get("course") ?? undefined
 
@@ -184,10 +189,18 @@ function AdminEnrollmentsInner() {
                   : "Who is taking what, and how it was paid."
             }
             action={
-              <Button size="sm" variant="outline" onClick={exportCsv} disabled={exporting}>
-                <DownloadIcon size={14} />
-                {exporting ? "Exporting…" : "Export CSV"}
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                {superAdmin && (
+                  <Button size="sm" render={<Link href="/admin/enrollments/add" />}>
+                    <UserPlusIcon size={14} />
+                    Add paid learners
+                  </Button>
+                )}
+                <Button size="sm" variant="outline" onClick={exportCsv} disabled={exporting}>
+                  <DownloadIcon size={14} />
+                  {exporting ? "Exporting…" : "Export CSV"}
+                </Button>
+              </div>
             }
           />
 
@@ -361,7 +374,7 @@ function AdminEnrollmentsInner() {
                                   Restore
                                 </DropdownMenuItem>
                               )}
-                              {e.coursePackages.length > 0 && (e.status === "active" || e.status === "completed") && (
+                              {superAdmin && e.coursePackages.length > 0 && (e.status === "active" || e.status === "completed") && (
                                 <DropdownMenuItem
                                   onClick={() => {
                                     setPackageChoice(e.packageKey)

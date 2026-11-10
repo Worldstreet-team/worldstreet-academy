@@ -9,10 +9,26 @@
  *
  * Every function sorts a copy by `startsAt` (then `number`) and never assumes
  * sorted input.
+ *
+ * `hidden` (owner, 2026-11-08) is the admin's "Show on the website" switch,
+ * off. It changes what the public is told, never who is in a cohort: placement
+ * reads every cohort, shown or hidden.
  */
 
-export type CohortView = { number: number; name: string; startsAt: string; endsAt: string | null }
-export type CohortCalendar = { next: CohortView | null; current: CohortView | null; all: CohortView[] }
+export type CohortView = { number: number; name: string; startsAt: string; endsAt: string | null; hidden: boolean }
+export type CohortCalendar = {
+  /**
+   * The cohort the website announces: the soonest upcoming one, and only while
+   * it is shown. A hidden next cohort means no countdown at all; the site never
+   * skips ahead to a later shown cohort, because a visitor who pays now is
+   * placed in the soonest one, shown or not.
+   */
+  next: CohortView | null
+  /** The soonest upcoming cohort, shown or hidden: staff views only. */
+  upcoming: CohortView | null
+  current: CohortView | null
+  all: CohortView[]
+}
 export type CohortStatus = "upcoming" | "running" | "past"
 
 export const COHORT_STATUS_LABEL: Record<CohortStatus, string> = {
@@ -76,10 +92,21 @@ export function cohortStatus(
 }
 
 export function calendarOf(cohorts: readonly CohortView[], now: number): CohortCalendar {
-  return { next: nextCohort(cohorts, now), current: currentCohort(cohorts, now), all: sorted(cohorts) }
+  const upcoming = nextCohort(cohorts, now)
+  return {
+    next: upcoming && !upcoming.hidden ? upcoming : null,
+    upcoming,
+    current: currentCohort(cohorts, now),
+    all: sorted(cohorts),
+  }
 }
 
-/** Today's env-driven cohort, used while the collection is empty (ruling 5). */
+/**
+ * The env-built cohort that places learners while the collection is empty
+ * (ruling 5). It is hidden: the website announces only a cohort an admin
+ * added and left shown, so removing every cohort can never bring back a
+ * countdown nobody can switch off.
+ */
 export function fallbackCohort(startsAt: string | undefined, number: string | undefined): CohortView {
   const parsed = startsAt ? new Date(startsAt) : null
   const start =
@@ -87,7 +114,7 @@ export function fallbackCohort(startsAt: string | undefined, number: string | un
   const trimmed = number?.trim() ?? ""
   const n = /^\d+$/.test(trimmed) ? Number(trimmed) : NaN
   const num = Number.isSafeInteger(n) && n >= 1 ? n : 1
-  return { number: num, name: cohortName(num), startsAt: start.toISOString(), endsAt: null }
+  return { number: num, name: cohortName(num), startsAt: start.toISOString(), endsAt: null, hidden: true }
 }
 
 /**

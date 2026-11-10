@@ -12,7 +12,6 @@ import {
   PaymentEvent,
   Earning,
   EARNINGS_CLEARING_DAYS,
-  REFERRAL_COMMISSION_RATE,
   type IOrder,
   type OrderStatus,
   type PackageKey,
@@ -27,13 +26,13 @@ import { getCourseAccess, isLessonLockedFor, lockedLessonIds, openPublishedLesso
 import { courseTeacherIds } from "@/lib/teaching"
 import { saveWithCertificateId } from "@/lib/certificate-id"
 import { POINTS, awardPoints, pointKey } from "@/lib/points"
-import { PACKAGE_KEYS, packageFor, sellsPackages } from "@/lib/entitlements"
+import { PACKAGE_KEYS, isOnSale, packageFor, sellsPackages } from "@/lib/entitlements"
 import { courseKindOf } from "@/lib/course-kind"
+import { kindIsOpen } from "@/lib/marketplace"
 import {
-  isFirstPaidPurchase,
+  bookReferralCommission,
   referralCookieCode,
   sellerLinkCookieCode,
-  referralCreditReference,
   referrerFor,
   splitSale,
   type Referrer,
@@ -44,6 +43,7 @@ import {
   isInsufficientBalance,
   walletEnabled,
   WalletError,
+  type WalletCharge,
 } from "@/lib/wallet"
 
 // ============================================================================
@@ -166,6 +166,10 @@ export async function purchaseCourse(input: { courseId: string; packageKey?: Pac
     if (!course) {
       return { success: false, error: "Course not found or not available", code: "not_found" }
     }
+    // The marketplace is Coming soon (MARKETPLACE_OPEN): it sells nothing.
+    if (!kindIsOpen(course.kind)) {
+      return { success: false, error: "The marketplace opens soon.", code: "not_found" }
+    }
 
     // Scheduled courses take money only once they are live — before that the
     // only door is preEnrollCourse, which never charges.
@@ -190,6 +194,10 @@ export async function purchaseCourse(input: { courseId: string; packageKey?: Pac
     const price = pkg ? pkg.price : course.pricing === "paid" ? course.price ?? 0 : 0
     const amountMinor = Math.round(price * 100)
     const isPaid = amountMinor > 0
+    // No course is free (isOnSale): nothing enrols without a charge.
+    if (!isPaid) {
+      return { success: false, error: "This course isn't on sale.", code: "not_found" }
+    }
     const packageFields = { packageKey: pkg?.key ?? null, packageName: pkg?.name ?? null }
 
     // The charge reference is deterministic per PURCHASE GENERATION, not per
@@ -206,7 +214,18 @@ export async function purchaseCourse(input: { courseId: string; packageKey?: Pac
     // Package purchases carry the key; single-price references stay
     // byte-identical to pre-package orders so their retries still replay.
     const baseReference = `academy_enroll_${user.id}_${courseId}${pkg ? `_${pkg.key}` : ""}`
-    const reference = generation > 0 ? `${baseReference}_r${generation}` : baseReference
+    // A declined charge moved no money, so the next try gets a fresh key
+    // (2026-11-08). The wallet replays a stored response for 24h; were it to
+    // replay a decline, a learner who has since topped up would stay declined
+    // for a day. Only "insufficient balance" counts: any other failure may
+    // have taken the money, so its retry must replay the same key.
+    const declines = await Order.countDocuments({
+      user: user.id,
+      course: courseId,
+      status: "failed",
+      failureCode: "insufficient_funds",
+    })
+    const reference = `${baseReference}${generation > 0 ? `_r${generation}` : ""}${declines > 0 ? `_d${declines}` : ""}`
 
     let chargeId: string | null = null
     let order: IOrder | null = null
@@ -251,8 +270,9 @@ export async function purchaseCourse(input: { courseId: string; packageKey?: Pac
         authUserId: user.authUserId,
       })
 
+      let charge: WalletCharge
       try {
-        const { charge } = await createWalletCharge(user.authUserId, {
+        ;({ charge } = await createWalletCharge(user.authUserId, {
           amountMinor,
           description: pkg ? `Course: ${course.title} — ${pkg.name}` : `Course: ${course.title}`,
           metadata: {
@@ -261,14 +281,7 @@ export async function purchaseCourse(input: { courseId: string; packageKey?: Pac
             ...(packageFields.packageKey ? { packageKey: packageFields.packageKey } : {}),
           },
           idempotencyKey: reference,
-        })
-        chargeId = charge.id
-        ord.chargeId = charge.id
-        await transitionOrder(ord, "paid")
-        await logPaymentEvent(ord._id, reference, "charge_confirmed", {
-          chargeId: charge.id,
-          amountMinor: charge.amountMinor,
-        })
+        }))
       } catch (err) {
         if (isInsufficientBalance(err)) {
           const details = err.details as { availableMinor?: number }
@@ -288,19 +301,43 @@ export async function purchaseCourse(input: { courseId: string; packageKey?: Pac
           }
         }
         const code = err instanceof WalletError ? err.code : "WALLET_ERROR"
+        // Only a refusal from the wallet proves no money moved. After a timeout,
+        // a dropped connection (WALLET_UNAVAILABLE) or a wallet-side error, the
+        // debit may have completed after we gave up: the learner must never be
+        // told "not charged" then. A retry replays this same key, so it can't
+        // charge twice, and reconciliation reports a charge no order holds.
+        const outcomeUnknown = !(err instanceof WalletError) || code === "WALLET_UNAVAILABLE" || err.status >= 500
         ord.failureCode = code
         await transitionOrder(ord, "failed", code)
         await logPaymentEvent(ord._id, reference, "charge_failed", {
           code,
+          outcomeUnknown,
           message: err instanceof Error ? err.message : String(err),
         })
         console.error("[Payments] wallet charge failed:", err)
         return {
           success: false,
-          error: "We couldn't reach the payment service. You have not been charged.",
+          error: outcomeUnknown
+            ? "We couldn't confirm your payment with your WorldStreet wallet. Please try again: you won't be charged twice. If your balance went down and you still can't get in, contact support."
+            : "Your WorldStreet wallet couldn't take this payment. You have not been charged.",
           code: "wallet_unavailable",
         }
       }
+
+      // The debit is confirmed. A failed save here must not turn it into a
+      // "failed" order that tells the learner nothing moved: enrolment below
+      // still runs, and if that fails too its handler refunds this charge.
+      chargeId = charge.id
+      ord.chargeId = charge.id
+      try {
+        await transitionOrder(ord, "paid")
+      } catch (err) {
+        console.error("[Payments] charge confirmed but the order didn't save — enrolling anyway:", charge.id, err)
+      }
+      await logPaymentEvent(ord._id, reference, "charge_confirmed", {
+        chargeId: charge.id,
+        amountMinor: charge.amountMinor,
+      })
     }
 
     // Create (or reactivate) the enrollment — access unlocks here and never
@@ -414,7 +451,15 @@ export async function purchaseCourse(input: { courseId: string; packageKey?: Pac
       return { success: false, error: "Failed to enroll in course", code: "enroll_failed" }
     }
 
-    if (order) await transitionOrder(order, "enrolled")
+    // The learner has paid and holds the seat (2026-11-08). Nothing below may
+    // turn that into "Failed to enroll": a retry would only stop at "already
+    // enrolled", and the earning and commission below would never be written.
+    // Each step is guarded on its own, so one failure can't skip the next.
+    if (order) {
+      await transitionOrder(order, "enrolled").catch((err) =>
+        console.error("[Payments] enrolled, but the order status didn't save:", order?.reference, err)
+      )
+    }
 
     // Who made the sale (owner, 2026-10-05): the code in the buyer's `wsa_ref`
     // cookie, else whoever their account says invited them. It sets the
@@ -463,9 +508,9 @@ export async function purchaseCourse(input: { courseId: string; packageKey?: Pac
       const availableAt = new Date(Date.now() + EARNINGS_CLEARING_DAYS * 24 * 60 * 60 * 1000)
       const feeMinor = Math.round(amountMinor * (1 - split.share))
       const netMinor = amountMinor - feeMinor
-      const instructor = await User.findById(course.instructor).select("authUserId")
-      if (instructor?.authUserId) {
-        try {
+      try {
+        const instructor = await User.findById(course.instructor).select("authUserId")
+        if (instructor?.authUserId) {
           await Earning.create({
             enrollment: enrollment._id,
             order: order?._id ?? null,
@@ -489,60 +534,48 @@ export async function purchaseCourse(input: { courseId: string; packageKey?: Pac
                 : `academy_earn_${enrollment._id.toString()}`,
             chargeId,
           })
-        } catch (err) {
-          console.error("[Earnings] failed to record sale earning:", err)
         }
+      } catch (err) {
+        console.error("[Earnings] failed to record sale earning:", err)
       }
 
-      // The referral commission (owner, 2026-10-05): 10% of the referred
-      // person's FIRST paid enrollment, ever, out of the Academy's share, to
-      // the referrer's wallet after the same clearing window. Only on a
-      // "referral" sale — never a self-referral, never on a sale the seller's
-      // own link made. The referrer may be any user, not only faculty.
-      const commissionMinor = Math.round(amountMinor * REFERRAL_COMMISSION_RATE)
-      if (split.attribution?.kind === "referral" && referrer && order && commissionMinor > 0) {
-        try {
-          if (referrer.userId !== user.id && (await isFirstPaidPurchase(user.id, order._id.toString()))) {
-            await Earning.create({
-              enrollment: enrollment._id,
-              order: order._id,
-              course: course._id,
-              instructor: referrer.userId,
-              instructorAuthUserId: referrer.authUserId,
-              student: user.id,
-              kind: "referral",
-              grossMinor: amountMinor,
-              feeMinor: amountMinor - commissionMinor,
-              netMinor: commissionMinor,
-              currency: "USD",
-              status: "pending",
-              availableAt,
-              // One per buyer, ever (see referralCreditReference).
-              creditReference: referralCreditReference(user.id),
-              chargeId,
-              note: `referral: ${Math.round(REFERRAL_COMMISSION_RATE * 100)}% of the referred learner's first paid enrollment, code ${referrer.code}`,
-            })
-          }
-        } catch (err) {
-          // A duplicate reference is this buyer's one commission, already recorded.
-          if ((err as { code?: number }).code !== 11000) {
-            console.error("[Referrals] failed to record the referral commission:", err)
-          }
-        }
+      // The referral commission (owner, 2026-10-05): a share of this purchase
+      // by the plan bought (Basic 10%, Standard 12%, Executive 15%, else 10%),
+      // out of the Academy's share, to the referrer's wallet after the same
+      // clearing window. Every purchase earns, not only the first (client,
+      // 2026-11-05). Only on a "referral" sale — never a self-referral, never
+      // on a sale the seller's own link made. The referrer may be any user.
+      if (split.attribution?.kind === "referral" && referrer && order) {
+        await bookReferralCommission({
+          referrer,
+          buyerId: user.id,
+          orderId: order._id.toString(),
+          enrollmentId: enrollment._id.toString(),
+          courseId: course._id.toString(),
+          amountMinor,
+          packageKey: pkg?.key ?? null,
+          chargeId,
+          via: "wallet",
+        })
       }
     }
 
     // Update course + instructor aggregates. Pre-enrollment already counted
-    // this student, so activation only moves money aggregates.
-    if (!isActivation) {
-      await Course.findByIdAndUpdate(courseId, { $inc: { enrolledCount: 1 } })
+    // this student, so activation only moves money aggregates. Display
+    // counters only: a failure is logged, never shown to the paid learner.
+    try {
+      if (!isActivation) {
+        await Course.findByIdAndUpdate(courseId, { $inc: { enrolledCount: 1 } })
+      }
+      await User.findByIdAndUpdate(course.instructor, {
+        $inc: {
+          ...(isActivation ? {} : { "instructorProfile.totalStudents": 1 }),
+          "instructorProfile.totalEarnings": isPaid ? price * split.share : 0,
+        },
+      })
+    } catch (err) {
+      console.error("[Payments] enrolled, but the course/instructor counters didn't update:", err)
     }
-    await User.findByIdAndUpdate(course.instructor, {
-      $inc: {
-        ...(isActivation ? {} : { "instructorProfile.totalStudents": 1 }),
-        "instructorProfile.totalEarnings": isPaid ? price * split.share : 0,
-      },
-    })
 
     // Executive (D4): the instructor and admins schedule onboarding; the
     // buyer's intake form waits on the success page. Keyed on the Executive
@@ -571,8 +604,12 @@ export async function purchaseCourse(input: { courseId: string; packageKey?: Pac
     // D27: one welcome on the learner's first paid enrollment — after the confirmation, never awaited.
     if (isPaid) void sendWelcomeOnce(user.id, enrollment._id.toString())
 
-    revalidatePath("/dashboard/my-courses")
-    revalidatePath(`/courses/${courseId}`)
+    try {
+      revalidatePath("/dashboard/my-courses")
+      revalidatePath(`/courses/${courseId}`)
+    } catch (err) {
+      console.error("[Payments] enrolled, but the page refresh failed:", err)
+    }
 
     return {
       success: true,
@@ -872,6 +909,9 @@ export async function preEnrollCourse(courseId: string): Promise<PreEnrollResult
       return { success: false, error: "You need to be signed in to enroll", code: "auth" }
     }
 
+    if (typeof courseId !== "string" || !Types.ObjectId.isValid(courseId)) {
+      return { success: false, error: "Course not found" }
+    }
     const course = await Course.findOne({ _id: courseId, status: "published" })
     if (!course) {
       return { success: false, error: "Course not found or not available", code: "not_found" }
@@ -883,6 +923,13 @@ export async function preEnrollCourse(courseId: string): Promise<PreEnrollResult
     }
     if (!course.preEnrollEnabled) {
       return { success: false, error: "Pre-launch enrollment isn't open for this course", code: "not_open" }
+    }
+    // A reservation is paid for at launch, so only a course on sale takes one.
+    if (!kindIsOpen(course.kind)) {
+      return { success: false, error: "The marketplace opens soon.", code: "not_found" }
+    }
+    if (!isOnSale(course)) {
+      return { success: false, error: "This course isn't on sale.", code: "not_found" }
     }
 
     const existing = await Enrollment.findOne({ user: user.id, course: courseId })

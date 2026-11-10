@@ -16,19 +16,20 @@ import { sendNewSellerApplicationAdminEmail, sendSellerDecisionEmail } from "@/l
 import { appUrl } from "@/lib/app-url"
 import { SCHOOL_BY_SLUG, SCHOOL_SLUGS, schoolSlugOf, type SchoolSlug } from "@/lib/schools"
 import { isFacultyRole, safeWebUrl } from "@/lib/faculty"
-import { SELLER_HOME } from "@/lib/marketplace"
+import { MARKETPLACE_OPEN, SELLER_HOME } from "@/lib/marketplace"
 
 /**
- * Seller applications. Owen, 2026-10-28: the marketplace is open to anyone
- * (it was approved sellers only from 2026-10-05). Submitting the form at
- * /dashboard/sell/apply approves the account at once and sets
- * `User.sellerStatus = "approved"`, which opens the trimmed instructor area
- * for marketplace courses — never a role change. Quality is held at the
- * course instead: every marketplace course still passes the four recorded
- * reviews before it is published (lib/actions/admin-course-review.ts). Admins
- * see each new seller at /admin/sellers; rows submitted before the change can
- * still be approved or rejected there. Faculty (INSTRUCTOR/ADMIN) may already
- * put courses on the marketplace and don't apply.
+ * Seller applications — the Marketplace Creator sign-up, separate from the
+ * staff tutor job application (lib/actions/applications.ts). Anyone may apply
+ * online (Owen, 2026-10-28), and an admin approves or rejects each one on the
+ * details sent (Owen, voice note 2026-11-05: "they can apply as instructors,
+ * then we will approve them based on their details"). Approval at
+ * /admin/sellers sets `User.sellerStatus = "approved"`, which opens the
+ * trimmed instructor area for the creator's own marketplace courses — never a
+ * role change, so a creator never teaches the Academy's official students.
+ * Every marketplace course still passes the four recorded reviews before it
+ * is published (lib/actions/admin-course-review.ts). Faculty
+ * (INSTRUCTOR/ADMIN) may already put courses on the marketplace and don't apply.
  */
 
 type Result<T> = { success: true; data: T } | { success: false; error: string }
@@ -136,19 +137,7 @@ export async function getMySellerApplication(): Promise<MySellerApplication | nu
       User.findById(user.id).select("sellerStatus").lean(),
       SellerApplication.findOne({ user: user.id }).sort({ createdAt: -1 }).lean(),
     ])
-    // Open marketplace: an application still waiting from before 2026-10-28 is
-    // approved the first time its applicant looks, as a new one would be.
-    if (latest?.status === "submitted") {
-      const approved = await SellerApplication.findOneAndUpdate(
-        { _id: latest._id, status: "submitted" },
-        { $set: { status: "approved", reviewedBy: null, reviewedAt: new Date(), reason: null } },
-        { new: true }
-      ).lean()
-      if (approved) {
-        await User.updateOne({ _id: user.id }, { $set: { sellerStatus: "approved" } })
-        return { sellerStatus: "approved", isFaculty: isFacultyRole(user.role), application: toView(approved) }
-      }
-    }
+    // A waiting application stays waiting until an admin decides it (2026-11-05).
     return {
       sellerStatus: me?.sellerStatus ?? "none",
       isFaculty: isFacultyRole(user.role),
@@ -165,6 +154,8 @@ export async function submitSellerApplication(input: SellerApplicationInput): Pr
     await connectDB()
     const user = await getCurrentUser()
     if (!user) return { success: false, error: "Sign in to apply" }
+    // The marketplace is Coming soon (MARKETPLACE_OPEN): no new sellers yet.
+    if (!MARKETPLACE_OPEN) return { success: false, error: "The marketplace opens soon." }
     if (isFacultyRole(user.role)) {
       return { success: false, error: "You're faculty — you can already put courses on the marketplace" }
     }
@@ -180,14 +171,14 @@ export async function submitSellerApplication(input: SellerApplicationInput): Pr
     const open = await SellerApplication.exists({ user: user.id, status: "submitted" })
     if (open) return { success: false, error: "Your application is already in review" }
 
-    // Open marketplace: the application is its own approval (reviewedBy null
-    // marks it self-serve). A rejected applicant may sell after applying again.
+    // Waits for an admin's decision on these details (2026-11-05). A rejected
+    // applicant may apply again.
     const now = new Date()
     const application = await SellerApplication.create({
       user: user.id,
-      status: "approved",
+      status: "submitted",
       reviewedBy: null,
-      reviewedAt: now,
+      reviewedAt: null,
       fullName: answers.fullName,
       school: answers.school,
       topic: answers.topic,
@@ -196,15 +187,15 @@ export async function submitSellerApplication(input: SellerApplicationInput): Pr
       pitch: answers.pitch,
       agreedAt: now,
     })
-    await User.updateOne({ _id: user.id }, { $set: { sellerStatus: "approved" } })
+    await User.updateOne({ _id: user.id }, { $set: { sellerStatus: "applied" } })
 
-    // Fire-and-forget: the bell and an email for every admin, so they know who
-    // joined — their courses reach the review queue when submitted.
+    // Fire-and-forget: the bell and an email for every admin, so they can
+    // review the details at /admin/sellers.
     const schoolName = SCHOOL_BY_SLUG[answers.school].name
     void notifyAdmins({
       type: "application",
-      title: "New Marketplace Creator",
-      body: `${answers.fullName} joined the marketplace to sell “${answers.topic}” (${SCHOOL_BY_SLUG[answers.school].short}).`.slice(0, 500),
+      title: "New Marketplace Creator application",
+      body: `${answers.fullName} applied to sell “${answers.topic}” (${SCHOOL_BY_SLUG[answers.school].short}) on the marketplace.`.slice(0, 500),
       href: "/admin/sellers",
     })
     void (async () => {

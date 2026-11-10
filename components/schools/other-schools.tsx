@@ -1,7 +1,7 @@
 import { ArrowRightIcon, CompassIcon } from "@/components/icons"
 import Link from "next/link"
 
-import { SCHOOLS, type School, type SchoolSlug } from "@/lib/schools"
+import { SCHOOLS, type FromPrice, type School, type SchoolSlug } from "@/lib/schools"
 import { cn } from "@/lib/utils"
 import { plural } from "@/components/programs/format"
 import { SchoolCard } from "@/components/marketing/school-card"
@@ -21,7 +21,7 @@ export function OtherSchools({
 }: {
   school: School
   counts: Record<SchoolSlug, number>
-  cheapest: Record<SchoolSlug, number | null>
+  cheapest: Record<SchoolSlug, FromPrice | null>
   /** Published programs across the catalogue. */
   total: number
 }) {

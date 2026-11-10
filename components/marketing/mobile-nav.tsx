@@ -22,6 +22,22 @@ export type MarketingNavLink = {
   label: string
   /** Rendered as a plain <a> — cross-domain Clerk URLs aren't app routes. */
   external?: boolean
+  /** A world that isn't open yet: its Coming soon page, with a "Coming soon" chip. */
+  soon?: boolean
+}
+
+/** The small chip after a closed world's name — in the sheet and the bar. */
+export function SoonChip({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn(
+        "ml-2 inline-flex shrink-0 items-center rounded-full border border-ws-hairline px-2 py-0.5 text-[11px] font-semibold leading-none text-ws-muted",
+        className
+      )}
+    >
+      Coming soon
+    </span>
+  )
 }
 
 const linkClass =
@@ -38,6 +54,7 @@ function NavAnchor({ link, className, onClick }: { link: MarketingNavLink; class
   ) : (
     <Link href={link.href} onClick={onClick} className={className}>
       {link.label}
+      {link.soon && <SoonChip />}
     </Link>
   )
 }

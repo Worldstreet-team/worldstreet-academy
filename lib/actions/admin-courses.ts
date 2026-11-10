@@ -9,6 +9,7 @@ import { notifyUser } from "@/lib/notify"
 import { PROGRAM_KIND_FILTER, courseKindOf } from "@/lib/course-kind"
 import { courseFormatOf, hasDeliverable, isFileFormat, type CourseFormat } from "@/lib/course-format"
 import { creatorPublishRefusal } from "@/lib/course-review"
+import { isOnSale } from "@/lib/entitlements"
 
 const PAGE_SIZE = 20
 
@@ -141,6 +142,8 @@ export async function adminSetCourseStatus(
     if (course.status === status) return { success: true }
 
     if (status === "published") {
+      // No course is free (isOnSale): set a price in the editor first.
+      if (!isOnSale(course)) return { success: false, error: "Can't publish a course without a price" }
       const format = courseFormatOf(course)
       if (!hasDeliverable({ format, totalLessons: course.totalLessons ?? 0, productFile: course.productFile ?? null })) {
         return {

@@ -145,14 +145,14 @@ export async function Landing() {
         signedIn={signedIn}
       />
 
-      {/* New Economy — free courses on WorldStreet's products; hides at zero */}
+      {/* New Economy — courses on WorldStreet's products; hides at zero */}
       <CourseTeaser
         id="new-economy"
-        label="New Economy · Free"
-        title="Free courses on the new economy"
-        body="How to use each WorldStreet product, step by step. Free, at your own pace."
+        label="New Economy"
+        title="Courses on the new economy"
+        body="How to use each WorldStreet product, step by step, at your own pace."
         href="/new-economy"
-        linkLabel="All free courses"
+        linkLabel="All New Economy courses"
         courses={newEconomy}
         signedIn={signedIn}
       />

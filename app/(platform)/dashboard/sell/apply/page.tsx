@@ -1,22 +1,25 @@
 import { Glyph, Store01Icon } from "@/components/icons"
 import type { Metadata } from "next"
-
+import Link from "next/link"
+import { redirect } from "next/navigation"
 
 import { Topbar } from "@/components/platform/topbar"
 import { SellerApplyPanel } from "@/components/sell/seller-apply-panel"
 import { getMySellerApplication } from "@/lib/actions/seller-applications"
 import { getCachedUser } from "@/lib/auth/cached"
 import { MARKETPLACE_SHARE_ACADEMY, MARKETPLACE_SHARE_OWN_LINK } from "@/lib/db/models"
-import { sellerSplitNote } from "@/lib/marketplace"
+import { MARKETPLACE_OPEN, sellerSplitNote } from "@/lib/marketplace"
 
 export const metadata: Metadata = { title: "Sell on the marketplace" }
 
 /**
  * `/dashboard/sell/apply` — the seller application (owner, 2026-10-05), in
  * the student shell. Exempt from the paid-dashboard gate (lib/start-gate.ts):
- * a seller needn't be enrolled anywhere.
+ * a seller needn't be enrolled anywhere. While the marketplace is Coming soon
+ * (MARKETPLACE_OPEN) it takes no applications and sends to that page.
  */
 export default async function SellApplyPage() {
+  if (!MARKETPLACE_OPEN) redirect("/marketplace")
   const [user, data] = await Promise.all([getCachedUser(), getMySellerApplication()])
 
   return (
@@ -31,8 +34,9 @@ export default async function SellApplyPage() {
             Sell on the marketplace
           </h1>
           <p className="mx-auto max-w-md text-[15px] leading-relaxed text-muted-foreground">
-            Anyone can sell. Tell us what you&apos;ll teach and start straight away: you build your course, we review
-            it and it goes live beside the Academy&apos;s own.
+            Anyone can apply to sell their own course. Tell us what you&apos;ll teach; we approve creators on their
+            details, then review each course before it goes live. Looking for a teaching job with the Academy
+            instead? See our <Link href="/careers" className="font-medium text-foreground underline underline-offset-4">careers page</Link>.
           </p>
         </header>
 

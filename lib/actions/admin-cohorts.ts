@@ -8,13 +8,7 @@ import { Cohort, Course, Enrollment } from "@/lib/db/models"
 import { requireAdmin } from "@/lib/auth/admin"
 import { PROGRAM_KIND_FILTER } from "@/lib/course-kind"
 import { cohortDateFull, lagosInstant } from "@/lib/cohort"
-import {
-  cohortName,
-  cohortStatus,
-  fallbackCohort,
-  type CohortStatus,
-  type CohortView,
-} from "@/lib/cohort-rules"
+import { cohortName, cohortStatus, type CohortStatus, type CohortView } from "@/lib/cohort-rules"
 import { cohortsForEnrollments } from "@/lib/cohort-calendar"
 
 /**
@@ -22,7 +16,9 @@ import { cohortsForEnrollments } from "@/lib/cohort-calendar"
  * (`YYYY-MM-DDTHH:mm`) and are read with the fixed +01:00 offset here, never
  * in the browser. Rules: numbers 1–999 and unique; a higher number starts
  * strictly later than every lower one; a started cohort keeps its number and
- * can't move its start into the future; there is no delete.
+ * can't move its start into the future. Any cohort can be removed (owner,
+ * 2026-11-08), which is how a first cohort that never ran gives up its number.
+ * `hidden` is the "Show on the website" switch, off; it can change at any time.
  */
 
 export type AdminCohortRow = {
@@ -31,6 +27,7 @@ export type AdminCohortRow = {
   name: string
   startsAt: string
   endsAt: string | null
+  hidden: boolean
   note: string | null
   status: CohortStatus
   learners: number
@@ -40,6 +37,7 @@ export type CohortFormInput = {
   number: number
   startsAt: string
   endsAt: string | null
+  hidden: boolean
   note: string | null
 }
 
@@ -51,40 +49,40 @@ const CohortInput = z.object({
   number: z.number().int().min(1).max(999),
   startsAt: z.string().regex(LOCAL),
   endsAt: z.string().regex(LOCAL).nullable(),
+  hidden: z.boolean(),
   note: z.string().trim().max(500).nullable(),
 })
 
 const CohortId = z.string().regex(/^[a-f0-9]{24}$/)
 
-type CohortLean = { _id: Types.ObjectId; number: number; startsAt: Date; endsAt: Date | null; note: string | null }
+type CohortLean = {
+  _id: Types.ObjectId
+  number: number
+  startsAt: Date
+  endsAt: Date | null
+  /** Missing on a cohort saved before the switch: shown. */
+  hidden?: boolean
+  note: string | null
+}
 
-function viewOf(c: { number: number; startsAt: Date; endsAt: Date | null }): CohortView {
+function viewOf(c: { number: number; startsAt: Date; endsAt: Date | null; hidden?: boolean }): CohortView {
   return {
     number: c.number,
     name: cohortName(c.number),
     startsAt: c.startsAt.toISOString(),
     endsAt: c.endsAt ? c.endsAt.toISOString() : null,
+    hidden: c.hidden === true,
   }
 }
 
-export async function adminListCohorts(): Promise<
-  Result<{ cohorts: AdminCohortRow[]; fallback: (CohortView & { status: CohortStatus }) | null }>
-> {
+export async function adminListCohorts(): Promise<Result<{ cohorts: AdminCohortRow[] }>> {
   try {
     await connectDB()
     await requireAdmin()
 
     const rows = (await Cohort.find().sort({ number: -1 }).lean()) as unknown as CohortLean[]
-    if (rows.length === 0) {
-      const fallback = fallbackCohort(
-        process.env.NEXT_PUBLIC_COHORT_STARTS_AT,
-        process.env.NEXT_PUBLIC_COHORT_NUMBER
-      )
-      return {
-        success: true,
-        data: { cohorts: [], fallback: { ...fallback, status: cohortStatus(fallback, [fallback], Date.now()) } },
-      }
-    }
+    // With no cohorts the website shows none (the env fallback is hidden, lib/cohort-rules.ts).
+    if (rows.length === 0) return { success: true, data: { cohorts: [] } }
 
     // Learner count (ruling 13): distinct users with an active or completed
     // program enrolment placed in the cohort.
@@ -110,7 +108,6 @@ export async function adminListCohorts(): Promise<
     return {
       success: true,
       data: {
-        fallback: null,
         cohorts: rows.map((r, i) => ({
           id: String(r._id),
           ...views[i],
@@ -134,7 +131,7 @@ async function save(id: string | null, input: CohortFormInput): Promise<Result<C
 
     const parsed = CohortInput.safeParse(input)
     if (!parsed.success) return { success: false, error: "Check the number, dates and note" }
-    const { number: n, note } = parsed.data
+    const { number: n, hidden, note } = parsed.data
 
     const startsAt = lagosInstant(parsed.data.startsAt)
     if (!startsAt) return { success: false, error: "Enter the start as a date and time" }
@@ -190,7 +187,7 @@ async function save(id: string | null, input: CohortFormInput): Promise<Result<C
       }
     }
 
-    const fields = { number: n, name: cohortName(n), startsAt, endsAt, note: note || null }
+    const fields = { number: n, name: cohortName(n), startsAt, endsAt, hidden, note: note || null }
     if (existing) {
       await Cohort.updateOne({ _id: existing._id }, { $set: fields })
     } else {
@@ -199,7 +196,7 @@ async function save(id: string | null, input: CohortFormInput): Promise<Result<C
 
     revalidatePath("/admin/cohorts")
     revalidatePath("/", "layout")
-    return { success: true, data: viewOf({ number: n, startsAt, endsAt }) }
+    return { success: true, data: viewOf({ number: n, startsAt, endsAt, hidden }) }
   } catch (err) {
     if (typeof err === "object" && err !== null && (err as { code?: number }).code === 11000) {
       const n = Number(input?.number)
@@ -216,4 +213,32 @@ export async function adminCreateCohort(input: CohortFormInput): Promise<Result<
 
 export async function adminUpdateCohort(id: string, input: CohortFormInput): Promise<Result<CohortView>> {
   return save(id, input)
+}
+
+/**
+ * Removes a cohort for good. No other record points at a cohort (placement is
+ * derived from the enrolment date), so nothing else changes: its learners are
+ * placed again, in the next cohort or else the one before it, which the admin
+ * dialog states before it asks. With none left, the website shows no cohort.
+ */
+export async function adminRemoveCohort(id: string): Promise<Result<{ number: number }>> {
+  try {
+    await connectDB()
+    const admin = await requireAdmin()
+
+    const cid = CohortId.safeParse(id)
+    if (!cid.success) return { success: false, error: "Cohort not found" }
+    const removed = (await Cohort.findOneAndDelete({ _id: cid.data }).select("number").lean()) as unknown as {
+      number: number
+    } | null
+    if (!removed) return { success: false, error: "Cohort not found" }
+    console.info("[Cohorts] removed", cohortName(removed.number), "by", admin.id)
+
+    revalidatePath("/admin/cohorts")
+    revalidatePath("/", "layout")
+    return { success: true, data: { number: removed.number } }
+  } catch (err) {
+    console.error("[Cohorts] remove failed:", err)
+    return { success: false, error: "Couldn't remove the cohort" }
+  }
 }

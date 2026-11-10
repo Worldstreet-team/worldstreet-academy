@@ -1,5 +1,6 @@
 "use client"
-import { ArrowRightLeftIcon, BadgeCheckIcon, BookOpenIcon, CheckIcon, ChevronLeftIcon, CopyCheckIcon, LoaderCircleIcon, LockKeyholeIcon, MailIcon, PackageCheckIcon, ReceiptTextIcon, RotateCcwIcon, ShieldCheckIcon, WalletIcon } from "@/components/icons"
+// Transfers closed (CTO, 2026-11-08): ArrowRightLeftIcon and ReceiptTextIcon only served the commented-out transfer pieces.
+import { BadgeCheckIcon, BookOpenIcon, CheckIcon, ChevronLeftIcon, CopyCheckIcon, LoaderCircleIcon, LockKeyholeIcon, MailIcon, PackageCheckIcon, RotateCcwIcon, ShieldCheckIcon, WalletIcon } from "@/components/icons"
 
 import * as React from "react"
 import Image from "next/image"
@@ -16,16 +17,17 @@ import { queryKeys } from "@/lib/hooks/queries/keys"
 import { PACKAGE_LABEL } from "@/lib/entitlements"
 import { BRAND } from "@/lib/brand"
 import { SCHOOL_BY_SLUG, type SchoolSlug } from "@/lib/schools"
-import { espeeAmount } from "@/lib/espee"
+// import { transferAmountLabel, type TransferMethod } from "@/lib/payment-channels" — transfers closed (CTO, 2026-11-08)
 import { cn } from "@/lib/utils"
 import { RollingAmount } from "@/components/ui/rolling-amount"
-import { Segmented } from "@/components/ui/system"
+// import { Segmented } from "@/components/ui/system" — only the transfer tabs used it
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Disclosure } from "@/components/checkout/disclosure"
 import { MobileSummary, OrderCard } from "@/components/checkout/order-summary"
+import { discountOf } from "@/components/programs/package-model"
 import { Appear, PayButton, ShortfallPanel, type PayPhase } from "@/components/checkout/payment-parts"
-import { EspeeAction, EspeePanel, useEspeeProof } from "@/components/checkout/espee-panel"
+// import { EspeeAction, EspeePanel, useEspeeProof } from "@/components/checkout/espee-panel" — transfers closed (CTO, 2026-11-08)
 import {
   LEVEL_LABEL,
   centsUsd,
@@ -46,12 +48,25 @@ export type CheckoutFacts = {
   openVideoSec: number
 }
 
-type PayMethod = "wallet" | "espee"
-
-const METHOD_OPTIONS = [
-  { key: "wallet", label: "WorldStreet wallet" },
-  { key: "espee", label: "ESPEE transfer" },
-] as const satisfies readonly { key: PayMethod; label: string }[]
+// ── Transfers closed (CTO, 2026-11-08: "All payments route through WorldStreet") ──
+// The payment-method tabs below are kept commented, not deleted.
+//
+// /** The tabs: the wallet, then the programme document's three transfers in its order (Owen, 2026-11-05). */
+// type PayMethod = "wallet" | "bank" | "usdt" | "espee"
+//
+// const METHOD_OPTIONS = [
+//   { key: "wallet", label: "Wallet" },
+//   { key: "bank", label: "Bank" },
+//   { key: "usdt", label: "USDT" },
+//   { key: "espee", label: "ESPEES" },
+// ] as const satisfies readonly { key: PayMethod; label: string }[]
+//
+// type UsdtNetwork = "usdt_trc20" | "usdt_bep20"
+//
+// /** The tab a stored transfer method belongs to. */
+// function tabOf(method: TransferMethod): PayMethod {
+//   return method === "usdt_trc20" || method === "usdt_bep20" ? "usdt" : method
+// }
 
 /** One saved choice per program + package. */
 function intentKeyOf(courseId: string, packageKey: PublicPackage["key"] | null): string {
@@ -75,9 +90,9 @@ function saveCheckoutIntent(
  * everything that can be decided before the buyer acts: the program exists
  * and is live, the buyer isn't enrolled, and the package is the one they chose
  * on the program page. So there is no package picker here — only the order,
- * the wallet, and one button. When ESPEE is on (owner meeting 2026-10-03) a
- * paid order also offers an ESPEE transfer: the learner sends it outside our
- * system, uploads the receipt, and an admin opens the program.
+ * the wallet, and one button. Every paid order is paid from the WorldStreet
+ * wallet (CTO, 2026-11-08); the transfer option (bank, USDT, ESPEES) that
+ * used to sit beside it is commented out below, not deleted.
  *
  * Desktop: order details on the left, the payment card pinned on the right.
  * Phone: a collapsible order summary under the header (Shopify's pattern), the
@@ -99,7 +114,7 @@ export function CheckoutView({
   facts: CheckoutFacts
   /** The buyer holds a pre-launch reservation on this program; paying activates it. */
   reservedSeat: boolean
-  /** "Pay with ESPEE": whether it's offered, our details, and the buyer's proof for this program. */
+  /** Paying by transfer: whether it's offered, and the buyer's proof for this program. */
   espee: EspeeCheckoutState
   /** "First L." of whoever this purchase is credited to (their link or the account's referral), or null. */
   inviter: string | null
@@ -130,6 +145,8 @@ export function CheckoutView({
   const price = selected.price
   const priceMinor = Math.round(price * 100)
   const isPaid = priceMinor > 0
+  // The plan's regular price, struck through on the receipt (display only: the charge is `price`).
+  const discount = discountOf(selected)
   // The wallet is the only way a paid seat is bought, so when it is off the
   // purchase cannot succeed — `purchaseCourse` fails closed before it touches
   // money. Say so before the click rather than after it. A free program needs
@@ -142,17 +159,27 @@ export function CheckoutView({
   const shortfallMinor = declinedShortfallMinor ?? (knownShortfallMinor > 0 ? knownShortfallMinor : null)
   const shortfall = !payBlocked && shortfallMinor !== null && shortfallMinor > 0
 
-  // ESPEE is offered on a paid order while it's on — and a proof already
-  // under review is always shown, even if the option has since been turned off.
-  const espeeShown = isPaid && (espee.enabled || espee.open !== null)
-  const [method, setMethod] = React.useState<PayMethod>(
-    espeeShown && (espee.open !== null || !wallet.enabled) ? "espee" : "wallet"
-  )
-  const byEspee = espeeShown && method === "espee"
-  const espeeForm = useEspeeProof({
-    courseId: program.id,
-    packageKey: program.tierCount > 0 ? selected.key : undefined,
-  })
+  // Transfers closed (CTO, 2026-11-08): the wallet is the only way to pay, so
+  // nothing on this page is ever "by transfer". The old state, kept commented:
+  //
+  // // Transfers are offered on a paid order while they're on — and a proof
+  // // already under review is always shown, even if they have since been turned off.
+  // const espeeShown = isPaid && (espee.enabled || espee.open !== null)
+  // const [method, setMethod] = React.useState<PayMethod>(
+  //   !espeeShown ? "wallet" : espee.open !== null ? tabOf(espee.open.method) : !wallet.enabled ? "bank" : "wallet"
+  // )
+  // const [usdtNetwork, setUsdtNetwork] = React.useState<UsdtNetwork>(
+  //   espee.open?.method === "usdt_bep20" ? "usdt_bep20" : "usdt_trc20"
+  // )
+  // const byEspee = espeeShown && method !== "wallet"
+  // /** How this order is paid when it's a transfer (the USDT tab carries its network). */
+  // const transferMethod: TransferMethod = method === "usdt" ? usdtNetwork : method === "wallet" ? "bank" : method
+  // const espeeForm = useEspeeProof({
+  //   receiptUpload: espee.receiptUpload,
+  //   courseId: program.id,
+  //   packageKey: program.tierCount > 0 ? selected.key : undefined,
+  // })
+  const byEspee = false as boolean
 
   const school = program.school ? SCHOOL_BY_SLUG[program.school] : null
   const multiTier = program.tierCount > 1
@@ -288,16 +315,22 @@ export function CheckoutView({
     }
   }
 
-  const busy = phase !== "idle" || espeeForm.submitting
+  const busy = phase !== "idle" // || espeeForm.submitting — transfers closed
 
   /** The page's one primary action — rendered in the payment card on desktop and in the bottom bar on a phone. */
   function primaryAction(where: "card" | "bar") {
     const id = where === "card" ? "checkout-pay" : "checkout-pay-bar"
-    if (byEspee) {
-      return (
-        <EspeeAction id={id} open={espee.open !== null} form={espeeForm} onSubmit={() => espeeForm.submit(saveInvite)} />
-      )
-    }
+    // Transfers closed (CTO, 2026-11-08):
+    // if (byEspee) {
+    //   return (
+    //     <EspeeAction
+    //       id={id}
+    //       open={espee.open !== null}
+    //       form={espeeForm}
+    //       onSubmit={() => espeeForm.submit(saveInvite, transferMethod, espee.nairaRate?.ngnPerUsd ?? null)}
+    //     />
+    //   )
+    // }
     if (payBlocked) {
       // Gold is the page's primary action. With the wallet off there is no
       // action to offer, so the CTA drops out of gold rather than sitting
@@ -390,7 +423,7 @@ export function CheckoutView({
               {!isPaid
                 ? "Review your order, then confirm your free enrollment."
                 : byEspee
-                  ? "Review your order, then send the ESPEE transfer and upload your receipt."
+                  ? "Review your order, then send the payment and upload your receipt."
                   : "Review your order, then pay from your WorldStreet wallet."}
             </p>
           </div>
@@ -417,6 +450,7 @@ export function CheckoutView({
                 {isPaid ? "Payment" : "Your enrollment"}
               </h2>
 
+              {/* Transfers closed (CTO, 2026-11-08) — the method tabs, kept commented:
               {espeeShown && (
                 <Segmented
                   options={METHOD_OPTIONS}
@@ -426,7 +460,7 @@ export function CheckoutView({
                   grow
                   className="mt-4"
                 />
-              )}
+              )} */}
 
               {isPaid && !byEspee && (
                 <div className="mt-4 flex items-center gap-3 rounded-[14px] bg-ws-sunken p-3.5">
@@ -465,6 +499,20 @@ export function CheckoutView({
                     {isPaid ? centsUsd(priceMinor) : "Free"}
                   </dd>
                 </div>
+                {discount && (
+                  <div className="flex items-baseline gap-3">
+                    <dt className="min-w-0 flex-1 text-ws-muted">
+                      Regular price{" "}
+                      <s className="tabular-nums decoration-1">
+                        <span className="sr-only">was </span>
+                        {wholeUsd(discount.listPrice)}
+                      </s>
+                    </dt>
+                    <dd className="shrink-0 tabular-nums text-ws-muted">
+                      You save {wholeUsd(discount.listPrice - price)}
+                    </dd>
+                  </div>
+                )}
               </dl>
               <div className="mt-4 flex items-end justify-between gap-3 border-t border-ws-hairline pt-4">
                 <span className="pb-1 text-[14px] font-semibold text-ws-primary">{isPaid ? "Total due" : "Total"}</span>
@@ -507,7 +555,16 @@ export function CheckoutView({
                 </p>
               </Appear>
 
-              {byEspee && <EspeePanel espee={espee} priceMinor={priceMinor} form={espeeForm} />}
+              {/* Transfers closed (CTO, 2026-11-08) — the transfer panel, kept commented:
+              {byEspee && (
+                <EspeePanel
+                  espee={espee}
+                  priceMinor={priceMinor}
+                  form={espeeForm}
+                  method={transferMethod}
+                  onUsdtNetwork={(network) => setUsdtNetwork(network === "usdt_bep20" ? "usdt_bep20" : "usdt_trc20")}
+                />
+              )} */}
 
               {/* Who referred this buyer (owner meeting 2026-10-03) — asked once:
                   the first answer is kept. When their link or a code they gave
@@ -586,7 +643,9 @@ export function CheckoutView({
                     {!isPaid
                       ? "No payment needed. Your program opens as soon as you enrol."
                       : byEspee
-                        ? "Your receipt is stored privately. Your program opens once an admin confirms the transfer — we'll email you either way."
+                        ? espee.receiptUpload
+                          ? "Your receipt is stored privately. Your program opens once an admin confirms the payment — we'll email you either way."
+                          : "Your program opens once an admin matches your WhatsApp receipt and confirms the payment — we'll email you either way."
                         : "Charged once, only when you press Pay. Your program opens the moment the wallet confirms."}
                   </span>
                 </p>
@@ -686,12 +745,13 @@ export function CheckoutView({
                 </Link>
               </Disclosure>
 
+              {/* Transfers closed (CTO, 2026-11-08) — "How payment works" for a transfer, kept commented:
               {isPaid && byEspee && (
                 <Disclosure icon={ShieldCheckIcon} title="How payment works" summary="Transfer · receipt · confirmation">
                   <ul className="space-y-4">
-                    <HowRow icon={ArrowRightLeftIcon} title="Send ESPEE to the Academy">
-                      Transfer exactly {espeeAmount(priceMinor)} ESPEE to the account shown in the payment card — 1 ESPEE
-                      is $1.
+                    <HowRow icon={ArrowRightLeftIcon} title="Send the payment to the Academy">
+                      Send {transferAmountLabel(transferMethod, priceMinor, espee.nairaRate?.ngnPerUsd)} to the account
+                      shown in the payment card.
                     </HowRow>
                     <HowRow icon={ReceiptTextIcon} title="Upload your receipt">
                       Add the transfer reference and a screenshot or PDF of the receipt. Only our payments team can see
@@ -715,7 +775,7 @@ export function CheckoutView({
                     </span>
                   </p>
                 </Disclosure>
-              )}
+              )} */}
 
               {isPaid && !byEspee && (
                 <Disclosure icon={ShieldCheckIcon} title="How payment works" summary="One debit · access on confirmation">

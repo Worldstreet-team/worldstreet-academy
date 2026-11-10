@@ -124,7 +124,7 @@ export async function exportInterestedLearnersCsv(): Promise<
     }
 
     for (const m of proofs) {
-      const label = m.status === "submitted" ? "ESPEE proof under review" : "ESPEE proof rejected"
+      const label = m.status === "submitted" ? "Transfer proof under review" : "Transfer proof rejected"
       note(m.user, label, m.createdAt, { course: m.course, plan: m.packageKey })
     }
 

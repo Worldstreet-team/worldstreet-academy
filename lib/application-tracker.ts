@@ -12,7 +12,7 @@ export const APPLICATION_STEPS = [
   { title: "Academic review", body: "Our team reads every application. You'll hear back by email and in the app." },
   {
     title: "Interview",
-    body: "We schedule a short call on the platform — usually a few times for you to pick from — and you join it from your dashboard.",
+    body: "We interview you in person at our office or by video call on the platform — usually offering a few times for you to pick from.",
   },
   {
     title: "Teaching demonstration",

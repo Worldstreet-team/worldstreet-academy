@@ -1,6 +1,9 @@
 import Link from "next/link"
 import { BrandLockup } from "@/components/shared/brand-lockup"
 import { BRAND } from "@/lib/brand"
+import { SoonChip } from "@/components/marketing/mobile-nav"
+import { WORLDS } from "@/lib/institution"
+import { MARKETPLACE_OPEN } from "@/lib/marketplace"
 
 /**
  * The ecosystem's legal documents, published by the WorldStreet hub
@@ -57,15 +60,22 @@ export function Footer({ showFaculty }: { showFaculty: boolean }) {
                 </Link>
               </li>
               <li>
-                <Link href="/marketplace" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                  Marketplace
-                </Link>
-              </li>
-              <li>
                 <Link href="/new-economy" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                  New Economy — free
+                  New Economy
                 </Link>
               </li>
+              {/* The worlds not open yet (owner voice note, 2026-11-02): their Coming soon pages, with the chip */}
+              {WORLDS.filter((world) => world.key !== "academy").map((world) => (
+                <li key={world.key}>
+                  <Link
+                    href={world.href}
+                    className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {world.short}
+                    {!world.open && <SoonChip />}
+                  </Link>
+                </li>
+              ))}
               {/* Only when faculty exists (spec §10) — never a link to an empty page */}
               {showFaculty && (
                 <li>
@@ -92,11 +102,16 @@ export function Footer({ showFaculty }: { showFaculty: boolean }) {
             </ul>
           </div>
           <div>
-            <h4 className="text-sm font-semibold mb-3">Teach</h4>
+            <h4 className="text-sm font-semibold mb-3">Work with us</h4>
             <ul className="space-y-2">
               <li>
-                <Link href="/teach" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                  Become a WMA Instructor
+                {/* Staff tutor vacancies (a job, interviewed and approved) — owner voice note, 2026-11-05.
+                    Team, same day: "retain a 'Become an Instructor' section on the website". */}
+                <Link
+                  href="/careers#become-an-instructor"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Become an Instructor
                 </Link>
               </li>
               <li>
@@ -104,11 +119,13 @@ export function Footer({ showFaculty }: { showFaculty: boolean }) {
                   Create a Course
                 </Link>
               </li>
-              <li>
-                <Link href="/sell" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                  Sell your course
-                </Link>
-              </li>
+              {MARKETPLACE_OPEN && (
+                <li>
+                  <Link href="/sell" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                    Sell your course
+                  </Link>
+                </li>
+              )}
             </ul>
           </div>
           <div>

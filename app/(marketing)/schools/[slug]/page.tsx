@@ -13,7 +13,7 @@ import { schoolCover } from "@/lib/school-art"
 import { fetchBrowseCourses, fetchFaculty, fetchProgramBySlug } from "@/lib/actions/student"
 import { fetchProgramCurriculum } from "@/lib/actions/program-page"
 import { fetchSchoolReviews } from "@/lib/actions/school-page"
-import { packagePriceLabel, programPriceLabel } from "@/lib/program-price"
+import { packagePriceLabel, programPriceLabel, wasPriceNote } from "@/lib/program-price"
 import { appUrl } from "@/lib/app-url"
 import { BRAND } from "@/lib/brand"
 import { FACULTY_PUBLIC } from "@/lib/faculty"
@@ -167,7 +167,8 @@ export default async function SchoolPage({ params }: Params) {
         ? { href: "/programs", label: "Browse all programs" }
         : null
 
-  const fromText = cheapest === null ? null : cheapest === 0 ? "starting free" : `from ${packagePriceLabel(cheapest)}`
+  const fromText =
+    cheapest === null ? null : `from ${packagePriceLabel(cheapest.price)}${wasPriceNote(cheapest.price, cheapest.listPrice)}`
   const closing =
     programs.length === 0
       ? {
@@ -178,7 +179,7 @@ export default async function SchoolPage({ params }: Params) {
       : only
         ? {
             title: `Begin with ${only.title}`,
-            body: `The ${school.short} program, ${programPriceLabel(only).toLowerCase()}. Its page has the full curriculum and the plans to choose from.`,
+            body: `The ${school.short} program, ${programPriceLabel(only).toLowerCase()}${wasPriceNote(only.price ?? 0, only.listPrice)}. Its page has the full curriculum and the plans to choose from.`,
             cta: { href: `/programs/${only.slug}`, label: `Explore ${only.title}` },
           }
         : {

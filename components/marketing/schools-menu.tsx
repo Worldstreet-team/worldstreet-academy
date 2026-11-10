@@ -8,6 +8,7 @@ import Link from "next/link"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { SchoolIcon } from "@/components/shared/school-icon"
 import { SCHOOLS, type School, type SchoolSlug } from "@/lib/schools"
+import { WORLDS } from "@/lib/institution"
 import { schoolCover } from "@/lib/school-art"
 import { cn } from "@/lib/utils"
 
@@ -19,12 +20,18 @@ function programCountLabel(count: number): string {
   return count === 1 ? "1 program" : `${count} programs`
 }
 
+/** The worlds not open yet, listed under "Coming soon". */
+const COMING_SOON = WORLDS.filter((world) => !world.open)
+
 /**
  * "Explore schools" — the marketplace header's catalogue menu. A Base UI
  * popover (click to open; Esc, outside click and a chosen link close it)
  * holding the seven schools in two columns, in school order, with
- * "All schools" / "All programs" at its foot. No gold in here: the bar's
- * one gold button stays the only primary action.
+ * "All schools" / "All programs" at its foot, then the worlds that aren't
+ * open yet under "Coming soon" — the Marketplace while MARKETPLACE_OPEN is off
+ * and the Opportunity Hub (owner voice note, 2026-11-02); the bar has no room
+ * for them. No gold in here: the bar's one gold button stays the only
+ * primary action.
  */
 export function SchoolsMenu({ counts, className }: { counts: SchoolCounts; className?: string }) {
   const [open, setOpen] = React.useState(false)
@@ -74,6 +81,26 @@ export function SchoolsMenu({ counts, className }: { counts: SchoolCounts; class
             All programs
           </FooterLink>
         </div>
+        {COMING_SOON.length > 0 && (
+          <div className="mt-2 border-t border-ws-hairline px-1 pt-2">
+            <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-ws-subtle">
+              Coming soon
+            </p>
+            <ul className="flex flex-wrap items-center gap-1">
+              {COMING_SOON.map((world) => (
+                <li key={world.key}>
+                  <Link
+                    href={world.href}
+                    onClick={close}
+                    className="inline-flex h-9 items-center rounded-full px-3 text-[13px] font-semibold text-ws-muted outline-none transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-raised hover:text-ws-primary focus-visible:bg-ws-raised focus-visible:text-ws-primary"
+                  >
+                    {world.short}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   )

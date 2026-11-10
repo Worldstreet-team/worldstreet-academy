@@ -1,5 +1,5 @@
 import type { BrowseCourse } from "@/lib/actions/student"
-import { SCHOOLS, type SchoolSlug } from "@/lib/schools"
+import { SCHOOLS, type FromPrice, type SchoolSlug } from "@/lib/schools"
 import { schoolCover } from "@/lib/school-art"
 import { FACULTY_PUBLIC } from "@/lib/faculty"
 
@@ -27,8 +27,10 @@ export type IndexProgram = {
   level: Level
   /** Program art (its thumbnail, else its program art, else its school's cover). */
   art: string | null
-  /** Cheapest way in, whole USD; 0 = free; null = no price set. */
+  /** Cheapest way in, whole USD (every listed course is on sale); null = no price set. */
   price: number | null
+  /** The regular price `price` is discounted from, shown struck through; null = no discount. */
+  listPrice: number | null
   /** Enabled packages; 2+ means the price is the cheapest of a ladder ("from"). */
   packages: number
   /** "Opens Oct 3" for a program scheduled in the future; null once it is open. */
@@ -51,8 +53,8 @@ export type IndexSchool = {
   blurb: string
   cover: string | null
   programs: IndexProgram[]
-  /** Cheapest program in the school, whole USD; 0 = free; null = none priced. */
-  from: number | null
+  /** Cheapest program in the school, with its regular price; null = none priced. */
+  from: FromPrice | null
   terms: string[]
 }
 
@@ -79,8 +81,16 @@ export function matches(terms: readonly string[], tokens: readonly string[]): bo
   return tokens.every((t) => terms.some((w) => w.startsWith(t)))
 }
 
+/** The cheapest priced program and the regular price it is discounted from; null when none is priced. */
+export function cheapestProgram(programs: readonly IndexProgram[]): FromPrice | null {
+  let low: FromPrice | null = null
+  for (const p of programs) {
+    if (p.price !== null && (low === null || p.price < low.price)) low = { price: p.price, listPrice: p.listPrice }
+  }
+  return low
+}
+
 function toProgram(course: BrowseCourse, now: number): IndexProgram {
-  const price = course.pricing === "free" ? 0 : course.price
   const opensAt = course.availableAt ? new Date(course.availableAt) : null
   return {
     id: course.id,
@@ -88,7 +98,8 @@ function toProgram(course: BrowseCourse, now: number): IndexProgram {
     title: course.title,
     level: course.level,
     art: course.thumbnailUrl,
-    price: price ?? null,
+    price: course.price ?? null,
+    listPrice: course.listPrice,
     packages: course.tierCount,
     opens:
       opensAt && opensAt.getTime() > now
@@ -130,7 +141,6 @@ export function buildSchoolsIndex(courses: readonly BrowseCourse[]): SchoolsInde
 
   const schools = SCHOOLS.map((school, i): IndexSchool => {
     const programs = bySchool.get(school.slug) ?? []
-    const priced = programs.map((p) => p.price).filter((p): p is number => p !== null)
     const lead = school.name.startsWith(LEAD) ? LEAD.trim() : null
     return {
       slug: school.slug,
@@ -143,7 +153,7 @@ export function buildSchoolsIndex(courses: readonly BrowseCourse[]): SchoolsInde
       blurb: school.blurb,
       cover: schoolCover(school.slug),
       programs,
-      from: priced.length ? Math.min(...priced) : null,
+      from: cheapestProgram(programs),
       terms: wordsOf(
         [
           school.name,

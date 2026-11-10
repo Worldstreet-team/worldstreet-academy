@@ -4,7 +4,8 @@ import connectDB from "@/lib/db"
 import { Order, PaymentEvent, Enrollment, Earning } from "@/lib/db/models"
 import type { PackageKey } from "@/lib/db/models"
 import { requireAdmin } from "@/lib/auth/admin"
-import { getWalletCharge, walletEnabled } from "@/lib/wallet"
+import { TRANSFER_METHODS } from "@/lib/payment-channels"
+import { getWalletCharge, listUserCharges, walletEnabled, type UserChargeItem } from "@/lib/wallet"
 
 const PAGE_SIZE = 20
 
@@ -240,11 +241,12 @@ export async function adminRunReconciliation(): Promise<{
     }
 
     const findings: ReconcileFinding[] = []
-    // ESPEE orders never touch the wallet (no chargeId by design), so there is
-    // nothing to reconcile them against. Older orders have no paymentMethod.
+    // Transfer orders (ESPEE, bank, USDT) never touch the wallet (no chargeId
+    // by design), so there is nothing to reconcile them against. Older orders
+    // have no paymentMethod.
     const orders = await Order.find({
       status: { $in: ["paid", "enrolled", "refunded"] },
-      paymentMethod: { $ne: "espee" },
+      paymentMethod: { $nin: [...TRANSFER_METHODS] },
     })
       .sort({ createdAt: -1 })
       .limit(500)
@@ -282,6 +284,67 @@ export async function adminRunReconciliation(): Promise<{
       }
     }
 
+    // Charged, but the order says "failed" (2026-11-08): the debit succeeded
+    // and the save after it didn't, or the wallet completed it after our
+    // timeout. The learner was told to retry, and a retry within 24h replays
+    // the same charge and moves the order on, so a failed order still here
+    // with a successful charge no seat holds means a learner paid for
+    // nothing: refund the charge or enrol them. Declines moved no money.
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    const failedOrders = await Order.find({
+      status: "failed",
+      failureCode: { $ne: "insufficient_funds" },
+      paymentMethod: { $nin: [...TRANSFER_METHODS] },
+      createdAt: { $gte: since },
+    })
+      .sort({ createdAt: -1 })
+      .limit(200)
+      .lean()
+    const chargesByUser = new Map<string, UserChargeItem[] | null>()
+    for (const order of failedOrders) {
+      const label = `${order.reference}`
+      let candidates: string[]
+      if (order.chargeId) {
+        try {
+          const charge = await getWalletCharge(order.authUserId, order.chargeId)
+          candidates = charge.status === "succeeded" ? [charge.id] : []
+        } catch {
+          findings.push({ severity: "warning", message: `${label}: failed order with a charge; wallet lookup failed` })
+          continue
+        }
+      } else {
+        // No charge id came back (a timeout): look for one by course and amount.
+        let list = chargesByUser.get(order.authUserId)
+        if (list === undefined) {
+          list = await listUserCharges(order.authUserId, 50).catch(() => null)
+          chargesByUser.set(order.authUserId, list)
+        }
+        if (list === null) {
+          findings.push({ severity: "warning", message: `${label}: failed with an unknown outcome; wallet charge list unavailable` })
+          continue
+        }
+        candidates = list
+          .filter(
+            (c) =>
+              c.status === "succeeded" &&
+              String(c.metadata?.courseId ?? "") === String(order.course) &&
+              c.amountMinor === order.amountMinor
+          )
+          .map((c) => c.id)
+      }
+      for (const chargeId of candidates) {
+        const [held, tracked] = await Promise.all([
+          Enrollment.exists({ transactionId: chargeId }),
+          Order.exists({ chargeId, status: { $in: ["paid", "enrolled", "refunded"] } }),
+        ])
+        if (held || tracked) continue
+        findings.push({
+          severity: "error",
+          message: `${label}: marked failed, but wallet charge ${chargeId} succeeded and no enrollment holds it. The learner paid: refund the charge or enrol them.`,
+        })
+      }
+    }
+
     // Paid enrollments without an order record
     const paidEnrollments = await Enrollment.find({
       pricePaid: { $gt: 0 },
@@ -300,7 +363,7 @@ export async function adminRunReconciliation(): Promise<{
       }
     }
 
-    return { success: true, findings, checkedOrders: orders.length }
+    return { success: true, findings, checkedOrders: orders.length + failedOrders.length }
   } catch (error) {
     console.error("Admin reconciliation error:", error)
     return { success: false, error: "Reconciliation failed", findings: [], checkedOrders: 0 }

@@ -930,6 +930,8 @@ export default function InstructorMeetingsPage() {
       await joinRTKAndSetup(result.authToken)
     } else {
       setSetupMessage(null)
+      // Say why, instead of closing the dialog onto nothing.
+      setScheduleNotice(result.error ?? "Couldn't start the meeting. Try again in a moment.")
     }
   }
 
@@ -971,6 +973,7 @@ export default function InstructorMeetingsPage() {
       await joinRTKAndSetup(result.authToken)
     } else {
       setSetupMessage(null)
+      setScheduleNotice(result.error ?? "Couldn't start the class. Try again in a moment.")
     }
   }
 

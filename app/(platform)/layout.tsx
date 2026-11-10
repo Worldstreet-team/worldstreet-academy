@@ -10,6 +10,7 @@ import { CallProvider } from "@/components/providers/call-provider"
 import { MeetingProvider } from "@/components/providers/meeting-provider"
 import { QueryProvider } from "@/components/providers/query-provider"
 import { getCachedUser } from "@/lib/auth/cached"
+import { claimWaitingGrants } from "@/lib/access-grants"
 import { START_SCHOOL_COOKIE, needsSchoolChoice, schoolsPathFor } from "@/lib/start-gate"
 import { getStartGateState } from "@/lib/start-gate-state"
 import { TranslateScript } from "@/components/translator/translate-script"
@@ -39,7 +40,11 @@ export default async function PlatformLayout({
     const gate = await getStartGateState(user.id).catch(() => null)
     if (
       gate &&
-      needsSchoolChoice({ role: user.role, instructorStatus: user.instructorStatus, pathname, ...gate })
+      needsSchoolChoice({ role: user.role, instructorStatus: user.instructorStatus, pathname, ...gate }) &&
+      // A payment an admin recorded for this email (team, 2026-11-06) opens
+      // here if sign-in didn't open it (the account was made in the mobile
+      // app, say, or the first try failed). Only runs for a learner it would send away.
+      (await claimWaitingGrants(user)) === 0
     ) {
       redirect(
         gate.hasOpenProof

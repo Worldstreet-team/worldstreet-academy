@@ -92,11 +92,7 @@ export default clerkMiddleware(async (auth, request) => {
       signUpUrl: "/register",
     }
   : {
-      // Not a Clerk satellite: academy.* is a subdomain of the hub's root
-      // domain, so the session cookies on .worldstreetgold.com already reach
-      // it. Satellite mode made clerk-js send every signed-out visitor to
-      // /v1/client/sync, which refuses a host that is not a registered
-      // satellite ("link_domain must be included", 2026-11-10).
+      // A plain subdomain of the hub's Clerk domain, never a satellite — see app/layout.tsx.
       signInUrl: "https://www.worldstreetgold.com/login",
       signUpUrl: "https://www.worldstreetgold.com/register",
     }

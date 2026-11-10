@@ -3,6 +3,7 @@
 import connectDB from "@/lib/db"
 import { requireAdmin } from "@/lib/auth/admin"
 import { partnerRows, type PartnerRow } from "@/lib/referrals"
+import { partnerLevelFor } from "@/lib/partner-levels"
 
 export async function adminListPartners(): Promise<
   { success: true; data: { rows: PartnerRow[]; inactive: number } } | { success: false; error: string }
@@ -45,6 +46,7 @@ export async function adminExportPartnersCsv(): Promise<
       "Clicks",
       "Sign-ups",
       "Enrolled",
+      "Level",
       "Revenue (USD)",
       "Commission pending (USD)",
       "Commission paid (USD)",
@@ -59,6 +61,7 @@ export async function adminExportPartnersCsv(): Promise<
         r.clicks,
         r.signUps,
         r.enrolled,
+        quote(partnerLevelFor(r.enrolled)?.name ?? ""),
         usd(r.revenueMinor),
         usd(r.commissionPendingMinor),
         usd(r.commissionPaidMinor),

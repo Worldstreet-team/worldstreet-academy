@@ -2,7 +2,8 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { SCHOOLS, type SchoolSlug } from "@/lib/schools"
+import { SCHOOLS, type FromPrice, type SchoolSlug } from "@/lib/schools"
+import { PackageDiscount } from "@/components/programs/package-offer"
 import { useStartSchool } from "@/components/marketing/start-school-store"
 import { useMotionOK } from "@/components/marketing/motion/bus"
 import { cn } from "@/lib/utils"
@@ -22,7 +23,7 @@ import { cn } from "@/lib/utils"
  * Only a row ABOVE the line counts as past: on a short screen where it starts
  * below the fold, the bar stays down.
  */
-export function StickySchoolBar({ cheapest }: { cheapest: Record<SchoolSlug, number | null> }) {
+export function StickySchoolBar({ cheapest }: { cheapest: Record<SchoolSlug, FromPrice | null> }) {
   const picked = useStartSchool((s) => s.picked)
   const [show, setShow] = React.useState(false)
   const ok = useMotionOK()
@@ -82,7 +83,8 @@ export function StickySchoolBar({ cheapest }: { cheapest: Record<SchoolSlug, num
               {from !== null && (
                 <span className="block tabular-nums text-ws-muted sm:inline">
                   <span className="hidden sm:inline"> · </span>
-                  {from === 0 ? "free to start" : `from $${from.toLocaleString("en-US")}`}
+                  from ${from.price.toLocaleString("en-US")}{" "}
+                  <PackageDiscount pkg={from} chipClassName="hidden" />
                 </span>
               )}
             </>

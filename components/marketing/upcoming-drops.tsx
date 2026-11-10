@@ -6,6 +6,8 @@ import { cn } from "@/lib/utils"
 import { Reveal, RevealGroup } from "@/components/marketing/motion/reveal"
 import { dropDateLabel } from "@/components/marketing/course-card"
 import type { BrowseCourse } from "@/lib/actions/student"
+import { programPriceLabel } from "@/lib/program-price"
+import { PackageDiscount } from "@/components/programs/package-offer"
 
 /**
  * §5 — UPCOMING DROPS. List rows for published courses with a future
@@ -31,8 +33,8 @@ export function UpcomingDrops({ drops }: { drops: BrowseCourse[] }) {
             On the calendar.
           </h2>
           <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-ws-muted">
-            Scheduled releases. Where pre-enrollment is on, reserve a seat free
-            and get an email the moment the program goes live.
+            Scheduled releases. Where pre-enrollment is on, reserve a seat now, pay
+            when the program goes live, and get an email the moment it does.
           </p>
         </RevealGroup>
 
@@ -75,10 +77,19 @@ export function UpcomingDrops({ drops }: { drops: BrowseCourse[] }) {
                           {course.category ? `${course.category} · ` : ""}
                           {course.level}
                         </span>
+                        {/* Priced like every other program (team, 2026-11-04). */}
+                        <span className="mt-1 inline-flex flex-wrap items-baseline gap-x-1.5 text-[13px] font-semibold tabular-nums text-ws-primary">
+                          {programPriceLabel(course)}
+                          <PackageDiscount
+                            pkg={{ price: course.price ?? 0, listPrice: course.listPrice }}
+                            chipClassName="hidden"
+                            className="text-[12px] font-normal"
+                          />
+                        </span>
                       </span>
                       <span className="col-span-2 text-[13px] font-semibold text-ws-gold transition-opacity duration-[var(--ws-motion-fast)] group-hover:opacity-80 sm:col-span-1">
                         {course.preEnrollEnabled
-                          ? "Pre-enroll free →"
+                          ? "Reserve a seat →"
                           : "View program →"}
                       </span>
                     </div>

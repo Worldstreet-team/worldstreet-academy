@@ -13,6 +13,12 @@ export interface ICohort extends Document {
   name: string
   startsAt: Date
   endsAt: Date | null
+  /**
+   * The "Show on the website" switch, off (owner, 2026-11-08): no countdown,
+   * banner, offer timer or calendar row. Placement ignores it. A missing field
+   * reads as shown, so every cohort saved before the switch stays shown.
+   */
+  hidden: boolean
   /** Admin-only; never printed on a public page. */
   note: string | null
   createdBy: Types.ObjectId | null
@@ -26,6 +32,7 @@ const CohortSchema = new Schema<ICohort>(
     name: { type: String, required: true },
     startsAt: { type: Date, required: true },
     endsAt: { type: Date, default: null },
+    hidden: { type: Boolean, default: false },
     note: { type: String, default: null, maxlength: 500 },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
   },

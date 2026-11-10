@@ -18,6 +18,16 @@ export function loginUrl(returnPath: string): string {
 }
 
 /**
+ * A `redirect_url` taken from the browser, kept only when it is a path on this
+ * site ("/…", never "//host" or "/\host"), so a sign-in link can never send
+ * anyone elsewhere. Anything else returns to the dashboard.
+ */
+export function safeReturnPath(value: string | string[] | undefined): string {
+  const path = typeof value === "string" ? value : ""
+  return path.startsWith("/") && !path.startsWith("//") && !path.startsWith("/\\") ? path : "/dashboard"
+}
+
+/**
  * Where a signed-out visitor returns to after signing in from a checkout page:
  * the checkout path they were on, query included (`courseId`, `package`).
  * Only a checkout path is ever returned, so the return can never be steered

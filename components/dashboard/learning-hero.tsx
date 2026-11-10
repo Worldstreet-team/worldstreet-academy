@@ -32,6 +32,7 @@ import { ClassBand, classTabBadge } from "@/components/dashboard/class-band"
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import { useClientNow } from "@/lib/hooks/use-now"
 import { schoolCover } from "@/lib/school-art"
+import { wasPriceNote } from "@/lib/program-price"
 import { SCHOOL_BY_SLUG, SCHOOLS } from "@/lib/schools"
 import { cn } from "@/lib/utils"
 
@@ -683,9 +684,7 @@ function FinishEnrollingHero({ intent }: { intent: MyEnrollmentIntent }) {
   const price =
     intent.price === null
       ? null
-      : intent.price === 0
-        ? "Free"
-        : `${intent.fromPrice ? "from " : ""}$${intent.price.toLocaleString("en-US")}`
+      : `${intent.fromPrice ? "from " : ""}$${intent.price.toLocaleString("en-US")}${wasPriceNote(intent.price, intent.listPrice)}`
 
   async function dismiss() {
     await dismissEnrollmentIntent()

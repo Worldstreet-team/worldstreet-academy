@@ -52,7 +52,7 @@ function FilterSelect({
 }
 
 /**
- * The marketplace's search and filters: topic (the course's school), format, price,
+ * The marketplace's search and filters: topic (the course's school), format,
  * level and sort. A plain GET form, so it works before hydration; once
  * hydrated, a change navigates straight away and the URL keeps only the
  * filters that are set. The page itself filters on the server.
@@ -134,17 +134,6 @@ export function MarketplaceFilters({
           options={[
             { value: "", label: "All formats" },
             ...formats.map((f) => ({ value: f.value, label: `${f.label} (${f.count})` })),
-          ]}
-        />
-        <FilterSelect
-          name="price"
-          label="Price"
-          value={values.price}
-          onChange={(price) => go({ price: price as MarketplaceFilterValues["price"] })}
-          options={[
-            { value: "", label: "Any price" },
-            { value: "free", label: "Free" },
-            { value: "paid", label: "Paid" },
           ]}
         />
         <FilterSelect

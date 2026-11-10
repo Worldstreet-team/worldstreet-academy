@@ -1,5 +1,5 @@
 "use client"
-import { Glyph, ArrowDown01Icon, ArrowRight01Icon, BookOpen01Icon, Bookmark02Icon, Brain01Icon, Calendar03Icon, Certificate01Icon, ChampionIcon, ClipboardCheckIcon, ChartUpIcon, DashboardSquare01Icon, DollarCircleIcon, EyeIcon, GameController01Icon, GiftIcon, HelpCircleIcon, Inbox, LinkSquare02Icon, Logout01Icon, MentoringIcon, Message01Icon, ReceiptTextIcon, Store01Icon, Task01Icon, TeachingIcon, UserGroup02Icon, UserMultiple02Icon, Video01Icon, VideoReplayIcon, Wallet01Icon } from "@/components/icons"
+import { Glyph, ArrowDown01Icon, BookOpen01Icon, Bookmark02Icon, Brain01Icon, Calendar03Icon, Certificate01Icon, ChampionIcon, ClipboardCheckIcon, ChartUpIcon, DashboardSquare01Icon, DollarCircleIcon, EyeIcon, GameController01Icon, GiftIcon, HelpCircleIcon, Inbox, LinkSquare02Icon, Logout01Icon, MentoringIcon, Message01Icon, ReceiptTextIcon, Store01Icon, Task01Icon, TeachingIcon, UserGroup02Icon, UserMultiple02Icon, Video01Icon, VideoReplayIcon, Wallet01Icon } from "@/components/icons"
 
 import * as React from "react"
 import Image from "next/image"
@@ -570,26 +570,9 @@ export function AppSidebar() {
           {rows(accountItems)}
         </NavGroup>
 
-        {/* Teaching is a conversion action, not a destination — a card, not
-            another row competing with navigation. */}
-        {!isInstructor && !collapsed && (
-          <Link
-            href="/dashboard/become-instructor"
-            className="group/teach my-2 flex items-center gap-3 rounded-[20px] border border-border bg-card p-3.5 outline-none transition-colors duration-[var(--ws-motion-fast)] hover:bg-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring dark:border-transparent"
-          >
-            <span className="min-w-0 flex-1">
-              <span className="block text-[13.5px] font-semibold text-foreground">Become a WMA Instructor</span>
-              <span className="mt-0.5 block text-[11.5px] leading-relaxed text-muted-foreground">
-                Share what you know and earn from your courses.
-              </span>
-            </span>
-            <Glyph
-              icon={ArrowRight01Icon}
-              aria-hidden
-              className="size-4 shrink-0 text-muted-foreground transition-colors duration-[var(--ws-motion-fast)] group-hover/teach:text-foreground"
-            />
-          </Link>
-        )}
+        {/* No "Become an instructor" card here: staff tutors are hired a few
+            at a time through /careers, not recruited from every student's
+            sidebar (owner, 2026-11-05). */}
 
         {/* The rest of the ecosystem — every app, each in a new tab. */}
         <NavGroup label="WorldStreet" hasActive={false} collapsed={collapsed}>

@@ -5,6 +5,7 @@ import connectDB from "@/lib/db"
 import { User, type IUser } from "@/lib/db/models"
 import { adminLevelOf, type AdminLevel } from "@/lib/admin-levels"
 import { referralCookieCode, referralOwner } from "@/lib/referrals"
+import { claimWaitingGrants } from "@/lib/access-grants"
 import type { AuthUser } from "./types"
 
 /**
@@ -176,6 +177,9 @@ async function syncOnce(authUser: AuthUser, updateNames: boolean): Promise<Local
         verified: authUser.isVerified,
         referredBy,
       })
+      // A payment an admin recorded before this account existed opens now
+      // (team, 2026-11-06), so the first page already sees the program.
+      await claimWaitingGrants({ id: user._id.toString(), email: user.email, verified: user.verified })
     }
   } else {
     // Update existing user - only update names if we have real values (from login API, not JWT)

@@ -4,7 +4,7 @@ import { CheckIcon, LockIcon, PlayIcon } from "@/components/icons"
 import * as React from "react"
 import { motion } from "motion/react"
 import { SCHOOLS } from "@/lib/schools"
-import { PROGRAM_PRICE_LIST } from "@/lib/entitlements"
+import { PROGRAM_PRICE_LIST, PROGRAM_REGULAR_PRICE } from "@/lib/entitlements"
 import { SchoolIcon } from "@/components/shared/school-icon"
 import { EASE_INERTIA, EASE_LUX } from "@/components/marketing/motion/ease"
 import { useMotionOK } from "@/components/marketing/motion/bus"
@@ -314,12 +314,17 @@ export function ProgramVignette() {
 
 /* ── 03 Choose your package ──────────────────────────────────────────────── */
 
-/** The plan ladder every program sells, at the Academy's price list. */
+/**
+ * The plan ladder every program in every school sells, at the Academy's price
+ * list with the regular price struck through (team, 2026-11-04: the section
+ * covers all the schools, not one program, and shows the discount). Basic
+ * includes live classes and Q&A; every plan runs 9 weeks.
+ */
 const TIERS = [
-  { name: "Basic", price: PROGRAM_PRICE_LIST.basic, highlight: false, lines: ["Full curriculum", "Self-paced lessons", "Progress tracking"] },
-  { name: "Standard", price: PROGRAM_PRICE_LIST.standard, highlight: true, lines: ["Everything in Basic", "Live classes and Q&A", "Signed certificate"] },
-  { name: "Executive", price: PROGRAM_PRICE_LIST.executive, highlight: false, lines: ["Everything in Standard", "1:1 mentorship", "Priority support"] },
-]
+  { key: "basic", name: "Basic", highlight: false, lines: ["Live classes and Q&A", "Recorded classes", "Certificate"] },
+  { key: "standard", name: "Standard", highlight: true, lines: ["Everything in Basic", "Beginner to advanced", "Projects and mentorship"] },
+  { key: "executive", name: "Executive", highlight: false, lines: ["Full curriculum", "Strictly one-on-one tutor", "Priority support"] },
+] as const
 
 export function PackagesVignette() {
   const ok = useMotionOK()
@@ -330,7 +335,7 @@ export function PackagesVignette() {
           Choose your learning experience
         </p>
         <p className="mt-1 font-display text-[15px] font-semibold text-ws-primary md:text-lg">
-          Forex Trading Mastery · plans
+          All {SCHOOLS.length} schools · 9-week programs
         </p>
       </div>
       {/* Phones: three compact rows (name + price left, CTA right). sm+: three
@@ -358,8 +363,13 @@ export function PackagesVignette() {
             )}
             <div className="min-w-0">
               <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-ws-muted">{tier.name}</p>
-              <p className="mt-0.5 font-display text-xl font-semibold tabular-nums text-ws-primary sm:mt-1 sm:text-2xl">
-                ${tier.price}
+              <p className="mt-0.5 flex flex-wrap items-baseline gap-x-1.5 sm:mt-1">
+                <span className="font-display text-xl font-semibold tabular-nums text-ws-primary sm:text-2xl">
+                  ${PROGRAM_PRICE_LIST[tier.key]}
+                </span>
+                <s className="text-[12px] tabular-nums text-ws-muted decoration-1">
+                  ${PROGRAM_REGULAR_PRICE[tier.key].toLocaleString("en-US")}
+                </s>
               </p>
             </div>
             <ul className="mt-3 hidden space-y-1.5 sm:block">

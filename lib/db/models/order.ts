@@ -13,10 +13,11 @@ import type { PackageKey } from "./course"
  *
  * Only a confirmed charge from the central Worldstreet wallet service moves an
  * order to `paid`; course access is granted on `enrolled` and never before.
- * The one exception is an ESPEE order (paymentMethod "espee", owner meeting
- * 2026-10-03): the money moved outside the wallet, so an admin's approval of
- * the learner's proof (ManualPayment) is what moves it to `paid`, and it never
- * carries a chargeId.
+ * The one exception is a transfer order — paymentMethod "espee" (owner meeting
+ * 2026-10-03), or "bank", "usdt_trc20" or "usdt_bep20" (the programme
+ * document's payment details, 2026-11-05): the money moved outside the wallet,
+ * so an admin's approval of the learner's proof (ManualPayment) is what moves
+ * it to `paid`, and it never carries a chargeId.
  */
 
 export type OrderStatus =
@@ -29,7 +30,7 @@ export type OrderStatus =
   | "refunded"
 
 /** How the money moved. Additive: orders written before ESPEE read as "wallet". */
-export type OrderPaymentMethod = "wallet" | "espee"
+export type OrderPaymentMethod = "wallet" | "espee" | "bank" | "usdt_trc20" | "usdt_bep20"
 
 /**
  * Who made the sale (owner, 2026-10-05), decided in lib/referrals.ts:
@@ -91,7 +92,7 @@ const OrderSchema = new Schema<IOrder>(
     },
     chargeId: { type: String, default: null },
     packageKey: { type: String, enum: [null, "basic", "standard", "executive"], default: null },
-    paymentMethod: { type: String, enum: ["wallet", "espee"], default: "wallet" },
+    paymentMethod: { type: String, enum: ["wallet", "espee", "bank", "usdt_trc20", "usdt_bep20"], default: "wallet" },
     attribution: {
       type: new Schema(
         {

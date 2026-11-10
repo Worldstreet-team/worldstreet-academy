@@ -10,6 +10,7 @@ import { EASE_INERTIA } from "@/components/marketing/motion/ease"
 import { SchoolIcon } from "@/components/shared/school-icon"
 import { SCHOOL_BY_SLUG } from "@/lib/schools"
 import { cn } from "@/lib/utils"
+import { PackageDiscount } from "@/components/programs/package-offer"
 import { Highlight } from "./highlight"
 import { LEVEL_LABEL, RENDER_THUMB, isRender, plural, usd, type IndexProgram, type SchoolHit } from "./model"
 
@@ -151,14 +152,8 @@ export function SchoolRow({
                 {plural(total, "program")}
                 {school.from !== null && (
                   <>
-                    {" · "}
-                    {school.from === 0 ? (
-                      <span className="font-semibold text-ws-primary">Free</span>
-                    ) : (
-                      <>
-                        from <span className="font-semibold text-ws-primary">{usd(school.from)}</span>
-                      </>
-                    )}
+                    {" · "}from <span className="font-semibold text-ws-primary">{usd(school.from.price)}</span>{" "}
+                    <PackageDiscount pkg={school.from} chipClassName="hidden" />
                   </>
                 )}
               </>
@@ -245,12 +240,13 @@ export function ProgramLink({ program, tokens }: { program: IndexProgram; tokens
       </span>
       {program.price !== null && (
         <span className="shrink-0 text-right tabular-nums leading-tight">
-          {program.packages >= 2 && program.price > 0 && (
-            <span className="block text-[11.5px] text-ws-muted">from</span>
-          )}
-          <span className="block text-[15px] font-semibold text-ws-primary">
-            {program.price === 0 ? "Free" : usd(program.price)}
-          </span>
+          {program.packages >= 2 && <span className="block text-[11.5px] text-ws-muted">from</span>}
+          <span className="block text-[15px] font-semibold text-ws-primary">{usd(program.price)}</span>
+          <PackageDiscount
+            pkg={{ price: program.price, listPrice: program.listPrice }}
+            chipClassName="hidden"
+            className="flex justify-end text-[11.5px]"
+          />
         </span>
       )}
       <ArrowRightIcon

@@ -939,6 +939,8 @@ export default function MeetingsPage() {
       await joinRTKAndSetup(result.authToken)
     } else {
       setSetupMessage(null)
+      // Say why, instead of closing the dialog onto nothing.
+      setJoinError(result.error ?? "Couldn't start the meeting. Try again in a moment.")
     }
   }
 

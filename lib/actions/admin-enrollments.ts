@@ -3,9 +3,9 @@
 import { revalidatePath } from "next/cache"
 import mongoose from "mongoose"
 import connectDB from "@/lib/db"
-import { Course, Enrollment, PaymentEvent, User, type CourseKind, type ICoursePackage, type PackageKey } from "@/lib/db/models"
+import { Course, Earning, Enrollment, PaymentEvent, User, type CourseKind, type ICoursePackage, type PackageKey } from "@/lib/db/models"
 import type { EnrollmentStatus } from "@/lib/db/models/enrollment"
-import { requireAdmin } from "@/lib/auth/admin"
+import { requireAdmin, requireSuperAdmin } from "@/lib/auth/admin"
 import { courseAvailability } from "@/lib/types/course"
 import type { CourseStatus } from "@/lib/types/course"
 import { PACKAGE_RANK, entitlementsFor, isPackageKey, packageFor } from "@/lib/entitlements"
@@ -235,10 +235,21 @@ export async function adminListEnrollments(filters?: {
   }
 }
 
+/** Prefixed to the note of each pending earning a cancellation reverses, so a restore reopens exactly those. */
+const CANCELLED_NOTE = "enrollment cancelled before clearing: "
+const CANCELLED_NOTE_RE = new RegExp(`^${CANCELLED_NOTE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`)
+
 /**
  * Suspend/cancel/restore one customer's enrollment. Restore returns the
  * record to wherever it was in the lifecycle: activated ones become active,
  * never-activated ones fall back to pre-enrolled.
+ *
+ * A cancelled purchase earns nothing that hasn't paid out yet (2026-11-08):
+ * cancelling reverses the enrollment's pending tutor share and referral
+ * commission, and restoring a cancelled enrollment reopens exactly those.
+ * Earnings already cleared stay paid; returning money is a refund's job
+ * (`refundEnrollment`, which claws back). This is also how a transfer
+ * approved in error stops its commission: a transfer has no wallet refund.
  */
 export async function adminSetEnrollmentStatus(
   enrollmentId: string,
@@ -246,10 +257,25 @@ export async function adminSetEnrollmentStatus(
 ) {
   try {
     await connectDB()
-    await requireAdmin()
+    const admin = await requireAdmin()
 
+    if (typeof enrollmentId !== "string" || !mongoose.isValidObjectId(enrollmentId)) return { success: false, error: "Enrollment not found" }
     const enrollment = await Enrollment.findById(enrollmentId)
     if (!enrollment) return { success: false, error: "Enrollment not found" }
+    // Four eyes, as on transfers and paid-learner grants: no admin changes their own seat.
+    if (enrollment.user.toString() === admin.id) {
+      return { success: false, error: "Another admin has to change your own enrollment" }
+    }
+    const wasCancelled = enrollment.status === "cancelled"
+    // …nor reopens a commission that pays them: restoring a cancelled enrollment
+    // turns its reversed referral commission back to pending.
+    if (
+      action === "restore" &&
+      wasCancelled &&
+      (await Earning.exists({ enrollment: enrollment._id, kind: "referral", instructor: admin.id, status: "reversed", note: CANCELLED_NOTE_RE }))
+    ) {
+      return { success: false, error: "You referred this learner, so another admin has to restore their enrollment" }
+    }
 
     if (action === "suspend") {
       if (enrollment.status === "suspended") return { success: true }
@@ -268,6 +294,23 @@ export async function adminSetEnrollmentStatus(
           : "pre_enrolled"
     }
     await enrollment.save()
+
+    if (action === "cancel") {
+      const pending = await Earning.find({ enrollment: enrollment._id, kind: { $in: ["sale", "referral"] }, status: "pending" })
+      for (const earning of pending) {
+        earning.status = "reversed"
+        earning.note = `${CANCELLED_NOTE}${earning.note ?? ""}`
+        await earning.save()
+      }
+    } else if (action === "restore" && wasCancelled) {
+      const reversed = await Earning.find({ enrollment: enrollment._id, status: "reversed", note: CANCELLED_NOTE_RE })
+      for (const earning of reversed) {
+        earning.status = "pending"
+        earning.note = earning.note.replace(CANCELLED_NOTE_RE, "")
+        await earning.save()
+      }
+    }
+
     // A restored completion that was never stamped stores the ID its certificate
     // already prints (the legacy value) — restore never mints a fresh one.
     if (action === "restore") {
@@ -296,13 +339,18 @@ export async function adminSetEnrollmentPackage(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     await connectDB()
-    const admin = await requireAdmin()
+    // A plan change is access without a WorldStreet payment: super admin only (CTO, 2026-11-08).
+    const admin = await requireSuperAdmin()
 
     if (!mongoose.isValidObjectId(enrollmentId)) return { success: false, error: "Enrollment not found" }
     if (!isPackageKey(packageKey)) return { success: false, error: "Unknown plan" }
 
     const enrollment = await Enrollment.findById(enrollmentId)
     if (!enrollment) return { success: false, error: "Enrollment not found" }
+    // Four eyes: a plan change is access without payment, so never on your own seat.
+    if (enrollment.user.toString() === admin.id) {
+      return { success: false, error: "Another admin has to change your own plan" }
+    }
 
     // Payment decides the tier of a reservation or a refunded row; only live
     // enrollments can be moved, so the audit trail never goes stale.
@@ -374,6 +422,9 @@ export async function adminSetEnrollmentPackage(
     revalidatePath("/admin/enrollments")
     return { success: true }
   } catch (error) {
+    if (error instanceof Error && error.message === "Not authorized") {
+      return { success: false, error: "Only a super admin can change a learner's plan" }
+    }
     console.error("Admin set enrollment package error:", error)
     return { success: false, error: "Failed to change the plan" }
   }

@@ -1,5 +1,5 @@
 "use client"
-import { StarIcon } from "@/components/icons"
+import { CalendarClockIcon, StarIcon } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
@@ -11,6 +11,7 @@ import { levelChipStyle } from "@/components/shared/level-badge"
 import { WishlistButton, autoBookmark } from "@/components/marketing/wishlist-button"
 import type { BrowseCourse } from "@/lib/actions/student"
 import { programPriceLabel } from "@/lib/program-price"
+import { PackageDiscount } from "@/components/programs/package-offer"
 import { SCHOOL_BY_SLUG } from "@/lib/schools"
 import { ACADEMY_FACULTY_SHORT, FACULTY_PUBLIC } from "@/lib/faculty"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -130,6 +131,14 @@ export function MarketingCourseCard({
               {SCHOOL_BY_SLUG[course.school].short}
             </span>
           )}
+          {/* A program with its own start date (`availableAt`): when its
+              cohort starts, as the school page's program cards show it. */}
+          {drop && course.availableAt && (
+            <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-black/65 px-2.5 py-1 text-[11px] font-semibold text-white">
+              <CalendarClockIcon size={12} aria-hidden />
+              Starts {dropDateLabel(course.availableAt)}
+            </span>
+          )}
           {/* The Udemy move, inside the rules: on a hover-capable pointer the
               first three outcomes slide up over the art. Solid fill (no glass),
               transform only, and the full list lives on the program page, so
@@ -167,15 +176,17 @@ export function MarketingCourseCard({
                 {course.level}
               </span>
             </div>
-            {drop && course.availableAt ? (
-              <span className="inline-flex items-center rounded-full bg-ws-warning/15 px-2.5 py-0.5 text-[11px] font-semibold text-ws-warning">
-                Drops {dropDateLabel(course.availableAt)}
-              </span>
-            ) : (
-              <span className="text-[13px] font-semibold tabular-nums text-ws-primary">
-                {programPriceLabel(course)}
-              </span>
-            )}
+            {/* The price, always — a program with its own start date too
+                (team, 2026-11-04: "the drop Nov should be the price just like
+                others"); its date sits on the art. */}
+            <span className="inline-flex items-baseline gap-1.5 text-[13px] font-semibold tabular-nums text-ws-primary">
+              {programPriceLabel(course)}
+              <PackageDiscount
+                pkg={{ price: course.price ?? 0, listPrice: course.listPrice }}
+                chipClassName="hidden"
+                className="text-[12px] font-normal"
+              />
+            </span>
           </div>
 
           <h3 className="mb-3 mt-2.5 line-clamp-2 min-h-[2.6em] font-display text-[16px] font-semibold leading-[1.3] text-ws-primary">
@@ -219,7 +230,7 @@ export function MarketingCourseCard({
                 </span>
               )}
               {drop && course.preEnrollEnabled && (
-                <span className="text-[11px] font-medium text-ws-gold">Free pre-enroll</span>
+                <span className="text-[11px] font-medium text-ws-gold">Reserve a seat</span>
               )}
             </span>
           </div>

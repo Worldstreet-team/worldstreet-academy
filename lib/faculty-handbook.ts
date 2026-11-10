@@ -31,8 +31,8 @@ export type HandbookFigures = {
   creatorShareOwnLink: number
   /** MARKETPLACE_SHARE_ACADEMY */
   creatorShareAcademy: number
-  /** REFERRAL_COMMISSION_RATE */
-  referralRate: number
+  /** REFERRAL_RATE_BY_PLAN (Basic, Standard, Executive) */
+  referralRates: { basic: number; standard: number; executive: number }
   /** EARNINGS_CLEARING_DAYS */
   clearingDays: number
 }
@@ -158,6 +158,8 @@ export function handbookSections(key: HandbookKey, figures: HandbookFigures): Ha
           blocks: [
             list(
               item("Lessons sit in sections and play in the order you set."),
+              item("You add, edit and remove the lessons of every program you teach, from My Courses → Lessons."),
+              item("A recorded video lesson states how long it runs, in hours and minutes. The program page adds these up, so leave it empty until you know."),
               item("A free preview lesson is open to anyone, enrolled or not."),
               item("A lesson can require a plan. Learners on a lower plan see it locked, but only while the program still sells that plan.")
             ),
@@ -269,7 +271,7 @@ export function handbookSections(key: HandbookKey, figures: HandbookFigures): Ha
               ),
               item("If a sale is refunded, its earning is taken back: reversed before it clears, or deducted from your wallet after."),
               item(
-                `WMA Partners: when someone you invite makes their first paid purchase, ${sharePercent(figures.referralRate)} of it is yours, paid like a sale.`
+                `WMA Partners: every time someone you invite pays for a purchase, by wallet or by a transfer the Academy has confirmed, a share of it is yours, paid like a sale: ${sharePercent(figures.referralRates.basic)} of a Basic plan, ${sharePercent(figures.referralRates.standard)} of Standard and ${sharePercent(figures.referralRates.executive)} of Executive.`
               )
             ),
           ],

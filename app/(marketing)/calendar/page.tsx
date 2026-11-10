@@ -23,12 +23,15 @@ function statusOf(c: CohortView, all: CohortView[]) {
 
 /**
  * `/calendar` — the Academic Calendar (blueprint §19/§20): the next cohort
- * as the landing's band, then every cohort, newest start first. A cohort's
- * admin note never prints here.
+ * as the landing's band, then every cohort shown on the website, newest start
+ * first (a hidden one is left off; its status still counts every cohort). A
+ * cohort's admin note never prints here.
  */
 export default async function CalendarPage() {
   const calendar = await getCohortCalendar()
-  const newestFirst = [...calendar.all].sort((a, b) => Date.parse(b.startsAt) - Date.parse(a.startsAt))
+  const newestFirst = calendar.all
+    .filter((c) => !c.hidden)
+    .sort((a, b) => Date.parse(b.startsAt) - Date.parse(a.startsAt))
 
   return (
     <div className="pb-24 md:pb-32">
@@ -55,30 +58,32 @@ export default async function CalendarPage() {
         )}
       </section>
 
-      <section className="mx-auto mt-14 max-w-7xl px-6">
-        <h2 className="font-display text-2xl font-semibold tracking-[-0.02em] text-ws-primary">All cohorts</h2>
-        <div className="mt-6 rounded-[20px] border border-ws-hairline bg-ws-surface p-6 dark:border-transparent sm:p-8">
-          <ol className="divide-y divide-ws-hairline">
-            {newestFirst.map((c) => (
-              <li
-                key={c.number}
-                className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 py-4 first:pt-0 last:pb-0"
-              >
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="text-[16px] font-semibold text-ws-primary">{c.name}</span>
-                  <span className="rounded-full bg-ws-chip px-3 py-1 text-[12px] font-semibold text-ws-primary">
-                    {COHORT_STATUS_LABEL[statusOf(c, calendar.all)]}
-                  </span>
-                </div>
-                <p className="text-[14px] text-ws-muted">
-                  {`Starts ${cohortDateFull(c.startsAt)}`}
-                  {c.endsAt ? ` · Ends ${cohortDateFull(c.endsAt)}` : ""}
-                </p>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
+      {newestFirst.length > 0 && (
+        <section className="mx-auto mt-14 max-w-7xl px-6">
+          <h2 className="font-display text-2xl font-semibold tracking-[-0.02em] text-ws-primary">All cohorts</h2>
+          <div className="mt-6 rounded-[20px] border border-ws-hairline bg-ws-surface p-6 dark:border-transparent sm:p-8">
+            <ol className="divide-y divide-ws-hairline">
+              {newestFirst.map((c) => (
+                <li
+                  key={c.number}
+                  className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 py-4 first:pt-0 last:pb-0"
+                >
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-[16px] font-semibold text-ws-primary">{c.name}</span>
+                    <span className="rounded-full bg-ws-chip px-3 py-1 text-[12px] font-semibold text-ws-primary">
+                      {COHORT_STATUS_LABEL[statusOf(c, calendar.all)]}
+                    </span>
+                  </div>
+                  <p className="text-[14px] text-ws-muted">
+                    {`Starts ${cohortDateFull(c.startsAt)}`}
+                    {c.endsAt ? ` · Ends ${cohortDateFull(c.endsAt)}` : ""}
+                  </p>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+      )}
     </div>
   )
 }

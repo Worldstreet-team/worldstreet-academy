@@ -13,6 +13,7 @@ import { SchoolIcon } from "@/components/shared/school-icon"
 import { initialsOf, plural } from "@/components/programs/format"
 import { SCHOOL_SECTION, SectionHead } from "@/components/schools/section-head"
 import { opensLabel, sizeLine, type SchoolProgram } from "@/components/schools/model"
+import { PackageDiscount } from "@/components/programs/package-offer"
 
 /**
  * `#programs` — the core of the page. Big, image-led program cards whose
@@ -95,7 +96,6 @@ function ProgramCard({ item, variant }: { item: SchoolProgram; variant: "feature
   const more = program.whatYouWillLearn.length - peek.length
   const size = sizeLine(facts)
   const rated = program.rating !== null && program.ratingCount > 0
-  const free = program.pricing === "free" || !program.price
   const description = program.shortDescription ?? program.description
 
   return (
@@ -238,12 +238,18 @@ function ProgramCard({ item, variant }: { item: SchoolProgram; variant: "feature
           )}
 
           <div className="mt-5 flex items-end justify-between gap-4 border-t border-ws-hairline pt-5">
-            <p className="flex items-baseline gap-1.5">
-              {!free && program.tierCount > 1 && <span className="text-[13px] font-medium text-ws-muted">From</span>}
-              <span className="font-display text-[26px] font-light leading-none tabular-nums tracking-[-0.02em] text-ws-primary">
-                {free ? "Free" : `$${program.price?.toLocaleString("en-US")}`}
-              </span>
-            </p>
+            <div>
+              <p className="flex items-baseline gap-1.5">
+                {program.tierCount > 1 && <span className="text-[13px] font-medium text-ws-muted">From</span>}
+                <span className="font-display text-[26px] font-light leading-none tabular-nums tracking-[-0.02em] text-ws-primary">
+                  {`$${(program.price ?? 0).toLocaleString("en-US")}`}
+                </span>
+              </p>
+              <PackageDiscount
+                pkg={{ price: program.price ?? 0, listPrice: program.listPrice }}
+                className="mt-2 flex text-[13px]"
+              />
+            </div>
             <span className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-ws-primary">
               View program
               <ArrowRightIcon

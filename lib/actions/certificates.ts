@@ -36,6 +36,14 @@ export type CertificateData = {
   schoolName: string | null
   /** The highest credential earned; a null stored tier reads as Completion. */
   tier: CertificateTier
+  /**
+   * The Academy issues it (`creditsAcademy`: programs, New Economy courses, an
+   * admin's listing). An Academy certificate opens on completion under the
+   * Academy's seal (owner, 2026-11-08); it never waits on a person's signature.
+   */
+  issuedByAcademy: boolean
+  /** A marketplace creator's certificate before the creator has signed: not downloadable yet. */
+  locked: boolean
 }
 
 export type StudentCertificate = {
@@ -84,6 +92,9 @@ export type CourseCertificatesResult = {
  * Fetch certificate data for a specific course enrollment
  */
 export async function fetchCertificate(courseId: string): Promise<CertificateData | null> {
+  // An id, never an object: {"$ne": null} would pair the learner's completion
+  // of one course with another course's title on the certificate.
+  if (typeof courseId !== "string" || !/^[a-f0-9]{24}$/.test(courseId)) return null
   try {
     await connectDB()
     const currentUser = await getCurrentUser()
@@ -122,21 +133,25 @@ export async function fetchCertificate(courseId: string): Promise<CertificateDat
     // deploy → backfill window): store the legacy ID this page already prints.
     const certificateId = enrollment.certificateId ?? (await ensureCertificateId(enrollment, false))
     const standing = await ensureCertificateTier(enrollment._id)
+    const credit = courseCredit(courseKindOf(course), instructor)
+    const instructorSignatureUrl = instructor?.signatureUrl ?? null
 
     return {
       id: enrollment._id.toString(),
       studentName: [user.firstName, user.lastName].filter(Boolean).join(" "),
       courseTitle: course.title,
       // An Academy program is signed for by the account that holds it, in the Academy's name (creditsAcademy).
-      instructorName: instructor ? courseCredit(courseKindOf(course), instructor).name : "",
+      instructorName: instructor ? credit.name : "",
       completedAt: enrollment.completedAt.toISOString(),
       courseId: courseId,
-      instructorSignatureUrl: instructor?.signatureUrl ?? null,
+      instructorSignatureUrl,
       studentSignatureUrl: user.signatureUrl ?? null,
       certificateId,
       programName: course.title,
       schoolName: schoolFromSlug(course.school)?.name ?? null,
       tier: standing?.tier ?? enrollment.certificateTier ?? "completion",
+      issuedByAcademy: credit.academy,
+      locked: !credit.academy && !instructorSignatureUrl,
     }
   } catch (error) {
     console.error("Fetch certificate error:", error)

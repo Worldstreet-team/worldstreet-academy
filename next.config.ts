@@ -16,6 +16,13 @@ const nextConfig: NextConfig = {
       }
     : {}),
   reactStrictMode: false,
+  // The certificate picture (lib/certificate-art.tsx) reads its fonts and the
+  // mark from public/ at runtime. The Docker image copies public/ whole; a
+  // traced (standalone or serverless) build needs them declared.
+  outputFileTracingIncludes: {
+    // Keys are globs: "[courseId]" would read as a character class, so the segment is "*".
+    "/dashboard/courses/*/certificate/image": ["./public/fonts/certificate/**", "./public/brand/wsa-mark.png"],
+  },
   images: {
     dangerouslyAllowSVG: true,
     contentDispositionType: "attachment",

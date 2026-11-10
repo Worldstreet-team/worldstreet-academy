@@ -4,6 +4,7 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 
 import { BRAND } from "@/lib/brand"
+import { transferLabel } from "@/lib/payment-channels"
 import { getCachedUser } from "@/lib/auth/cached"
 import { getMyEspeePayments, type EspeeProofView, type EspeeRejectionView } from "@/lib/actions/manual-payments"
 import { needsSchoolChoice } from "@/lib/start-gate"
@@ -80,6 +81,7 @@ function UnderReview({ proofs, email }: { proofs: EspeeProofView[]; email: strin
             >
               <dl className="space-y-2.5 text-[14px]">
                 <Fact label="Program" value={p.courseTitle} />
+                <Fact label="Paid by" value={transferLabel(p.method)} />
                 {p.packageName && <Fact label="Plan" value={p.packageName} />}
                 <Fact label="Amount" value={p.amountLabel} />
                 <Fact label="Submitted" value={submittedLabel(p.submittedAt)} />
@@ -119,7 +121,7 @@ function NotConfirmed({ rejection }: { rejection: EspeeRejectionView }) {
           Payment not confirmed
         </h1>
         <p className="mt-2 text-pretty text-[14px] leading-relaxed text-ws-muted">
-          We couldn&apos;t confirm your ESPEE payment of {rejection.amountLabel} for {rejection.courseTitle}.
+          We couldn&apos;t confirm your payment of {rejection.amountLabel} for {rejection.courseTitle}.
         </p>
         {rejection.reason && (
           <p className="mt-5 w-full whitespace-pre-wrap rounded-[14px] bg-ws-surface p-4 text-left text-[14px] leading-relaxed text-ws-primary">

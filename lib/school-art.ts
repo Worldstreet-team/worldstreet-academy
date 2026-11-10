@@ -23,7 +23,7 @@ export function schoolCover(slug: string | null | undefined): string | null {
 }
 
 /**
- * Art for the 12 programs: static, code-owned files under
+ * Art for the programs: static, code-owned files under
  * `public/art/programs/`, keyed by `Course.slug`. A slug missing here has no
  * program art yet and falls back to the school's cover, then the school
  * icon — art can land one file at a time. Add an entry only in the same

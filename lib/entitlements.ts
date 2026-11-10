@@ -120,6 +120,32 @@ export function pricingFromPackages(
   return { pricing: price > 0 ? "paid" : "free", price }
 }
 
+/**
+ * The regular price of the tier a "from" price quotes (the cheapest enabled
+ * one, as pricingFromPackages picks it), when it is above that tier's price;
+ * null otherwise. Display only — checkout charges `price`.
+ */
+export function listPriceFromPackages(packages: ICoursePackage[] | null | undefined): number | null {
+  const enabled = (packages ?? []).filter((p) => p.enabled)
+  if (enabled.length === 0) return null
+  const cheapest = enabled.reduce((low, p) => (p.price < low.price ? p : low))
+  return cheapest.listPrice != null && cheapest.listPrice > cheapest.price ? cheapest.listPrice : null
+}
+
+/**
+ * No course on the Academy is free (owner, 2026-11-03): every course sells at
+ * a price, so a course is on sale only when it is paid and priced above $0.
+ * Saving, publishing, approval, pre-enrolment and checkout refuse anything
+ * else, and every public catalogue read filters with ON_SALE_FILTER. A
+ * learner already enrolled in a legacy free course keeps it.
+ */
+export function isOnSale(course: { pricing?: string | null; price?: number | null }): boolean {
+  return course.pricing === "paid" && typeof course.price === "number" && course.price > 0
+}
+
+/** The Mongo twin of isOnSale, for catalogue reads. */
+export const ON_SALE_FILTER = { pricing: "paid", price: { $gt: 0 } } as const
+
 /** Ladder order — also the order the program page renders tiers in. */
 export const PACKAGE_KEYS = ["basic", "standard", "executive"] as const
 
@@ -135,16 +161,27 @@ export const PACKAGE_LABEL: Record<PackageKey, string> = {
 }
 
 /**
- * The Academy's price list (Owen, 2026-10-28): every plan of every school
- * program sells at these whole-USD prices, and faculty don't set their own.
+ * The Academy's price list (the programme document of 13 Sept; Owen,
+ * 2026-11-05: "use this" — replacing 2026-10-28's 49/99/199): every plan of
+ * every school program sells at these whole-USD prices, and faculty don't set their own.
  * The editor shows them read-only and createCourse/updateCourse write them
- * whatever is posted. Marketplace courses keep their creator's single price;
- * New Economy courses are free. scripts/mastery-catalogue.mjs carries the same
- * figures literally (a script can't import this module) — keep both equal.
+ * whatever is posted. Marketplace and New Economy courses keep their own
+ * single price. scripts/mastery-catalogue.mjs carries the same figures
+ * literally (a script can't import this module) — keep both equal.
  */
-export const PROGRAM_PRICE_LIST: Record<PackageKey, number> = { basic: 49, standard: 99, executive: 199 }
+export const PROGRAM_PRICE_LIST: Record<PackageKey, number> = { basic: 49, standard: 199, executive: 999 }
 
-/** "Basic $49 · Standard $99 · Executive $199" */
+/**
+ * Each plan's regular price (owner, 2026-11-03: "those are the actual
+ * prices"). It is stored as the plan's `listPrice` and shown struck through
+ * beside the price list, with the saving: the plans sell at a discount from
+ * these. Display only — checkout charges PROGRAM_PRICE_LIST. Written whatever
+ * is posted, like the price list, and carried literally by
+ * scripts/mastery-catalogue.mjs.
+ */
+export const PROGRAM_REGULAR_PRICE: Record<PackageKey, number> = { basic: 300, standard: 1000, executive: 10000 }
+
+/** "Basic $49 · Standard $199 · Executive $999" */
 export const PROGRAM_PRICE_LIST_LINE = PACKAGE_KEYS.map((key) => `${PACKAGE_LABEL[key]} $${PROGRAM_PRICE_LIST[key]}`).join(" · ")
 
 /** Lowest enabled tier whose package includes `flag` — the package a lock notice names. null when none does. */

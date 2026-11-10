@@ -18,6 +18,7 @@ import { sendCourseReviewDecisionEmail } from "@/lib/email"
 import { appUrl } from "@/lib/app-url"
 import { courseFormatOf, hasDeliverable, isFileFormat, productTypeLabel, type CourseFormat } from "@/lib/course-format"
 import { courseReviewFingerprint } from "@/lib/course-review"
+import { isOnSale } from "@/lib/entitlements"
 import {
   REVIEW_CHECKS,
   REVIEW_CHECK_DETAILS,
@@ -74,9 +75,11 @@ export async function adminApproveCourseReview(courseId: string, seenFingerprint
     if (!id.success) return { success: false, error: "Invalid course" }
 
     const course = await Course.findOne({ _id: id.data, kind: "marketplace", "review.status": "pending" })
-      .select("title slug instructor publishedAt totalLessons kind format productFile review.checks")
+      .select("title slug instructor publishedAt totalLessons kind format productFile pricing price review.checks")
       .lean()
     if (!course) return { success: false, error: "This course isn't waiting for review" }
+    // No course is free (isOnSale): the creator sets a price before it can go live.
+    if (!isOnSale(course)) return { success: false, error: "Can't publish a course without a price" }
     const format = courseFormatOf(course)
     if (!hasDeliverable({ format, totalLessons: course.totalLessons ?? 0, productFile: course.productFile ?? null })) {
       return {

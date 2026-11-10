@@ -4,14 +4,18 @@ import { cookies } from "next/headers"
 import { Types } from "mongoose"
 import {
   Earning,
+  Enrollment,
   Order,
   PartnerClick,
   User,
+  EARNINGS_CLEARING_DAYS,
   INSTRUCTOR_REVENUE_SHARE,
   MARKETPLACE_SHARE_ACADEMY,
   MARKETPLACE_SHARE_OWN_LINK,
+  referralRateFor,
   type CourseKind,
   type OrderAttributionKind,
+  type PackageKey,
 } from "@/lib/db/models"
 import { REFERRAL_COOKIE, SELLER_LINK_COOKIE, normalizeReferralCode, sellerLinkCodeFor } from "@/lib/referral-link"
 import { maskedName } from "@/lib/masked-name"
@@ -19,8 +23,9 @@ import { PARTNER_CLICK_WINDOW_DAYS, partnerDay, recentDays, type PartnerClickDay
 
 /**
  * Server half of referrals (owner, 2026-10-05): minting a person's code, who
- * invited a buyer, who made a sale and what its seller keeps, and the one
- * commission a referred person can earn their referrer. Client-safe rules
+ * invited a buyer, who made a sale and what its seller keeps, and the
+ * commission each of a referred person's purchases earns their referrer
+ * (client, 2026-11-05: every purchase, however it was paid). Client-safe rules
  * (cookie, normalizing, links) are in lib/referral-link.ts. Callers have
  * already run connectDB().
  */
@@ -168,10 +173,10 @@ export type SaleSplit = {
  *   program       no code                —             85%
  *
  * A code the buyer owns is ignored: never a self-referral. "New economy"
- * courses are free and follow the program row. The 10% commission is decided
- * apart from this (`isFirstPaidPurchase`): only ever on a "referral" sale, so
- * never on one the seller's own link made. With no code, or when this can't
- * be decided, the sale is the Academy's — the "no code" rows.
+ * courses follow the program row. The commission is booked apart from this
+ * (`bookReferralCommission`): only ever on a "referral" sale, so never on one
+ * the seller's own link made. With no code, or when this can't be decided,
+ * the sale is the Academy's — the "no code" rows.
  */
 export function splitSale(input: {
   kind: CourseKind
@@ -196,32 +201,161 @@ export function splitSale(input: {
 /* ═══════════════════ the referral commission ═══════════════════ */
 
 /**
- * The credit reference of a buyer's referral commission. One per BUYER, not
- * per enrollment: the unique index on `creditReference` makes "only the
- * referred person's first paid enrollment, ever" a database guarantee, and a
- * duplicate-key error on create means the commission was already paid.
+ * The credit reference of the commission order `orderId` earns. One per ORDER
+ * (client, 2026-11-05: every purchase earns, not only the first), so the
+ * unique index on `creditReference` makes a replayed purchase or a resumed
+ * transfer approval book it once. Commissions booked before that change carry
+ * `academy_ref_<buyerId>`, one per buyer.
  */
-export function referralCreditReference(buyerId: string): string {
-  return `academy_ref_${buyerId}`
+export function referralCreditReference(orderId: string): string {
+  return `academy_ref_order_${orderId}`
 }
 
 /**
- * Whether order `orderId` is the buyer's first paid enrollment, ever: no
- * other order of theirs is paid or enrolled (an ESPEE order counts), and no
- * referral commission has ever named them as the student — even a reversed one.
+ * Book the referral commission one paid order earns its referrer: the plan's
+ * share (`referralRateFor` — Basic 10%, Standard 12%, Executive 15%; 10%
+ * without a plan), pending through the clearing window, then credited to the
+ * referrer's WorldStreet wallet (its USD balance) by /api/cron/earnings; it
+ * pays for programs, and USD withdrawal isn't open yet (2026-11-08). Every
+ * purchase earns (client, 2026-11-05), whatever the
+ * way it was paid: a wallet purchase (`purchaseCourse`), or a transfer once an
+ * admin confirms it (`adminApproveEspeePayment`). On a transfer the money sits
+ * in the Academy's bank or crypto account, so the Academy pays it from its own
+ * funds. Never a self-referral. Callers book it only on a "referral" sale.
+ * Never throws: the money has already moved, so a failure is logged.
  */
-export async function isFirstPaidPurchase(buyerId: string, orderId: string): Promise<boolean> {
-  const [otherPaid, priorCommission] = await Promise.all([
-    Order.exists({ user: buyerId, _id: { $ne: orderId }, status: { $in: ["paid", "enrolled"] } }),
-    Earning.exists({ kind: "referral", student: buyerId }),
-  ])
-  return !otherPaid && !priorCommission
+export async function bookReferralCommission(input: {
+  referrer: Referrer
+  buyerId: string
+  orderId: string
+  enrollmentId: string
+  courseId: string
+  amountMinor: number
+  packageKey: PackageKey | null
+  /** The wallet charge; null on a transfer. */
+  chargeId: string | null
+  /** How the learner paid, for the ledger note: "wallet", "Bank transfer" … */
+  via: string
+}): Promise<void> {
+  const { referrer, buyerId, packageKey } = input
+  if (referrer.userId === buyerId) return
+  const rate = referralRateFor(packageKey)
+  const commissionMinor = Math.round(input.amountMinor * rate)
+  if (commissionMinor <= 0) return
+  // Two tries: a passing database error shouldn't cost the referrer this
+  // commission. A miss after both is booked by the earnings cron's
+  // `bookMissingReferralCommissions` pass; the reference keeps either one-off.
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      await Earning.create({
+        enrollment: input.enrollmentId,
+        order: input.orderId,
+        course: input.courseId,
+        instructor: referrer.userId,
+        instructorAuthUserId: referrer.authUserId,
+        student: buyerId,
+        kind: "referral",
+        grossMinor: input.amountMinor,
+        feeMinor: input.amountMinor - commissionMinor,
+        netMinor: commissionMinor,
+        currency: "USD",
+        status: "pending",
+        availableAt: new Date(Date.now() + EARNINGS_CLEARING_DAYS * 24 * 60 * 60 * 1000),
+        creditReference: referralCreditReference(input.orderId),
+        chargeId: input.chargeId,
+        note: `referral: ${Math.round(rate * 100)}% of a referred learner's purchase${packageKey ? ` (${packageKey})` : ""}, paid by ${input.via}, code ${referrer.code}`,
+      })
+      return
+    } catch (err) {
+      // A duplicate reference is this order's commission, already booked.
+      if ((err as { code?: number }).code === 11000) return
+      console.error(`[Referrals] failed to record the referral commission (try ${attempt} of 2):`, err)
+      if (attempt < 2) await new Promise((r) => setTimeout(r, 500))
+    }
+  }
+}
+
+/** The ledger note's "paid by …" for an order's payment method. */
+const PAID_BY: Record<string, string> = {
+  wallet: "wallet",
+  espee: "ESPEE transfer",
+  bank: "bank transfer",
+  usdt_trc20: "USDT (TRC20)",
+  usdt_bep20: "USDT (BEP20)",
+}
+
+/**
+ * Books the commission a referred, enrolled order is missing (2026-11-08).
+ * `bookReferralCommission` never throws (the money has already moved), so a
+ * write that failed during a purchase or a transfer approval was only logged;
+ * /api/cron/earnings runs this before it clears, and the order's credit
+ * reference makes it book once. Only orders since the first per-order
+ * commission was ever booked: before that, production followed the old
+ * first-purchase-only rule (`academy_ref_<buyerId>`), and those orders must
+ * not start earning now. Skips an enrollment that no longer grants access
+ * (refunded or cancelled). Returns how many it booked.
+ */
+export async function bookMissingReferralCommissions(limit = 100): Promise<number> {
+  const first = await Earning.findOne({ kind: "referral", creditReference: /^academy_ref_order_/ })
+    .sort({ createdAt: 1 })
+    .select("order createdAt")
+    .lean()
+  if (!first) return 0
+  const firstOrder = first.order ? await Order.findById(first.order).select("createdAt").lean() : null
+  const since = firstOrder?.createdAt ?? first.createdAt
+
+  const orders = await Order.find({ status: "enrolled", "attribution.kind": "referral", createdAt: { $gte: since } })
+    .sort({ createdAt: -1 })
+    .limit(500)
+    .select("_id user course amountMinor packageKey chargeId paymentMethod attribution")
+    .lean()
+  if (orders.length === 0) return 0
+  const have = await Earning.find({ creditReference: { $in: orders.map((o) => referralCreditReference(String(o._id))) } })
+    .select("creditReference")
+    .lean()
+  const booked = new Set(have.map((e) => e.creditReference))
+
+  let count = 0
+  for (const o of orders) {
+    if (count >= limit) break
+    const reference = referralCreditReference(String(o._id))
+    if (booked.has(reference) || !o.attribution?.userId) continue
+    try {
+      const [owner, enrollment] = await Promise.all([
+        User.findById(o.attribution.userId).select(REFERRER_FIELDS).lean(),
+        Enrollment.findOne({ user: o.user, course: o.course, status: { $in: ["active", "completed"] } }).select("_id").lean(),
+      ])
+      if (!owner?.authUserId || !enrollment) continue
+      await bookReferralCommission({
+        referrer: {
+          userId: String(owner._id),
+          authUserId: owner.authUserId,
+          code: o.attribution.code,
+          firstName: owner.firstName ?? "",
+          lastName: owner.lastName ?? "",
+          source: "account",
+        },
+        buyerId: String(o.user),
+        orderId: String(o._id),
+        enrollmentId: String(enrollment._id),
+        courseId: String(o.course),
+        amountMinor: o.amountMinor,
+        packageKey: o.packageKey ?? null,
+        chargeId: o.chargeId ?? null,
+        via: PAID_BY[o.paymentMethod ?? "wallet"] ?? "wallet",
+      })
+      if (await Earning.exists({ creditReference: reference })) {
+        count++
+        console.info("[Referrals] booked a missing commission for order", String(o._id))
+      }
+    } catch (err) {
+      console.error("[Referrals] couldn't book a missing commission for order", String(o._id), err)
+    }
+  }
+  return count
 }
 
 /* ═══════════════════ the referrals page ═══════════════════ */
-
-/** "refunded": the purchase was refunded, so the commission was reversed or clawed back. */
-export type ReferralCommissionStatus = "pending" | "cleared" | "refunded"
 
 export type ReferralPerson = {
   id: string
@@ -230,7 +364,16 @@ export type ReferralPerson = {
   joinedAt: string
   /** Has a paid or enrolled order. */
   paid: boolean
-  commission: { status: ReferralCommissionStatus; netMinor: number; availableAt: string } | null
+  /** What their purchases earned you, one commission per purchase; null when none has. */
+  commission: {
+    /** Still in the clearing window, and when the soonest of those clears. */
+    pendingMinor: number
+    nextClearsAt: string | null
+    /** Credited to your wallet and not clawed back. */
+    paidMinor: number
+    /** Commissions whose purchase was refunded. */
+    refunded: number
+  } | null
 }
 
 export type ReferralSummary = {
@@ -245,7 +388,7 @@ export type ReferralSummary = {
   clearedMinor: number
   /** Visits to this code's partner link: all time, and per Lagos day for the last 30 (newest first, empty days 0). */
   clicks: { total: number; last30: PartnerClickDay[] }
-  /** What learners paid for purchases credited to this code as a referral: paid or enrolled orders, wallet and ESPEE; not refunds, not a creator's own link. */
+  /** What learners paid for purchases credited to this code as a referral: paid or enrolled orders, wallet and transfers; not refunds, not a creator's own link. */
   revenueMinor: number
   /** Newest first. */
   people: ReferralPerson[]
@@ -291,15 +434,24 @@ export async function referralSummary(userId: string, limit = 25): Promise<Refer
 
   let pendingMinor = 0
   let clearedMinor = clawbacks.reduce((sum, c) => sum + c.netMinor, 0)
-  const byStudent = new Map<string, ReferralPerson["commission"]>()
+  const byStudent = new Map<string, NonNullable<ReferralPerson["commission"]>>()
   for (const c of commissions) {
     if (c.status === "pending") pendingMinor += c.netMinor
     if (c.status === "cleared") clearedMinor += c.netMinor
-    const status: ReferralCommissionStatus =
-      c.status === "pending" ? "pending" : c.status === "cleared" && !clawedBack.has(c._id.toString()) ? "cleared" : "refunded"
-    if (c.student) {
-      byStudent.set(c.student.toString(), { status, netMinor: c.netMinor, availableAt: c.availableAt.toISOString() })
+    if (!c.student) continue
+    const key = c.student.toString()
+    const row = byStudent.get(key) ?? { pendingMinor: 0, nextClearsAt: null, paidMinor: 0, refunded: 0 }
+    if (c.status === "pending") {
+      row.pendingMinor += c.netMinor
+      const at = c.availableAt.toISOString()
+      if (!row.nextClearsAt || at < row.nextClearsAt) row.nextClearsAt = at
+    } else if (c.status === "cleared" && !clawedBack.has(c._id.toString())) {
+      row.paidMinor += c.netMinor
+    } else {
+      // Reversed before clearing, or clawed back after: the purchase was refunded.
+      row.refunded += 1
     }
+    byStudent.set(key, row)
   }
 
   return {

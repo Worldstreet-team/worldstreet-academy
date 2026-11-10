@@ -226,10 +226,12 @@ function InstructorExamPageInner() {
   const lessonId = search.get("lesson")
   const queryClient = useQueryClient()
 
-  const { data: exam, isLoading } = useQuery({
+  const { data: loaded, isLoading } = useQuery({
     queryKey: [...queryKeys.courseExam(courseId), lessonId ?? "final"],
     queryFn: () => getCourseExamForInstructor(courseId, lessonId),
   })
+  const notYours = loaded === "not_yours"
+  const exam = notYours ? null : loaded
 
   const [title, setTitle] = React.useState("")
   const [instructions, setInstructions] = React.useState("")
@@ -355,6 +357,13 @@ function InstructorExamPageInner() {
 
         {isLoading ? (
           <Skeleton className="h-64 rounded-lg" />
+        ) : notYours ? (
+          <Card>
+            <CardContent className="p-4 text-sm text-muted-foreground">
+              Only the program&apos;s owner or an admin edits its {lessonId ? "quizzes" : "exam"}. You teach this
+              program: its lessons, live classes and assignments are yours to run.
+            </CardContent>
+          </Card>
         ) : (
           <>
             {/* Settings */}

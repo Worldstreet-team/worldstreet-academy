@@ -25,6 +25,7 @@ import {
   sendNewApplicationAdminEmail,
   sendUnderReviewEmail,
   sendSlotsProposedEmail,
+  sendOfficeInterviewInviteEmail,
 } from "@/lib/email"
 import type {
   ApplicationPassion,
@@ -36,6 +37,13 @@ import type {
 import { APP_URL } from "@/lib/app-url"
 import { BRAND } from "@/lib/brand"
 import { SCHOOL_SLUGS, schoolSlugOf, type SchoolSlug } from "@/lib/schools"
+import {
+  HIRING_OPEN,
+  INTERVIEW_LOCATION_MAX,
+  INTERVIEW_PREFERENCES,
+  type InterviewMode,
+  type InterviewPreference,
+} from "@/lib/careers"
 
 const PAGE_SIZE = 20
 
@@ -66,6 +74,8 @@ export type ApplicationAnswersInput = {
   extraDocumentUrl?: string
   /** Terms-of-teaching acceptance — required at submit, recorded with a timestamp. */
   termsAccepted?: boolean
+  /** Staff hiring (2026-11-05): office, online or either — required at submit, absent on older applications. */
+  interviewPreference?: InterviewPreference
 }
 
 /** Bason's questions, validated at submit (the form's own constraints, mirrored). */
@@ -94,6 +104,7 @@ function teachingAnswersView(answers: IApplicationAnswers) {
     passionReason: answers.passionReason || undefined,
     readyToCommit: answers.readyToCommit ?? undefined,
     extraDocumentUrl: answers.extraDocumentUrl ?? undefined,
+    interviewPreference: answers.interviewPreference ?? undefined,
   }
 }
 
@@ -105,6 +116,77 @@ export type InterviewInfo = {
   scheduledAt: string | null
   /** Deep link into the meetings page waiting room. */
   joinPath: string
+}
+
+/**
+ * A booked staff tutor interview: a room to join online, or a time and an
+ * address at the office (owner, 2026-11-05).
+ */
+export type ScheduledInterview =
+  | ({ mode: "online" } & InterviewInfo)
+  | { mode: "office"; scheduledAt: string; location: string }
+
+type InterviewFields = Pick<
+  import("@/lib/db/models").IInstructorApplication,
+  "interviewMeetingId" | "interviewMode" | "interviewLocation" | "interviewAt" | "slotsMode" | "slotsLocation"
+>
+
+/** The booked interview as both the applicant and the admin views read it. */
+async function scheduledInterviewOf(app: InterviewFields): Promise<ScheduledInterview | null> {
+  if (app.interviewMode === "office") {
+    return app.interviewAt
+      ? { mode: "office", scheduledAt: new Date(app.interviewAt).toISOString(), location: app.interviewLocation ?? "" }
+      : null
+  }
+  if (!app.interviewMeetingId) return null
+  const meeting = await Meeting.findById(app.interviewMeetingId).select("scheduledAt status").lean()
+  if (!meeting || meeting.status === "ended") return null
+  return {
+    mode: "online",
+    meetingId: app.interviewMeetingId.toString(),
+    scheduledAt: meeting.scheduledAt ? new Date(meeting.scheduledAt).toISOString() : null,
+    joinPath: `/dashboard/meetings?join=${app.interviewMeetingId.toString()}`,
+  }
+}
+
+/**
+ * Whether the booked interview has taken place. Approval waits for it: a
+ * staff tutor is hired through the interview, never approved on paper alone
+ * (owner, 2026-11-05). An online interview counts only once its room was
+ * actually opened (`startedAt`) — not a room ended or cancelled unstarted, and
+ * not a time that passed with nobody joining. An office interview has no
+ * room, so its booked time having come is the only sign there is.
+ */
+async function interviewHeld(app: InterviewFields): Promise<boolean> {
+  if (app.interviewMode === "office") return !!app.interviewAt && new Date(app.interviewAt).getTime() <= Date.now()
+  if (!app.interviewMeetingId) return false
+  const meeting = await Meeting.findById(app.interviewMeetingId).select("status startedAt").lean()
+  return !!meeting && (!!meeting.startedAt || meeting.status === "active")
+}
+
+/** Validates how an interview will be held: an office interview needs its address. */
+const InterviewPlace = z.discriminatedUnion("mode", [
+  z.object({ mode: z.literal("online") }),
+  z.object({
+    mode: z.literal("office"),
+    location: z
+      .string({ error: "Add the office address for the interview" })
+      .trim()
+      .min(5, "Add the office address for the interview")
+      .max(INTERVIEW_LOCATION_MAX, `Keep the address under ${INTERVIEW_LOCATION_MAX} characters`),
+  }),
+])
+export type InterviewPlaceInput = { mode: InterviewMode; location?: string }
+type InterviewPlace = z.infer<typeof InterviewPlace>
+
+/**
+ * How the next interview will be held: what the reviewer chose when proposing
+ * slots (`slotsMode`; rows from before it read `interviewMode`); online before that.
+ */
+function plannedInterviewOf(app: InterviewFields): { mode: InterviewMode; location: string | null } {
+  const mode = app.slotsMode ?? app.interviewMode
+  const location = app.slotsMode ? app.slotsLocation : app.interviewLocation
+  return mode === "office" ? { mode: "office", location: location ?? null } : { mode: "online", location: null }
 }
 
 export type AdminDemoView = {
@@ -125,7 +207,9 @@ export type MyApplication = {
   decisionNote: string
   history: { status: string; at: string; note?: string }[]
   createdAt: string
-  interview: InterviewInfo | null
+  interview: ScheduledInterview | null
+  /** How the proposed slots (or the next interview) will be held; online unless a reviewer chose the office. */
+  plannedInterview: { mode: InterviewMode; location: string | null }
   /** A reviewer asked for a teaching demonstration (adds a tracker step). */
   demoRequested: boolean
   /** The demonstration room while it hasn't ended — the outcome is never exposed. */
@@ -151,6 +235,14 @@ export async function submitInstructorApplication(input: ApplicationAnswersInput
 
     if (user.role === "INSTRUCTOR" || user.role === "ADMIN") {
       return { success: false, error: "You already have instructor access" }
+    }
+    // Staff tutors are hired only while a vacancy is open (lib/careers.ts).
+    if (!HIRING_OPEN) {
+      return { success: false, error: "We aren't hiring staff tutors right now. Watch our careers page for the next vacancy." }
+    }
+    const interviewPreference = INTERVIEW_PREFERENCES.find((p) => p === input.interviewPreference)
+    if (!interviewPreference) {
+      return { success: false, error: "Tell us whether you can interview at the office or online" }
     }
 
     // Validation — mirror the form's constraints server-side.
@@ -231,6 +323,7 @@ export async function submitInstructorApplication(input: ApplicationAnswersInput
         cvUrl: sanitizeUrl(input.cvUrl),
         ...teaching.data,
         extraDocumentUrl: sanitizeUrl(input.extraDocumentUrl),
+        interviewPreference,
       },
       termsAcceptedAt: new Date(),
       history: [
@@ -247,7 +340,7 @@ export async function submitInstructorApplication(input: ApplicationAnswersInput
     // Fire-and-forget: bell + email for admins, email receipt for the applicant.
     void notifyAdmins({
       type: "application",
-      title: "New instructor application",
+      title: "New staff tutor application",
       body: `${user.firstName} ${user.lastName} applied: "${headline}"`,
       href: `/admin/applications/${application._id.toString()}`,
     })
@@ -296,20 +389,8 @@ export async function getMyInstructorApplication(): Promise<MyApplication | null
       .lean()
     if (!app) return null
 
-    // Interview details when one is scheduled (or already live).
-    let interview: InterviewInfo | null = null
-    if (app.interviewMeetingId) {
-      const meeting = await Meeting.findById(app.interviewMeetingId)
-        .select("scheduledAt status")
-        .lean()
-      if (meeting && meeting.status !== "ended") {
-        interview = {
-          meetingId: app.interviewMeetingId.toString(),
-          scheduledAt: meeting.scheduledAt ? new Date(meeting.scheduledAt).toISOString() : null,
-          joinPath: `/dashboard/meetings?join=${app.interviewMeetingId.toString()}`,
-        }
-      }
-    }
+    // Interview details when one is scheduled (or already live), online or at the office.
+    const interview = await scheduledInterviewOf(app)
 
     // Teaching demonstration room, read the same way.
     let demo: InterviewInfo | null = null
@@ -349,6 +430,7 @@ export async function getMyInstructorApplication(): Promise<MyApplication | null
       })),
       createdAt: app.createdAt.toISOString(),
       interview,
+      plannedInterview: plannedInterviewOf(app),
       demoRequested: Boolean(app.demo?.requested),
       demo,
       proposedSlots:
@@ -518,7 +600,10 @@ export type AdminApplicationDetail = AdminApplicationRow & {
   history: { status: string; at: string; by?: string; note?: string }[]
   applicantJoinedAt: string | null
   applicantEnrollments: number
-  interview: InterviewInfo | null
+  interview: ScheduledInterview | null
+  plannedInterview: { mode: InterviewMode; location: string | null }
+  /** The interview's time has come (or its room was opened) — approval waits for it. */
+  interviewHeld: boolean
   proposedSlots: ProposedSlotView[]
   scorecard: ScorecardView | null
   termsAcceptedAt: string | null
@@ -550,19 +635,7 @@ export async function adminGetApplication(applicationId: string): Promise<AdminA
       ? await Enrollment.countDocuments({ user: applicant._id })
       : 0
 
-    let interview: InterviewInfo | null = null
-    if (a.interviewMeetingId) {
-      const meeting = await Meeting.findById(a.interviewMeetingId)
-        .select("scheduledAt status")
-        .lean()
-      if (meeting && meeting.status !== "ended") {
-        interview = {
-          meetingId: a.interviewMeetingId.toString(),
-          scheduledAt: meeting.scheduledAt ? new Date(meeting.scheduledAt).toISOString() : null,
-          joinPath: `/dashboard/meetings?join=${a.interviewMeetingId.toString()}`,
-        }
-      }
-    }
+    const [interview, held] = await Promise.all([scheduledInterviewOf(a), interviewHeld(a)])
 
     let demo: AdminDemoView | null = null
     if (a.demo) {
@@ -628,6 +701,8 @@ export async function adminGetApplication(applicationId: string): Promise<AdminA
       applicantJoinedAt: applicant?.createdAt ? new Date(applicant.createdAt).toISOString() : null,
       applicantEnrollments,
       interview,
+      plannedInterview: plannedInterviewOf(a),
+      interviewHeld: held,
       proposedSlots: (a.proposedSlots ?? []).map((s) => ({
         at: new Date(s.at).toISOString(),
         note: s.note,
@@ -764,6 +839,10 @@ async function scheduleInterviewCore(
     }
   } else {
     app.interviewMeetingId = meetingDoc._id
+    // An online interview replaces any office booking.
+    app.interviewMode = "online"
+    app.interviewLocation = undefined
+    app.interviewAt = null
     app.proposedSlots = []
     if (app.status !== "interview_scheduled") {
       app.status = "interview_scheduled"
@@ -825,11 +904,113 @@ async function scheduleInterviewCore(
   return { meetingId: meetingDoc._id.toString(), joinPath, rescheduled }
 }
 
-/** Admin schedules (or reschedules) the interview directly at a specific time. */
-export async function adminScheduleInterview(applicationId: string, scheduledAtISO: string) {
+/**
+ * Books (or moves) an in-person staff tutor interview at the office (owner,
+ * 2026-11-05: "tutors … can come to the office for interview"). No room is
+ * minted: the time and the address live on the application. An online room
+ * booked earlier is closed, so the applicant isn't left two interviews.
+ */
+async function scheduleOfficeInterview(
+  app: HydratedDocument<import("@/lib/db/models").IInstructorApplication>,
+  host: InterviewHost,
+  scheduledAt: Date,
+  byName: string,
+  location: string
+) {
+  const applicant = app.user as unknown as {
+    _id: Types.ObjectId
+    firstName?: string
+    email?: string
+    avatarUrl?: string | null
+  }
+  const rescheduled = app.interviewMode === "office" && !!app.interviewAt
+  const replacedRoom = app.interviewMeetingId
+
+  app.interviewMode = "office"
+  app.interviewLocation = location
+  app.interviewAt = scheduledAt
+  app.interviewMeetingId = null
+  app.proposedSlots = []
+  if (app.status !== "interview_scheduled") app.status = "interview_scheduled"
+  const when = scheduledAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })
+  app.history.push({
+    status: "interview_scheduled",
+    at: new Date(),
+    by: byName,
+    note: `${rescheduled ? "Office interview moved to" : "Office interview scheduled for"} ${when} at ${location}`,
+  })
+  await app.save()
+  if (replacedRoom) {
+    await Meeting.updateOne(
+      { _id: replacedRoom, status: { $ne: "ended" } },
+      { $set: { status: "ended", endedAt: new Date() } }
+    )
+  }
+  await User.findByIdAndUpdate(applicant._id, { $set: { instructorStatus: "interview" } })
+
+  const statusUrl = `${APP_URL}/dashboard/become-instructor`
+  void notifyUser(applicant._id.toString(), {
+    type: "application",
+    title: rescheduled ? "Your office interview was moved" : "Interview at our office",
+    body: `${when} with ${host.name} — ${location}`,
+    href: "/dashboard/become-instructor",
+  })
+  if (applicant.email) {
+    const ics = buildInterviewIcs({
+      uid: `${app._id.toString()}-office`,
+      title: `${BRAND.name} — Staff Tutor Interview`,
+      description: `In-person interview with ${host.name} about your staff tutor application.`,
+      startsAt: scheduledAt,
+      durationMinutes: 45,
+      url: statusUrl,
+      organizerName: host.name,
+      location,
+    })
+    void sendOfficeInterviewInviteEmail(
+      applicant.email,
+      {
+        applicantName: applicant.firstName || "there",
+        applicantAvatarUrl: applicant.avatarUrl ?? undefined,
+        hostName: host.name,
+        hostAvatarUrl: host.avatarUrl ?? undefined,
+        scheduledAt: scheduledAt.toISOString(),
+        location,
+        statusUrl,
+      },
+      ics
+    )
+  }
+
+  return { meetingId: null, joinPath: null, rescheduled }
+}
+
+/** Books the interview the chosen way: an online room, or a time and address at the office. */
+function bookInterview(
+  app: HydratedDocument<import("@/lib/db/models").IInstructorApplication>,
+  host: InterviewHost,
+  scheduledAt: Date,
+  byName: string,
+  place: InterviewPlace
+) {
+  return place.mode === "office"
+    ? scheduleOfficeInterview(app, host, scheduledAt, byName, place.location)
+    : scheduleInterviewCore(app, host, scheduledAt, byName)
+}
+
+/** Admin schedules (or reschedules) the interview directly at a specific time, online or at the office. */
+export async function adminScheduleInterview(
+  applicationId: string,
+  scheduledAtISO: string,
+  placeInput: InterviewPlaceInput = { mode: "online" }
+) {
   try {
     await connectDB()
     const admin = await requireAdmin()
+
+    const place = InterviewPlace.safeParse(placeInput)
+    if (!place.success) {
+      return { success: false, error: place.error.issues[0]?.message ?? "Choose how the interview is held" }
+    }
 
     const scheduledAt = new Date(scheduledAtISO)
     if (isNaN(scheduledAt.getTime())) return { success: false, error: "Invalid date" }
@@ -847,11 +1028,12 @@ export async function adminScheduleInterview(applicationId: string, scheduledAtI
     }
 
     const adminName = `${admin.firstName} ${admin.lastName}`.trim()
-    const result = await scheduleInterviewCore(
+    const result = await bookInterview(
       app,
       { id: admin.id, name: adminName, avatarUrl: admin.avatarUrl },
       scheduledAt,
-      adminName
+      adminName,
+      place.data
     )
 
     revalidatePath(`/admin/applications/${applicationId}`)
@@ -986,11 +1168,17 @@ export async function adminRecordDemoOutcome(
  */
 export async function adminProposeSlots(
   applicationId: string,
-  slots: { at: string; note?: string }[]
+  slots: { at: string; note?: string }[],
+  placeInput: InterviewPlaceInput = { mode: "online" }
 ) {
   try {
     await connectDB()
     const admin = await requireAdmin()
+
+    const place = InterviewPlace.safeParse(placeInput)
+    if (!place.success) {
+      return { success: false, error: place.error.issues[0]?.message ?? "Choose how the interview is held" }
+    }
 
     const parsed = (slots ?? [])
       .map((s) => ({ at: new Date(s.at), note: s.note?.trim() || undefined }))
@@ -1014,12 +1202,16 @@ export async function adminProposeSlots(
     app.proposedSlots = parsed as typeof app.proposedSlots
     app.slotsProposedBy = admin.id as unknown as typeof app.slotsProposedBy
     app.slotsProposedAt = new Date()
+    // The pick books the interview the way the reviewer chose here. Kept apart
+    // from the interview* fields, which describe what is booked now.
+    app.slotsMode = place.data.mode
+    app.slotsLocation = place.data.mode === "office" ? place.data.location : undefined
     if (app.status === "submitted") app.status = "under_review"
     app.history.push({
       status: app.status,
       at: new Date(),
       by: adminName,
-      note: `Proposed ${parsed.length} interview slot${parsed.length === 1 ? "" : "s"}`,
+      note: `Proposed ${parsed.length} ${place.data.mode === "office" ? "office" : "online"} interview slot${parsed.length === 1 ? "" : "s"}`,
     })
     await app.save()
 
@@ -1090,11 +1282,16 @@ export async function pickInterviewSlot(applicationId: string, slotAtISO: string
 
     const hostName = `${host.firstName ?? ""} ${host.lastName ?? ""}`.trim() || "WorldStreet Team"
     const applicantName = `${user.firstName} ${user.lastName}`.trim()
-    const result = await scheduleInterviewCore(
+    // Booked the way the reviewer proposed: at the office when they gave an address, else online.
+    const planned = plannedInterviewOf(app)
+    const place: InterviewPlace =
+      planned.mode === "office" && planned.location ? { mode: "office", location: planned.location } : { mode: "online" }
+    const result = await bookInterview(
       app,
       { id: host._id.toString(), name: hostName, avatarUrl: host.avatarUrl ?? null },
       new Date(picked.at),
-      applicantName
+      applicantName,
+      place
     )
 
     // Tell the reviewer which slot won.
@@ -1211,6 +1408,18 @@ export async function adminDecideApplication(
       return { success: false, error: `Application is already ${app.status}` }
     }
 
+    // Staff tutors are hired through an interview (owner, 2026-11-05): no
+    // approval before one is booked and its time has come. Rejection may
+    // happen at any stage.
+    if (decision === "approved" && (app.status !== "interview_scheduled" || !(await interviewHeld(app)))) {
+      return {
+        success: false,
+        error:
+          app.status === "interview_scheduled"
+            ? "Approve after the interview has taken place"
+            : "Interview the applicant (at the office or online) before approving",
+      }
+    }
     if (decision === "approved" && app.demo?.requested && !app.demo.outcome) {
       return { success: false, error: "Record the teaching demonstration's outcome before approving" }
     }
@@ -1245,7 +1454,6 @@ export async function adminDecideApplication(
         { _id: user._id },
         {
           $set: {
-            role: newRole,
             instructorStatus: "approved",
             instructorProfile: {
               headline: app.answers.headline,
@@ -1268,8 +1476,12 @@ export async function adminDecideApplication(
           },
         }
       )
-      user.role = newRole
-      if (user.authUserId) await syncRoleToClerk(user.authUserId, newRole)
+      // Only a USER is promoted, and only if they are still a USER now: a role a
+      // super admin granted since the read above (ADMIN) is never overwritten.
+      if (newRole !== user.role) {
+        const promoted = await User.updateOne({ _id: user._id, role: "USER" }, { $set: { role: newRole } })
+        if (promoted.modifiedCount > 0 && user.authUserId) await syncRoleToClerk(user.authUserId, newRole)
+      }
     } else {
       await User.updateOne({ _id: user._id }, { $set: { instructorStatus: "rejected" } })
     }
@@ -1277,11 +1489,11 @@ export async function adminDecideApplication(
     // Fire-and-forget notifications + email.
     void notifyUser(user._id.toString(), {
       type: "application",
-      title: decision === "approved" ? "You're an instructor now" : "Application update",
+      title: decision === "approved" ? "Welcome to the Academy's teaching staff" : "Application update",
       body:
         decision === "approved"
-          ? "Your instructor application was approved. Your instructor portal is ready."
-          : decisionNote || "Your instructor application wasn't approved this time.",
+          ? "Your staff tutor application was approved. Your instructor portal is ready; we'll assign you to a program."
+          : decisionNote || "Your staff tutor application wasn't approved this time.",
       href: decision === "approved" ? "/instructor" : "/dashboard/become-instructor",
     })
     void sendApplicationDecisionEmail(user.email, {

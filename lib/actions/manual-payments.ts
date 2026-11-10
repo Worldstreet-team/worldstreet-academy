@@ -6,6 +6,7 @@ import { z } from "zod/v4"
 import connectDB from "@/lib/db"
 import {
   Course,
+  Earning,
   Enrollment,
   ManualPayment,
   Order,
@@ -18,14 +19,24 @@ import {
   type PackageKey,
 } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth/actions"
-import { requireAdmin } from "@/lib/auth/admin"
+import { requireSuperAdmin } from "@/lib/auth/admin" // CTO 2026-11-08: transfers and outside payments are reconciled by the super admin only
 import { courseAvailability } from "@/lib/types/course"
 import { PACKAGE_KEYS, packageFor, sellsPackages } from "@/lib/entitlements"
 import { notifyAdmins, notifyUser } from "@/lib/notify"
 import { appUrl } from "@/lib/app-url"
 import { courseKindOf } from "@/lib/course-kind"
+import { kindIsOpen } from "@/lib/marketplace"
 import { normalizeReferralCode } from "@/lib/referral-link"
-import { referralOwner, referrerFor, splitSale } from "@/lib/referrals"
+import { bookReferralCommission, referralCookieCode, referralOwner, referrerFor, splitSale } from "@/lib/referrals"
+import {
+  NAIRA_RATE_MAX,
+  NAIRA_RATE_MIN,
+  getNairaQuote,
+  getNairaRateAdminView,
+  recentlyQuotedRate,
+  setPinnedNairaRate,
+  type NairaRateAdminView,
+} from "@/lib/naira-rate"
 import {
   sendEnrollmentConfirmationEmail,
   sendEspeePaymentAdminEmail,
@@ -46,17 +57,32 @@ import {
   PAYMENT_PROOF_TYPES,
   PAYMENT_PROOF_TYPE_ERROR,
   checkoutPathFor,
-  espeeAmountLabel,
   proofContentTypeForKey,
 } from "@/lib/espee"
+import {
+  TRANSFER_METHODS,
+  nairaFor,
+  transferAmountLabel,
+  transferLabel,
+  type NairaQuote,
+  type TransferMethod,
+} from "@/lib/payment-channels"
 
 /*
- * "Pay with ESPEE" (owner meeting, 2026-10-03). The learner transfers ESPEE
- * outside our system (1 ESPEE = $1), uploads the receipt into the PRIVATE
- * resources bucket and submits a proof; an admin approves or rejects it.
- * Approval writes the Order and the Enrollment — the same access record a
- * wallet purchase writes — but never an instructor Earning. The option is
- * hidden entirely while ESPEE_PAYMENT_DETAILS or the private bucket is unset.
+ * Paying by transfer: "Pay with ESPEE" (owner meeting, 2026-10-03), and since
+ * 2026-11-05 a bank transfer or USDT as well — the programme document's
+ * payment details (lib/payment-channels.ts; the names here still say ESPEE).
+ * The learner sends the money outside our system, uploads the receipt into the
+ * PRIVATE resources bucket and submits a proof; an admin approves or rejects
+ * it. Approval writes the Order and the Enrollment — the same access record a
+ * wallet purchase writes — but never an instructor Earning; a partner who
+ * referred the learner earns their commission as on a wallet purchase (client,
+ * 2026-11-05). A bank transfer is quoted in naira at lib/naira-rate.ts's rate,
+ * kept on the proof. With the private
+ * bucket set, the receipt is uploaded here; without it, transfers stay open
+ * and the receipt goes on WhatsApp, as the programme document asks — the proof
+ * then carries the reference only. ESPEE_PAYMENT_DETAILS is no longer read:
+ * the document's details are code.
  */
 
 const OBJECT_ID = /^[a-f0-9]{24}$/
@@ -86,14 +112,20 @@ const PAGE_SIZE = 20
 const PROOF_STATUSES = ["submitted", "approved", "rejected"] as const satisfies readonly ManualPaymentStatus[]
 
 /**
- * The Academy's ESPEE account details (server-only, free multi-line text), or
- * null when the option is off: unset, or no private bucket to keep receipts in.
- * A value pasted into one line with literal "\n" reads as line breaks too.
+ * Whether paying by transfer is offered. CLOSED (CTO, 2026-11-08: "All
+ * payments route through WorldStreet"): checkout takes the WorldStreet wallet
+ * only and a new proof is refused. Proofs sent before stay readable, and only
+ * a super admin decides them.
  */
-function espeeDetails(): string | null {
-  const details = process.env.ESPEE_PAYMENT_DETAILS?.replace(/\\n/g, "\n").trim()
-  if (!details || !hasPrivateResourceBucket()) return null
-  return details
+function transfersOpen(): boolean {
+  // Was open from 2026-10-03 (ESPEE) and 2026-11-05 (bank, USDT); kept for the record:
+  // return true
+  return false
+}
+
+/** Whether the receipt is uploaded at checkout: only into the private bucket, never the public one. */
+function receiptsInApp(): boolean {
+  return hasPrivateResourceBucket()
 }
 
 function fullName(person: { firstName?: string | null; lastName?: string | null } | null | undefined, fallback: string) {
@@ -140,6 +172,8 @@ async function quoteProgram(
 > {
   const course = await Course.findOne({ _id: courseId, status: "published" })
   if (!course) return { ok: false, error: "This program isn't available", code: "not_found" }
+  // The marketplace is Coming soon (MARKETPLACE_OPEN): it sells nothing.
+  if (!kindIsOpen(course.kind)) return { ok: false, error: "The marketplace opens soon.", code: "not_found" }
   if (courseAvailability(course) === "coming_soon") {
     return { ok: false, error: "This program isn't live yet", code: "not_live" }
   }
@@ -160,6 +194,8 @@ async function quoteProgram(
 
 export type EspeeProofView = {
   id: string
+  /** How it was paid: ESPEE, bank or USDT. */
+  method: TransferMethod
   courseId: string
   courseTitle: string
   packageKey: PackageKey | null
@@ -170,21 +206,24 @@ export type EspeeProofView = {
 }
 
 export type EspeeCheckoutState = {
-  /** The option is offered: details set and the private bucket configured. */
+  /** Paying by transfer is offered. The details are lib/payment-channels.ts. */
   enabled: boolean
-  /** The Academy's ESPEE account details; null while disabled. */
-  details: string | null
+  /** The receipt is uploaded at checkout (private bucket set); false: it goes on WhatsApp. */
+  receiptUpload: boolean
   /** The caller's proof for this program that is waiting on an admin. */
   open: EspeeProofView | null
   /** The caller's newest rejected proof for this program. */
   lastRejection: { reason: string; rejectedAt: string } | null
   /** The caller's "Who invited you?" answer, once given (first answer wins). */
   referredBy: string | null
+  /** The naira rate a bank transfer is quoted at; null: none known, so the learner confirms it on WhatsApp. */
+  nairaRate: NairaQuote | null
 }
 
 function proofView(
   p: {
     _id: Types.ObjectId
+    method?: TransferMethod | null
     course: Types.ObjectId
     packageKey: PackageKey | null
     packageName: string | null
@@ -196,6 +235,7 @@ function proofView(
 ): EspeeProofView {
   return {
     id: p._id.toString(),
+    method: p.method ?? "espee",
     courseId: p.course.toString(),
     courseTitle,
     packageKey: p.packageKey ?? null,
@@ -206,31 +246,39 @@ function proofView(
   }
 }
 
-/** Everything checkout needs to offer ESPEE for one program. Fails closed to "off". */
+/** Everything checkout needs to offer paying by transfer for one program. Fails closed to "off". */
 export async function getEspeeCheckoutState(courseId: string): Promise<EspeeCheckoutState> {
-  const off: EspeeCheckoutState = { enabled: false, details: null, open: null, lastRejection: null, referredBy: null }
+  const off: EspeeCheckoutState = {
+    enabled: false,
+    receiptUpload: false,
+    open: null,
+    lastRejection: null,
+    referredBy: null,
+    nairaRate: null,
+  }
   try {
     await connectDB()
     const user = await getCurrentUser()
     if (!user || !OBJECT_ID.test(courseId)) return off
 
-    const details = espeeDetails()
-    const [open, rejected, me, course] = await Promise.all([
+    const [open, rejected, me, course, nairaRate] = await Promise.all([
       ManualPayment.findOne({ user: user.id, course: courseId, status: "submitted" }).lean(),
       ManualPayment.findOne({ user: user.id, course: courseId, status: "rejected" }).sort({ createdAt: -1 }).lean(),
       User.findById(user.id).select("referredBy").lean(),
       Course.findById(courseId).select("title").lean(),
+      transfersOpen() ? getNairaQuote() : Promise.resolve(null),
     ])
 
     return {
-      enabled: details !== null,
-      details,
+      enabled: transfersOpen(),
+      receiptUpload: receiptsInApp(),
       open: open ? proofView(open, course?.title ?? "") : null,
       lastRejection:
         rejected && rejected.reviewedAt
           ? { reason: rejected.rejectionReason ?? "", rejectedAt: rejected.reviewedAt.toISOString() }
           : null,
       referredBy: me?.referredBy?.text ?? null,
+      nairaRate,
     }
   } catch (error) {
     console.error("Get ESPEE checkout state error:", error)
@@ -251,7 +299,7 @@ const UploadInput = z.object({
 /**
  * A presigned PUT into the PRIVATE resources bucket, inside the caller's own
  * proofs folder. The receipt goes straight from the browser to R2; refused
- * outright while ESPEE is off (which includes "no private bucket").
+ * outright while transfers are off (no private bucket).
  */
 export async function getPaymentProofUploadUrl(input: {
   courseId: string
@@ -262,12 +310,14 @@ export async function getPaymentProofUploadUrl(input: {
     await connectDB()
     const user = await getCurrentUser()
     if (!user) return { success: false, error: "You need to be signed in" }
+    // No transfers, no receipts: never mint an upload link into the private bucket.
+    if (!transfersOpen()) return { success: false, error: "Paying by transfer isn't available right now" }
 
     const parsed = UploadInput.safeParse(input)
     if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Choose your receipt" }
     const extension = PAYMENT_PROOF_TYPES[parsed.data.contentType]
     if (!extension) return { success: false, error: PAYMENT_PROOF_TYPE_ERROR }
-    if (!espeeDetails()) return { success: false, error: "ESPEE payments aren't available right now" }
+    if (!receiptsInApp()) return { success: false, error: "Send your receipt on WhatsApp instead" }
     if (!(await Course.exists({ _id: parsed.data.courseId, status: "published" }))) {
       return { success: false, error: "This program isn't available" }
     }
@@ -291,13 +341,18 @@ export async function getPaymentProofUploadUrl(input: {
 const SubmitInput = z.object({
   courseId: z.string().regex(OBJECT_ID, "Program not found"),
   packageKey: z.enum(PACKAGE_KEYS).optional(),
-  receiptKey: z.string().min(1, "Upload your receipt").max(300, "Upload your receipt again"),
+  // A client from before bank and USDT sends no method: it was paying by ESPEE.
+  method: z.enum(TRANSFER_METHODS, { error: "Choose how you paid" }).default("espee"),
+  // Empty when the receipt went on WhatsApp (no private bucket); required otherwise (checked below).
+  receiptKey: z.string().max(300, "Upload your receipt again").default(""),
   transferReference: z
     .string()
     .trim()
-    .min(3, "Enter the transfer reference from your ESPEE receipt")
+    .min(3, "Enter the reference from your receipt")
     .max(120, "Keep the reference under 120 characters"),
   note: z.string().trim().max(500, "Keep the note under 500 characters").optional(),
+  // The naira rate the bank amount was shown at; null when checkout showed none ("confirm on WhatsApp").
+  ngnPerUsd: z.number().finite().positive().nullable().default(null),
 })
 
 export type EspeeSubmitResult =
@@ -313,11 +368,12 @@ export type EspeeSubmitResult =
         | "free"
         | "receipt"
         | "failed"
+        | "rate_changed"
         | QuoteErrorCode
     }
 
 /**
- * Submit an ESPEE payment proof for review. The amount is re-derived from the
+ * Submit a transfer proof (ESPEE, bank or USDT) for review. The amount is re-derived from the
  * course; the receipt must already be uploaded through getPaymentProofUploadUrl
  * — only keys inside the caller's own folder are accepted. One open proof per
  * program: a second submit gets the first one back instead of a duplicate.
@@ -325,9 +381,11 @@ export type EspeeSubmitResult =
 export async function submitEspeePayment(input: {
   courseId: string
   packageKey?: PackageKey
+  method?: TransferMethod
   receiptKey: string
   transferReference: string
   note?: string
+  ngnPerUsd?: number | null
 }): Promise<EspeeSubmitResult> {
   try {
     await connectDB()
@@ -338,9 +396,9 @@ export async function submitEspeePayment(input: {
     if (!parsed.success) {
       return { success: false, error: parsed.error.issues[0]?.message ?? "Check the form and try again", code: "invalid" }
     }
-    const { courseId, packageKey, receiptKey, transferReference } = parsed.data
-    if (!espeeDetails()) {
-      return { success: false, error: "ESPEE payments aren't available right now", code: "unavailable" }
+    const { courseId, packageKey, method, receiptKey, transferReference } = parsed.data
+    if (!transfersOpen()) {
+      return { success: false, error: "Paying by transfer isn't available right now", code: "unavailable" }
     }
 
     const enrolled = await Enrollment.exists({
@@ -356,16 +414,40 @@ export async function submitEspeePayment(input: {
     const quote = await quoteProgram(courseId, packageKey)
     if (!quote.ok) return { success: false, error: quote.error, code: quote.code }
     if (quote.amountMinor <= 0) {
-      return { success: false, error: "This program is free — enrol without a payment", code: "free" }
+      return { success: false, error: "This course isn't on sale.", code: "free" }
     }
 
-    // Only a receipt uploaded into the caller's own folder, of a type we accept.
-    const receiptContentType = proofContentTypeForKey(receiptKey)
-    if (!receiptKey.startsWith(paymentProofKeyPrefix(user.id)) || receiptKey.includes("..") || !receiptContentType) {
-      return { success: false, error: "Upload your receipt again", code: "receipt" }
+    // With the private bucket: only a receipt uploaded into the caller's own
+    // folder, of a type we accept. Without it, no key at all (WhatsApp).
+    let receiptContentType: string | null = null
+    if (receiptsInApp()) {
+      receiptContentType = proofContentTypeForKey(receiptKey)
+      if (!receiptKey.startsWith(paymentProofKeyPrefix(user.id)) || receiptKey.includes("..") || !receiptContentType) {
+        return { success: false, error: receiptKey ? "Upload your receipt again" : "Upload your receipt", code: "receipt" }
+      }
+    } else if (receiptKey) {
+      return { success: false, error: "Send your receipt on WhatsApp instead", code: "receipt" }
     }
 
-    const amountLabel = espeeAmountLabel(quote.amountMinor)
+    // A bank transfer is asked for in naira at the rate checkout SHOWED, kept on
+    // the proof so the admin checks the receipt against the figure the learner
+    // sent. The rate comes from the browser, so it is stored only if this
+    // server really quoted it recently (`recentlyQuotedRate`); otherwise the
+    // rate has moved on, and the learner is asked to check the new amount.
+    let naira: { ngnPerUsd: number; source: "pinned" | "market" } | null = null
+    if (method === "bank" && parsed.data.ngnPerUsd !== null) {
+      naira = await recentlyQuotedRate(parsed.data.ngnPerUsd)
+      if (!naira) {
+        return {
+          success: false,
+          error: "The naira rate changed since you opened checkout. Check the new amount before you send the payment.",
+          code: "rate_changed",
+        }
+      }
+    }
+    const amountLabel = transferAmountLabel(method, quote.amountMinor, naira?.ngnPerUsd)
+    // This request is the learner's, so its cookie is their partner link — approval runs in the admin's.
+    const referralCode = await referralCookieCode()
     const learnerName = fullName(user, user.email)
     let paymentId: string
     try {
@@ -377,9 +459,13 @@ export async function submitEspeePayment(input: {
         packageName: quote.packageName,
         amountMinor: quote.amountMinor,
         currency: "USD",
-        method: "espee",
+        method,
         amountLabel,
-        receiptKey,
+        ngnPerUsd: naira?.ngnPerUsd ?? null,
+        rateSource: naira?.source ?? null,
+        amountNgn: naira ? nairaFor(quote.amountMinor, naira.ngnPerUsd) : null,
+        referralCode,
+        receiptKey: receiptKey || null,
         receiptContentType,
         transferReference,
         note: parsed.data.note ?? "",
@@ -401,7 +487,7 @@ export async function submitEspeePayment(input: {
     const plan = quote.packageName ? ` — ${quote.packageName}` : ""
     void notifyAdmins({
       type: "payment",
-      title: "New ESPEE payment to review",
+      title: `New ${transferLabel(method)} payment to review`,
       body: `${learnerName} sent ${amountLabel} for ${quote.course.title}${plan}.`.slice(0, 500),
       href: `/admin/payments/espee/${paymentId}`,
       courseId,
@@ -414,6 +500,7 @@ export async function submitEspeePayment(input: {
           .filter((a) => a.email && !a.email.endsWith("@users.noemail"))
           .map((a) =>
             sendEspeePaymentAdminEmail(a.email, {
+              methodLabel: transferLabel(method),
               learnerName,
               learnerAvatarUrl: user.avatarUrl || undefined,
               courseTitle: quote.course.title,
@@ -426,6 +513,7 @@ export async function submitEspeePayment(input: {
       )
     })().catch((err) => console.error("[ESPEE] admin emails failed:", err))
     void sendEspeeProofReceivedEmail({
+      methodLabel: transferLabel(method),
       to: user.email ?? "",
       firstName: user.firstName ?? "",
       courseTitle: quote.course.title,
@@ -529,6 +617,8 @@ export async function saveReferral(
 
 export type AdminEspeeRow = {
   id: string
+  /** ESPEE, bank or USDT (older rows: ESPEE). */
+  method: TransferMethod
   learnerName: string
   learnerEmail: string
   learnerAvatar: string | null
@@ -554,6 +644,7 @@ type PopulatedLearner = {
 
 function adminRow(p: {
   _id: Types.ObjectId
+  method?: TransferMethod | null
   user: unknown
   course: unknown
   packageName: string | null
@@ -568,6 +659,7 @@ function adminRow(p: {
   const course = p.course as { title?: string } | null
   return {
     id: p._id.toString(),
+    method: p.method ?? "espee",
     learnerName: fullName(learner, learner?.email || "Unknown"),
     learnerEmail: learner?.email ?? "",
     learnerAvatar: learner?.avatarUrl || null,
@@ -597,7 +689,7 @@ export async function adminListEspeePayments(filters?: {
   const empty = { payments: [], total: 0, page: 1, pageCount: 1, counts }
   try {
     await connectDB()
-    await requireAdmin()
+    await requireSuperAdmin()
 
     const status = PROOF_STATUSES.find((s) => s === filters?.status) ?? "submitted"
     const page = Math.max(1, Math.floor(filters?.page ?? 1))
@@ -639,7 +731,9 @@ export type AdminEspeeDetail = AdminEspeeRow & {
   note: string
   /** A 10-minute signed GET (inline, no download disposition); null when the private bucket is gone. */
   receiptUrl: string | null
-  receiptContentType: string
+  receiptContentType: string | null
+  /** No receipt here: the learner was asked to send it on WhatsApp. */
+  receiptOnWhatsApp: boolean
   rejectionReason: string | null
   reviewedByName: string
   orderReference: string | null
@@ -648,12 +742,16 @@ export type AdminEspeeDetail = AdminEspeeRow & {
   /** Approved, but the approval was interrupted before the program opened — approving again finishes it. */
   stranded: boolean
   history: { status: string; at: string; note?: string; by?: string }[]
+  /** A bank transfer's quote: naira per $1 and whose rate it was. Null for other methods and older proofs. */
+  nairaRate: { ngnPerUsd: number; source: "pinned" | "market" } | null
+  /** The partner commission this payment's approval booked, if any. */
+  commission: { netMinor: number; status: "pending" | "cleared" | "reversed"; note: string } | null
 }
 
 export async function adminGetEspeePayment(paymentId: string): Promise<AdminEspeeDetail | null> {
   try {
     await connectDB()
-    await requireAdmin()
+    await requireSuperAdmin()
     if (!OBJECT_ID.test(paymentId)) return null
 
     const p = await ManualPayment.findById(paymentId)
@@ -667,11 +765,12 @@ export async function adminGetEspeePayment(paymentId: string): Promise<AdminEspe
     const courseRef = p.course as unknown as { _id?: Types.ObjectId } | null
     const courseId = courseRef?._id?.toString() ?? ""
 
-    const [reviewer, order, enrollment, receiptUrl] = await Promise.all([
+    const [reviewer, order, commission, enrollment, receiptUrl] = await Promise.all([
       p.reviewedBy ? User.findById(p.reviewedBy).select("firstName lastName email").lean() : null,
       p.order ? Order.findById(p.order).select("reference").lean() : null,
+      p.order ? Earning.findOne({ kind: "referral", order: p.order }).select("netMinor status note").lean() : null,
       learnerId && courseId ? Enrollment.findOne({ user: learnerId, course: courseId }).select("status").lean() : null,
-      hasPrivateResourceBucket()
+      p.receiptKey && hasPrivateResourceBucket()
         ? generatePresignedDownloadUrl(p.receiptKey, { expiresIn: 600, bucket: R2_RESOURCE_BUCKET }).catch(() => null)
         : Promise.resolve(null),
     ])
@@ -687,7 +786,8 @@ export async function adminGetEspeePayment(paymentId: string): Promise<AdminEspe
       packageKey: p.packageKey ?? null,
       note: p.note ?? "",
       receiptUrl,
-      receiptContentType: p.receiptContentType,
+      receiptContentType: p.receiptContentType ?? null,
+      receiptOnWhatsApp: !p.receiptKey,
       rejectionReason: p.rejectionReason ?? null,
       reviewedByName: reviewer ? fullName(reviewer, reviewer.email ?? "Admin") : "",
       orderReference: order?.reference ?? null,
@@ -699,6 +799,8 @@ export async function adminGetEspeePayment(paymentId: string): Promise<AdminEspe
         note: h.note,
         by: h.by,
       })),
+      nairaRate: p.ngnPerUsd && p.rateSource ? { ngnPerUsd: p.ngnPerUsd, source: p.rateSource } : null,
+      commission: commission ? { netMinor: commission.netMinor, status: commission.status, note: commission.note ?? "" } : null,
     }
   } catch (error) {
     console.error("Admin get ESPEE payment error:", error)
@@ -714,7 +816,7 @@ export type EspeeApproveResult =
  * Approve a proof: the learner's program opens. The claim is atomic
  * (submitted → approved in one filtered write), so a double click or a second
  * admin can never approve twice. Then, mirroring purchaseCourse: an Order
- * (paid → enrolled, paymentMethod "espee", no chargeId), a PaymentEvent, and
+ * (paid → enrolled, paymentMethod = the proof's method, no chargeId), a PaymentEvent, and
  * the Enrollment created, activated (pre_enrolled) or restored (refunded). If
  * the enrollment can't be written, the proof goes back to `submitted` and the
  * order to `failed`.
@@ -722,7 +824,7 @@ export type EspeeApproveResult =
 export async function adminApproveEspeePayment(paymentId: string): Promise<EspeeApproveResult> {
   try {
     await connectDB()
-    const admin = await requireAdmin()
+    const admin = await requireSuperAdmin()
     if (!OBJECT_ID.test(paymentId)) return { success: false, error: "Payment not found" }
 
     const proof = await ManualPayment.findById(paymentId).lean()
@@ -730,6 +832,16 @@ export async function adminApproveEspeePayment(paymentId: string): Promise<Espee
     // Four eyes on money: no admin approves the proof that enrolls themselves.
     if (proof.user.toString() === admin.id) {
       return { success: false, error: "Another admin has to approve your own payment" }
+    }
+    // …nor the one whose partner commission would be theirs: since 2026-11-05
+    // an approval pays the learner's referrer from the Academy's funds. Who
+    // that is: the partner link the learner had when they submitted (kept on
+    // the proof — this request is the admin's, so its cookies say nothing
+    // about the learner), else their saved `referredBy`. Read before any
+    // write, so a failure here changes nothing.
+    const referrer = await referrerFor(proof.user.toString(), normalizeReferralCode(proof.referralCode))
+    if (referrer?.userId === admin.id) {
+      return { success: false, error: "You referred this learner, so another admin has to approve their payment" }
     }
     const resuming = isStrandedApproval(proof, Date.now())
     if (proof.status !== "submitted" && !resuming) {
@@ -753,6 +865,8 @@ export async function adminApproveEspeePayment(paymentId: string): Promise<Espee
     const alreadyIn = existing?.status === "active" || existing?.status === "completed"
 
     const adminName = fullName(admin, admin.email)
+    const method: TransferMethod = proof.method ?? "espee"
+    const via = transferLabel(method)
     const now = new Date()
     // A resumed approval re-claims on the reviewedAt it read, so two admins
     // finishing the same stranded proof can't both run.
@@ -779,7 +893,7 @@ export async function adminApproveEspeePayment(paymentId: string): Promise<Espee
                 : "Approval resumed after an interrupted attempt"
               : alreadyIn
                 ? "The learner already had access, so the enrollment was left as it was. Refund the transfer outside the platform if it was a duplicate."
-                : "ESPEE transfer confirmed",
+                : `${via} payment confirmed`,
           },
         },
       },
@@ -807,7 +921,7 @@ export async function adminApproveEspeePayment(paymentId: string): Promise<Espee
       order = await Order.findOne({ reference })
       if (order) {
         // An earlier approval of this proof failed to enroll and left the order `failed`.
-        await transitionOrder(order, "paid", `ESPEE transfer re-confirmed by ${adminName}`)
+        await transitionOrder(order, "paid", `${via} payment re-confirmed by ${adminName}`)
       } else {
         order = await Order.create({
           user: proof.user,
@@ -817,12 +931,12 @@ export async function adminApproveEspeePayment(paymentId: string): Promise<Espee
           amountMinor: proof.amountMinor,
           currency: "USD",
           packageKey: packageFields.packageKey,
-          paymentMethod: "espee",
+          paymentMethod: method,
           status: "paid",
           chargeId: null,
           history: [
-            { status: "pending", at: proof.createdAt, note: `ESPEE proof submitted (reference ${proof.transferReference})` },
-            { status: "paid", at: now, note: `ESPEE transfer confirmed by ${adminName}` },
+            { status: "pending", at: proof.createdAt, note: `${via} proof submitted (reference ${proof.transferReference})` },
+            { status: "paid", at: now, note: `${via} payment confirmed by ${adminName}` },
           ],
         })
       }
@@ -833,6 +947,7 @@ export async function adminApproveEspeePayment(paymentId: string): Promise<Espee
         courseId,
         packageKey: packageFields.packageKey,
         transferReference: proof.transferReference,
+        method,
         approvedBy: admin.id,
       })
 
@@ -904,27 +1019,49 @@ export async function adminApproveEspeePayment(paymentId: string): Promise<Espee
       console.error("[ESPEE] enrolled, but the order/proof link failed:", err)
     }
 
-    // Who made the sale, recorded as on a wallet order (owner, 2026-10-05) —
-    // from the learner's saved `referredBy` only: this request is the admin's,
-    // so its cookies say nothing about the learner. Record only: ESPEE pays no
-    // share and no referral commission (below). Never fails the approval.
+    // Who made the sale, recorded as on a wallet order (owner, 2026-10-05), from
+    // the `referrer` read above. A referral earns its partner the commission,
+    // as a wallet purchase does (client, 2026-11-05); the Academy pays it from
+    // its own funds. Never fails the approval.
     try {
       const split = splitSale({
         kind: courseKindOf(course),
         sellerId: course.instructor.toString(),
         buyerId: learnerId,
-        referrer: await referrerFor(learnerId, null),
+        referrer,
       })
       if (split.attribution) {
         await Order.updateOne({ _id: order._id }, { $set: { attribution: split.attribution } })
+      }
+      // A link they arrived through also answers "Who invited you?" for an
+      // account that has no answer yet (first answer wins), as in purchaseCourse.
+      if (referrer?.source === "link") {
+        await User.updateOne(
+          { _id: learnerId, referredBy: null },
+          { $set: { referredBy: { text: referrer.code, at: new Date(), code: referrer.code, userId: referrer.userId } } }
+        ).catch((err) => console.error("[Referrals] failed to save who invited the buyer:", err))
+      }
+      if (split.attribution?.kind === "referral" && referrer) {
+        await bookReferralCommission({
+          referrer,
+          buyerId: learnerId,
+          orderId: order._id.toString(),
+          enrollmentId,
+          courseId,
+          amountMinor: proof.amountMinor,
+          packageKey: packageFields.packageKey,
+          chargeId: null,
+          via,
+        })
       }
     } catch (err) {
       console.error("[ESPEE] couldn't record who made the sale:", err)
     }
 
-    // No instructor Earning, no referral Earning, and no totalEarnings (owner meeting 2026-10-03):
-    // an ESPEE transfer never enters the wallet system, so there is no charge
-    // to clear an instructor's share from. Only the student counts move, as in
+    // No instructor Earning and no totalEarnings (owner meeting 2026-10-03): a
+    // transfer never enters the wallet system, so there is no charge to clear
+    // an instructor's share from (the referral commission above is the one
+    // exception, client 2026-11-05). Only the student counts move, as in
     // purchaseCourse — pre-enrollment already counted this student.
     if (!isActivation) {
       await Course.findByIdAndUpdate(courseId, { $inc: { enrolledCount: 1 } })
@@ -976,6 +1113,54 @@ export async function adminApproveEspeePayment(paymentId: string): Promise<Espee
   }
 }
 
+/* ═══════════════════ admin: the naira rate ═══════════════════ */
+
+/** The rate card on the transfers queue: what checkout quotes, the market rate and any pin. Null when it can't be read. */
+export async function adminGetNairaRate(): Promise<NairaRateAdminView | null> {
+  try {
+    await connectDB()
+    await requireSuperAdmin()
+    return await getNairaRateAdminView()
+  } catch (error) {
+    console.error("Admin get naira rate error:", error)
+    return null
+  }
+}
+
+const PinRateInput = z.object({
+  ngnPerUsd: z
+    .number({ error: "Enter the rate in naira per $1" })
+    .finite("Enter the rate in naira per $1")
+    .min(NAIRA_RATE_MIN, `The rate must be at least ₦${NAIRA_RATE_MIN}`)
+    .max(NAIRA_RATE_MAX, `The rate must be under ₦${NAIRA_RATE_MAX.toLocaleString("en-US")}`)
+    .nullable(),
+})
+
+/**
+ * Pin the naira rate bank transfers are quoted at, or clear the pin (null) to
+ * go back to the daily market rate. Proofs already submitted keep the rate
+ * they were quoted.
+ */
+export async function adminSetNairaRate(
+  ngnPerUsd: number | null
+): Promise<{ success: true } | { success: false; error: string }> {
+  try {
+    await connectDB()
+    const admin = await requireSuperAdmin()
+    const parsed = PinRateInput.safeParse({ ngnPerUsd })
+    if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Check the rate" }
+    const rate = parsed.data.ngnPerUsd === null ? null : Math.round(parsed.data.ngnPerUsd * 100) / 100
+    await setPinnedNairaRate(rate, { id: admin.id, name: fullName(admin, admin.email) })
+    console.info(`[NairaRate] ${rate === null ? "pin cleared" : `pinned at ${rate}`} by admin ${admin.id}`)
+    revalidatePath("/admin/payments/espee")
+    revalidatePath("/dashboard/checkout")
+    return { success: true }
+  } catch (error) {
+    console.error("Admin set naira rate error:", error)
+    return { success: false, error: "Couldn't save the rate — try again" }
+  }
+}
+
 const RejectInput = z.object({
   paymentId: z.string().regex(OBJECT_ID, "Payment not found"),
   reason: z
@@ -992,7 +1177,7 @@ export async function adminRejectEspeePayment(
 ): Promise<{ success: true } | { success: false; error: string }> {
   try {
     await connectDB()
-    const admin = await requireAdmin()
+    const admin = await requireSuperAdmin()
 
     const parsed = RejectInput.safeParse({ paymentId, reason })
     if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Check the reason" }
@@ -1020,6 +1205,7 @@ export async function adminRejectEspeePayment(
     const checkoutPath = checkoutPathFor(courseId, rejected.packageKey ?? null)
 
     void sendEspeePaymentRejectedEmail({
+      methodLabel: transferLabel(rejected.method),
       to: learner?.email ?? "",
       firstName: learner?.firstName ?? "",
       courseTitle,

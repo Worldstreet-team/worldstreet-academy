@@ -42,6 +42,8 @@ export {
   MARKETPLACE_SHARE_OWN_LINK,
   MARKETPLACE_SHARE_ACADEMY,
   REFERRAL_COMMISSION_RATE,
+  REFERRAL_RATE_BY_PLAN,
+  referralRateFor,
 } from "./earning"
 export { Notification, type INotification, type NotificationType } from "./notification"
 export {
@@ -84,5 +86,7 @@ export {
 export { Recording, type IRecording, type RecordingStatus } from "./recording"
 export { PointEvent, type IPointEvent, type PointEventKind } from "./point-event"
 export { PartnerClick, type IPartnerClick } from "./partner-click"
+export { NairaRate, type INairaRate } from "./naira-rate"
+export { AccessGrant, type IAccessGrant, type AccessGrantStatus } from "./access-grant"
 export { Attendance, type IAttendance } from "./attendance"
 export { Cohort, type ICohort } from "./cohort"

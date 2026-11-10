@@ -4,12 +4,13 @@ import { ArrowRightIcon, PlayIcon, SearchXIcon } from "@/components/icons"
 import * as React from "react"
 import Link from "next/link"
 
-import { SCHOOLS, type SchoolSlug } from "@/lib/schools"
+import { SCHOOLS, type FromPrice, type SchoolSlug } from "@/lib/schools"
 import { BRAND } from "@/lib/brand"
 import { Segmented } from "@/components/ui/system"
 import { Reveal } from "@/components/marketing/motion/reveal"
 import { useMotionOK } from "@/components/marketing/motion/bus"
 import { cn } from "@/lib/utils"
+import { PackageDiscount } from "@/components/programs/package-offer"
 import { CoverMosaic } from "./cover-mosaic"
 import { IndexBar } from "./index-bar"
 import { SchoolRow, ProgramLink } from "./school-row"
@@ -28,8 +29,8 @@ export type IndexStats = {
   schools: number
   /** Programs across the seven schools. */
   programs: number
-  /** Cheapest way into any school's program, whole USD; null when none is priced. */
-  from: number | null
+  /** Cheapest way into any school's program, with its regular price; null when none is priced. */
+  from: FromPrice | null
   instructors: number
   /** Free preview lessons the closing section can play. */
   freeLessons: number
@@ -374,15 +375,10 @@ function Totals({ stats }: { stats: IndexStats }) {
   }
   if (stats.from !== null) {
     bits.push(
-      stats.from === 0 ? (
-        <>
-          <b className="font-semibold text-ws-primary">free</b> to start
-        </>
-      ) : (
-        <>
-          from <b className="font-semibold text-ws-primary">{usd(stats.from)}</b>
-        </>
-      )
+      <>
+        from <b className="font-semibold text-ws-primary">{usd(stats.from.price)}</b>{" "}
+        <PackageDiscount pkg={stats.from} chipClassName="hidden" />
+      </>
     )
   }
   if (stats.instructors > 0) {

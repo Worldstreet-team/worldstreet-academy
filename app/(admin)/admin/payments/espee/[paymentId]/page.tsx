@@ -25,6 +25,8 @@ import {
 } from "@/lib/actions/manual-payments"
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import { formatDate, formatDateTime, money, StatusBadge } from "@/components/admin/shared"
+// import { PAYMENT_WHATSAPP, TRANSFER_CHANNELS, … } — the destination details are commented out (transfers closed, CTO 2026-11-08)
+import { formatNairaRate, transferLabel } from "@/lib/payment-channels"
 
 /** One label/value line in the details card. */
 function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
@@ -37,7 +39,7 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
 }
 
 /**
- * One ESPEE payment proof (owner meeting 2026-10-03): the receipt beside what
+ * One transfer proof — ESPEE (owner meeting 2026-10-03), bank or USDT (2026-11-05): the receipt beside what
  * the learner says they sent. Approve opens the program and sends the
  * enrollment email; Reject emails the learner the reason, and they may try
  * again. Both are one-shot on the server — a second click is refused.
@@ -120,7 +122,7 @@ export default function AdminEspeePaymentDetailPage() {
             <div className="rounded-lg border border-ws-hairline bg-ws-surface p-6 text-center">
               <p className="text-sm font-medium">Payment not found</p>
               <Link href="/admin/payments/espee" className="mt-2 inline-block text-xs text-ws-muted hover:text-ws-primary hover:underline">
-                Back to ESPEE payments
+                Back to transfer payments
               </Link>
             </div>
           ) : (
@@ -226,7 +228,10 @@ export default function AdminEspeePaymentDetailPage() {
                     </div>
                     {!payment.receiptUrl ? (
                       <p className="rounded-lg bg-ws-raised px-3 py-6 text-center text-xs text-muted-foreground">
-                        The receipt can&apos;t be shown: the private resources bucket isn&apos;t configured.
+                        {payment.receiptOnWhatsApp
+                          ? // Was: `…send it on WhatsApp to ${PAYMENT_WHATSAPP.display}…` — the number is commented out (transfers closed, CTO 2026-11-08).
+                            "No receipt was uploaded: the learner was asked to send it on WhatsApp. Match it by the reference before approving."
+                          : "The receipt can't be shown: the private resources bucket isn't configured."}
                       </p>
                     ) : isPdf ? (
                       <div className="flex flex-col items-center gap-3 rounded-lg bg-ws-raised px-3 py-10 text-center">
@@ -260,9 +265,23 @@ export default function AdminEspeePaymentDetailPage() {
                       {payment.courseTitle}
                       {plan}
                     </DetailRow>
+                    <DetailRow label="Paid by">
+                      {transferLabel(payment.method)}
+                      {/* Transfers closed (CTO, 2026-11-08): the destination details are commented out in lib/payment-channels.ts.
+                      <span className="text-muted-foreground">
+                        {" "}
+                        · to {TRANSFER_CHANNELS[payment.method].details.map((d) => d.value).join(", ")}
+                      </span> */}
+                    </DetailRow>
                     <DetailRow label="Amount">
                       <span className="font-semibold tabular-nums">{payment.amountLabel}</span>
                       <span className="text-muted-foreground tabular-nums"> · {money(payment.amountMinor)}</span>
+                      {payment.nairaRate && (
+                        <span className="block text-[12px] text-muted-foreground tabular-nums">
+                          Quoted at {formatNairaRate(payment.nairaRate.ngnPerUsd)} per $1 (
+                          {payment.nairaRate.source === "pinned" ? "pinned rate" : "market rate"})
+                        </span>
+                      )}
                     </DetailRow>
                     <DetailRow label="Transfer reference">
                       <span className="font-mono text-[13px]">{payment.transferReference}</span>
@@ -279,6 +298,20 @@ export default function AdminEspeePaymentDetailPage() {
                         <span className="text-muted-foreground">Not given</span>
                       )}
                     </DetailRow>
+                    {payment.commission && (
+                      <DetailRow label="Partner commission">
+                        <span className="font-semibold tabular-nums">{money(payment.commission.netMinor)}</span>
+                        <span className="text-muted-foreground">
+                          {" "}
+                          ·{" "}
+                          {payment.commission.status === "pending"
+                            ? "pending, paid from the Academy's funds"
+                            : payment.commission.status === "cleared"
+                              ? "paid to the partner's wallet"
+                              : "reversed"}
+                        </span>
+                      </DetailRow>
+                    )}
                     {payment.orderReference && (
                       <DetailRow label="Order">
                         <span className="font-mono text-[12px]">{payment.orderReference}</span>
@@ -323,10 +356,13 @@ export default function AdminEspeePaymentDetailPage() {
           <DialogHeader>
             <DialogTitle>Approve this payment?</DialogTitle>
             <DialogDescription>
-              Approve only once you&apos;ve confirmed {payment?.amountLabel} arrived in the ESPEE account.{" "}
+              Approve only once you&apos;ve confirmed {payment?.amountLabel} arrived in the Academy&apos;s{" "}
+              {/* was: {payment ? TRANSFER_CHANNELS[payment.method].account : "account"} — commented out (transfers closed, CTO 2026-11-08) */}
+              {payment ? `${transferLabel(payment.method)} account` : "account"}.{" "}
               {payment?.learnerName} gets {payment?.courseTitle}
               {plan} straight away, plus the enrollment email with their sign-in details. No instructor earning is
-              recorded for ESPEE payments.
+              recorded for transfer payments. If a partner referred them, the partner&apos;s commission is booked
+              and paid from the Academy&apos;s own funds.
             </DialogDescription>
           </DialogHeader>
           {actionError && <p className="text-xs text-ws-danger">{actionError}</p>}

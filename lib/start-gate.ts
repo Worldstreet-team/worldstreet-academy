@@ -1,4 +1,15 @@
+import { ON_SALE_FILTER } from "@/lib/entitlements"
 import { schoolSlugOf } from "@/lib/schools"
+
+/**
+ * The courses whose enrollment opens the dashboard (owner voice note,
+ * 2026-11-02: "the official academy, where they pay to have access to the
+ * dashboard"): an Academy course — a school program or New Economy course —
+ * on sale. A marketplace (tutor) course or a legacy free course never opens
+ * it; its page still opens for a learner who also has an Academy enrollment.
+ * Legacy rows without a kind are programs, so `$ne` matches them.
+ */
+export const OPENS_DASHBOARD_FILTER = { ...ON_SALE_FILTER, kind: { $ne: "marketplace" } } as const
 
 /** First-party memory of a guest's landing-page choice (30 days). */
 export const START_SCHOOL_COOKIE = "wsa_school"
@@ -6,7 +17,7 @@ export const START_SCHOOL_COOKIE = "wsa_school"
 export type StartGateInput = {
   role: "USER" | "INSTRUCTOR" | "ADMIN"
   instructorStatus: "none" | "applied" | "interview" | "approved" | "rejected"
-  /** An active or completed enrollment — the only thing that opens the dashboard. */
+  /** An active or completed enrollment in an Academy course on sale (OPENS_DASHBOARD_FILTER) — the only thing that opens the dashboard. */
   hasAccess: boolean
   pathname: string
 }
@@ -33,7 +44,8 @@ const EXEMPT_PREFIXES = [
 
 /**
  * No dashboard without paying (owner meeting, 2026-10-03): a learner gets in
- * only with an active or completed enrollment. A saved school
+ * only with an active or completed enrollment in an Academy course on sale
+ * (OPENS_DASHBOARD_FILTER, 2026-11-02). A saved school
  * (EnrollmentIntent) or a reservation no longer opens it — intents are still
  * saved, for the pay-later reminders. Before that (owner, 2026-09-16; plan
  * D15) any enrollment or saved school was enough. Instructors, admins and

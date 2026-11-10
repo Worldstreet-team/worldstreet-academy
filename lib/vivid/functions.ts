@@ -233,11 +233,10 @@ const scrollToSection: VividFunctionConfig = {
 
 const searchCourses: VividFunctionConfig = {
   name: "searchCourses",
-  description: "Search/browse courses. Filter by level, pricing, category. Returns course list with IDs for navigation.",
+  description: "Search/browse courses. Filter by level, category. Returns course list with IDs for navigation.",
   parameters: params({
     search: str("Search term", false),
     level: enm("Difficulty", ["beginner", "intermediate", "advanced"], false),
-    pricing: enm("Price filter", ["free", "paid"], false),
     category: str("Category filter", false),
     sortBy: enm("Sort", ["popular", "newest", "rating", "price-low", "price-high"], false),
     limit: num("Max results (default 20)", false),
@@ -266,7 +265,7 @@ const getUserEnrollments: VividFunctionConfig = {
 
 const enrollInCourse: VividFunctionConfig = {
   name: "enrollInCourse",
-  description: "Enroll the user in a course. For free courses, enrolls directly. For paid courses, navigates to checkout.",
+  description: "Start enrolling the user in a course. Every course is paid, so this opens checkout.",
   parameters: params({ courseId: str("Course ID to enroll in", true) }),
   handler: noop,
   executionContext: "server",

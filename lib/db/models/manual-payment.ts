@@ -3,11 +3,12 @@ import type { PackageKey } from "./course"
 
 /**
  * A learner's proof of a payment made OUTSIDE the WorldStreet wallet — "Pay
- * with ESPEE" (owner meeting, 2026-10-03). The learner transfers ESPEE to the
- * Academy's account (1 ESPEE = $1), uploads the receipt and the transfer
- * reference, and an admin approves or rejects it. Approval writes the Order
- * (paymentMethod "espee") and the Enrollment; nothing here grants access by
- * itself.
+ * with ESPEE" (owner meeting, 2026-10-03), and since 2026-11-05 a bank
+ * transfer or USDT too (the programme document's payment details;
+ * lib/payment-channels.ts). The learner sends the money to the Academy's
+ * account, uploads the receipt and the transfer reference, and an admin
+ * approves or rejects it. Approval writes the Order (paymentMethod = this
+ * row's method) and the Enrollment; nothing here grants access by itself.
  *
  * State machine (history[] records every transition, Order-style):
  *   submitted → approved
@@ -20,7 +21,7 @@ import type { PackageKey } from "./course"
  */
 
 export type ManualPaymentStatus = "submitted" | "approved" | "rejected"
-export type ManualPaymentMethod = "espee"
+export type ManualPaymentMethod = "espee" | "bank" | "usdt_trc20" | "usdt_bep20"
 
 export interface IManualPaymentTransition {
   status: ManualPaymentStatus
@@ -42,10 +43,17 @@ export interface IManualPayment extends Document {
   amountMinor: number
   currency: string
   method: ManualPaymentMethod
-  /** What the learner was asked to send, e.g. "49 ESPEE". */
+  /** What the learner was asked to send, e.g. "49 ESPEE", "49 USDT", "₦65,978 ($49)", or "$49 in naira" with no rate. */
   amountLabel: string
-  receiptKey: string
-  receiptContentType: string
+  /** A bank transfer's quote (2026-11-05): naira per $1, whose rate it was, and the whole naira asked for. Null otherwise, and on older rows. */
+  ngnPerUsd: number | null
+  rateSource: "pinned" | "market" | null
+  amountNgn: number | null
+  /** The partner code in the learner's `wsa_ref` cookie when they submitted — approval runs in the admin's request, so it is kept here. */
+  referralCode: string | null
+  /** The uploaded receipt's key; null when it went on WhatsApp instead (no private bucket — 2026-11-05). */
+  receiptKey: string | null
+  receiptContentType: string | null
   transferReference: string
   note: string
   status: ManualPaymentStatus
@@ -68,10 +76,14 @@ const ManualPaymentSchema = new Schema<IManualPayment>(
     packageName: { type: String, default: null },
     amountMinor: { type: Number, required: true, min: 1 },
     currency: { type: String, default: "USD" },
-    method: { type: String, enum: ["espee"], default: "espee" },
+    method: { type: String, enum: ["espee", "bank", "usdt_trc20", "usdt_bep20"], default: "espee" },
     amountLabel: { type: String, required: true },
-    receiptKey: { type: String, required: true },
-    receiptContentType: { type: String, required: true },
+    ngnPerUsd: { type: Number, default: null },
+    rateSource: { type: String, enum: [null, "pinned", "market"], default: null },
+    amountNgn: { type: Number, default: null },
+    referralCode: { type: String, default: null, maxlength: 24 },
+    receiptKey: { type: String, default: null },
+    receiptContentType: { type: String, default: null },
     transferReference: { type: String, required: true, maxlength: 120 },
     note: { type: String, default: "", maxlength: 500 },
     status: { type: String, enum: ["submitted", "approved", "rejected"], default: "submitted" },

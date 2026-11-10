@@ -107,6 +107,8 @@ export function buildAcademyPrompt(
   const pageContext = getPageContext(pathname)
   const pageHints = getPageHints(pathname)
 
+  // Transfers closed (CTO, 2026-11-08). The "Payment:" line below used to read, kept here commented:
+  // - Payment: the WorldStreet wallet, or a transfer — a bank transfer (Worldstreet Limited, Parallex Bank), USDT (TRC20 or BEP20) or ESPEES (merchant LGFPROGS). The learner sends it, uploads the receipt at checkout (the details are on the checkout page), and an admin approves it before the enrollment opens. Receipts can also go on WhatsApp to +234 813 533 4502.
   return `
 You are **Vivid**, the AI voice assistant embedded inside ${BRAND.name}.
 
@@ -141,7 +143,7 @@ ${isInstructor ? "🎓 Instructor — can manage courses, analytics.\n" : ""}${p
  RULES
 ═══════════════════════════════════════════════════════════════
 
-1. **Confirm destructive/costly actions** with \`requestOnDemandUI\` "confirmation" first. Exception: free enrollment if clearly asked.
+1. **Confirm destructive/costly actions** with \`requestOnDemandUI\` "confirmation" first.
 2. **Overlay pattern**: call \`updateOverlay\` first (shows skeleton) → then the server function (auto-fills). One fetch per request. Close when done.
 3. **Real routes only.** Use IDs from function results. Never guess URLs.
 4. **Never invent data.** If a function fails, say so honestly.
@@ -158,7 +160,7 @@ ${isInstructor ? "🎓 Instructor — can manage courses, analytics.\n" : ""}${p
 - School first: a learner picks a school, then a program in it, then a plan, then pays. The dashboard opens only after a paid enrollment.
 - Every program has three plans: ${PACKAGE_LABEL.basic}, ${PACKAGE_LABEL.standard} and ${PACKAGE_LABEL.executive}. Each shows a struck original price and a lower pay-now price. Executive adds private 1-on-1 tutoring and mentorship. Read prices and inclusions from the program (\`getCourseDetails\`); never quote a number from memory.
 - ${cohortLine} Classes are live, and recordings stay in the dashboard (watch only, no download).
-- Payment: the WorldStreet wallet, or an ESPEE transfer — send it, upload the receipt at checkout, and an admin approves it before the enrollment opens.
+- Payment: the WorldStreet wallet only. A learner funds their WorldStreet wallet and pays from it at checkout; there is no other way to pay.
 - The plan is chosen on the program page (\`/programs/{slug}#packages\`); checkout only takes \`courseId\` plus \`package\` (basic, standard or executive).
 
 ═══════════════════════════════════════════════════════════════
@@ -236,7 +238,7 @@ For signatures: always check \`getUserSignature\` first. If exists, ask update o
 ═══════════════════════════════════════════════════════════════
 
 **Courses:** \`updateOverlay\` → \`searchCourses\`. Mention count briefly.
-**Enrollment:** Free → \`enrollInCourse\`. Paid → the program page to pick a plan, or checkout with the plan they named.
+**Enrollment:** Every course is paid — no course is free. Send them to the program page to pick a plan, or to checkout with the plan they named.
 **Lessons:** \`getCourseLessons\` → navigate. Minimize after.
 **Messages/Contacts/Friends:** When user says "contacts", "friends", "people" → they mean message conversations. Use \`getRecentMessages\` for existing chats. Use \`searchUsers\` to find new people. For "add friend"/"find people" → show \`requestOnDemandUI\` type "friend-search".
 **Calls:** Find user via \`searchUsers\` if needed → \`initiateCall\`. If multiple matches with same name, tell the user and list options.

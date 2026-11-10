@@ -6,7 +6,7 @@
  *   node scripts/mastery-catalogue.mjs           # dry run — prints the plan
  *   node scripts/mastery-catalogue.mjs --apply   # writes
  *
- * Phase 13 (D21): the 12 programs are filed under the seven schools, and
+ * Phase 13 (D21): the programs are filed under the seven schools, and
  * `category` is the school's short label. Run `migrate-schools-v2.mjs` first;
  * never run a pre-Phase 13 copy of this script after it (it would move the
  * programs back to retired slugs). Each MATCH prints `school: <existing> -> <new>`.
@@ -15,7 +15,7 @@
  * db.collection("courses"), --apply gate). Differs from it in one way that
  * matters: this script never archives or deletes, and every program is
  * diffed and written individually (rather than one bulk insertMany) because
- * each of the 12 needs its own match/insert/rename decision and slug check.
+ * each program needs its own match/insert/rename decision and slug check.
  *
  * This is a plain .mjs maintenance script — it cannot import the app's TS,
  * so the shapes below are duplicated literally from:
@@ -38,15 +38,30 @@
  * never touches thumbnailUrl, status, instructor, enrolledCount or rating on
  * an existing row, and never deletes or archives anything.
  *
- * Plans (institutional blueprint §9, decision D23; prices from Owen,
- * 2026-10-28, replacing the 2026-10-03 49/199/999 ladder): every one of the
- * 12 programs sells the same three plans — Basic "Foundation" $49 (4 weeks),
- * Standard "Mastery" $99 (8–12 weeks, the highlighted "most popular") and
- * Executive "Personalized Mastery" $199 (Flexible schedule). `price` is what
- * checkout charges. `listPrice` (a struck-through "was" price) is null: the
- * blueprint's $300/$1,000/$10,000 fees are not used, so no plan shows one. Basic = recorded classes,
- * assignments, assessments and the certificate (BASIC_TIER) — no live classes
- * and no instructor Q&A; Standard is STANDARD_TIER; Executive is FULL. Every
+ * Programs (Owen, 2026-11-05: "follow the document"): the 11 cohort courses of
+ * the programme document of 13 Sept 2026 ("Complete Programme Structure", §1),
+ * plus "E-Commerce & Digital Business", which the document doesn't list. The
+ * team kept it later that day: "Keep it, provided it remains part of the
+ * approved programme catalogue. It aligns with the School of Digital Business
+ * and should remain visible as a programme". It's a cohort course like the
+ * other 11. "Cybersecurity" is renamed "Cybersecurity Mastery" as the document
+ * names it.
+ *
+ * Plans (institutional blueprint §9, decision D23; prices from the programme
+ * document, Owen 2026-11-05, replacing the 2026-10-28 49/99/199 list): every
+ * program sells the same three plans — Basic "Foundation" $49, Standard
+ * "Mastery" $199 (the highlighted "most popular") and Executive "Personalized
+ * Mastery" $999, each running 9 weeks (team, 2026-11-04: "9 weeks, every
+ * program"). `price` is what
+ * checkout charges. `listPrice` is each plan's regular price, shown struck
+ * through beside it with the saving (Owen, 2026-11-03: the blueprint's
+ * $300/$1,000/$10,000 "are the actual prices"; the plans sell at a discount
+ * from them) — PROGRAM_REGULAR_PRICE in lib/entitlements.ts. Basic = live
+ * classes, recorded classes, instructor Q&A, assignments, assessments and the
+ * certificate (BASIC_TIER; team call 2026-11-04: "the basic package is also
+ * live class including Q&A"); Standard is STANDARD_TIER; Executive is
+ * EXECUTIVE_TIER, strictly one-on-one with no group classes or their
+ * recordings (client, 2026-11-05: answer 5B; Owen: no recordings either). Every
  * program gets the one §9 feature list per plan (BASIC_FEATURES,
  * STANDARD_FEATURES, EXECUTIVE_FEATURES); Executive keeps the owner's two
  * extra promises, "Lifetime mentorship access" and "Access to the signal
@@ -76,8 +91,8 @@
  *
  * - PRICE: applying this changes what existing programs charge and what
  *   each price buys — e.g. a single-package program at 99 (full access)
- *   becomes Basic 49 (recorded classes, assignments, assessments and the
- *   certificate, but no live classes or Q&A), Standard 99 and Executive 199 (full access) — see the boxed WARNING printed
+ *   becomes Basic 49 (live and recorded classes, Q&A, assignments, assessments
+ *   and the certificate), Standard 199 and Executive 999 (full access) — see the boxed WARNING printed
  *   at the top of every run, which lists each program's scalar price and
  *   enabled plan prices, current -> new. Any --apply that would change an
  *   *existing* row's scalar price OR its enabled plan prices (mock DBs
@@ -161,10 +176,16 @@ const SCHOOLS = {
 
 // ---- duplicated from lib/db/models/course.ts (ICoursePackage / IPackageEntitlements) ----
 const FULL = { liveClasses: true, instructorQa: true, assignments: true, certificate: true, mentorship: true, prioritySupport: true, recordings: true }
-// Basic (institutional blueprint §9, D23): recorded classes, assignments, assessments and the certificate — no live classes, no instructor Q&A.
-const BASIC_TIER = { liveClasses: false, instructorQa: false, assignments: true, certificate: true, mentorship: false, prioritySupport: false, recordings: true }
+// Basic (blueprint §9, D23; team call 2026-11-04: "the basic package is also live class including Q&A"):
+// live classes, recorded classes, instructor Q&A, assignments, assessments and the certificate. The same
+// services as Standard — Standard goes further in the curriculum (its lessons can be set "Standard and up").
+const BASIC_TIER = { liveClasses: true, instructorQa: true, assignments: true, certificate: true, mentorship: false, prioritySupport: false, recordings: true }
 // Standard-tier ladder rung: live classes + recordings + Q&A + assignments + certificate, no mentorship/priority support.
 const STANDARD_TIER = { liveClasses: true, instructorQa: true, assignments: true, certificate: true, mentorship: false, prioritySupport: false, recordings: true }
+// Executive (client, 2026-11-05, answer 5B: "strictly one-on-one, without access to general group live
+// classes"; Owen: no group recordings either): the full curriculum, one-on-one mentorship sessions
+// (private meetings, never gated on liveClasses), Q&A, assignments, the certificate and priority support.
+const EXECUTIVE_TIER = { liveClasses: false, instructorQa: true, assignments: true, certificate: true, mentorship: true, prioritySupport: true, recordings: false }
 
 function pkg(key, name, tagline, price, features, entitlements, { highlight = false, ctaLabel = null, enabled = true, listPrice = null, duration = null } = {}) {
   return { key, name, tagline, price, listPrice, duration, features, highlight, ctaLabel, enabled, entitlements }
@@ -180,7 +201,7 @@ function minEnabledPrice(packages) {
 // Ladder order, as lib/entitlements.ts PACKAGE_RANK.
 const RANK = { basic: 1, standard: 2, executive: 3 }
 
-/** "49/99/199" — a row's enabled package prices in ladder order; "none" when it sells none. */
+/** "49/199/999" — a row's enabled package prices in ladder order; "none" when it sells none. */
 function ladderPrices(packages) {
   const enabled = (packages ?? [])
     .filter((p) => p.enabled !== false)
@@ -189,36 +210,44 @@ function ladderPrices(packages) {
 }
 
 // ---------------------------------------------------------------------------
-// The three plans every program sells. Prices are Owen's (2026-10-28):
-// `price` is what checkout charges; `listPrice` stays null (no struck-through
-// "was" price — the blueprint's $300/$1,000/$10,000 fees are not used).
-// Everything else is institutional blueprint §9 and decision D23: Foundation
-// (4 weeks), Mastery (8–12 weeks), Personalized Mastery (Flexible schedule).
-// Basic = recorded classes, assignments, assessments and the certificate, with
-// no live classes and no instructor Q&A. Every program gets the same §9 feature
-// list per plan (the program's subject lives on in whatYouWillLearn); Executive
+// The three plans every program sells. Prices are the programme document's
+// (13 Sept; Owen, 2026-11-05: "use this"):
+// `price` is what checkout charges; `listPrice` is the regular price it is
+// discounted from, shown struck through (Owen, 2026-11-03: $300/$1,000/$10,000).
+// Both must equal PROGRAM_PRICE_LIST and PROGRAM_REGULAR_PRICE in lib/entitlements.ts.
+// Everything else is institutional blueprint §9 and decision D23 (Foundation,
+// Mastery, Personalized Mastery), with two changes from the team call of
+// 2026-11-04: every plan runs 9 weeks ("9 weeks, every program", replacing
+// 4 weeks / 8–12 weeks / Flexible schedule), and Basic includes live classes,
+// workshops and instructor Q&A. Every program gets the same §9 feature list
+// per plan (the program's subject lives on in whatYouWillLearn); Executive
 // keeps the owner's two extra promises, "Lifetime mentorship access" and
-// "Access to the signal group".
+// "Access to the signal group". Executive is strictly one-on-one (client,
+// 2026-11-05), so it no longer says "Everything in Standard" (that list
+// promises the live cohort).
 // ---------------------------------------------------------------------------
 
+const PLAN_DURATION = "9 weeks"
+
 const BASIC_FEATURES = [
-  "Foundation lessons", "Core concepts", "Selected recorded classes", "Learning materials", "Student community",
-  "Basic assignments", "Basic assessments", "Student dashboard", "Certificate of completion where applicable",
+  "Foundation lessons", "Core concepts", "Live classes and workshops", "Selected recorded classes", "Instructor Q&A",
+  "Learning materials", "Student community", "Basic assignments", "Basic assessments", "Student dashboard",
+  "Certificate of completion where applicable",
 ]
 const STANDARD_FEATURES = [
   "Everything in Basic", "Beginner-to-advanced curriculum", "Full live cohort", "Practical assignments", "Projects",
   "Instructor interaction", "Assessments", "Mentorship in your live cohort", "Advanced resources and community",
 ]
 const EXECUTIVE_FEATURES = [
-  "Everything in Standard", "Dedicated/private tutor", "One-on-one sessions", "Personalized learning plan",
+  "The full Standard curriculum", "Dedicated/private tutor", "Strictly one-on-one sessions", "Personalized learning plan",
   "Flexible scheduling", "Individual feedback", "Private mentorship", "Progress reviews", "Personalized projects",
   "Executive community", "Premium support", "Lifetime mentorship access", "Access to the signal group",
 ]
 
 const PLAN = {
-  basic: { label: "Basic", tagline: "Foundation", price: 49, listPrice: null, duration: "4 weeks", entitlements: BASIC_TIER, features: BASIC_FEATURES, highlight: false, ctaLabel: null },
-  standard: { label: "Standard", tagline: "Mastery", price: 99, listPrice: null, duration: "8–12 weeks", entitlements: STANDARD_TIER, features: STANDARD_FEATURES, highlight: true, ctaLabel: null },
-  executive: { label: "Executive", tagline: "Personalized Mastery", price: 199, listPrice: null, duration: "Flexible schedule", entitlements: FULL, features: EXECUTIVE_FEATURES, highlight: false, ctaLabel: "Apply / Enrol for $199" },
+  basic: { label: "Basic", tagline: "Foundation", price: 49, listPrice: 300, duration: PLAN_DURATION, entitlements: BASIC_TIER, features: BASIC_FEATURES, highlight: false, ctaLabel: null },
+  standard: { label: "Standard", tagline: "Mastery", price: 199, listPrice: 1000, duration: PLAN_DURATION, entitlements: STANDARD_TIER, features: STANDARD_FEATURES, highlight: true, ctaLabel: null },
+  executive: { label: "Executive", tagline: "Personalized Mastery", price: 999, listPrice: 10000, duration: PLAN_DURATION, entitlements: EXECUTIVE_TIER, features: EXECUTIVE_FEATURES, highlight: false, ctaLabel: "Apply / Enrol for $999" },
 }
 
 /** A program's three plans from its plan names: `{ basic, standard, executive }`; everything else comes from PLAN. */
@@ -311,7 +340,8 @@ const PROGRAMS = [
     newInsertDraft: false, spec: null, buildPackages: () => genericLadder("App Development"),
   },
   {
-    title: "Cybersecurity", legacyTitles: [], school: "technology-ai",
+    // Named as the programme document names it (13 Sept); production holds "Cybersecurity".
+    title: "Cybersecurity Mastery", legacyTitles: ["Cybersecurity"], school: "technology-ai",
     newInsertDraft: false, spec: null, buildPackages: () => genericLadder("Cybersecurity"),
   },
   {
@@ -324,15 +354,19 @@ const PROGRAMS = [
   },
   {
     title: "Video Editing Mastery", legacyTitles: [], school: "creative-economy",
-    newInsertDraft: true, spec: null, buildPackages: () => genericLadder("Video Editing"),
+    // One of the document's 11 cohort courses: a fresh install publishes it.
+    newInsertDraft: false, spec: null, buildPackages: () => genericLadder("Video Editing"),
   },
   {
     title: "Tech Sales & Digital Marketing", legacyTitles: [], school: "digital-business",
     newInsertDraft: false, spec: null, buildPackages: () => genericLadder("Tech Sales & Marketing"),
   },
   {
+    // Not in the programme document (13 Sept), but kept by the team on
+    // 2026-11-05 as part of the approved catalogue, visible as a program, so a
+    // fresh install publishes it.
     title: "E-Commerce & Digital Business", legacyTitles: [], school: "digital-business",
-    newInsertDraft: true, spec: null, buildPackages: () => genericLadder("E-Commerce"),
+    newInsertDraft: false, spec: null, buildPackages: () => genericLadder("E-Commerce"),
   },
   {
     title: "Virtual Assistance", legacyTitles: [], school: "digital-business",
@@ -406,8 +440,9 @@ async function resolveExisting(program) {
 }
 
 // ---------------------------------------------------------------------------
-// Plan diff: what a MATCH row's plans would change, field by field (price and
-// list price excluded — the price gate and the WARNING block cover those).
+// Plan diff: what a MATCH row's plans would change, field by field (price
+// excluded — the price gate and the WARNING block cover it; the regular price
+// is display-only and listed here).
 // `losses` lists every flag an existing plan has on that the new plan turns off.
 // ---------------------------------------------------------------------------
 
@@ -426,6 +461,7 @@ function diffPlans(current, next) {
     if (cur.name !== plan.name) parts.push(`name "${cur.name}" -> "${plan.name}"`)
     if (cur.tagline !== plan.tagline) parts.push(`tagline "${cur.tagline}" -> "${plan.tagline}"`)
     if ((cur.duration ?? null) !== (plan.duration ?? null)) parts.push(`duration ${quoted(cur.duration)} -> ${quoted(plan.duration)}`)
+    if ((cur.listPrice ?? null) !== (plan.listPrice ?? null)) parts.push(`regular price ${cur.listPrice ?? "none"} -> ${plan.listPrice ?? "none"}`)
     if (Boolean(cur.enabled) !== Boolean(plan.enabled)) parts.push(`enabled ${Boolean(cur.enabled)} -> ${Boolean(plan.enabled)}`)
     const flags = []
     for (const flag of Object.keys(FULL)) {
@@ -580,11 +616,14 @@ console.log(
     boxed([
       "WARNING — price-derivation script",
       "",
-      "Every program is set to Owen's three plans (2026-10-28):",
+      "Every program is set to the programme document's three plans (Owen, 2026-11-05):",
       `  ${["basic", "standard", "executive"].map((k) => `${PLAN[k].label} ${usd(PLAN[k].price)}`).join(" · ")}`,
       "and its scalar price is derived from them (the cheapest enabled plan).",
-      "Basic now includes recorded classes, assignments, assessments and the",
-      "certificate, but no live classes or instructor Q&A (full access = Executive).",
+      "Every plan runs 9 weeks. Basic includes live and recorded classes,",
+      "instructor Q&A, assignments, assessments and the certificate",
+      "(existing Basic learners gain live classes and Q&A). Executive is strictly",
+      "one-on-one: existing Executive learners LOSE group live classes and their",
+      "recordings (client, 2026-11-05), so --apply needs --allow-access-loss.",
       "Production runs follow docs/launch-runbook.md §6 (owner-executed).",
       "",
       "Per program: scalar price current -> derived · enabled plan prices current -> new",

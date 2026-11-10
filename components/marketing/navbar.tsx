@@ -11,7 +11,7 @@ import { countProgramsBySchool } from "@/lib/schools"
 import { needsSchoolChoice } from "@/lib/start-gate"
 import { getStartGateState } from "@/lib/start-gate-state"
 import { getSellerStatus } from "@/lib/seller"
-import { SELLER_HOME } from "@/lib/marketplace"
+import { MARKETPLACE_OPEN, SELLER_HOME } from "@/lib/marketplace"
 import { BRAND } from "@/lib/brand"
 import { BrandLockup } from "@/components/shared/brand-lockup"
 import { cn } from "@/lib/utils"
@@ -58,18 +58,22 @@ export async function Navbar({ showFaculty }: { showFaculty: boolean }) {
   // Below lg every destination lives in the sheet (in journey order, spec
   // §17); "How it works" is a landing anchor, so it lives only there. Cohorts
   // and the two ways to teach follow the corrections brief's menu (§3,
-  // 2026-10-28): Academy faculty apply at /teach, anyone sells at /sell.
+  // 2026-10-28): anyone sells at /sell. Staff tutor hiring is a job, posted
+  // on /careers from the footer, never in this menu (owner, 2026-11-05). The
+  // Marketplace (while MARKETPLACE_OPEN is off) and the Opportunity Hub are
+  // Coming soon (owner voice note, 2026-11-02): listed with a chip, linking
+  // to their Coming soon pages, and nobody is invited to sell yet.
   const sheetLinks: MarketingNavLink[] = [
     { href: "/academy", label: "The Academy" },
     { href: "/schools", label: "All schools" },
     { href: "/programs", label: "All programs" },
     { href: "/calendar", label: "Cohorts" },
-    { href: "/marketplace", label: "Marketplace" },
-    { href: "/new-economy", label: "New Economy — free" },
+    { href: "/new-economy", label: "New Economy" },
     ...(showFaculty ? [{ href: "/faculty", label: "Faculty" }] : []),
     { href: "/#how-it-works", label: "How it works" },
-    { href: "/teach", label: "Become an Instructor" },
-    { href: "/sell", label: "Sell on the marketplace" },
+    { href: "/marketplace", label: "Marketplace", soon: !MARKETPLACE_OPEN },
+    { href: "/opportunity-hub", label: "Opportunity Hub", soon: true },
+    ...(MARKETPLACE_OPEN ? [{ href: "/sell", label: "Sell on the marketplace" }] : []),
     ...(user && !gated ? [{ href: "/dashboard", label: "My Learning" }] : []),
     ...(isInstructor ? [{ href: "/instructor", label: "Instructor Dashboard" }] : []),
     ...(isSeller ? [{ href: SELLER_HOME, label: "Creator area" }] : []),
@@ -95,8 +99,11 @@ export async function Navbar({ showFaculty }: { showFaculty: boolean }) {
       <NavSearch className="hidden min-w-0 max-w-md flex-1 md:block" />
 
       <div className="flex shrink-0 items-center gap-1 sm:gap-1.5 md:ml-auto">
-        {/* Text links from lg: The Academy, Programs and the Marketplace (the
-            Academy's two halves, owner 2026-10-03). Measured at 1024: the
+        {/* Text links from lg: The Academy, Programs and — once it opens
+            (MARKETPLACE_OPEN) — the Marketplace (owner 2026-10-03). While it
+            is Coming soon it and the Opportunity Hub sit under "Coming soon"
+            in Explore schools instead: the bar has no room for two more
+            links and their chips at 1024 (measured 2026-11-03). Measured at 1024: the
             links take px-2 until xl (px-3 after) so the three fit on one
             line with the search still ~90px wide, no wrap and no overflow;
             with Faculty too the search would vanish, so Faculty — and a
@@ -110,9 +117,11 @@ export async function Navbar({ showFaculty }: { showFaculty: boolean }) {
           <Link href="/programs" className={barLinkClass}>
             Programs
           </Link>
-          <Link href="/marketplace" className={barLinkClass}>
-            Marketplace
-          </Link>
+          {MARKETPLACE_OPEN && (
+            <Link href="/marketplace" className={barLinkClass}>
+              Marketplace
+            </Link>
+          )}
           {showFaculty && (
             <Link
               href="/faculty"

@@ -11,8 +11,28 @@
  * Server-only seller reads are in lib/seller.ts.
  */
 import type { CourseFormat } from "@/lib/course-format"
+import type { CourseKind } from "@/lib/db/models"
 
 import { SCHOOLS } from "@/lib/schools"
+
+/**
+ * The marketplace — the tutors' platform — is "Coming soon" while the official
+ * Academy launches (owner voice note, 2026-11-02: "it's not supposed to be part
+ * of the official academy… you can put that as coming soon"). While closed,
+ * nothing public lists, shows or sells a marketplace course: /marketplace is a
+ * Coming soon page, /sell and the seller application send there, course pages
+ * 404, and checkout, ESPEE, pre-enrolment and Vivid refuse. Authoring and admin
+ * review keep working, so courses are ready when it opens. True reopens it.
+ */
+export const MARKETPLACE_OPEN: boolean = false
+
+/** Mongo filter for public course reads: leaves out marketplace courses while it is closed. */
+export const OPEN_KINDS_FILTER: Record<string, unknown> = MARKETPLACE_OPEN ? {} : { kind: { $ne: "marketplace" } }
+
+/** Whether a course of this kind may be shown or sold now (a missing kind is a program). */
+export function kindIsOpen(kind: CourseKind | null | undefined): boolean {
+  return MARKETPLACE_OPEN || kind !== "marketplace"
+}
 
 /** Where an approved seller lands in the instructor area — the only home they have there. */
 export const SELLER_HOME = "/instructor/courses"
@@ -78,14 +98,13 @@ export function isMarketplaceSort(value: unknown): value is MarketplaceSort {
   return typeof value === "string" && MARKETPLACE_SORTS.some((s) => s.value === value)
 }
 
-/** The marketplace's URL state: `?q=&school=&format=&price=&level=&sort=`. */
+/** The marketplace's URL state: `?q=&school=&format=&level=&sort=`. No price filter: no course is free. */
 export type MarketplaceFilterValues = {
   q: string
   /** A school slug, used as the course's topic; "" = every topic. */
   school: string
   /** A marketplace format; "" = every format. */
   format: "" | CourseFormat
-  price: "" | "free" | "paid"
   level: "" | "beginner" | "intermediate" | "advanced"
   sort: MarketplaceSort
 }
@@ -96,7 +115,6 @@ export function marketplaceHref(values: Partial<MarketplaceFilterValues>): strin
   if (values.q?.trim()) params.set("q", values.q.trim())
   if (values.school) params.set("school", values.school)
   if (values.format) params.set("format", values.format)
-  if (values.price) params.set("price", values.price)
   if (values.level) params.set("level", values.level)
   if (values.sort && values.sort !== "popular") params.set("sort", values.sort)
   const query = params.toString()

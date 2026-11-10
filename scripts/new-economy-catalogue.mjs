@@ -1,18 +1,20 @@
 /**
- * Install the New Economy courses (owner meeting, 2026-10-03): one FREE
- * course per WorldStreet product, explaining how to use it. They land as
- * DRAFTS for the team to fill with lessons and publish from the editor.
+ * Install the New Economy courses (owner meeting, 2026-10-03): one course per
+ * WorldStreet product, explaining how to use it. They land as unpriced DRAFTS
+ * for the team to fill with lessons, price and publish from the editor — no
+ * course is free (owner, 2026-11-03), so the editor asks for a price before it
+ * saves and nothing unpriced can be published.
  *
  *   node scripts/new-economy-catalogue.mjs --owner <admin email>                          # dry run
  *   MONGODB_URI=<uri> node scripts/new-economy-catalogue.mjs --owner <admin email> --apply  # writes
  *
  * Modeled on scripts/mastery-catalogue.mjs (dotenv, raw db.collection
  * writes, an --apply gate). What it does:
- *   - INSERT a missing course as a draft: kind "new-economy", pricing "free",
- *     price 0, no packages, owned by the --owner ADMIN.
+ *   - INSERT a missing course as a draft: kind "new-economy", pricing "paid",
+ *     price 0 (unpriced), no packages, owned by the --owner ADMIN.
  *   - On MATCH (same title, kind "new-economy") $set only what makes it a
- *     New Economy course — kind, free pricing, no packages, school/category —
- *     and the one-line copy. Never status, owner, lessons, art or counters.
+ *     New Economy course — kind, no packages, school/category — and the
+ *     one-line copy. Never its price, status, owner, lessons, art or counters.
  * It NEVER publishes, never unpublishes and never deletes. Idempotent: a
  * re-run after a clean run reports 0 modifications.
  *
@@ -118,7 +120,7 @@ for (const c of COURSES) {
 }
 
 const description = (line) =>
-  `${line} A free New Economy course from ${BRAND_NAME}: short lessons, at your own pace.`
+  `${line} A New Economy course from ${BRAND_NAME}: short lessons, at your own pace.`
 
 const slugify = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "")
 
@@ -167,8 +169,6 @@ for (const course of COURSES) {
     const row = ours[0]
     const setDoc = {
       kind: "new-economy",
-      pricing: "free",
-      price: 0,
       packages: [],
       school: null,
       category: CATEGORY,
@@ -207,7 +207,8 @@ for (const course of COURSES) {
     previewVideoUrl: null,
     instructor: owner._id,
     level: "beginner",
-    pricing: "free",
+    // Unpriced: not on sale until the team sets a price in the editor.
+    pricing: "paid",
     price: 0,
     currency: "USD",
     status: "draft",
@@ -235,7 +236,7 @@ for (const course of COURSES) {
   }
 
   console.log(`\nINSERT ${course.title}`)
-  console.log(`  slug: "${doc.slug}" · status: draft · free · owner: ${owner.email}`)
+  console.log(`  slug: "${doc.slug}" · status: draft · unpriced · owner: ${owner.email}`)
   counts.inserted++
   if (APPLY) await courses.insertOne(doc)
 }

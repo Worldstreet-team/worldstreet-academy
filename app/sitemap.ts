@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next"
 import { appUrl } from "@/lib/app-url"
 import { SCHOOLS } from "@/lib/schools"
 import { FACULTY_PUBLIC, facultyHref } from "@/lib/faculty"
+import { MARKETPLACE_OPEN } from "@/lib/marketplace"
 import { fetchBrowseCourses, fetchFaculty } from "@/lib/actions/student"
 
 // Programs and faculty change with publishing and roles — read them per
@@ -12,7 +13,8 @@ export const revalidate = 0
  * /sitemap.xml — the indexable public pages: home, the schools, every
  * published program (the set /programs lists), the marketplace and New
  * Economy with their published courses (whose pages are /programs/<slug>
- * too), /calendar, /sell, /teach, /certification and, while faculty exists and is public (FACULTY_PUBLIC),
+ * too — the marketplace and /sell only while MARKETPLACE_OPEN), /calendar,
+ * /careers, /certification and, while faculty exists and is public (FACULTY_PUBLIC),
  * /faculty and each profile. Never /verify
  * (student names, noindex), the signed-in apps, /login, /register or the /courses redirects. No
  * lastModified: BrowseCourse carries no update time, and a guess would be false.
@@ -32,13 +34,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...SCHOOLS.map((school) => ({ url: appUrl(`/schools/${school.slug}`) })),
     { url: appUrl("/programs") },
     ...programs.map((program) => ({ url: appUrl(`/programs/${program.slug}`) })),
-    { url: appUrl("/marketplace") },
+    ...(MARKETPLACE_OPEN ? [{ url: appUrl("/marketplace") }, { url: appUrl("/sell") }] : []),
     ...marketplace.map((course) => ({ url: appUrl(`/programs/${course.slug}`) })),
     { url: appUrl("/new-economy") },
     ...newEconomy.map((course) => ({ url: appUrl(`/programs/${course.slug}`) })),
     { url: appUrl("/calendar") },
-    { url: appUrl("/sell") },
-    { url: appUrl("/teach") },
+    { url: appUrl("/careers") },
     { url: appUrl("/certification") },
     ...(faculty.length > 0
       ? [{ url: appUrl("/faculty") }, ...faculty.map((member) => ({ url: appUrl(facultyHref(member.username)) }))]

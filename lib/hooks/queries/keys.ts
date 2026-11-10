@@ -81,6 +81,10 @@ export const queryKeys = {
   adminEspeePayments: (filters?: { status?: string; page?: number }) =>
     filters ? (["admin", "espee-payments", filters] as const) : (["admin", "espee-payments"] as const),
   adminEspeePaymentDetail: (id: string) => ["admin", "espee-payment", id] as const,
+  adminNairaRate: ["admin", "naira-rate"] as const,
+  adminPaidLearnerPrograms: ["admin", "paid-learners", "programs"] as const,
+  adminPaidLearners: (filters?: { status?: string; search?: string; page?: number }) =>
+    filters ? (["admin", "paid-learners", "list", filters] as const) : (["admin", "paid-learners", "list"] as const),
   adminSellerApplications: (filters?: { status?: string; page?: number }) =>
     filters ? (["admin", "seller-applications", filters] as const) : (["admin", "seller-applications"] as const),
   adminFacultyProfile: (userId: string) => ["admin", "faculty-profile", userId] as const,

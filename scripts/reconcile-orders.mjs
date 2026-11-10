@@ -57,9 +57,14 @@ const enrollments = db.collection("enrollments")
 
 const problems = []
 const healed = []
-// ESPEE orders never touch the wallet (no chargeId by design) — nothing to reconcile.
+// Transfer orders (ESPEE, bank, USDT, and payments an admin recorded from
+// outside the platform) never touch the wallet (no chargeId by design) —
+// nothing to reconcile. Keep in step with TRANSFER_METHODS in lib/payment-channels.ts.
 const paidOrders = await orders
-  .find({ status: { $in: ["paid", "enrolled", "refunded"] }, paymentMethod: { $ne: "espee" } })
+  .find({
+    status: { $in: ["paid", "enrolled", "refunded"] },
+    paymentMethod: { $nin: ["espee", "bank", "usdt_trc20", "usdt_bep20"] },
+  })
   .toArray()
 
 console.log(`Reconciling ${paidOrders.length} order(s) against the wallet service...`)
@@ -97,6 +102,58 @@ for (const order of paidOrders) {
   }
   if (charge.status === "succeeded" && ["paid"].includes(order.status) && !enrollment) {
     problems.push(`${label}: charged but never enrolled (orphaned charge — refund or enroll)`)
+  }
+}
+
+// Charged, but the order says "failed" (2026-11-08; same check as
+// adminRunReconciliation): the debit succeeded and the save after it didn't,
+// or the wallet completed it after our timeout. Report only — whether to
+// refund or enrol is a person's call. Declines moved no money.
+async function listCharges(authUserId) {
+  const res = await fetch(
+    `${WALLET_BASE_URL}/v1/wallet/${encodeURIComponent(authUserId)}/charges?limit=50&role=spender`,
+    { headers: { "X-Wallet-Service-Token": WALLET_SERVICE_TOKEN } }
+  )
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok || body.ok === false) return null
+  return body.charges ?? []
+}
+const failedOrders = await orders
+  .find({
+    status: "failed",
+    failureCode: { $ne: "insufficient_funds" },
+    paymentMethod: { $nin: ["espee", "bank", "usdt_trc20", "usdt_bep20"] },
+    createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+  })
+  .toArray()
+const chargesByUser = new Map()
+for (const order of failedOrders) {
+  const label = `order ${order._id} (${order.reference})`
+  let candidates = []
+  if (order.chargeId) {
+    const { charge, error } = await getCharge(order.authUserId, order.chargeId)
+    if (error) {
+      problems.push(`${label}: failed order with a charge; wallet lookup failed (${error})`)
+      continue
+    }
+    if (charge.status === "succeeded") candidates = [charge.id]
+  } else {
+    if (!chargesByUser.has(order.authUserId)) chargesByUser.set(order.authUserId, await listCharges(order.authUserId))
+    const list = chargesByUser.get(order.authUserId)
+    if (list === null) {
+      problems.push(`${label}: failed with an unknown outcome; wallet charge list unavailable`)
+      continue
+    }
+    candidates = list
+      .filter((c) => c.status === "succeeded" && String(c.metadata?.courseId ?? "") === String(order.course) && c.amountMinor === order.amountMinor)
+      .map((c) => c.id)
+  }
+  for (const chargeId of candidates) {
+    const held = await enrollments.findOne({ transactionId: chargeId }, { projection: { _id: 1 } })
+    const tracked = await orders.findOne({ chargeId, status: { $in: ["paid", "enrolled", "refunded"] } }, { projection: { _id: 1 } })
+    if (!held && !tracked) {
+      problems.push(`${label}: marked failed, but wallet charge ${chargeId} succeeded and no enrollment holds it (the learner paid — refund or enrol)`)
+    }
   }
 }
 

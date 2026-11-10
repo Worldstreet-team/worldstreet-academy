@@ -4,6 +4,7 @@
  * retype them.
  */
 import { BRAND, SITE_DESCRIPTION } from "@/lib/brand"
+import { MARKETPLACE_OPEN } from "@/lib/marketplace"
 
 /** §18 — the homepage hero. The eyebrow is uppercased by CSS. */
 export const HERO = {
@@ -58,23 +59,55 @@ export const JOURNEY_EXAMPLES = [
   ["Learn AI", "Build AI solutions", "Solve business problems", "Create products/services", "Generate economic value"],
 ] as const
 
-/** §6 — the Opportunity Hub has no description yet (D18): no body, no link. */
-export type World = { key: "academy" | "marketplace" | "opportunity-hub"; name: string; body: string | null; href: string | null }
+/**
+ * §6. Only the Academy is open (owner voice note, 2026-11-02: "let's focus on
+ * the one that will make the academy start first"): the Marketplace follows
+ * MARKETPLACE_OPEN and the Opportunity Hub — internships and the like, in
+ * that note's words — is Coming soon. A closed world's `href` is its Coming
+ * soon page.
+ */
+export type World = {
+  key: "academy" | "marketplace" | "opportunity-hub"
+  name: string
+  /** The menu's name for it. */
+  short: string
+  body: string | null
+  href: string
+  open: boolean
+}
 export const WORLDS: readonly World[] = [
   {
     key: "academy",
     name: "The Academy",
+    short: "The Academy",
     body: "This is the institutional learning environment. Schools, Programs, Faculty, Cohorts, Live classes, Assessments, Assignments, Mentorship, Certifications, Student communities and Projects. This is the premium, structured academic side.",
     href: "/schools",
+    open: true,
   },
   {
     key: "marketplace",
     name: "The Academy Marketplace",
+    short: "Marketplace",
     body: "This is the open knowledge marketplace. External educators, experts and creators can submit courses. They do not automatically become WMA faculty.",
     href: "/marketplace",
+    open: MARKETPLACE_OPEN,
   },
-  { key: "opportunity-hub", name: "The Opportunity Hub", body: null, href: null },
+  {
+    key: "opportunity-hub",
+    name: "The Opportunity Hub",
+    short: "Opportunity Hub",
+    body: "Internships and other opportunities for WMA learners.",
+    href: "/opportunity-hub",
+    open: false,
+  },
 ]
+
+/** One world by key — the Coming soon pages read their name and line from here. */
+export function worldOf(key: World["key"]): World {
+  const world = WORLDS.find((w) => w.key === key)
+  if (!world) throw new Error(`Unknown world: ${key}`)
+  return world
+}
 
 /** §20, §21 */
 export const ECOSYSTEM =

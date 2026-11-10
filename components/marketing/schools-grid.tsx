@@ -4,7 +4,7 @@ import { ArrowRightIcon } from "@/components/icons"
 import * as React from "react"
 
 import { motion, useMotionValue, useScroll, useSpring, useTransform, type MotionValue } from "motion/react"
-import type { SchoolSlug } from "@/lib/schools"
+import type { FromPrice, SchoolSlug } from "@/lib/schools"
 import { SCHOOLS } from "@/lib/schools"
 import { BRAND } from "@/lib/brand"
 import { SchoolPanel } from "@/components/marketing/school-panel"
@@ -128,7 +128,7 @@ export function SchoolsGrid({
   cheapest,
 }: {
   counts: Record<SchoolSlug, number>
-  cheapest: Record<SchoolSlug, number | null>
+  cheapest: Record<SchoolSlug, FromPrice | null>
 }) {
   const ok = useMotionOK()
   const lg = useMediaQuery("(min-width: 1024px)")

@@ -34,7 +34,7 @@ const faqs: Faq[] = [
   {
     question: "How do I become an instructor?",
     answer:
-      "Choose “Become a WMA Instructor” in the sidebar and apply there. Tell us about your expertise and the courses you want to teach; our team reviews every application and you'll get a notification with the decision.",
+      "Open “Become an Instructor” in the website footer, which leads to our careers page, and apply for the staff tutor vacancy. It's a job application: our team reviews every application, interviews shortlisted applicants at our office or online, and approves or declines before anyone is appointed as an Academy instructor. You'll get a notification with the decision. Selling your own course on the marketplace is a separate sign-up.",
   },
   {
     question: "Can I get a refund on a course?",
@@ -68,8 +68,8 @@ const quickLinks: QuickLink[] = [
     icon: "certificates",
   },
   {
-    title: "Become a WMA Instructor",
-    description: "Apply to teach on the Academy.",
+    title: "Staff tutor application",
+    description: "Apply for a staff tutor vacancy, or follow your application.",
     href: "/dashboard/become-instructor",
     icon: "instructor",
   },

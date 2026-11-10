@@ -1,642 +1,269 @@
 "use client"
-import { CheckIcon, ChevronLeftIcon, DownloadIcon } from "@/components/icons"
+import { CheckIcon, ChevronLeftIcon, CopyIcon, DownloadIcon, ImageIcon, LockIcon } from "@/components/icons"
 
-import { useCallback, useState, useSyncExternalStore } from "react"
-import Image from "next/image"
-import { Button } from "@/components/ui/button"
+import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import type { CertificateData } from "@/lib/actions/certificates"
 import { SignatureCanvas } from "@/components/shared/signature-canvas"
-import { useTheme } from "next-themes"
 import { BRAND } from "@/lib/brand"
-import { CERT_TIER_TITLE } from "@/lib/certificate-tier"
+import { CERT_TIER_LABEL } from "@/lib/certificate-tier"
 
-// ── Helper: fetch image as base64 data URL ───────────────────────────────────
-
-async function fetchAsDataUrl(url: string): Promise<string | null> {
-  try {
-    const resp = await fetch(url)
-    const blob = await resp.blob()
-    return new Promise<string>((resolve) => {
-      const reader = new FileReader()
-      reader.onloadend = () => resolve(reader.result as string)
-      reader.readAsDataURL(blob)
-    })
-  } catch {
-    return null
-  }
-}
-
-// ── Corner Ornament SVG ──────────────────────────────────────────────────────
-
-function CornerOrnament({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 80 80" fill="none">
-      {/* Outer L bracket */}
-      <path
-        d="M0 0 L40 0 L40 3 L3 3 L3 40 L0 40 Z"
-        fill="currentColor"
-      />
-      {/* Inner L bracket */}
-      <path
-        d="M6 6 L28 6 L28 8 L8 8 L8 28 L6 28 Z"
-        fill="currentColor"
-        opacity="0.35"
-      />
-      {/* Diamond accent */}
-      <path
-        d="M14 2 L16 0 L18 2 L16 4 Z"
-        fill="currentColor"
-        opacity="0.5"
-      />
-      <path
-        d="M2 14 L4 12 L6 14 L4 16 Z"
-        fill="currentColor"
-        opacity="0.5"
-      />
-    </svg>
-  )
-}
-
-// ── Certificate visual component (used for preview) ──────────────────────────
-
-/** The Academy signatory block renders only once product supplies a name and a signature file (D9). */
-const signatory =
-  BRAND.signatory.name && BRAND.signatory.imagePath
-    ? { name: BRAND.signatory.name, title: BRAND.signatory.title, imagePath: BRAND.signatory.imagePath }
-    : null
-
-function CertificatePreview({
-  data,
-  studentSignature,
-  certificateId,
-  verifyLabel,
-}: {
-  data: CertificateData
-  studentSignature: string | null
-  certificateId: string
-  verifyLabel: string | null
-}) {
-  const { theme, systemTheme } = useTheme()
-  // The stored theme is only known on the client, so the first client render
-  // must match the server's (no theme) or the logo `src` mismatches on hydration.
-  const hydrated = useSyncExternalStore(
-    () => () => {},
-    () => true,
-    () => false
-  )
-  const [titleMain, titleSub] = CERT_TIER_TITLE[data.tier]
-  const currentTheme = !hydrated ? undefined : theme === "system" ? systemTheme : theme
-  const logoPath = currentTheme === "light" 
-    ? "/worldstreet-logo/WorldStreet4x.png"
-    : "/worldstreet-logo/WorldStreet1x.png"
-
-  // UTC — the same day /verify shows.
-  const completedDate = new Date(data.completedAt).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    timeZone: "UTC",
-  })
-
-  return (
-    /* Print artifact: always paper — a light island, so ws-* classes resolve
-       to ink-on-paper regardless of the app theme. The design system's light
-       brand applies to a data-brand element INSIDE data-theme="light". */
-    <div data-theme="light">
-    <div
-      data-brand="worldstreet"
-      className="relative w-full aspect-[1.414/1] bg-ws-surface text-ws-primary overflow-clip"
-      id="certificate-preview"
-    >
-      {/* ── Decorative borders ─────────────────────────────────── */}
-      {/* Outer thick border */}
-      <div className="absolute inset-3 sm:inset-4 md:inset-6 border-2 border-ws-primary" />
-      {/* Inner thin border */}
-      <div className="absolute inset-4 sm:inset-5 md:inset-7 border border-ws-track" />
-      {/* Third decorative border */}
-      <div className="absolute inset-5 sm:inset-6 md:inset-8 border border-ws-hairline" />
-
-      {/* ── Corner ornaments ───────────────────────────────────── */}
-      <CornerOrnament className="absolute top-4 left-4 sm:top-5 sm:left-5 md:top-7 md:left-7 w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 text-ws-primary" />
-      <CornerOrnament className="absolute top-4 right-4 sm:top-5 sm:right-5 md:top-7 md:right-7 w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 text-ws-primary rotate-90" />
-      <CornerOrnament className="absolute bottom-4 left-4 sm:bottom-5 sm:left-5 md:bottom-7 md:left-7 w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 text-ws-primary -rotate-90" />
-      <CornerOrnament className="absolute bottom-4 right-4 sm:bottom-5 sm:right-5 md:bottom-7 md:right-7 w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 text-ws-primary rotate-180" />
-
-      {/* ── Center watermark — theme-based logo monochrome ─────────── */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <Image
-          src={logoPath}
-          alt=""
-          width={320}
-          height={320}
-          className="w-40 h-40 sm:w-56 sm:h-56 md:w-72 md:h-72 object-contain opacity-[0.04] grayscale"
-          aria-hidden="true"
-        />
-      </div>
-
-      {/* ── Unsigned overlay (prevents screenshots) ────────────── */}
-      {!data.instructorSignatureUrl && (
-        <div className="absolute inset-0 bg-ws-surface/90 flex items-center justify-center pointer-events-none z-10">
-          <div className="text-center space-y-2">
-            <p className="text-lg sm:text-xl md:text-2xl font-semibold text-ws-primary">
-              Pending Instructor Signature
-            </p>
-            <p className="text-xs sm:text-sm text-ws-muted">
-              This certificate will be available once your instructor signs it
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* ── Content ────────────────────────────────────────────── */}
-      {/* The card keeps its 1.414 ratio but grows when this column needs more
-          height (min-h-full + overflow-clip, which unlike overflow-hidden keeps
-          the ratio's content-based minimum) — a narrow card with md type (the
-          sidebar band) never clips or overlaps. Below sm the certificate ID
-          line stays in flow under the signatures; from sm up it sits at the
-          card's bottom, just inside the frame — never on its lines. */}
-      <div className="relative min-h-full flex flex-col items-center justify-between gap-4 sm:gap-0 px-8 py-10 sm:px-10 sm:py-12 md:px-20 md:py-14">
-        {/* Header — Logo + Institution */}
-        <div className="flex flex-col items-center gap-2 sm:gap-3">
-          <Image
-            src={logoPath}
-            alt={BRAND.name}
-            width={48}
-            height={48}
-            className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 object-contain"
-          />
-          <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
-            <div className="h-px w-8 sm:w-12 md:w-20 bg-ws-track" />
-            <p className="text-[9px] sm:text-[10px] md:text-xs tracking-[0.35em] uppercase text-ws-subtle font-medium">
-              {BRAND.name}
-            </p>
-            <div className="h-px w-8 sm:w-12 md:w-20 bg-ws-track" />
-          </div>
-        </div>
-
-        {/* Title */}
-        <div className="text-center space-y-1 sm:space-y-1.5">
-          <h1 className="text-xl sm:text-3xl md:text-[42px] font-extralight tracking-[0.2em] sm:tracking-[0.25em] uppercase text-ws-primary leading-none">
-            {titleMain}
-          </h1>
-          <p className="text-[8px] sm:text-[9px] md:text-[11px] tracking-[0.3em] uppercase text-ws-subtle font-light">
-            {titleSub}
-          </p>
-        </div>
-
-        {/* Presented to */}
-        <div className="text-center space-y-2 sm:space-y-3">
-          <p className="text-[8px] sm:text-[9px] md:text-[10px] tracking-[0.2em] uppercase text-ws-subtle">
-            This is proudly presented to
-          </p>
-          <div className="relative">
-            <p className="text-2xl sm:text-4xl md:text-[48px] text-ws-primary leading-tight font-cursive">
-              {data.studentName}
-            </p>
-            <div className="mt-2 sm:mt-3 mx-auto w-28 sm:w-40 md:w-56 h-px bg-ws-hairline" />
-          </div>
-        </div>
-
-        {/* Program info */}
-        <div className="text-center max-w-[70%]">
-          <p className="text-[8px] sm:text-[9px] md:text-[10px] text-ws-subtle mb-1.5 sm:mb-2">
-            for successfully completing the program
-          </p>
-          <p className="text-xs sm:text-sm md:text-lg font-semibold text-ws-primary leading-snug">
-            {data.programName}
-          </p>
-          {data.schoolName && (
-            <p className="mt-0.5 text-[7px] sm:text-[8px] md:text-[10px] text-ws-muted">
-              {data.schoolName}
-            </p>
-          )}
-        </div>
-
-        {/* Bottom — Signatures + Seal */}
-        <div className="w-full grid grid-cols-3 items-end gap-4 px-0 sm:px-2 md:px-6">
-          {/* Student signature + Date */}
-          <div className="flex flex-col items-center gap-1">
-            {studentSignature && (
-              <img
-                src={studentSignature}
-                alt="Student signature"
-                className="h-6 sm:h-8 md:h-10 w-auto object-contain mb-0.5"
-              />
-            )}
-            <div className="w-full max-w-[120px] sm:max-w-[140px] md:max-w-[160px] h-px bg-ws-track" />
-            <p className="text-[7px] sm:text-[8px] md:text-[9px] text-ws-subtle uppercase tracking-widest mt-0.5">
-              Student
-            </p>
-            <p className="text-[8px] sm:text-[9px] md:text-[10px] text-ws-muted font-medium">
-              {completedDate}
-            </p>
-          </div>
-
-          {/* Center — the Academy signatory once configured (D9), else the seal */}
-          {signatory ? (
-            <div className="flex flex-col items-center gap-1">
-              <Image
-                src={signatory.imagePath}
-                alt={`${signatory.name} signature`}
-                width={160}
-                height={40}
-                className="h-6 sm:h-8 md:h-10 w-auto object-contain mb-0.5"
-              />
-              <div className="w-full max-w-[120px] sm:max-w-[140px] md:max-w-[160px] h-px bg-ws-track" />
-              <p className="text-[7px] sm:text-[8px] md:text-[9px] text-ws-subtle uppercase tracking-widest mt-0.5">
-                {signatory.title ?? "Authorized signatory"}
-              </p>
-              <p className="text-[8px] sm:text-[9px] md:text-[10px] text-ws-muted font-medium">
-                {signatory.name}
-              </p>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center">
-              <Image
-                src={logoPath}
-                alt={BRAND.name}
-                width={64}
-                height={64}
-                className="w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 object-contain"
-              />
-              <p className="text-[6px] sm:text-[7px] md:text-[8px] text-ws-subtle tracking-widest uppercase mt-1">
-                Verified
-              </p>
-            </div>
-          )}
-
-          {/* Instructor signature */}
-          <div className="flex flex-col items-center gap-1">
-            {data.instructorSignatureUrl && (
-              <img
-                src={data.instructorSignatureUrl}
-                alt="Instructor signature"
-                className="h-6 sm:h-8 md:h-10 w-auto object-contain mb-0.5"
-              />
-            )}
-            <div className="w-full max-w-[120px] sm:max-w-[140px] md:max-w-[160px] h-px bg-ws-track" />
-            <p className="text-[7px] sm:text-[8px] md:text-[9px] text-ws-subtle uppercase tracking-widest mt-0.5">
-              Instructor
-            </p>
-            <p className="text-[8px] sm:text-[9px] md:text-[10px] text-ws-muted font-medium">
-              {data.instructorName}
-            </p>
-          </div>
-        </div>
-
-        {/* Certificate ID + where to verify it (spec §13) */}
-        <p className="sm:absolute sm:bottom-7 md:bottom-9 sm:inset-x-0 flex flex-wrap justify-center gap-x-2 sm:px-8 text-center text-[6px] sm:text-[7px] md:text-[8px] text-ws-subtle tracking-wider tabular-nums">
-          <span>{`Certificate ID ${certificateId}`}</span>
-          {verifyLabel && <span>{`Verify at ${verifyLabel}`}</span>}
-        </p>
-      </div>
-    </div>
-    </div>
-  )
-}
-
-// ── Main certificate page client component ───────────────────────────────────
+/**
+ * The certificate page (owner, 2026-11-08: "better designed and in a
+ * downloadable way"). The certificate itself is one server-drawn picture
+ * (lib/certificate-art.tsx via ./image): the page shows it, and "Download PDF"
+ * and "Image" fetch the same drawing at print size, so the download is exactly
+ * what the learner sees. An Academy certificate is ready on completion; a
+ * marketplace creator's waits for the creator's signature (`data.locked`).
+ * The learner's own signature is optional and prints above "Holder".
+ */
 
 /**
  * The stored certificate ID, or — for a certificate completed before IDs were
  * stored — the ID it has always printed. Same rule as `legacyCertificateId` in
- * lib/certificate-id.ts and the backfill in scripts/backfill-certificate-ids.mjs,
- * repeated because that module (node crypto + Mongoose) can't enter a client
- * bundle. Change all three together.
+ * lib/certificate-id.ts, the image route and the backfill in
+ * scripts/backfill-certificate-ids.mjs, repeated because that module (node
+ * crypto + Mongoose) can't enter a client bundle. Change them together.
  */
 function printedCertificateId(data: CertificateData): string {
   return data.certificateId ?? `${BRAND.certificatePrefix}-${data.id.slice(-8).toUpperCase()}`
+}
+
+/** A short stable tag for a signature URL, so a new signature fetches a new picture. */
+function versionOf(value: string | null): string {
+  if (!value) return "0"
+  let h = 0
+  for (let i = 0; i < value.length; i++) h = (Math.imul(31, h) + value.charCodeAt(i)) | 0
+  return (h >>> 0).toString(36)
+}
+
+function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 10_000)
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => resolve(reader.result as string)
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(blob)
+  })
 }
 
 export function CertificateClient({ data, verifyUrl }: { data: CertificateData; verifyUrl: string | null }) {
   const certificateId = printedCertificateId(data)
   /** Printed without the scheme; never uppercased — the /verify path is case-sensitive. */
   const verifyLabel = verifyUrl ? verifyUrl.replace(/^https?:\/\//, "") : null
-  const { theme, systemTheme } = useTheme()
-  const currentTheme = theme === "system" ? systemTheme : theme
-  const logoPath = currentTheme === "light" 
-    ? "/worldstreet-logo/WorldStreet4x.png"
-    : "/worldstreet-logo/WorldStreet1x.png"
 
-  const [studentSig, setStudentSig] = useState<string | null>(
-    data.studentSignatureUrl
-  )
-  const [isSigned, setIsSigned] = useState(!!data.studentSignatureUrl)
+  const [studentSig, setStudentSig] = useState<string | null>(data.studentSignatureUrl)
   const [showCanvas, setShowCanvas] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+  const [failed, setFailed] = useState(false)
+  const [busy, setBusy] = useState<"pdf" | "png" | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  // Bumped by "Try again": a failed image needs a new address, or the browser reuses the failure.
+  const [retry, setRetry] = useState(0)
 
-  const downloadPDF = useCallback(async () => {
-    const { jsPDF } = await import("jspdf")
-    const [titleMain, titleSub] = CERT_TIER_TITLE[data.tier]
-    const doc = new jsPDF({
-      orientation: "landscape",
-      unit: "mm",
-      format: "a4",
+  const imgRef = useRef<HTMLImageElement>(null)
+  const imageBase = `/dashboard/courses/${data.courseId}/certificate/image`
+  const version = versionOf(studentSig)
+  const previewSrc = `${imageBase}?v=${version}${retry ? `&r=${retry}` : ""}`
+  const fileStem = `${BRAND.name}-Certificate-${data.programName}`.replace(/[^a-zA-Z0-9]+/g, "-").replace(/-+$/, "")
+  const title = `${CERT_TIER_LABEL[data.tier]}: ${data.programName}`
+
+  // The server-rendered <img> can finish (or fail) before React attaches onLoad/onError, which then
+  // never fire: read its state once mounted, and again whenever the address changes.
+  useEffect(() => {
+    const el = imgRef.current
+    if (!el || !el.complete) return
+    if (el.naturalWidth > 0) setLoaded(true)
+    else setFailed(true)
+  }, [previewSrc])
+
+  // The print-size drawing takes the server a few seconds, so it starts once the certificate is
+  // showing; a download reuses that request (one per version), and a failed one is retried.
+  const printRef = useRef<{ version: string; blob: Promise<Blob> } | null>(null)
+  const printImage = useCallback((): Promise<Blob> => {
+    if (printRef.current?.version === version) return printRef.current.blob
+    const blob = fetch(`${imageBase}?size=print&v=${version}`, { cache: "no-store" }).then((res) => {
+      if (!res.ok) throw new Error(`certificate image ${res.status}`)
+      return res.blob()
     })
-
-    const w = 297
-    const h = 210
-    const cx = w / 2
-
-    // ── Load images in parallel ──────────────────────────────────
-    const [logoDataUrl, watermarkDataUrl, instructorSigDataUrl, studentSigDataUrl, signatoryDataUrl] =
-      await Promise.all([
-        fetchAsDataUrl(logoPath),
-        fetchAsDataUrl(logoPath),
-        data.instructorSignatureUrl
-          ? fetchAsDataUrl(data.instructorSignatureUrl)
-          : null,
-        studentSig ? fetchAsDataUrl(studentSig) : null,
-        signatory ? fetchAsDataUrl(signatory.imagePath) : null,
-      ])
-
-    // ── White background ─────────────────────────────────────────
-    doc.setFillColor(255, 255, 255)
-    doc.rect(0, 0, w, h, "F")
-
-    // ── Decorative borders ───────────────────────────────────────
-    // Outer thick border
-    doc.setDrawColor(30, 30, 30)
-    doc.setLineWidth(0.8)
-    doc.rect(8, 8, w - 16, h - 16)
-
-    // Inner border
-    doc.setDrawColor(180, 180, 180)
-    doc.setLineWidth(0.3)
-    doc.rect(10, 10, w - 20, h - 20)
-
-    // Third border
-    doc.setDrawColor(210, 210, 210)
-    doc.setLineWidth(0.2)
-    doc.rect(12, 12, w - 24, h - 24)
-
-    // ── Corner ornaments (L-shaped brackets) ─────────────────────
-    const corners = [
-      { x: 11, y: 11, sx: 1, sy: 1 },
-      { x: w - 11, y: 11, sx: -1, sy: 1 },
-      { x: 11, y: h - 11, sx: 1, sy: -1 },
-      { x: w - 11, y: h - 11, sx: -1, sy: -1 },
-    ]
-    doc.setDrawColor(30, 30, 30)
-    doc.setLineWidth(0.6)
-    corners.forEach(({ x, y, sx, sy }) => {
-      doc.line(x, y, x + 18 * sx, y)
-      doc.line(x, y, x, y + 18 * sy)
+    printRef.current = { version, blob }
+    blob.catch(() => {
+      if (printRef.current?.blob === blob) printRef.current = null
     })
-    doc.setDrawColor(180, 180, 180)
-    doc.setLineWidth(0.25)
-    corners.forEach(({ x, y, sx, sy }) => {
-      const ox = 3 * sx
-      const oy = 3 * sy
-      doc.line(x + ox, y + oy, x + ox + 10 * sx, y + oy)
-      doc.line(x + ox, y + oy, x + ox, y + oy + 10 * sy)
-    })
-    // Diamond accents at corners
-    doc.setFillColor(30, 30, 30)
-    corners.forEach(({ x, y, sx, sy }) => {
-      const dx = x + 16 * sx
-      const dy = y + 2 * sy
-      doc.triangle(dx, dy - 1.2, dx - 1.2 * sx, dy, dx, dy + 1.2, "F")
-      doc.triangle(dx, dy - 1.2, dx + 1.2 * sx, dy, dx, dy + 1.2, "F")
-    })
+    return blob
+  }, [imageBase, version])
 
-    // ── Center watermark — WorldStreet1 monochrome ───────────────
-    if (watermarkDataUrl) {
-      doc.saveGraphicsState()
-      const gState = doc.GState({ opacity: 0.04 })
-      doc.setGState(gState)
-      doc.addImage(watermarkDataUrl, "PNG", cx - 40, h / 2 - 40, 80, 80)
-      doc.restoreGraphicsState()
-    }
+  useEffect(() => {
+    if (!loaded || data.locked) return
+    const t = setTimeout(() => void printImage().catch(() => {}), 800)
+    return () => clearTimeout(t)
+  }, [loaded, data.locked, printImage])
 
-    // ── Logo (top center) — WorldStreet3x ────────────────────────
-    if (logoDataUrl) {
-      // Maintain aspect ratio - WorldStreet logo is wider than tall
-      const logoWidth = 18
-      const logoHeight = 12
-      doc.addImage(logoDataUrl, "PNG", cx - logoWidth/2, 18, logoWidth, logoHeight)
-    }
-
-    // ── Institution name with flanking lines ─────────────────────
-    doc.setDrawColor(180, 180, 180)
-    doc.setLineWidth(0.2)
-    doc.line(cx - 38, 38, cx - 18, 38)
-    doc.line(cx + 18, 38, cx + 38, 38)
-
-    doc.setFont("helvetica", "normal")
-    doc.setFontSize(7)
-    doc.setTextColor(160, 160, 160)
-    doc.text(BRAND.name.toUpperCase(), cx, 39, { align: "center" })
-
-    // ── Title line one (follows the tier) ──────────────────────────────────────
-    doc.setFont("helvetica", "normal")
-    doc.setFontSize(32)
-    doc.setTextColor(50, 50, 50)
-    doc.text(titleMain.toUpperCase(), cx, 56, { align: "center" })
-
-    // ── Title line two (follows the tier) ─────────────────────────────────
-    doc.setFontSize(7)
-    doc.setTextColor(160, 160, 160)
-    doc.text(titleSub.toUpperCase(), cx, 63, { align: "center" })
-
-    // ── "This is proudly presented to" ───────────────────────────
-    doc.setFontSize(6.5)
-    doc.setTextColor(160, 160, 160)
-    doc.text("THIS IS PROUDLY PRESENTED TO", cx, 78, { align: "center" })
-
-    // ── Student name (cursive) ───────────────────────────────────
-    doc.setFont("times", "bolditalic")
-    doc.setFontSize(26)
-    doc.setTextColor(25, 25, 25)
-    doc.text(data.studentName, cx, 93, { align: "center" })
-
-    // Line under name
-    doc.setDrawColor(210, 210, 210)
-    doc.setLineWidth(0.25)
-    doc.line(cx - 40, 97, cx + 40, 97)
-
-    // ── "for successfully completing the program" ────────────────
-    doc.setFont("helvetica", "normal")
-    doc.setFontSize(6.5)
-    doc.setTextColor(160, 160, 160)
-    doc.text("FOR SUCCESSFULLY COMPLETING THE PROGRAM", cx, 108, {
-      align: "center",
-    })
-
-    // ── Program title (+ school) ─────────────────────────────────
-    doc.setFont("helvetica", "bold")
-    doc.setFontSize(13)
-    doc.setTextColor(50, 50, 50)
-    const programLines: string[] =
-      data.programName.length > 55 ? doc.splitTextToSize(data.programName, 170) : [data.programName]
-    doc.text(programLines, cx, 118, { align: "center" })
-    if (data.schoolName) {
-      doc.setFont("helvetica", "normal")
-      doc.setFontSize(7)
-      doc.setTextColor(120, 120, 120)
-      doc.text(data.schoolName, cx, 118 + programLines.length * 5.5 + 1, { align: "center" })
-    }
-
-    // ── Bottom section: 3-column layout ──────────────────────────
-    const botY = h - 40
-    const colLeft = 65
-    const colRight = w - 65
-
-    // ── Left column: Student signature + Date ────────────────────
-    if (studentSigDataUrl) {
-      doc.addImage(studentSigDataUrl, "PNG", colLeft - 18, botY - 14, 36, 12)
-    }
-    doc.setDrawColor(180, 180, 180)
-    doc.setLineWidth(0.25)
-    doc.line(colLeft - 22, botY, colLeft + 22, botY)
-
-    doc.setFont("helvetica", "normal")
-    doc.setFontSize(5.5)
-    doc.setTextColor(160, 160, 160)
-    doc.text("STUDENT", colLeft, botY + 5, { align: "center" })
-
-    const dateFormatted = new Date(data.completedAt).toLocaleDateString(
-      "en-US",
-      { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" }
-    )
-    doc.setFontSize(7)
-    doc.setTextColor(80, 80, 80)
-    doc.text(dateFormatted, colLeft, botY + 11, { align: "center" })
-
-    // ── Center: Academy signatory (D9) when configured, else the seal ──
-    if (signatory) {
-      if (signatoryDataUrl) {
-        doc.addImage(signatoryDataUrl, "PNG", cx - 18, botY - 14, 36, 12)
+  async function download(kind: "pdf" | "png") {
+    setBusy(kind)
+    setError(null)
+    try {
+      if (kind === "png") {
+        saveBlob(await printImage(), `${fileStem}.png`)
+        return
       }
-      doc.setDrawColor(180, 180, 180)
-      doc.setLineWidth(0.25)
-      doc.line(cx - 22, botY, cx + 22, botY)
-
-      doc.setFont("helvetica", "normal")
-      doc.setFontSize(5.5)
-      doc.setTextColor(160, 160, 160)
-      doc.text((signatory.title ?? "Authorized signatory").toUpperCase(), cx, botY + 5, { align: "center" })
-
-      doc.setFontSize(7)
-      doc.setTextColor(80, 80, 80)
-      doc.text(signatory.name, cx, botY + 11, { align: "center" })
-    } else {
-      if (logoDataUrl) {
-        // Maintain aspect ratio - WorldStreet logo is wider than tall
-        const sealWidth = 24
-        const sealHeight = 16
-        doc.addImage(logoDataUrl, "PNG", cx - sealWidth/2, botY - 12, sealWidth, sealHeight)
-      }
-      doc.setFont("helvetica", "normal")
-      doc.setFontSize(5)
-      doc.setTextColor(190, 190, 190)
-      doc.text("VERIFIED", cx, botY + 13, { align: "center" })
+      const [blob, { jsPDF }] = await Promise.all([printImage(), import("jspdf")])
+      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4", compress: true })
+      doc.setProperties({ title, subject: `Certificate ID ${certificateId}`, author: BRAND.name, creator: BRAND.name })
+      // The drawing is A4 landscape (297×210 mm), edge to edge.
+      doc.addImage(await blobToDataUrl(blob), "PNG", 0, 0, 297, 210, undefined, "FAST")
+      doc.save(`${fileStem}.pdf`)
+    } catch (err) {
+      console.error("[Certificate] download failed:", err)
+      setError("We couldn't prepare the download. Please try again.")
+    } finally {
+      setBusy(null)
     }
+  }
 
-    // ── Right column: Instructor signature + Name ────────────────
-    if (instructorSigDataUrl) {
-      doc.addImage(
-        instructorSigDataUrl,
-        "PNG",
-        colRight - 18,
-        botY - 14,
-        36,
-        12
-      )
+  async function copyVerifyLink() {
+    if (!verifyUrl) return
+    try {
+      await navigator.clipboard.writeText(verifyUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      setCopied(false)
     }
-    doc.setDrawColor(180, 180, 180)
-    doc.setLineWidth(0.25)
-    doc.line(colRight - 22, botY, colRight + 22, botY)
-
-    doc.setFont("helvetica", "normal")
-    doc.setFontSize(5.5)
-    doc.setTextColor(160, 160, 160)
-    doc.text("INSTRUCTOR", colRight, botY + 5, { align: "center" })
-
-    doc.setFontSize(7)
-    doc.setTextColor(80, 80, 80)
-    doc.text(data.instructorName, colRight, botY + 11, { align: "center" })
-
-    // ── Certificate ID + verify URL (spec §13) ───────────────────
-    doc.setFont("helvetica", "normal")
-    doc.setFontSize(5.5)
-    doc.setTextColor(150, 150, 150)
-    doc.text(`CERTIFICATE ID ${certificateId}`, cx, h - 21, { align: "center" })
-    if (verifyLabel) {
-      doc.setFontSize(5)
-      doc.setTextColor(170, 170, 170)
-      doc.text(`Verify at ${verifyLabel}`, cx, h - 16.5, { align: "center" })
-    }
-
-    doc.save(
-      `${BRAND.name.replace(/[^a-zA-Z0-9]+/g, "-")}-Certificate-${data.programName.replace(/[^a-zA-Z0-9]/g, "-")}.pdf`
-    )
-  }, [data, studentSig, logoPath, certificateId, verifyLabel])
+  }
 
   return (
-    <div className="min-h-dvh flex flex-col items-center bg-ws-page">
+    <div className="flex min-h-dvh flex-col items-center bg-ws-page pb-24 md:pb-12">
       {/* Top bar */}
-      <div className="w-full max-w-5xl px-4 py-4 flex items-center justify-between">
-        <Button
-          variant="ghost"
-          size="sm"
-          render={<Link href="/dashboard/certificates" />}
-          className="gap-1.5"
-        >
-          <ChevronLeftIcon  size={16} />
+      <div className="flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-4">
+        <Button variant="ghost" size="sm" render={<Link href="/dashboard/certificates" />} className="gap-1.5">
+          <ChevronLeftIcon size={16} />
           My Certificates
         </Button>
 
-        <Button
-          size="sm"
-          onClick={downloadPDF}
-          disabled={!data.instructorSignatureUrl}
-          className="gap-1.5"
-        >
-          <DownloadIcon  size={16} />
-          {data.instructorSignatureUrl ? "Download PDF" : "Awaiting Signature"}
-        </Button>
+        {!data.locked && (
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" className="gap-1.5" disabled={busy !== null || failed} onClick={() => download("png")}>
+              <ImageIcon size={16} />
+              {busy === "png" ? "Preparing…" : "Image"}
+            </Button>
+            <Button size="sm" className="gap-1.5" disabled={busy !== null || failed} onClick={() => download("pdf")}>
+              <DownloadIcon size={16} />
+              {busy === "pdf" ? "Preparing…" : "Download PDF"}
+            </Button>
+          </div>
+        )}
+      </div>
+      {error && <p className="-mt-1 mb-3 w-full max-w-5xl px-4 text-right text-xs text-ws-danger">{error}</p>}
+
+      {/* The certificate */}
+      <div className="w-full max-w-5xl px-4">
+        {data.locked ? (
+          <div className="flex aspect-[1754/1240] w-full flex-col items-center justify-center gap-3 rounded-[20px] border border-ws-hairline bg-ws-surface p-8 text-center">
+            <span className="flex size-12 items-center justify-center rounded-[9px] bg-ws-chip">
+              <LockIcon size={22} />
+            </span>
+            <p className="text-lg font-semibold text-ws-primary sm:text-xl">Waiting for your instructor&rsquo;s signature</p>
+            <p className="max-w-md text-sm text-ws-muted">
+              {data.instructorName || "Your instructor"} signs this certificate before you can view and download it. You
+              completed {data.programName}; nothing else is needed from you.
+            </p>
+          </div>
+        ) : (
+          <div className="relative aspect-[1754/1240] w-full overflow-hidden rounded-[20px] border border-ws-hairline bg-ws-sunken shadow-sm">
+            {!loaded && !failed && <Skeleton className="absolute inset-0 rounded-none" />}
+            {failed ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
+                <p className="text-sm text-ws-muted">We couldn&rsquo;t load your certificate.</p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setFailed(false)
+                    setLoaded(false)
+                    setRetry((n) => n + 1)
+                  }}
+                >
+                  Try again
+                </Button>
+              </div>
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element -- a private, per-learner PNG from our own route; next/image would cache it publicly
+              <img
+                key={previewSrc}
+                ref={imgRef}
+                src={previewSrc}
+                alt={`${title}, awarded to ${data.studentName}`}
+                className={`absolute inset-0 h-full w-full transition-opacity duration-300 motion-reduce:transition-none ${loaded ? "opacity-100" : "opacity-0"}`}
+                onLoad={() => setLoaded(true)}
+                onError={() => setFailed(true)}
+              />
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Certificate */}
-      <div className="w-full max-w-4xl px-4 pb-6">
-        <div className="rounded-lg border border-ws-hairline overflow-hidden">
-          <CertificatePreview
-            data={data}
-            studentSignature={studentSig}
-            certificateId={certificateId}
-            verifyLabel={verifyLabel}
-          />
-        </div>
+      {/* ID and verification */}
+      <div className="mt-4 flex w-full max-w-5xl flex-col items-center gap-1 px-4 text-center text-[12px] text-ws-muted">
+        <p className="tabular-nums">{`Certificate ID ${certificateId}`}</p>
+        {verifyUrl && (
+          <p className="flex flex-wrap items-center justify-center gap-x-2">
+            <span>
+              Anyone can check it at{" "}
+              <a href={verifyUrl} className="break-all underline underline-offset-2 hover:text-ws-primary">
+                {verifyLabel}
+              </a>
+            </span>
+            <button
+              type="button"
+              onClick={copyVerifyLink}
+              className="inline-flex items-center gap-1 font-medium text-ws-primary underline-offset-2 hover:underline"
+            >
+              {copied ? <CheckIcon size={12} /> : <CopyIcon size={12} />}
+              {copied ? "Copied" : "Copy link"}
+            </button>
+          </p>
+        )}
       </div>
 
-      {/* Signature section */}
-      <div className="w-full max-w-4xl px-4 pb-12">
-        <div className="rounded-lg border border-ws-hairline bg-ws-surface p-6">
-          <div className="flex flex-col items-center gap-6">
-            {/* Student signature area */}
-            <div className="flex flex-col items-center gap-3 w-full">
-              <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
-                Your Signature
-              </p>
+      {/* The holder's own signature: optional */}
+      {!data.locked && (
+        <div className="mt-6 w-full max-w-5xl px-4">
+          <div className="rounded-[20px] border border-ws-hairline bg-ws-surface p-5 sm:p-6">
+            <div className="flex flex-col items-center gap-4 text-center">
+              <div>
+                <p className="text-sm font-semibold text-ws-primary">Your signature (optional)</p>
+                <p className="mt-0.5 text-xs text-ws-muted">It prints above &ldquo;Holder&rdquo; on your certificate.</p>
+              </div>
 
               {studentSig && !showCanvas ? (
                 <div className="flex flex-col items-center gap-3">
-                  <div className="w-48 h-20 rounded-lg border border-ws-hairline bg-ws-sunken flex items-center justify-center overflow-hidden">
-                    <img
-                      src={studentSig}
-                      alt="Your signature"
-                      className="h-full w-auto object-contain p-2"
-                    />
+                  <div className="flex h-20 w-48 items-center justify-center overflow-hidden rounded-[9px] border border-ws-hairline bg-ws-sunken">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- the learner's uploaded signature */}
+                    <img src={studentSig} alt="Your signature" className="h-full w-auto object-contain p-2" />
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1 text-ws-success">
-                      <CheckIcon  size={12} />
-                      <span className="text-[10px] font-medium">Signed</span>
-                    </div>
+                  <div className="flex items-center gap-3 text-xs">
+                    <span className="flex items-center gap-1 font-medium text-ws-success">
+                      <CheckIcon size={12} />
+                      On your certificate
+                    </span>
                     <button
+                      type="button"
                       onClick={() => setShowCanvas(true)}
-                      className="text-[10px] text-ws-muted hover:text-primary transition-colors underline underline-offset-2"
+                      className="text-ws-muted underline underline-offset-2 transition-colors hover:text-ws-primary"
                     >
                       Change signature
                     </button>
@@ -648,48 +275,19 @@ export function CertificateClient({ data, verifyUrl }: { data: CertificateData; 
                     currentSignatureUrl={studentSig}
                     onSave={(url) => {
                       setStudentSig(url)
-                      setIsSigned(true)
                       setShowCanvas(false)
+                      setLoaded(false)
+                      setFailed(false)
                     }}
-                    onCancel={
-                      studentSig ? () => setShowCanvas(false) : undefined
-                    }
+                    onCancel={studentSig ? () => setShowCanvas(false) : undefined}
                     compact
                   />
                 </div>
               )}
             </div>
-
-            {/* Status message for unsigned certificates */}
-            {!data.instructorSignatureUrl && (
-              <div className="w-full text-center py-2">
-                <p className="text-xs text-ws-warning">
-                  Your instructor needs to sign this certificate before you can download it
-                </p>
-              </div>
-            )}
           </div>
-
-          {isSigned && (
-            <p className="text-center text-xs text-ws-success mt-4 flex items-center justify-center gap-1">
-              <CheckIcon  size={14} />
-              Your signature has been added to the certificate
-            </p>
-          )}
         </div>
-
-        <p className="text-center text-[11px] text-muted-foreground mt-4 tabular-nums">
-          {`Certificate ID: ${certificateId}`}
-        </p>
-        {verifyUrl && (
-          <p className="text-center text-[11px] text-muted-foreground mt-1">
-            Verify this certificate at{" "}
-            <a href={verifyUrl} className="underline underline-offset-2 hover:text-ws-primary break-all">
-              {verifyLabel}
-            </a>
-          </p>
-        )}
-      </div>
+      )}
     </div>
   )
 }

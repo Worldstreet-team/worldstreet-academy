@@ -2,6 +2,7 @@ import "server-only"
 
 import { Course, ManualPayment, Order, type OrderStatus, type PackageKey } from "@/lib/db/models"
 import { PACKAGE_LABEL } from "@/lib/entitlements"
+import { isTransferMethod, type TransferMethod } from "@/lib/payment-channels"
 
 /**
  * A learner's own purchases (corrections brief §6–§7, 2026-10-28: payment
@@ -28,13 +29,13 @@ export type MyPayment = {
   /** The plan bought, e.g. "Standard"; null for a single-price course. */
   plan: string | null
   amountMinor: number
-  method: "wallet" | "espee"
+  method: "wallet" | TransferMethod
   status: MyPaymentStatus
-  /** Why an admin declined an ESPEE proof. */
+  /** Why an admin declined a transfer proof. */
   note: string | null
   /** ISO — the last change. */
   at: string
-  /** Where the row leads: the course once paid, the ESPEE status page while in review, else the program page. */
+  /** Where the row leads: the course once paid, the payment status page while in review, else the program page. */
   href: string | null
 }
 
@@ -73,7 +74,7 @@ export async function myPayments(userId: string): Promise<MyPayment[]> {
     ManualPayment.find({ user: userId, status: { $in: ["submitted", "rejected"] } })
       .sort({ updatedAt: -1 })
       .limit(LIMIT)
-      .select("course packageKey packageName amountMinor status rejectionReason updatedAt")
+      .select("course packageKey packageName amountMinor method status rejectionReason updatedAt")
       .lean(),
   ])
 
@@ -99,7 +100,7 @@ export async function myPayments(userId: string): Promise<MyPayment[]> {
         courseTitle: titleOf(courseId),
         plan: planOf(o.packageKey),
         amountMinor: o.amountMinor,
-        method: o.paymentMethod === "espee" ? "espee" : "wallet",
+        method: isTransferMethod(o.paymentMethod) ? o.paymentMethod : "wallet",
         status,
         note: null,
         at: o.updatedAt.toISOString(),
@@ -115,7 +116,7 @@ export async function myPayments(userId: string): Promise<MyPayment[]> {
         courseTitle: titleOf(courseId),
         plan: p.packageName ?? planOf(p.packageKey),
         amountMinor: p.amountMinor,
-        method: "espee",
+        method: p.method ?? "espee",
         status,
         note: p.status === "rejected" ? (p.rejectionReason ?? null) : null,
         at: p.updatedAt.toISOString(),

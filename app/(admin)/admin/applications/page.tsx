@@ -66,8 +66,8 @@ export default function AdminApplicationsPage() {
       <div className="flex-1 px-4 sm:px-6 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-8 md:px-8 md:pb-12 lg:px-12">
         <div className="mx-auto w-full max-w-7xl space-y-8">
         <PageHeader
-          title="Instructor applications"
-          subline="Review, interview and approve new instructors."
+          title="Staff tutor applications"
+          subline="Job applications to teach Academy students. Interview each shortlisted applicant at the office or online, then approve or reject. Marketplace creators are under Sellers."
         />
 
         <div className="flex items-center gap-3 flex-wrap">

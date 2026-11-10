@@ -40,8 +40,6 @@ const BODY = "max-w-3xl text-[16px] leading-relaxed text-ws-muted md:text-[17px]
 const CARD = "rounded-[20px] border border-ws-hairline bg-ws-surface p-6 dark:border-transparent"
 const GOLD_CTA =
   "inline-flex h-12 items-center justify-center rounded-full bg-ws-brand px-9 text-[15px] font-semibold text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:opacity-90"
-const OUTLINE_CTA =
-  "inline-flex h-12 items-center justify-center rounded-full border border-ws-hairline px-8 text-[15px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:border-ws-brand/40 hover:text-ws-gold"
 
 /** /academy: the institution, in the institutional blueprint's order (§1–§23). Static; no data fetch. */
 export default function AcademyPage() {
@@ -224,9 +222,6 @@ export default function AcademyPage() {
           <Reveal className="mx-auto mt-9 flex max-w-xs flex-col gap-3 sm:max-w-none sm:flex-row sm:items-center sm:justify-center">
             <Link href="/schools" className={GOLD_CTA}>
               Explore the Academy
-            </Link>
-            <Link href="/teach" className={OUTLINE_CTA}>
-              Become a WMA Instructor
             </Link>
           </Reveal>
         </div>

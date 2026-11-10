@@ -13,6 +13,7 @@ import { SchoolIcon } from "@/components/shared/school-icon"
 import { EASE_LUX } from "@/components/marketing/motion/ease"
 import { useMotionOK } from "@/components/marketing/motion/bus"
 import { LEVEL_LABEL, wholeUsd } from "@/components/checkout/order-lines"
+import { PackageDiscount } from "@/components/programs/package-offer"
 
 /**
  * The order as checkout shows it: the program's art and name, and the chosen
@@ -76,6 +77,7 @@ export function PackageRow({
         >
           {wholeUsd(pkg.price)}
         </span>
+        <PackageDiscount pkg={pkg} chip="compact" className="mt-1.5 flex justify-end text-[12.5px]" />
         {changeHref && (
           <Link
             href={changeHref}

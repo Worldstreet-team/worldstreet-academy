@@ -24,7 +24,7 @@ function formatLaunch(iso: string): string {
  * action for where this customer stands. Rendered by both course detail
  * pages whenever the course is not plain-live-and-active:
  *
- *  coming soon + not enrolled  → free pre-enroll button (or plain countdown
+ *  coming soon + not enrolled  → reserve-a-seat button, paid at launch (or plain countdown
  *                                when pre-enrollment is off)
  *  coming soon + pre-enrolled  → "Enrolled" state + countdown
  *  live + pre-enrolled         → "Start course — pay …" into checkout, which
@@ -116,7 +116,7 @@ export function CourseSchedulingCta({
             disabled={pending}
             className="flex h-11 cursor-pointer items-center justify-center rounded-full bg-ws-brand px-5 text-sm font-semibold text-ws-brand-on transition-opacity hover:opacity-90 disabled:opacity-50"
           >
-            {pending ? "Enrolling…" : "Enroll Now — Free Until Launch"}
+            {pending ? "Reserving…" : "Reserve your seat — pay at launch"}
           </button>
         ) : (
           <a

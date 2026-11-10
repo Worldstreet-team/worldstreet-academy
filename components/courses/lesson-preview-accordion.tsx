@@ -12,6 +12,7 @@ import type { PublicCourseLesson } from "@/lib/actions/student"
 import { PreviewVideoPlayer } from "./preview-video-player"
 
 import { RenderIcon } from "@/components/shared/render-icon"
+import { SafeHtml } from "@/components/shared/safe-html"
 
 interface LessonPreviewAccordionProps {
   lessons: PublicCourseLesson[]
@@ -227,11 +228,9 @@ export function LessonPreviewAccordion({
 
                   {/* Text Content Preview */}
                   {lesson.type === "text" && lesson.content && (
-                    <div
+                    <SafeHtml
+                      html={lesson.content}
                       className="prose prose-sm dark:prose-invert max-w-none text-sm text-ws-muted [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
-                      dangerouslySetInnerHTML={{
-                        __html: lesson.content,
-                      }}
                     />
                   )}
 

@@ -9,6 +9,7 @@ import { fetchBrowseCourses, type BrowseCourse } from "@/lib/actions/student"
 import { getCachedUser } from "@/lib/auth/cached"
 import { MARKETPLACE_SHARE_ACADEMY, MARKETPLACE_SHARE_OWN_LINK } from "@/lib/db/models"
 import {
+  MARKETPLACE_OPEN,
   isMarketplaceSort,
   marketplaceHref,
   sharePercent,
@@ -17,12 +18,17 @@ import {
 import { COURSE_FORMATS, FORMAT_LABEL, formatCount, isCourseFormat } from "@/lib/course-format"
 import { MarketingCourseCard } from "@/components/marketing/course-card"
 import { MarketplaceFilters } from "@/components/marketplace/marketplace-filters"
+import { ComingSoon } from "@/components/marketing/coming-soon"
+import { worldOf } from "@/lib/institution"
 
-export const metadata: Metadata = {
-  title: "Marketplace",
-  description: `Pre-recorded courses from practitioners, quality-reviewed by ${BRAND.name}. Learn on your schedule.`,
-  alternates: { canonical: appUrl("/marketplace") },
-}
+// While the marketplace is closed (MARKETPLACE_OPEN) this is its Coming soon page, kept out of search.
+export const metadata: Metadata = MARKETPLACE_OPEN
+  ? {
+      title: "Marketplace",
+      description: `Pre-recorded courses from practitioners, quality-reviewed by ${BRAND.name}. Learn on your schedule.`,
+      alternates: { canonical: appUrl("/marketplace") },
+    }
+  : { title: "Marketplace — coming soon", robots: { index: false } }
 
 // Publishing and reviews change the shelf under a cached render.
 export const revalidate = 0
@@ -34,20 +40,16 @@ const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v
 function readFilters(params: Record<string, string | string[] | undefined>): MarketplaceFilterValues {
   const school = first(params.school)
   const format = first(params.format)
-  const price = first(params.price)
   const level = first(params.level)
   const sort = first(params.sort)
   return {
     q: (first(params.q) ?? "").trim().replace(/\s+/g, " ").slice(0, 80),
     school: schoolSlugOf(school) ?? "",
     format: isCourseFormat(format) ? format : "",
-    price: price === "free" || price === "paid" ? price : "",
     level: level === "beginner" || level === "intermediate" || level === "advanced" ? level : "",
     sort: isMarketplaceSort(sort) ? sort : "popular",
   }
 }
-
-const isFree = (c: BrowseCourse) => c.pricing === "free" || !c.price
 
 /** Every word must appear in the title, the blurb, the topic or the seller's name. */
 function matches(course: BrowseCourse, words: string[]): boolean {
@@ -61,7 +63,7 @@ function matches(course: BrowseCourse, words: string[]): boolean {
 
 function sortCourses(courses: BrowseCourse[], sort: MarketplaceFilterValues["sort"]): BrowseCourse[] {
   const time = (iso: string | null) => (iso ? new Date(iso).getTime() : 0)
-  const price = (c: BrowseCourse) => (isFree(c) ? 0 : (c.price ?? 0))
+  const price = (c: BrowseCourse) => c.price ?? 0
   const sorted = [...courses]
   switch (sort) {
     case "rating":
@@ -88,6 +90,7 @@ function sortCourses(courses: BrowseCourse[], sort: MarketplaceFilterValues["sor
  * marketplace courses only.
  */
 export default async function MarketplacePage({ searchParams }: Search) {
+  if (!MARKETPLACE_OPEN) return <ComingSoon world={worldOf("marketplace")} />
   const [user, catalogue, params] = await Promise.all([
     getCachedUser(),
     fetchBrowseCourses({ kind: "marketplace" }),
@@ -101,7 +104,6 @@ export default async function MarketplacePage({ searchParams }: Search) {
     (c) =>
       (!filters.school || c.school === filters.school) &&
       (!filters.format || c.format === filters.format) &&
-      (!filters.price || (filters.price === "free" ? isFree(c) : !isFree(c))) &&
       (!filters.level || c.level === filters.level) &&
       (words.length === 0 || matches(c, words))
   )
@@ -120,7 +122,7 @@ export default async function MarketplacePage({ searchParams }: Search) {
     label: FORMAT_LABEL[value],
     count: catalogue.filter((c) => c.format === value).length,
   })).filter((f) => f.count > 0 || f.value === filters.format)
-  const filtering = Boolean(filters.q || filters.school || filters.format || filters.price || filters.level)
+  const filtering = Boolean(filters.q || filters.school || filters.format || filters.level)
 
   return (
     <div className="mx-auto max-w-7xl px-6 pb-24 pt-10 md:pb-32 md:pt-16">

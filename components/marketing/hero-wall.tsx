@@ -18,8 +18,9 @@ import { HeroPauseToggle, useSlideClock } from "@/components/marketing/hero-cont
 import { HeroCopy } from "@/components/marketing/hero-copy"
 import { useStartSchool } from "@/components/marketing/start-school-store"
 import { BRAND } from "@/lib/brand"
-import { SCHOOLS, SCHOOL_BY_SLUG, type School, type SchoolSlug } from "@/lib/schools"
+import { SCHOOLS, SCHOOL_BY_SLUG, type FromPrice, type School, type SchoolSlug } from "@/lib/schools"
 import { START_SCHOOL_COOKIE } from "@/lib/start-gate"
+import { wasPriceNote } from "@/lib/program-price"
 import { cn } from "@/lib/utils"
 
 const MotionLink = motion.create(Link)
@@ -87,7 +88,7 @@ export function HeroWall({
   cohortOpen,
 }: {
   counts: Record<SchoolSlug, number>
-  cheapest: Record<SchoolSlug, number | null>
+  cheapest: Record<SchoolSlug, FromPrice | null>
   signedIn: boolean
   registerUrl: string
   /** A cohort is upcoming: the secondary CTA points at its band. */
@@ -140,7 +141,8 @@ export function HeroWall({
       const from = cheapest[s.slug]
       return [
         n === 1 ? "1 program" : `${n} programs`,
-        from === null ? null : from === 0 ? "free to start" : `from $${from.toLocaleString("en-US")}`,
+        // Plain text (it is also announced), so the regular price is named, not struck.
+        from === null ? null : `from $${from.price.toLocaleString("en-US")}${wasPriceNote(from.price, from.listPrice)}`,
       ]
         .filter(Boolean)
         .join(" · ")

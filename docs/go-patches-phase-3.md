@@ -80,6 +80,7 @@ Otherwise the lesson is **locked**, and Go must:
   - Require a `packageKey` naming an enabled package; otherwise reject with `package_required`.
   - Charge `package.price × 100` cents.
   - Use the wallet reference and idempotency key `academy_enroll_<userId>_<courseId>_<packageKey>`, plus `_r<n>` after `n` refunded orders for that user and course.
+  - Web, 2026-11-08 (recommended for Go too): then `_d<n>` after `n` failed orders for that user and course with `failureCode: "insufficient_funds"`. A declined charge moved no money, so the retry after a top-up gets a fresh key; if the wallet replayed a stored decline, reusing the key would keep the learner declined for 24 h. Any other failure keeps the same key, because the debit may have happened.
   - Write `orders.packageKey`, `enrollments.packageKey` and `enrollments.packageName`.
   - A **pre-enrolled** enrollment activated by payment gets the same fields.
 - If the course has **no enabled package**, ignore any `packageKey` sent. Charge `course.price`, keep the reference exactly as today (no package segment), and store `packageKey: null`.
@@ -197,7 +198,7 @@ The Academy now has two halves: **school programs** (live cohorts, three plans) 
 | `courses.communityUrl` | string \| `null` | The course's class community (WhatsApp, Telegram, Discord, Social…): http(s), ≤ 500 chars. |
 | `users.sellerStatus` | `"none" \| "applied" \| "approved" \| "rejected"` | Missing = `"none"`. `"approved"` lets a **USER** create and edit their own marketplace courses on the web. It is not a role and grants nothing else. |
 
-- **Single price.** Marketplace and New Economy courses carry no package ladder (`packages: []`) and sell at `price`/`pricing`. New Economy courses are always `pricing: "free"`, `price: 0`, `school: null`, `category: "New Economy"`.
+- **Single price.** Marketplace and New Economy courses carry no package ladder (`packages: []`) and sell at `price`/`pricing`. New Economy courses have `school: null`, `category: "New Economy"`. Since 2026-11-03 they are paid like every course (§22); before that they were `pricing: "free"`, `price: 0`.
 - **Who may publish.** Go never publishes a course whose owner is a `USER` (a Marketplace Creator) and never writes `review.*`. Only the web's admin review publishes those, after four recorded checks on the current content. Faculty marketplace courses publish directly, as programs do.
 - **List by `status`, never by `review.status`.** A creator who edits a live course leaves it `status: "published"` with `review.status: "pending"` while the edit is re-reviewed, and it stays on sale meanwhile (web: `listCourses` in `lib/actions/student.ts` filters on `status` only).
 - **A `USER` can own a course.** `courses.instructor` may be a `USER` with `sellerStatus: "approved"`. The web refuses such an owner live classes, exams, assignments and certificate lists, and re-opens review when they edit. A live course's price is frozen for them. Go must refuse a `USER` owner on every meeting, exam, assignment, certificate-list, course, lesson and resource write: creators edit on the web only.
@@ -360,10 +361,10 @@ What Go does:
 **Go needs no patch;** only data changed.
 
 - **`courses.packages[].entitlements.recordings`** is a new web-only boolean (missing = `false`). The web treats a plan as including recorded classes when `recordings || liveClasses`. If mobile ever plays recordings, it uses the same rule and §10's signed-URL path.
-- **After the catalogue apply,** every catalogue program's Basic plan has `assignments`, `certificate` and `recordings` true, and `liveClasses`, `instructorQa`, `mentorship` and `prioritySupport` false.
+- **After the catalogue apply,** every catalogue program's Basic plan has `assignments`, `certificate` and `recordings` true, and `liveClasses`, `instructorQa`, `mentorship` and `prioritySupport` false. **Superseded 2026-11-04 (§24):** Basic now also has `liveClasses` and `instructorQa` true.
 - **What R1 and R4 already do with that data:** a Basic enrollment may start the final exam; `examRequired` now holds Basic completion until it passes; and a completed Basic enrollment gets a certificate.
-- **Basic's row today:** lessons open per R3 · final exam allowed · certificate yes (on completion) · live class refused · new thread refused.
-- **Display only:** `name`, `tagline` ("Foundation" / "Mastery" / "Personalized Mastery"), `duration` ("4 weeks" / "8–12 weeks" / "Flexible schedule") and `features`. The Executive tier label is "Executive"; it is not stored.
+- **Basic's row today:** lessons open per R3 · final exam allowed · certificate yes (on completion) · live class refused · new thread refused. (After §24's catalogue apply: live class allowed, new thread allowed.)
+- **Display only:** `name`, `tagline` ("Foundation" / "Mastery" / "Personalized Mastery"), `duration` ("9 weeks" on every plan since §24; before, "4 weeks" / "8–12 weeks" / "Flexible schedule") and `features`. The Executive tier label is "Executive"; it is not stored.
 
 ## 17. Phase 19 — Faculty system (institutional blueprint §16, D29)
 
@@ -415,10 +416,10 @@ The Academy keeps owning each program and keeps its sales share. An admin assign
 Owen's corrections: faculty is the Academy only; the tutors' marketplace is open to anyone; outside tutors (Nwakwesi Milash) move to the marketplace; every faculty course sells Basic $49, Standard $99 and Executive $199; payments must work. Nothing is renamed and no enum value is added. The handoff for this release, with the wallet and production steps, is `docs/backend-handoff-2026-10-29.md`.
 
 **R16 — The price list. REQUIRED only if Go writes `courses.packages` or hardcodes a plan price.**
-- Every plan of a school program (`kind` missing or `"program"`) sells at the price list: `basic` 49, `standard` 99, `executive` 199, whole USD (`PROGRAM_PRICE_LIST`, `lib/entitlements.ts`). The web writes these prices whatever its editor posts, and refuses a paid program with no enabled plan (it can still be free).
-- After `scripts/mastery-catalogue.mjs --apply --allow-price-change`, every catalogue program's `packages[].price` holds them, `courses.price` is 49 and `listPrice` is `null` (no struck-through price).
+- Every plan of a school program (`kind` missing or `"program"`) sells at the price list: `basic` 49, `standard` 99, `executive` 199, whole USD (`PROGRAM_PRICE_LIST`, `lib/entitlements.ts`). The web writes these prices whatever its editor posts, and refuses a program with no enabled plan (no course is free, §22).
+- After `scripts/mastery-catalogue.mjs --apply --allow-price-change`, every catalogue program's `packages[].price` holds them, `courses.price` is 49 and each plan's `listPrice` is its regular price, 300 / 1,000 / 10,000 (§22).
 - Go charges `package.price × 100` (R5), so it needs no change for the data. It does need one if it has its own plan-price table, prints prices from copy, or lets an instructor save plan prices (question 6 in §4): write the list prices, never posted ones.
-- Marketplace courses keep their creator's single price (`packages: []`). New Economy courses stay free.
+- Marketplace and New Economy courses keep their own single price (`packages: []`).
 
 **R17 — Who a course credits. Recommended: without it, mobile still names the catalogue's owner account on every program and certificate.**
 - A school program or a New Economy course credits **"WorldStreet Mastery Academy faculty"**, with the Academy's gold mark as the avatar, never `courses.instructor`'s name. The 12 programs belong to one account (`samsonrichfield@gmail.com`, named "Thy Richfield"); learners must not see it as a tutor.
@@ -447,3 +448,110 @@ What Go must get right:
 - **Credit.** Until the owner's role changes, R17's rule still credits them by name on the marketplace, never as Academy faculty.
 
 **Earnings (no rule change; please confirm).** A program sale still books the seller's share, 85%, to `courses.instructor` as a `kind: "sale"` earning. For all 12 programs that is the catalogue's owner account, and `/api/cron/earnings` credits it to that account's wallet after 7 days. Confirm that wallet is the Academy's own before the first paid sale; the handoff lists the options if it isn't.
+
+## 22. No free courses, and regular prices struck through (Owen, 2026-11-03)
+
+Owen: "We don't want to do free classes." The program plans' $49 / $99 / $199 are discounted prices; $300 / $1,000 / $10,000 "are the actual prices" and show struck through. Nothing is renamed and no field is added: `packages[].listPrice` has existed since Phase 2.
+
+**R18 — No free enrolment. REQUIRED if mobile can enrol without a charge (§4, R5).**
+- A course is on sale only when `pricing: "paid"` and `price > 0` (`isOnSale` and `ON_SALE_FILTER`, `lib/entitlements.ts`). Go must refuse to enrol anyone in a course that isn't on sale, and must never charge or enrol for 0.
+- Hide courses that aren't on sale from every list, as the web does: `{ pricing: "paid", price: { $gt: 0 } }` beside the published and `kind` filters.
+- If mobile writes courses, never save one with `pricing: "free"` or `price: 0`. New Economy courses are paid like marketplace courses, at one price.
+- Learners already enrolled in a legacy free course keep the enrollment, but it no longer opens the dashboard (R19).
+- Pre-enrolment (a reservation on a scheduled course, paid at launch) is unchanged, but only a course on sale takes one.
+
+**Display (recommended).** Each program plan's `listPrice` (300 / 1,000 / 10,000) is its regular price. The web shows it struck through beside `price`, with "Save NN%". Checkout always charges `price` (R5), never `listPrice`.
+
+**Data.** `scripts/mastery-catalogue.mjs --apply --allow-price-change` writes the ladder with these regular prices. Until it runs, production programs keep their single legacy price and show no struck price. `scripts/new-economy-catalogue.mjs` now inserts unpriced drafts (`pricing: "paid"`, `price: 0`, so not on sale) and never rewrites a course's price.
+
+## 23. Marketplace "Coming soon"; the dashboard is for paid Academy learners (voice note, 2026-11-02)
+
+The owner's voice note: the tutors' platform "is not supposed to be part of the official academy that the students have to pay for"; it and internships go in the menu as Coming soon; "let's first of all work on the official academy, where they pay to have access to the dashboard". No schema changes.
+
+**R19 — Only a paid Academy enrollment opens the dashboard. REQUIRED if mobile gates its home on enrollment.**
+- A learner (role `USER`, no instructor application) gets the dashboard only with an `active` or `completed` enrollment in a course matching `OPENS_DASHBOARD_FILTER` (`lib/start-gate.ts`): `{ pricing: "paid", price: { $gt: 0 }, kind: { $ne: "marketplace" } }`. That is a school program or New Economy course on sale (legacy rows without `kind` are programs).
+- An enrollment in a marketplace course or a legacy free course is kept, but it doesn't open the dashboard. Such a learner is sent to choose a program, as one with no enrollment is.
+- Instructors, admins and instructor applicants are never gated, as before.
+
+**R20 — The marketplace is closed. REQUIRED if mobile lists or sells marketplace courses.**
+- While `MARKETPLACE_OPEN` (`lib/marketplace.ts`) is `false`, the web lists, shows and sells no `kind: "marketplace"` course: catalogue reads add `{ kind: { $ne: "marketplace" } }`, a marketplace course page is 404, and checkout, ESPEE, pre-enrolment and Vivid refuse with "The marketplace opens soon." New seller applications are refused too.
+- Go should do the same: no marketplace listings, no marketplace purchase. Authoring and admin review are unchanged.
+- The Opportunity Hub has no data. It is a Coming soon page on the web (`/opportunity-hub`).
+
+## 24. Basic includes live classes and Q&A; every plan runs 9 weeks; tutors add the lessons (team call, 2026-11-04)
+
+**Go needs no patch for the plans;** only data changed. Applies once `scripts/mastery-catalogue.mjs --apply` runs (§22's run does it too).
+- Every catalogue program's Basic plan gains `entitlements.liveClasses: true` and `entitlements.instructorQa: true`, beside `assignments`, `certificate` and `recordings`. Go's existing gates (R2 live classes, R3 Q&A) read the stored flags, so a Basic enrollment may then join a live class and open a Q&A thread. Existing Basic learners gain both on the apply.
+- Every plan's `duration` becomes "9 weeks". Display only.
+
+**R21 — Lessons are the teaching faculty's too. OPTIONAL (only if mobile lets instructors edit lessons).**
+- On the web, a program's lessons (add, edit, delete, minimum plan, video length) can be changed by its owner, an admin, **or a faculty member assigned in `courses.teachingFaculty`** while their role is `INSTRUCTOR` or `ADMIN` (`lessonCourse` in `lib/actions/instructor.ts`, over `teachesCourse` in `lib/teaching.ts`). The course itself (copy, plans, prices, publishing, exam) stays owner/admin only.
+- `lessons.videoDuration` is the tutor's stated length in seconds (typed as hours and minutes); `null` means not stated, and the program page leaves that lesson out of its video total.
+
+## 25. The programme document's prices, referral rates, payments and programs (Owen, 2026-11-05)
+
+Owen took the programme document of 13 Sept 2026 ("Complete Programme Structure") as the rule: "use this", "follow the document", "add these payments right now".
+
+**Prices: data only.** Once `scripts/mastery-catalogue.mjs --apply --allow-price-change` runs, every program's plans sell at Basic $49, Standard $199 and Executive $999 (`PROGRAM_PRICE_LIST`), with $300 / $1,000 / $10,000 still struck through. `courses.price` stays 49.
+
+**R22: Referral commission follows the plan. REQUIRED if Go pays referral commissions on mobile purchases.**
+- The web pays 10% on Basic, 12% on Standard and 15% on Executive of the referred learner's first paid enrollment, which is $4.90, $23.88 or $149.85 at today's prices. A course sold without plans pays 10% (`referralRateFor`, `lib/db/models/earning.ts`).
+- ~~Everything else is unchanged: one commission per buyer, ever (`academy_ref_<buyerId>`), never on a self-referral, and never on a transfer.~~ Superseded the same day by R24 (§26): every purchase earns, transfers included.
+- The Earning row's `note` now names the rate and plan.
+
+**R23: New `orders.paymentMethod` values. REQUIRED if Go reads `paymentMethod` with a fixed list.**
+- `paymentMethod` may now also be `"bank"`, `"usdt_trc20"` or `"usdt_bep20"`, beside `"wallet"` and `"espee"`.
+- These are transfer orders, approved by an admin from the learner's receipt (`manualpayments.method` carries the same values). Like ESPEE, they have no `chargeId`, earn no instructor earning, and are skipped by wallet reconciliation. Since R24 (§26) an approved transfer does earn the referrer's commission.
+- The bank, USDT and ESPEES details are the document's, in `lib/payment-channels.ts`. `ESPEE_PAYMENT_DETAILS` is no longer read.
+
+**Programs: data only.** The catalogue installs 12 cohort courses: the document's 11 plus "E-Commerce & Digital Business".
+- "Cybersecurity" is renamed "Cybersecurity Mastery", and its slug is kept.
+- The team kept "E-Commerce & Digital Business" on 2026-11-05, in the School of Digital Business. A new install publishes it. An existing draft row keeps its status.
+- Video Editing Mastery is installed as published.
+
+**Partner levels: web only, no data.** Academy Partner (1–100 successful referrals), Growth Partner (101–999) and Elite Partner (1,000+) are worked out from the paid referral count (`lib/partner-levels.ts`). The team set these ranges on 2026-11-05 so they have no gap or overlap; the document had 100–500. They are recognition only and never change a rate.
+
+## 26. The client's answers on referrals, the naira rate and Executive (2026-11-05)
+
+The client answered the points the programme document left open (forwarded by Owen, 2026-11-05): 1A, 2B, 3A, 4A, 5B.
+
+**R24: Every purchase earns its referrer, however it was paid. REQUIRED if Go pays referral commissions on mobile purchases or approves transfers.**
+- A referred learner's **every** paid purchase books a commission (answer 2B), not only the first. The rate is still the plan's (R22): 10% / 12% / 15%, 10% without a plan.
+- An approved transfer (bank, USDT, ESPEES) earns it too (answer 1A, "once payment is verified"). The web books it when an admin approves the proof (`adminApproveEspeePayment`). The Academy pays it from its own funds, because the learner's money went to the bank or crypto account, not the wallet.
+- One commission per **order**: `creditReference` is `academy_ref_order_<orderId>`. Rows booked before this keep `academy_ref_<buyerId>`. The unique index on `creditReference` still makes a retried purchase or approval book once.
+- On a transfer the row has `chargeId: null`, `order` set, and a `note` naming the method ("paid by Bank transfer"). `/api/cron/earnings` clears it like any other row (it reads only `status` and `availableAt`), crediting the referrer's wallet. The referrer withdraws from the wallet whenever they like.
+- Who referred a transfer buyer: the partner link in the learner's cookie when they submitted (kept on the proof as `manualpayments.referralCode`, since approval runs in the admin's request), else `users.referredBy`. Never a self-referral, never on a sale the seller's own link made (unchanged).
+- Shared code: `bookReferralCommission` in `lib/referrals.ts`, called from `purchaseCourse` and `adminApproveEspeePayment`.
+
+**R25: `manualpayments` gains five fields. Additive; REQUIRED only if Go writes or validates `manualpayments`.**
+- `ngnPerUsd` (number or null), `rateSource` (`"pinned"`, `"market"` or null) and `amountNgn` (whole naira or null): a bank transfer's naira quote (answer 3A, "a fixed exchange rate at checkout"). Null for other methods and older rows. `amountLabel` reads like "₦298,500 ($199)".
+- `referralCode` (string or null): see R24.
+- `receiptKey` and `receiptContentType` may be null (since 2026-11-05: without the private bucket the receipt goes on WhatsApp).
+
+**Web only, no Go change: the naira rate.** A new collection `nairarates` (one row, `key: "USD_NGN"`) holds the last market rate from `https://open.er-api.com/v6/latest/USD` (fetched by the server at most every 12 hours; quoted for up to 4 days if the feed is down) and an optional rate an admin pins at `/admin/payments/espee`, which wins until cleared. With neither, checkout asks the learner to confirm the rate on WhatsApp. Students pay any bank charges and USDT network fees, so the full fee arrives (answer 4A, unchanged).
+
+**Executive is strictly one-on-one: data only.** After `mastery-catalogue.mjs --apply --allow-access-loss`, every program's Executive plan has `liveClasses: false` and `recordings: false` (answer 5B; Owen: no group recordings either). It keeps mentorship, instructor Q&A, assignments, the certificate and priority support, and its lessons still open everything Standard's do. Mentorship sessions are private meetings with no `courseId`, so they never depend on `liveClasses`. If Go decides class access from the entitlements, nothing changes; if it hard-codes Executive as full access, it must read the plan instead.
+
+## 27. Learners who paid outside the platform (team voice note, 2026-11-06)
+
+The first students paid by bank, USDT or ESPEES before checkout took payments, and must not pay again. An admin now records each payment at `/admin/enrollments/add`, either one learner at a time or from a CSV list. Nobody gets login details: sign-in stays on the hub.
+
+**New collection `accessgrants`: web only, invisible to Go.** It holds one row per learner and program:
+- what they paid: `email`, `course`, `packageKey`, `amountMinor` (what they actually paid), `method` (the transfer values), `reference` and `paidAt`;
+- its `status`: `waiting`, `opened` or `cancelled`.
+
+The program opens at one of three moments:
+- straight away, if an account already has that email;
+- on the learner's first web sign-in (`lib/auth/sync.ts`), once their email is verified;
+- when the dashboard gate would otherwise turn them away.
+
+**R26: grant orders look like approved transfers. REQUIRED only if Go reads `orders.reference` patterns or treats every non-wallet order as an ESPEE proof.**
+- Opening a grant writes the same rows a transfer approval writes:
+  - an `orders` row with `reference: "academy_grant_<grantId>"` and `paymentMethod` set to the method they paid by (`bank`, `usdt_trc20`, `usdt_bep20` or `espee`);
+  - `chargeId: null` and status `enrolled`;
+  - history entries for the day they paid and for who recorded it;
+  - an `enrollments` row with `pricePaid` set and `transactionId: null`.
+- The enrollment's `purchasedAt` is the day they paid, not the day it was recorded, so the cohort derived from it is the one they paid for.
+- No instructor earning and no partner commission are booked, because the platform never took the money.
+- Payment events are `access_grant_opened` and `access_grant_failed`.
+- A learner whose account was first made in the mobile app gets the program the first time they open the web dashboard. If Go wants that sooner, it can open `waiting` rows for the signed-in email by the same rules, or an admin can press "Open it now".

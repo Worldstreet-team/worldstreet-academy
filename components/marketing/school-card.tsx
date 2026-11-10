@@ -2,7 +2,8 @@ import { ArrowRightIcon } from "@/components/icons"
 import Link from "next/link"
 import Image from "next/image"
 
-import type { School } from "@/lib/schools"
+import type { FromPrice, School } from "@/lib/schools"
+import { PackageDiscount } from "@/components/programs/package-offer"
 import { schoolCover } from "@/lib/school-art"
 import { SchoolIcon } from "@/components/shared/school-icon"
 
@@ -45,8 +46,8 @@ export function SchoolCard({
 }: {
   school: School
   count: number
-  /** Cheapest program in the school, whole USD; 0 = free; null hides it. */
-  fromPrice?: number | null
+  /** Cheapest program in the school, with its regular price; null hides it. */
+  fromPrice?: FromPrice | null
   /** h3 under a section h2 (landing); h2 under the page h1 (/schools, /dashboard/start). */
   headingLevel?: "h2" | "h3"
   /** Defaults to the public school page. */
@@ -60,7 +61,7 @@ export function SchoolCard({
   const Heading = headingLevel
   const cover = schoolCover(school.slug)
   const programs = count === 0 ? "Programs coming soon" : count === 1 ? "1 program" : `${count} programs`
-  const price = fromPrice === null ? null : fromPrice === 0 ? "Free" : `$${fromPrice.toLocaleString("en-US")}`
+  const price = fromPrice === null ? null : `$${fromPrice.price.toLocaleString("en-US")}`
 
   return (
     <Link
@@ -110,9 +111,9 @@ export function SchoolCard({
             {programs}
             {price && (
               <>
-                {" · "}
-                {fromPrice === 0 ? null : "from "}
-                <span className="font-semibold text-ws-primary">{price}</span>
+                {" · from "}
+                <span className="font-semibold text-ws-primary">{price}</span>{" "}
+                {fromPrice && <PackageDiscount pkg={fromPrice} chipClassName="hidden" />}
               </>
             )}
           </span>

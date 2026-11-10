@@ -51,7 +51,7 @@ const navItems: BottomNavItem[] = [
 /** ESPEE payments, Courses, Cohorts, Sellers, Partners, Reviews and Exams share the fifth slot behind a "More" menu. Team joins the menu for super admins. */
 const moreItems: BottomNavItem[] = [
   {
-    title: "ESPEE payments",
+    title: "Transfer payments",
     href: "/admin/payments/espee",
     icon: ReceiptText,
     match: (p: string) => p.startsWith("/admin/payments/espee"),
@@ -105,7 +105,8 @@ const teamItem: BottomNavItem = {
 export function AdminBottomNav() {
   const pathname = usePathname()
   const user = useUser()
-  const shownMore = isSuperAdmin(user) ? [teamItem, ...moreItems] : moreItems
+  // Transfer receipts are the super admin's to reconcile (CTO, 2026-11-08).
+  const shownMore = isSuperAdmin(user) ? [teamItem, ...moreItems] : moreItems.filter((item) => item.href !== "/admin/payments/espee")
   const moreActive = shownMore.some((item) => item.match?.(pathname) ?? pathname === item.href)
 
   return (

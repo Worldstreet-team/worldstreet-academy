@@ -24,7 +24,7 @@ export type PackageKey = "basic" | "standard" | "executive"
  *  - program      a school program: live cohorts, Basic/Standard/Executive
  *  - marketplace  a pre-recorded course sold on the Academy marketplace, by an
  *                 approved seller or by the Academy's own faculty
- *  - new-economy  a free course on how to use a WorldStreet product
+ *  - new-economy  a course on how to use a WorldStreet product (paid, like every course)
  */
 export type CourseKind = "program" | "marketplace" | "new-economy"
 

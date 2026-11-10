@@ -1,6 +1,7 @@
 import { ArrowRightIcon, CheckIcon } from "@/components/icons"
 import type { Metadata } from "next"
 import Link from "next/link"
+import { redirect } from "next/navigation"
 
 import { BRAND } from "@/lib/brand"
 import { SCHOOLS } from "@/lib/schools"
@@ -8,7 +9,7 @@ import { appUrl } from "@/lib/app-url"
 import { EARNINGS_CLEARING_DAYS, MARKETPLACE_SHARE_ACADEMY, MARKETPLACE_SHARE_OWN_LINK } from "@/lib/db/models"
 import { COURSE_FORMATS, FORMAT_BLURB, FORMAT_LABEL } from "@/lib/course-format"
 import { REVIEW_CHECKS, REVIEW_CHECK_DETAILS } from "@/lib/review-checks"
-import { QUALITY_CRITERIA, sharePercent } from "@/lib/marketplace"
+import { MARKETPLACE_OPEN, QUALITY_CRITERIA, sharePercent } from "@/lib/marketplace"
 import { SectionLabel, SectionTitle } from "@/components/marketing/section-heading"
 
 export const metadata: Metadata = {
@@ -26,7 +27,7 @@ const GOLD_CTA =
 const STEPS = [
   {
     title: "Application",
-    body: "Open to anyone, in ten minutes: what you'll teach, a sample of your work and your agreement to the standards. Your Creator area opens straight away; build your listing in the editor and submit it.",
+    body: "Open to anyone, in ten minutes: what you'll teach, a sample of your work and your agreement to the standards. We approve creators on these details; your Creator area then opens and you build your listing in the editor and submit it.",
   },
   ...REVIEW_CHECKS.map((key) => {
     const d = REVIEW_CHECK_DETAILS[key]
@@ -41,10 +42,12 @@ const STEPS = [
  * for, the split (the larger share through the seller's own link), the
  * quality criteria every course is reviewed against and how review works.
  * One gold action, "Start selling", at the top and again at the foot; it
- * leads to the signed-in form, which opens the Creator area at once (open
- * marketplace, Owen 2026-10-28; the hub's sign-in comes first for a guest).
+ * leads to the signed-in form, and an admin approves each creator on their
+ * details (Owen, 2026-11-05); the hub's sign-in comes first for a guest.
+ * While the marketplace is Coming soon (MARKETPLACE_OPEN) it sends to that page.
  */
 export default function SellPage() {
+  if (!MARKETPLACE_OPEN) redirect("/marketplace")
   const own = sharePercent(MARKETPLACE_SHARE_OWN_LINK)
   const academy = sharePercent(MARKETPLACE_SHARE_ACADEMY)
 
@@ -193,8 +196,9 @@ export default function SellPage() {
               Ready to sell your course?
             </h2>
             <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-ws-muted">
-              Anyone can sell. You&rsquo;ll need a WorldStreet account, a sample of your teaching and a topic that
-              fits one of the {SCHOOLS.length} schools.
+              Anyone can apply to sell their own course. You&rsquo;ll need a WorldStreet account, a sample of your
+              teaching and a topic that fits one of the {SCHOOLS.length} schools. This isn&rsquo;t a job with the
+              Academy: staff tutor vacancies are on our careers page.
             </p>
           </div>
           <Link href={APPLY_HREF} className={GOLD_CTA}>

@@ -57,7 +57,7 @@ The Academy never holds a balance. It calls the central wallet server-to-server 
 - [ ] `NEXT_PUBLIC_WALLET_FUNDING_URL` and `NEXT_PUBLIC_WALLET_WITHDRAW_URL`: optional. Without them, learners top up and withdraw on the Academy's own wallet pages.
 - [ ] `CRON_SECRET`, plus the Coolify scheduled tasks in runbook §5. `academy-earnings` runs `/api/cron/earnings` every 15 minutes and moves matured earnings into wallets; it answers `503 wallet_disabled` without B1.
 - [ ] ESPEE (pay by transfer, admin approves the receipt):
-  - `ESPEE_PAYMENT_DETAILS`, the details learners pay to;
+  - ~~`ESPEE_PAYMENT_DETAILS`~~ — no longer read since 2026-11-05 (go-patches §25): the payment details are code;
   - `R2_RESOURCES_BUCKET_NAME`, the private bucket with no public access, whose CORS allows `PUT` with `Content-Type` from `https://academy.worldstreetgold.com`.
   - Without both, the ESPEE option stays hidden.
 
@@ -93,7 +93,7 @@ In release order. "§" means a section of that file.
 
 Whoever holds the production URI runs these, in this order. Each script is a dry run without `--apply`, and refuses `--apply` unless `MONGODB_URI` is on the command line. **`.env.local`'s URI is production.**
 
-1. [ ] **Catalogue prices.** `node scripts/mastery-catalogue.mjs` (read the boxed warning: every program changes to 49/99/199), then `MONGODB_URI="$PROD_URI" node scripts/mastery-catalogue.mjs --apply --allow-price-change`.
+1. [ ] **Catalogue prices.** `node scripts/mastery-catalogue.mjs` (read the boxed warning: every program changes to 49/199/999 since 2026-11-05 — go-patches §25 — each plan with its regular price 300/1,000/10,000 struck through; §7; every plan runs 9 weeks and Basic includes live classes and Q&A, go-patches §24), then `MONGODB_URI="$PROD_URI" node scripts/mastery-catalogue.mjs --apply --allow-price-change`.
 2. [ ] **Tutors to the marketplace.** `node scripts/move-tutor-courses.mjs`, check the two courses it lists, then `MONGODB_URI="$PROD_URI" node scripts/move-tutor-courses.mjs --apply`.
    - The courses leave the program catalogue at once.
    - They return on the marketplace, under the tutor's name, when an admin approves them at `/admin/courses?review=pending`. That takes four checks.
@@ -120,6 +120,49 @@ These are outside the web app's code. Please confirm or schedule each:
 5. Does Go write `courses.packages` or `users.role`? (R16, R14.)
 6. The brief proposes new roles: Employer, Academic Admin, Finance Admin and Support Admin. `users.role` is shared with Go, so any new value needs a joint plan before the web adds it.
 
+## 7. Addendum — no free courses, regular prices struck through (2026-11-03)
+
+Owen checked production after the 29 October push and still saw a free course and the old prices. There were two separate causes:
+
+- **The price ladder isn't in production data yet.** Every production program still sells one "Full program" at its legacy single price, because §4 step 1 (the catalogue apply) hasn't run. The code for the three plans is live; the data isn't. Run §4 steps 1 and 2.
+- **Free courses were allowed.** Owen: "We don't want to do free classes." The web now refuses them everywhere.
+
+What the web changes in this release:
+- **No course is free.** Saving, publishing, admin approval, pre-enrolment, checkout and Vivid refuse a course that isn't paid and priced above $0. Every public list, the program page, the sitemap and search hide one. The editor has no "Free" option, and New Economy courses take a price like marketplace courses.
+- **The live free course leaves the public site on deploy.** That is "Cryptocurrency Trading Masterclass: Beginner to Advanced", one of Milash's two courses. Its enrolled learners keep the enrollment, but since §8 it no longer opens the dashboard on its own. §4 step 2 moves it to the marketplace review queue, and it can only be approved once it has a price.
+- **Regular prices.** Basic $49, Standard $99 and Executive $199 are discounted prices. Each plan stores its regular price, $300 / $1,000 / $10,000, as `listPrice` (`PROGRAM_REGULAR_PRICE`). Program cards, school pages, the program page and checkout show it struck through, with "Save NN%" and the existing "Offer ends in" countdown to the next cohort. Checkout still charges $49 / $99 / $199.
+- **Pre-enrolment copy.** "Pre-enroll free" now reads "Reserve a seat". A reservation is still paid at launch.
+
+For you:
+- [ ] **Deploy, then §4 steps 1 and 2.** The struck prices appear only after the catalogue apply.
+- [ ] **Go R18** (`docs/go-patches-phase-3.md` §22). Required if mobile can enrol without a charge.
+
+---
+
+## 8. Addendum — the Academy first; the Marketplace and Opportunity Hub "Coming soon" (voice note, 2026-11-02)
+
+The owner's voice note on the live site: the outside tutor's courses showed up inside the Academy's programs. The tutors' platform "is not supposed to be part of the official academy that the students have to pay for". It and internships belong in the website menu, as Coming soon, and the work now is "the official academy, where they pay to have access to the dashboard".
+
+What the web changes in this release:
+- **The Marketplace is "Coming soon"** (`MARKETPLACE_OPEN = false`, `lib/marketplace.ts`).
+  - `/marketplace` is a Coming soon page, kept out of search; `/sell` and the seller application send there.
+  - Marketplace course pages are 404, and none is listed anywhere: home, sitemap, Vivid.
+  - Checkout, ESPEE, pre-enrolment, Vivid and new seller applications refuse with "The marketplace opens soon."
+  - Authoring and admin review still work. Setting the flag to `true` reopens all of it.
+- **The Opportunity Hub is "Coming soon"** at `/opportunity-hub`, with one line: "Internships and other opportunities for WMA learners."
+- **The menu.** Both closed areas appear with a "Coming soon" chip in four places:
+  - the phone menu;
+  - the "Explore schools" dropdown on desktop, under "Coming soon";
+  - the footer;
+  - "the three worlds" on the home and `/academy` pages.
+
+  The desktop bar shows only The Academy and Programs; the Marketplace link comes back when the marketplace opens. "Sell on the marketplace" and "Sell your course" are hidden while it is closed.
+- **Only a paid Academy enrollment opens the dashboard** (`OPENS_DASHBOARD_FILTER`, `lib/start-gate.ts`): one in a school program or New Economy course that is on sale. A learner whose only enrollments are marketplace or legacy free courses is sent to choose a program, the same as a new learner. On production that includes everyone who joined the free tutor course and bought nothing else.
+
+For you:
+- [ ] **Deploy, then §4 step 2** (`move-tutor-courses.mjs --apply`). That takes the tutor's two courses out of the schools. Until it runs, the paid one ("DIGITAL MARKETING MASTERCLASS", $26) is still listed as an Academy program.
+- [ ] **Go R19 and R20** (`docs/go-patches-phase-3.md` §23). Mobile must not open the dashboard for a marketplace or free enrollment, and must not list or sell marketplace courses.
+
 ---
 
 ## Appendix — status of the corrections brief (web app, 2026-10-29)
@@ -141,7 +184,7 @@ Owner names and target dates are Owen's to fill.
 | 2 | Premium system: charcoal and gold, readable type, responsive | Built | WorldStreet design system (stone `#0C0A09`, gold, Manrope). The brief says navy; the system is charcoal |
 | 3 | Nav: Home, Academy, Schools, Programmes, Marketplace, Login | Built | `components/marketing/navbar.tsx` |
 | 3 | Nav: Cohorts, About, Become an Instructor, Join WMA | Done (menu) | This push: the menu lists Cohorts (`/calendar`), The Academy (the about page), Become an Instructor (`/teach`) and Sell on the marketplace (`/sell`), and the guest button reads "Join WMA". The desktop bar keeps three links so it fits at 1024px; adding more there is a design call |
-| 3 | Nav: Opportunity Hub, Become a Partner | Not built | No pages. WMA Partners lives in the dashboard (`/dashboard/referrals`) |
+| 3 | Nav: Opportunity Hub, Become a Partner | Partial | Opportunity Hub: a Coming soon page (`/opportunity-hub`) in the menu since §8. Become a Partner: no page. WMA Partners lives in the dashboard (`/dashboard/referrals`) |
 | 3 | Homepage, school pages | Built | Phases 11–13. School faculty sections are hidden while `FACULTY_PUBLIC` is off |
 | 3 | Every link, form and CTA on desktop and mobile | Built | All-role crawl, 127 routes × 2 viewports (2026-10-19). Re-run on staging after this push |
 | 4 | Academy world | Built | Schools, programs, cohorts, classes, recordings, assessments, mentorship, certificates, communities |
@@ -151,7 +194,7 @@ Owner names and target dates are Owen's to fill.
 | 5 | Duration, curriculum, price and cohort per programme | Built | Plan duration per program, cohorts at `/admin/cohorts`. Prices now follow the price list (Owen) |
 | 6 | Prices | Done | Owen's 49 / 99 / 199 replaces the brief's 49 / 199 / 999 |
 | 6 | "Regular" prices $300 / $1,000 / $10,000 | Decision | Not shown. Against the new prices they would read as 84%, 90% and 98% off |
-| 6 | Referral 10% / 12% / 15% by plan | Decision | The web pays 10% of a referred learner's first paid purchase on any plan (`lib/referrals.ts`) |
+| 6 | Referral 10% / 12% / 15% by plan | Done (2026-11-05) | By plan, on every purchase of a referred learner, wallet or approved transfer (`lib/referrals.ts`; go-patches §25 R22, §26 R24) |
 | 6 | Enrol only after verified payment or admin override; no duplicates | Done | Verified locally: $99 charged once despite a double-click. Admin overrides at `/admin/enrollments` and ESPEE approval |
 | 6 | Inclusions, duration, price and next steps before checkout | Built | Program page and checkout summary |
 | 6 | Cancellation and refund policy before checkout | Partial | Checkout says a failed enrollment is refunded. There is no policy text; the hub's legal documents need a refund clause and a link |

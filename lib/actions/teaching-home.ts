@@ -546,7 +546,8 @@ export async function getTeachingHome(input: {
         cohorts,
         draftCount: courses.filter((c) => c.status === "draft" && isOwned(c)).length,
         teachesProgram: taught.some((c) => courseKindOf(c) === "program"),
-        nextCohort: calendar.next,
+        // Faculty prepare for the next cohort before the website announces it, so hidden counts here.
+        nextCohort: calendar.upcoming,
         todo,
         money: {
           pendingMinor,

@@ -85,7 +85,7 @@ export default function AdminSellersPage() {
         <div className="mx-auto w-full max-w-7xl space-y-8">
           <PageHeader
             title="Marketplace Creators"
-            subline="Anyone may sell on the marketplace: creators are approved as they join. Their courses are reviewed in Courses before they go live."
+            subline="Anyone may apply to sell their own courses. Approve or reject each creator on their details; approval never lets them teach Academy students. Their courses are reviewed in Courses before they go live."
           />
 
           <FilterChips

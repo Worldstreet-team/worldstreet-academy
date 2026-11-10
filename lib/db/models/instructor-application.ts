@@ -1,8 +1,12 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose"
 
 /**
- * Instructor application — the review pipeline between "student" and
- * "instructor". One ACTIVE application per user (enforced by a partial unique
+ * Instructor application — the staff tutor JOB application (owner,
+ * 2026-11-05): the Academy hires a few tutors for its official students
+ * through a vacancy on /careers, an interview at the office or online, and an
+ * approve-or-reject decision. Marketplace creators are a different track
+ * (SellerApplication) and never land here. The review pipeline between
+ * "student" and "instructor". One ACTIVE application per user (enforced by a partial unique
  * index); rejected/withdrawn applications stay as history and the user may
  * re-apply.
  *
@@ -62,6 +66,8 @@ export interface IApplicationAnswers {
   readyToCommit?: boolean
   /** "Anything else you'd like to upload?" — an optional PDF (R2 public URL), uploaded like the CV. */
   extraDocumentUrl?: string | null
+  /** Staff hiring (2026-11-05): how the applicant can be interviewed. Absent on older applications. */
+  interviewPreference?: "office" | "online" | "either"
 }
 
 export type ApplicationPassion = "yes" | "somewhat"
@@ -121,6 +127,21 @@ export interface IInstructorApplication extends Document {
   answers: IApplicationAnswers
   /** Set in Phase 3 when an interview meeting is scheduled for this application. */
   interviewMeetingId: Types.ObjectId | null
+  /*
+   * Staff hiring (2026-11-05), additive. `interviewMode` is how the BOOKED
+   * interview is held; absent = online, as before. An office interview has no
+   * meeting room: its time is `interviewAt` and its address
+   * `interviewLocation`, and `interviewMeetingId` stays null. Only booking
+   * writes these three; the proposed slots carry their own place
+   * (`slotsMode`, `slotsLocation`), so proposing new times never changes the
+   * interview already booked.
+   */
+  interviewMode?: "office" | "online"
+  interviewLocation?: string
+  interviewAt?: Date | null
+  /** How the proposed slots will be held, and the office address; absent = as `interviewMode` (rows from before). */
+  slotsMode?: "office" | "online"
+  slotsLocation?: string
   /** Slot negotiation: admin proposes times, the applicant picks one. */
   proposedSlots: IProposedSlot[]
   slotsProposedBy: Types.ObjectId | null
@@ -174,8 +195,15 @@ const InstructorApplicationSchema = new Schema<IInstructorApplication>(
       passionReason: { type: String, maxlength: 200 },
       readyToCommit: { type: Boolean },
       extraDocumentUrl: { type: String },
+      interviewPreference: { type: String, enum: ["office", "online", "either"] },
     },
     interviewMeetingId: { type: Schema.Types.ObjectId, ref: "Meeting", default: null },
+    // No defaults, so older applications read as online interviews.
+    interviewMode: { type: String, enum: ["office", "online"] },
+    interviewLocation: { type: String, maxlength: 300 },
+    interviewAt: { type: Date },
+    slotsMode: { type: String, enum: ["office", "online"] },
+    slotsLocation: { type: String, maxlength: 300 },
     proposedSlots: [
       {
         at: { type: Date, required: true },

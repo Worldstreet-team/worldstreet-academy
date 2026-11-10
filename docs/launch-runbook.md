@@ -25,25 +25,29 @@ Do the steps in order. Each ends with a **Check**; don't start the next step unt
 
 From the 2026-10-03 meeting: three plans on every program, ESPEE proof-of-payment, no dashboard without paying, a 19 October cohort countdown, faculty names hidden and a leads export. These steps are added to the sections below, not substituted for them.
 
-1. **Coolify env.** Without both of the first two variables the ESPEE option stays hidden, and checkout is wallet-only.
-   - `ESPEE_PAYMENT_DETAILS` is the account details learners send ESPEE to. Free text; literal `\n` becomes a line break.
+> **2026-11-08, CTO: all payments route through WorldStreet.** Checkout is wallet-only; the bank, USDT and ESPEES options are commented out in code (not deleted) and the Academy shows no account details. The transfer steps below are struck through; they only matter for proofs sent before that date, which only a super admin can open. Don't announce the change: if anyone asks why, they ask the CTO.
+
+1. **Coolify env.** ~~Without the private bucket the transfer options (bank, USDT, ESPEES) stay hidden, and checkout is wallet-only.~~ Checkout is wallet-only whatever the env.
+   - `ESPEE_PAYMENT_DETAILS` is **no longer read** (2026-11-05): the bank, USDT and ESPEES details are the programme document's, in `lib/payment-channels.ts`. It can be removed from Coolify.
    - `R2_RESOURCES_BUCKET_NAME` is the private bucket, with no public access. Receipts go there under `worldstreet-academy/payment-proofs/<userId>/`.
    - The private bucket's CORS must allow `PUT` with `Content-Type` from `https://academy.worldstreetgold.com`. Assignment uploads need the same rule.
-   - `NEXT_PUBLIC_COHORT_STARTS_AT` is the fallback while no cohort exists in `/admin/cohorts`. It defaults to `2026-10-19T00:00:00+01:00` and is read at build time, so a change needs a redeploy.
+   - `NEXT_PUBLIC_COHORT_STARTS_AT` is the fallback while no cohort exists in `/admin/cohorts`. It defaults to `2026-10-19T00:00:00+01:00` and is read at build time, so a change needs a redeploy. Since 2026-11-08 it only places learners and never shows a countdown: the website announces only a cohort an admin added and left shown.
 2. **Deploy** (§4).
-3. **Catalogue** (§6). Every program becomes Basic $49, Standard $99 and Executive $199 (Owen, 2026-10-28), with no struck-through "was" price, so the dry run shows a price change on every program. Apply with `--allow-price-change`.
-   - The price list also lives in the app (`PROGRAM_PRICE_LIST`, `lib/entitlements.ts`). The plan editor shows it read-only, and any program saved in the editor takes it whatever is posted. A paid program with no plan turned on can't be saved. Keep the script's `PLAN` prices equal to it.
+3. **Catalogue** (§6). Every program becomes Basic $49, Standard $199 and Executive $999 (the programme document of 13 Sept; Owen, 2026-11-05, replacing 2026-10-28's $49/$99/$199), each plan with its regular price ($300, $1,000, $10,000; Owen, 2026-11-03) struck through beside it, so the dry run shows a price change on every program. Apply with `--allow-price-change`.
+   - The price list also lives in the app (`PROGRAM_PRICE_LIST` and `PROGRAM_REGULAR_PRICE`, `lib/entitlements.ts`). The plan editor shows both read-only, and any program saved in the editor takes them whatever is posted. A program with no plan turned on can't be saved: no course is free. Keep the script's `PLAN` prices equal to them.
    - Existing slugs are kept. `--rename-slugs` would break every shared `/programs/<slug>` link.
    - Two production courses are outside the 12 titles and are a tutor's, not the Academy's: "Cryptocurrency Trading Masterclass Beginner to Advanced" and "DIGITALMARKETING MASTERCLASS" (Nwakwesi Milash). Faculty is the Academy only, so `node scripts/move-tutor-courses.mjs` (dry run, then `MONGODB_URI="$PROD_URI" node scripts/move-tutor-courses.mjs --apply`) moves them to the marketplace review queue, clears any plan ladder (a marketplace course sells at one price) and makes their owner a Marketplace Creator (`sellerStatus: "approved"`). They leave the program catalogue at once and go on the marketplace, under the tutor's own name, only when an admin approves them at `/admin/courses?review=pending`. Their prices and buyers are untouched.
    - Then, if the dry run listed an owner who still holds INSTRUCTOR, an admin sets that account to Student at `/admin/users`: they keep their creator area through `sellerStatus`, but stop being faculty.
    - The account that owns the 12 programs (`samsonrichfield@gmail.com`, shown as "Thy Richfield") is never moved: the scripts treat it as the Academy's own. Learners now see "WorldStreet Mastery Academy faculty" on every program instead of its name (or the faculty an admin assigned). **It still receives every program's 85% sale earning.** Confirm it is the Academy's own account before the first paid sale (see the backend handoff, `docs/backend-handoff-2026-10-29.md`).
-   - The marketplace is open to anyone: a seller application now approves itself. One sent before that change approves itself when its applicant next opens `/dashboard/sell/apply`; nothing to do (an admin may still decide it first under `/admin/sellers` → To review).
+   - **The marketplace is "Coming soon" (voice note, 2026-11-02).** `MARKETPLACE_OPEN` in `lib/marketplace.ts` is `false`, so approving the moved courses publishes them, but nobody can see or buy them yet, and no new seller can apply. When the owner opens the marketplace, set the flag to `true` and deploy. Sellers then sign up openly: a seller application approves itself, and one sent earlier approves itself when its applicant next opens `/dashboard/sell/apply`.
+   - **Only a paid Academy enrollment opens the dashboard** (`OPENS_DASHBOARD_FILTER`, `lib/start-gate.ts`). On deploy, learners whose only enrollment is the free tutor course, or any other free or marketplace course, are sent to `/schools` to choose a program.
 4. **Admins.** Grant each new admin with `MONGODB_URI="$PROD_URI" CLERK_SECRET_KEY="$CLERK_KEY" node scripts/grant-admin.mjs <email>`. It writes the role to Clerk only when `CLERK_SECRET_KEY="$CLERK_KEY"` is also on the command line; without it the script prints `skipped Clerk mirror`. Every admin account needs a real email address: each new ESPEE proof is emailed to all admins. From Phase 21 on, super admins grant admins at /admin/team — see "Admin levels" below.
 5. **Smoke test** on production with a test account that has no enrollment:
    - `/dashboard` sends it to `/schools`.
-   - Submit an ESPEE proof. `/dashboard` then shows "Payment received — under review".
-   - Approve it from `/admin/payments/espee`. `/dashboard` opens, and the learner gets the enrollment email with the sign-in line.
-   - Then reject a second proof and check that the reason shows at checkout.
+   - ~~Submit an ESPEE proof. `/dashboard` then shows "Payment received — under review".~~ (transfers closed 2026-11-08)
+   - ~~Approve it from `/admin/payments/espee`. `/dashboard` opens, and the learner gets the enrollment email with the sign-in line.~~
+   - ~~Then reject a second proof and check that the reason shows at checkout.~~
+   - Instead: checkout shows the WorldStreet wallet only (no Bank, USDT or ESPEES tab, no account number), and a short balance offers "Add $X to your wallet".
 6. **Sales export.** On `/admin/users`, use "Export interested learners".
 7. **Go team.** Point them at `docs/go-patches-phase-3.md` §7–§11: ESPEE orders have no wallet charge; referral earnings and seller shares (§8); course `kind` — Go must hide marketplace and New Economy courses wherever it lists programs (§9); recordings and the go-live notice (§10); points and the new application answers (§11).
    - Phase 14: §16 (Basic certifies; `recordings` is web-only).
@@ -51,9 +55,25 @@ From the 2026-10-03 meeting: three plans on every program, ESPEE proof-of-paymen
    - Phase 20: §9's R15 (required: no template or guide is approved until it is live; see §12).
 8. **Marketplace, referrals, teaching (2026-10-05, same release).**
    - Recordings need the same `R2_RESOURCES_BUCKET_NAME` and the new hourly `academy-recordings` task (§5). RealtimeKit bills recording at about $0.01 per minute; only course classes record, never 1-on-1 mentorship.
-   - New Economy courses: `MONGODB_URI="$PROD_URI" node scripts/new-economy-catalogue.mjs --owner <admin email>` (dry run), then `--apply`. It creates one free DRAFT per WorldStreet product; add lessons and publish each from the admin course editor.
-   - Anyone starts selling at `/sell` (no seller approval since 2026-10-28; admins see each new seller at `/admin/sellers`) → review each course at `/admin/courses?review=pending`. A seller keeps 85% through their own link (the "Your link" in their course list), 50% otherwise; referrers earn 10% of a referred person's first purchase. Both clear through the existing earnings task.
-   - Smoke test: open `/?ref=<your code>` from `/dashboard/referrals` in a private window, buy as a fresh account, and check `/dashboard/referrals` shows the pending 10%.
+   - New Economy courses: `MONGODB_URI="$PROD_URI" node scripts/new-economy-catalogue.mjs --owner <admin email>` (dry run), then `--apply`. It creates one unpriced DRAFT per WorldStreet product; add lessons, set a price (no course is free) and publish each from the admin course editor.
+   - Anyone starts selling at `/sell` (no seller approval since 2026-10-28; admins see each new seller at `/admin/sellers`) → review each course at `/admin/courses?review=pending`. A seller keeps 85% through their own link (the "Your link" in their course list), 50% otherwise; referrers earn 10% / 12% / 15% (Basic / Standard / Executive) of every purchase a referred person makes, by wallet or by a transfer an admin approves (client, 2026-11-05; go-patches §26). Both clear through the existing earnings task; a commission on a transfer is paid from the Academy's own funds.
+   - Smoke test: open `/?ref=<your code>` from `/dashboard/referrals` in a private window, buy a Basic plan as a fresh account, and check `/dashboard/referrals` shows the pending 10% ($4.90). Buy a second program as the same account: a second commission appears.
+   - ~~Bank transfers are quoted in naira.~~ (transfers closed 2026-11-08 — skip this bullet.) Open `/admin/payments/espee`: the "Bank transfer rate" card shows the market rate (from `open.er-api.com`, fetched by the server at most every 12 hours). If it reads "Unavailable", check the container can reach that host, or pin a rate there. With neither, checkout falls back to "confirm the rate on WhatsApp".
+9. **Students who already paid (team voice note, 2026-11-06).** Learners who paid by bank, USDT or ESPEES before checkout existed must not pay again, and must not be sent login details: sign-in stays on the hub.
+   - **Super admin only since 2026-11-08 (CTO):** an outside payment is reconciled with the CTO first; regular admins get a 404 here. At `/admin/enrollments` → **Add paid learners** (`/admin/enrollments/add`), record each payment. Enter:
+     - the email they will sign in with;
+     - the program and plan;
+     - the amount they **actually** paid, in US dollars;
+     - how they paid;
+     - the date they paid, which places them in the cohort they paid for;
+     - their reference.
+   - For a long list, download the template there and fill one row per learner and program. Upload it, check the preview, then press Add. Rows that need fixing are listed and never saved.
+   - **If an account already has that email, the program opens at once.** Otherwise the learner gets a "Your place is ready" email, and the program opens the first time they sign in with a **verified** email. "Recorded payments" lists who hasn't signed in yet, with these actions:
+     - "Email them again";
+     - "Open it now", for an account made in the mobile app;
+     - "Cancel", for a typo in the email.
+   - These payments book no instructor earning and no partner commission. An admin can't record their own (go-patches §27).
+   - Smoke test: record one for a test email with no account, sign up on the hub with that email, open `/dashboard`. The program is open, and `/dashboard/payments` lists the payment.
 
 **Rollback:** set `FACULTY_PUBLIC` in `lib/faculty.ts` back to `true` to show faculty again. Reverting the `feat/cohort-launch` merge restores the old gate and wallet-only checkout. Approved ESPEE enrollments stay valid, and their Orders carry `paymentMethod: "espee"`.
 
@@ -113,20 +133,44 @@ The academic structure becomes the seven schools of the institutional blueprint 
 
 3. **Dry run**, then review it:
    - Run `MONGODB_URI="$PROD_URI" node scripts/mastery-catalogue.mjs | tee "plans-dryrun-$(date +%Y%m%d-%H%M).log"`.
-   - Each MATCH has three `plan …:` lines. Basic gains `+assignments +certificate +recordings`; Standard and Executive gain `+recordings`.
-   - No line carries a `-flag`.
-   - If one does, a learner on that plan would lose that service. Stop and take it to the owner: `--allow-access-loss` is for a written go only.
-4. **Apply** with `--apply`, plus `--allow-price-change` only if step 1 applies, and `tee` the log. Then re-run `--apply`; it must end `Total modifiedCount across matched rows: 0`.
-5. **Check:** `curl -s "$SITE/programs/<forex slug>"` shows "Foundation", "Personalized Mastery", "4 weeks", "8–12 weeks" and "Flexible schedule". A Basic test learner sees Recordings, Assignments and, after the lessons, the exam.
+   - Each MATCH has three `plan …:` lines. Basic gains `+assignments +certificate +recordings`, and since 2026-11-04 also `+liveClasses +instructorQa` (team call: "the basic package is also live class including Q&A"); Standard gains `+recordings`. Every plan's duration becomes "9 weeks".
+   - Executive is strictly one-on-one since 2026-11-05 (client answer 5B, forwarded by Owen: "without access to general group live classes"; Owen: no group recordings either). An existing Executive plan therefore shows `plan executive: -liveClasses -recordings`. That is the one expected `-flag`, and the client's answer is the written go for it.
+   - No other line carries a `-flag`. If one does, a learner on that plan would lose that service. Stop and take it to the owner: `--allow-access-loss` is for a written go only.
+4. **Apply** with `--apply`, plus `--allow-price-change` only if step 1 applies, plus `--allow-access-loss` only if the dry run shows the Executive `-liveClasses -recordings` lines and nothing else, and `tee` the log. Then re-run `--apply`; it must end `Total modifiedCount across matched rows: 0`.
+5. **Check:** `curl -s "$SITE/programs/<forex slug>"` shows "Foundation", "Personalized Mastery" and "9 weeks" (every plan; the team, 2026-11-04: "9 weeks, every program"), and its "This program includes" list shows Live classes and Instructor Q&A without a "Standard" tag. A Basic test learner sees Live classes, Recordings, Assignments and, after the lessons, the exam.
 6. **Rollback:** re-run the previous release's script with `--apply` (that script has no `--allow-access-loss` flag; the flag exists only in this release's script). Basic learners then lose recordings, assignments and the exam. Issued certificate IDs stay valid.
 
-## Cohorts as data (Phase 12)
+## Cohorts as data (Phase 12; switch and remove 2026-11-08)
+
+The owner (2026-11-08): the first cohort that really runs is **Cohort 001**, and admins set its date, time and visibility themselves. Each cohort has a "Show on the website" switch and a "Remove cohort" button.
 
 1. **Deploy** (§4).
-2. As an admin, open `/admin/cohorts` and add Cohort 1, starting 2026-10-19 00:00 (Lagos time).
-3. Add Cohort 2 at the owner's date.
-4. **Check:** `/`, `/schools` and a program page count down to Cohort 002, and `/calendar` lists both.
-5. Then remove `NEXT_PUBLIC_COHORT_STARTS_AT` and `NEXT_PUBLIC_COHORT_NUMBER` from Coolify. They only matter while the collection is empty.
+2. As an admin, open `/admin/cohorts`. If it lists a Cohort 001 starting 19 October 2026 (it never ran), open it and choose **Remove cohort**. The confirm says where its learners go: placement follows the enrolment date, so they land in the next cohort.
+3. Add Cohort 1 at the owner's date and time (Lagos), with "Show on the website" on.
+4. **Check:** `/`, `/schools` and a program page count down to "Cohort 001 — Starts …", and `/calendar` lists it. Switch it off and save: the countdowns, banners and the plans' offer timer go, and `/calendar` says the date will be published. Switch it back on.
+5. `NEXT_PUBLIC_COHORT_STARTS_AT` and `NEXT_PUBLIC_COHORT_NUMBER` no longer show anything: with no cohorts, the env cohort only places learners and stays hidden. Remove them from Coolify when convenient.
+
+Edge rules: a hidden next cohort means no countdown anywhere, even if a later cohort is shown, because a visitor who pays then is placed in the hidden one. Learners already placed in a hidden cohort still see it (dashboard, welcome email), and faculty see it on their home. A started cohort keeps its number; remove it to free the number.
+
+## Payments and referrals — deploy-day test (2026-11-08)
+
+The owner: "we're good to go if, when deployed, the payment gateway works and referral payments work too." Run this once on production with one small real payment. Collection names are MongoDB's.
+
+1. **Shipped code is clean.** `git show <deployed sha>:lib/wallet.ts | grep -c MOCK` prints `0`. The local copy has a mock-wallet switch that would route every payment to a fake wallet, so deploy only from git.
+2. **Environment** (Coolify): `WALLET_BASE_URL`, `WALLET_SERVICE_TOKEN` (without both, every purchase is refused), `CRON_SECRET`, `R2_RESOURCES_BUCKET_NAME` and the R2 keys, `RESEND_API_KEY`.
+3. **Earnings job is scheduled** (§5) and "Run now" answers `200 {"ok":true,"commissionsBooked":…}`. If it isn't scheduled, commissions stay "pending" forever with no alert.
+4. ~~**Pin the naira rate** at `/admin/payments/espee` (the feed is the mid-market rate, not the bank's).~~ (transfers closed 2026-11-08)
+5. **Referred wallet purchase.** Referrer R (any account) copies their code from `/dashboard/referrals`. Buyer B, in a fresh browser, opens `/?ref=<CODE>`, signs in on the hub and buys a Basic plan ($49) from their wallet.
+   - `/admin/payments`: B's order is `enrolled` with a charge id; the wallet shows one $49 debit.
+   - `orders.attribution.kind` is `referral`; `enrollments` is `active` with `transactionId` = the charge id.
+   - `earnings`: a `sale` row and a `referral` row of 490 cents (10%), both `pending` for 7 days.
+   - `/admin/payments` → Reconcile → "Run report" is clean.
+6. **Decline, then top-up.** With less than the price in a wallet, a stale checkout tab declines ("Add $X to your wallet"). After topping up, paying again must succeed; its order reference ends `_d1`.
+7. ~~**Referred transfer.** A second referred buyer pays by bank transfer with a receipt; an admin approves it at `/admin/payments/espee`. `orders` shows `paymentMethod: "bank"` and no charge id; `earnings` gets a `referral` row and no `sale` row.~~ Replaced (CTO, 2026-11-08): **WorldStreet only.** Checkout shows no Bank, USDT or ESPEES option and no account number. Signed in as a regular admin, `/admin/payments/espee` and `/admin/enrollments/add` are 404 and the enrollment menu has no "Change package…"; as the super admin all three are there.
+8. **Payout.** On day 8, or after someone with database access sets the test commission's `availableAt` to now and runs the earnings job, the row turns `cleared` and R's wallet USD balance rises by $4.90. R can spend it on a program; USD withdrawal is "coming soon" (confirm with the hub team when it opens).
+9. **Refund and cancel.** Refund B's wallet order in `/admin/payments`: the $49 returns and both earnings rows turn `reversed`. Cancel a second referred wallet buyer's enrollment at `/admin/enrollments`: its pending commission turns `reversed` (restore reopens it).
+
+Open business questions (no code change made): on a referred Executive sale the program owner account gets 85% and the referrer 15%, so the Academy keeps 0% while programs are owned by an individual's account; and a second account can refer the first and earn 10–15% back.
 
 ## Certification tiers — Phase 17 (`mastery/phase-17`)
 
@@ -274,9 +318,9 @@ If reminders or earnings tasks already exist with a `curl` command, open their l
 
 ## 6. Production catalogue — `scripts/mastery-catalogue.mjs`
 
-What it does (its header): upserts the 12 programs by exact title (scoped to the catalogue owner, with a printed warning on any other match) — sets title, school, category and packages; sets copy only for Forex, Crypto and AI & AI Automation; derives those three programs' course price from their packages; renames "Content Creation / Video Editing Mastery" → "Content Creation Mastery" and "Artificial Intelligence & AI Automation" → "AI & AI Automation". **Not all new inserts are drafts:** each of the 12 program literals carries its own `newInsertDraft` flag (`status = program.newInsertDraft ? "draft" : "published"` — read the script, not this paraphrase, for which); on the current script only 2 of the 12 are flagged `true`, so a title that doesn't already exist in production and isn't one of those 2 goes live as `published` the moment `--apply` runs. Check each `INSERT` line in the dry run against this before applying. It never deletes or archives, aborts on slug drift (`ABORT: slug … exists`), and refuses a price change without `--allow-price-change`.
+What it does (its header): upserts 12 programs: the programme document's 11 (13 Sept; "Cybersecurity" is renamed "Cybersecurity Mastery") plus "E-Commerce & Digital Business", which the team kept on 2026-11-05 by exact title (scoped to the catalogue owner, with a printed warning on any other match) — sets title, school, category and packages; sets copy only for Forex, Crypto and AI & AI Automation; derives those three programs' course price from their packages; renames "Content Creation / Video Editing Mastery" → "Content Creation Mastery" and "Artificial Intelligence & AI Automation" → "AI & AI Automation". **Not all new inserts are drafts:** each program literal carries its own `newInsertDraft` flag (`status = program.newInsertDraft ? "draft" : "published"` — read the script, not this paraphrase, for which); since 2026-11-05 none is flagged `true`, so a title that doesn't already exist in production (most likely Video Editing Mastery and E-Commerce & Digital Business) goes live as `published` the moment `--apply` runs. Check each `INSERT` line in the dry run against this before applying. It never deletes or archives, aborts on slug drift (`ABORT: slug … exists`), and refuses a price change without `--allow-price-change`.
 
-**Stop condition:** the dry run must list only the two `newInsertDraft` programs as `INSERT` lines. Any other `INSERT` means a title in production doesn't match what the script expects (a slug or title mismatch with production) — stop and investigate before `--apply`; do not apply against an unexplained insert.
+**Stop condition:** the dry run may list only Video Editing Mastery and E-Commerce & Digital Business as `INSERT` lines (production never had them), and "Cybersecurity" as a `RENAME` to "Cybersecurity Mastery". If an E-Commerce & Digital Business row already exists as a draft, the script matches it and leaves its status alone, so publish it in the admin. Any other `INSERT` means a title in production doesn't match what the script expects (a slug or title mismatch with production) — stop and investigate before `--apply`; do not apply against an unexplained insert.
 
 Before: §2 (Go) and §4 (package-aware checkout) are live, and B2 is signed.
 
@@ -291,7 +335,7 @@ MONGODB_URI="$PROD_URI" node scripts/mastery-catalogue.mjs | tee "catalogue-dryr
 - Every `MATCH`/`RENAME` line's `_id`, status, owner email and price is the row you expect. No `WARN adopted row owned by`, no `WARN duplicate title`, no `ABORT`.
 - The summary reads `matched M / renamed R / inserted I / skipped 0`, with no `WARN: planned actions … do not add up`.
 
-**Apply** (`--allow-price-change` is needed only when the dry run shows a price change; without it the run exits 1 before writing):
+**Apply** (`--allow-price-change` is needed only when the dry run shows a price change; without it the run exits 1 before writing. Add `--allow-access-loss` only when the dry run's one loss is an existing Executive plan's `-liveClasses -recordings`, the client's 2026-11-05 "strictly one-on-one"; any other loss: stop):
 
 ```bash
 MONGODB_URI="$PROD_URI" node scripts/mastery-catalogue.mjs --apply --allow-price-change | tee "catalogue-apply-$(date +%Y%m%d-%H%M).log"

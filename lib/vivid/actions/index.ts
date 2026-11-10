@@ -102,7 +102,9 @@ export async function createVividSession(params: CreateSessionParams) {
       : null
 
     const calendar = await getCohortCalendar()
-    let instructions = buildAcademyPrompt(user, params.pathname || "/", { next: calendar.next, current: calendar.current })
+    // Vivid speaks only of cohorts the website shows (an admin's "Show on the website" switch).
+    const current = calendar.current && !calendar.current.hidden ? calendar.current : null
+    let instructions = buildAcademyPrompt(user, params.pathname || "/", { next: calendar.next, current })
     const functionNames = allVividFunctions.map((f) => f.name)
     instructions += generateFunctionInstructions(functionNames)
 

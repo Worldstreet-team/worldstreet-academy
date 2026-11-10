@@ -18,7 +18,16 @@ import {
 import { getCurrentUser } from "@/lib/auth"
 import { schoolSlugOf, storedSlugsFor, type SchoolSlug } from "@/lib/schools"
 import { programArt } from "@/lib/school-art"
-import { FULL_ACCESS, PACKAGE_RANK, canAccessLesson, effectiveLessonTier, entitlementsFor, recordingsAllowed } from "@/lib/entitlements"
+import {
+  FULL_ACCESS,
+  ON_SALE_FILTER,
+  PACKAGE_RANK,
+  canAccessLesson,
+  effectiveLessonTier,
+  entitlementsFor,
+  listPriceFromPackages,
+  recordingsAllowed,
+} from "@/lib/entitlements"
 import {
   getCourseAccess,
   lockedLessonIds,
@@ -34,6 +43,7 @@ import { facultySinceLabel } from "@/lib/faculty-credential"
 import { cohortsForEnrollments } from "@/lib/cohort-calendar"
 import { assignedFacultyFor, type ProgramTeacher } from "@/lib/teaching"
 import { PROGRAM_KIND_FILTER, courseKindOf } from "@/lib/course-kind"
+import { OPEN_KINDS_FILTER, kindIsOpen } from "@/lib/marketplace"
 import { FORMAT_LABEL, courseFormatOf, isFileFormat, productTypeLabel, type CourseFormat } from "@/lib/course-format"
 
 // ============================================================================
@@ -59,6 +69,8 @@ export type BrowseCourse = {
   school: SchoolSlug | null
   pricing: "free" | "paid"
   price: number | null
+  /** The regular price `price` is discounted from (that tier's `listPrice`), shown struck through; null = no discount. */
+  listPrice: number | null
   /** Enabled package tiers on the course (0 = no package ladder). `price` is already the cheapest enabled tier. */
   tierCount: number
   status: string
@@ -236,16 +248,15 @@ export async function fetchBrowseCourses(options?: {
     // this is a server action, so the value may be anything.
     const kind: CourseKind =
       options?.kind === "marketplace" || options?.kind === "new-economy" ? options.kind : "program"
-    const query: Record<string, unknown> = { status: "published", ...kindFilter(kind) }
-    
+    // The marketplace is Coming soon (MARKETPLACE_OPEN): it lists nothing.
+    if (!kindIsOpen(kind)) return []
+    // Only courses on sale: no course is free (isOnSale).
+    const query: Record<string, unknown> = { status: "published", ...kindFilter(kind), ...ON_SALE_FILTER }
+
     // A server action receives raw JSON: these filters reach the query only as
     // plain strings, never as operator objects like {"$ne": null} — else ignored.
     if (typeof options?.level === "string" && options.level && options.level !== "All") {
       query.level = options.level.toLowerCase()
-    }
-    if (options?.pricing) {
-      if (options.pricing === "Free") query.price = 0
-      else if (options.pricing === "Paid") query.price = { $gt: 0 }
     }
     if (typeof options?.school === "string" && options.school) {
       const current = schoolSlugOf(options.school)
@@ -292,6 +303,7 @@ export async function fetchBrowseCourses(options?: {
         school: schoolSlugOf(course.school),
         pricing: course.pricing as "free" | "paid",
         price: course.price,
+        listPrice: listPriceFromPackages(course.packages),
         tierCount: (course.packages ?? []).filter((p) => p.enabled).length,
         status: course.status,
         availableAt: course.availableAt ? course.availableAt.toISOString() : null,
@@ -347,7 +359,7 @@ export async function fetchFreePreviewLessons(limit = 6): Promise<FreePreview[]>
       // School programs only: the marketplace and New Economy have their own pages.
       .populate({
         path: "course",
-        match: { status: "published", ...PROGRAM_KIND_FILTER },
+        match: { status: "published", ...PROGRAM_KIND_FILTER, ...ON_SALE_FILTER },
         select: "title slug school thumbnailUrl",
       })
       .select("title videoUrl videoDuration videoThumbnailUrl course")
@@ -561,9 +573,14 @@ const NO_ENTITLEMENTS: IPackageEntitlements = {
   recordings: false,
 }
 
-/** Shared finder behind the program page (by slug) and checkout (by id). */
+/**
+ * Shared finder behind the program page (by slug) and checkout (by id). Only
+ * a course on sale is found: a legacy free course has no program page and no
+ * checkout (isOnSale) — its enrolled learners keep the dashboard course page.
+ * Nor is a marketplace course while the marketplace is closed (MARKETPLACE_OPEN).
+ */
 async function findProgram(filter: { slug: string } | { _id: string }): Promise<ProgramDetail | null> {
-  const course = await Course.findOne({ ...filter, status: "published" })
+  const course = await Course.findOne({ ...filter, status: "published", ...ON_SALE_FILTER, ...OPEN_KINDS_FILTER })
     .populate("instructor", "username role firstName lastName avatarUrl bio instructorProfile")
     .lean()
 
@@ -610,12 +627,13 @@ async function findProgram(filter: { slug: string } | { _id: string }): Promise<
             key: "standard",
             name: fileFormat ? FORMAT_LABEL[fileFormat] : courseKindOf(course) === "program" ? "Full program" : "Full course",
             tagline: "",
-            price: course.pricing === "free" ? 0 : course.price ?? 0,
+            // On sale (the finder's filter), so the course's own price.
+            price: course.price ?? 0,
             listPrice: null,
             duration: null,
             features: whatYouWillLearn,
             highlight: false,
-            ctaLabel: fileFormat ? (course.pricing === "free" || !course.price ? "Get it free" : "Buy now") : null,
+            ctaLabel: fileFormat ? "Buy now" : null,
             entitlements: fileFormat ? NO_ENTITLEMENTS : FULL_ACCESS,
           },
         ]
@@ -635,6 +653,7 @@ async function findProgram(filter: { slug: string } | { _id: string }): Promise<
     school: schoolSlugOf(course.school),
     pricing: course.pricing as "free" | "paid",
     price: course.price,
+    listPrice: listPriceFromPackages(course.packages),
     tierCount: enabled.length,
     status: course.status,
     availableAt: course.availableAt ? course.availableAt.toISOString() : null,
@@ -696,13 +715,15 @@ export async function fetchProgramById(courseId: string): Promise<ProgramDetail 
 
 /**
  * Slug for a published course id — the old `/courses/[id]` route redirects
- * through this. Non-ObjectId input and unpublished courses resolve to null.
+ * through this. Non-ObjectId input, unpublished courses and courses not on
+ * sale (no program page; isOnSale) resolve to null.
  */
 export async function fetchProgramSlug(courseId: string): Promise<string | null> {
   try {
     if (!mongoose.isValidObjectId(courseId)) return null
     await connectDB()
-    const course = await Course.findOne({ _id: courseId, status: "published" }).select("slug").lean()
+    const course = await Course.findOne({ _id: courseId, status: "published", ...ON_SALE_FILTER, ...OPEN_KINDS_FILTER })
+      .select("slug").lean()
     return course?.slug ?? null
   } catch (error) {
     console.error("Fetch program slug error:", error)
@@ -858,6 +879,7 @@ export async function fetchOtherCourses(excludeCourseId: string): Promise<Browse
       _id: { $ne: excludeCourseId },
       status: "published",
       ...PROGRAM_KIND_FILTER,
+      ...ON_SALE_FILTER,
     })
       .populate("instructor", "firstName lastName avatarUrl role")
       .limit(6)
@@ -889,6 +911,7 @@ export async function fetchOtherCourses(excludeCourseId: string): Promise<Browse
         school: schoolSlugOf(course.school),
         pricing: course.pricing as "free" | "paid",
         price: course.price,
+        listPrice: listPriceFromPackages(course.packages),
         tierCount: (course.packages ?? []).filter((p) => p.enabled).length,
         status: course.status,
         availableAt: course.availableAt ? course.availableAt.toISOString() : null,
@@ -1448,6 +1471,7 @@ export async function fetchInstructorPublicCourses(instructorId: string): Promis
       instructor: instructorId,
       status: "published",
       ...PROGRAM_KIND_FILTER,
+      ...ON_SALE_FILTER,
     })
       .select("title thumbnailUrl level pricing price totalLessons enrolledCount rating school slug")
       .sort({ createdAt: -1 })

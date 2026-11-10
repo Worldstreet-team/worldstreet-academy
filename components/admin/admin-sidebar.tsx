@@ -47,7 +47,7 @@ const manageItems: NavItem[] = [
     match: (p) => p === "/admin",
   },
   {
-    title: "Applications",
+    title: "Tutor applications",
     href: "/admin/applications",
     icon: Inbox,
     match: (p) => p.startsWith("/admin/applications"),
@@ -65,7 +65,7 @@ const manageItems: NavItem[] = [
     match: (p) => p.startsWith("/admin/payments") && !p.startsWith("/admin/payments/espee"),
   },
   {
-    title: "ESPEE payments",
+    title: "Transfer payments",
     href: "/admin/payments/espee",
     icon: ReceiptText,
     match: (p) => p.startsWith("/admin/payments/espee"),
@@ -161,7 +161,8 @@ export function AdminSidebar() {
   const superAdmin = isSuperAdmin(user)
   const items = superAdmin
     ? manageItems.flatMap((item) => (item.href === "/admin/users" ? [item, teamItem] : [item]))
-    : manageItems
+    : // Transfer receipts are the super admin's to reconcile (CTO, 2026-11-08).
+      manageItems.filter((item) => item.href !== "/admin/payments/espee")
 
   // Prefetch all navigation routes on mount for faster transitions
   useEffect(() => {

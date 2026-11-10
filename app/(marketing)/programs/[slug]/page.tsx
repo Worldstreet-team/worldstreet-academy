@@ -341,7 +341,7 @@ export default async function ProgramPage({
                     program.kind === "marketplace"
                       ? { heading: "More on the marketplace", href: "/marketplace", label: "Browse the marketplace" }
                       : program.kind === "new-economy"
-                        ? { heading: "More free courses", href: "/new-economy", label: "All New Economy courses" }
+                        ? { heading: "More New Economy courses", href: "/new-economy", label: "All New Economy courses" }
                         : undefined
                   }
                   signedIn={signedIn}

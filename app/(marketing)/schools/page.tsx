@@ -11,7 +11,7 @@ import { GateNotice } from "@/components/schools-index/gate-notice"
 import { FreeLessons } from "@/components/schools-index/free-lessons"
 import { BrowseAll } from "@/components/schools-index/browse-all"
 import { CohortBanner } from "@/components/marketing/cohort-banner"
-import { LEVEL_ORDER, buildSchoolsIndex, type LevelFilter } from "@/components/schools-index/model"
+import { LEVEL_ORDER, buildSchoolsIndex, cheapestProgram, type LevelFilter } from "@/components/schools-index/model"
 
 export const metadata: Metadata = {
   title: "Schools",
@@ -74,7 +74,6 @@ export default async function SchoolsPage({ searchParams }: Search) {
 
   const data = buildSchoolsIndex(courses)
   const inSchools = data.schools.flatMap((s) => s.programs)
-  const priced = inSchools.map((p) => p.price).filter((p): p is number => p !== null)
   const art = Array.from(
     new Set([...inSchools, ...data.others].map((p) => p.art).filter((a): a is string => Boolean(a)))
   )
@@ -86,7 +85,7 @@ export default async function SchoolsPage({ searchParams }: Search) {
         stats={{
           schools: data.schools.length,
           programs: inSchools.length,
-          from: priced.length ? Math.min(...priced) : null,
+          from: cheapestProgram(inSchools),
           instructors: facultyCount,
           freeLessons: previews.length,
         }}

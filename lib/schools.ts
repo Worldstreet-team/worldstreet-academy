@@ -11,6 +11,8 @@
  * (retired slugs that still arrive as 308s, 30-day cookies and stored
  * values) and `communityUrl` (filled in Phase 15).
  */
+import { isOnSale } from "@/lib/entitlements"
+
 export type SchoolSlug =
   | "trading-financial-markets"
   | "technology-ai"
@@ -129,7 +131,7 @@ export const SCHOOLS: readonly School[] = [
       { name: "Software Development", program: "App Development with AI" },
       { name: "Web Development", program: null },
       { name: "Data Analytics", program: "Data Analysis" },
-      { name: "Cybersecurity", program: "Cybersecurity" },
+      { name: "Cybersecurity", program: "Cybersecurity Mastery" },
       { name: "Cloud Computing", program: null },
       { name: "AI Automation", program: "AI & AI Automation" },
     ],
@@ -393,20 +395,26 @@ export function countProgramsBySchool(
 }
 
 /**
- * Cheapest program per school, whole USD (0 = a free program exists), null
- * when the school has no priced program. `price` is already the cheapest
- * enabled package (Phase 0 rule), so this never re-derives package rules.
+ * A school's cheapest way in: whole USD, and the regular price it is
+ * discounted from (null when it sells at no discount) — shown struck through.
+ */
+export type FromPrice = { price: number; listPrice: number | null }
+
+/**
+ * Cheapest program per school, null when the school has no program on sale
+ * (`isOnSale` — no course is free). `price` is already the cheapest enabled
+ * package (Phase 0 rule) and `listPrice` that package's regular price, so
+ * this never re-derives package rules.
  */
 export function cheapestBySchool(
-  items: ReadonlyArray<{ school: SchoolSlug | null; pricing: "free" | "paid"; price: number | null }>
-): Record<SchoolSlug, number | null> {
-  const out = Object.fromEntries(SCHOOLS.map((s) => [s.slug, null])) as Record<SchoolSlug, number | null>
+  items: ReadonlyArray<{ school: SchoolSlug | null; pricing: "free" | "paid"; price: number | null; listPrice: number | null }>
+): Record<SchoolSlug, FromPrice | null> {
+  const out = Object.fromEntries(SCHOOLS.map((s) => [s.slug, null])) as Record<SchoolSlug, FromPrice | null>
   for (const item of items) {
-    if (!item.school || !(item.school in out)) continue
-    const price = item.pricing === "free" ? 0 : item.price
-    if (price === null || price === undefined) continue
+    if (!item.school || !(item.school in out) || !isOnSale(item)) continue
+    const price = item.price as number
     const current = out[item.school]
-    if (current === null || price < current) out[item.school] = price
+    if (current === null || price < current.price) out[item.school] = { price, listPrice: item.listPrice }
   }
   return out
 }

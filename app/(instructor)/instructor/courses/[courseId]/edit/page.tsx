@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation"
-import { fetchCourseForEdit } from "@/lib/actions/instructor"
+import { fetchCourseForEdit, fetchCourseLessons } from "@/lib/actions/instructor"
+import { CourseLessonsView } from "@/components/instructor/course-lessons-view"
 import { CourseEditor } from "@/components/instructor/course-editor"
 import { MARKETPLACE_SHARE_ACADEMY, MARKETPLACE_SHARE_OWN_LINK } from "@/lib/db/models"
 import { sellerSplitNote } from "@/lib/marketplace"
@@ -11,8 +12,14 @@ export default async function EditCoursePage({
 }) {
   const { courseId } = await params
   const data = await fetchCourseForEdit(courseId)
-  
-  if (!data) notFound()
+
+  if (!data) {
+    // An assigned tutor edits the program's lessons, not the program itself:
+    // show them those (rendered, not redirected — see CourseLessonsView).
+    const lessons = await fetchCourseLessons(courseId)
+    if (lessons) return <CourseLessonsView courseId={courseId} data={lessons} />
+    notFound()
+  }
 
   // Transform data to match the CourseEditor expected format. Every editable
   // field must pass through here — anything dropped gets wiped on save,

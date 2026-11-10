@@ -69,6 +69,9 @@ const STATUS_TONES: Record<string, BadgeTone> = {
   completed: "success",
   passed: "success",
   banned: "danger",
+  // recorded payments (paid outside the platform)
+  waiting: "admin",
+  opened: "success",
   // enrollments
   pre_enrolled: "admin",
   active: "success",

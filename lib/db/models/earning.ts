@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose"
+import type { PackageKey } from "./course"
 
 /**
  * Instructor earnings ledger — one row per paid sale (kind "sale"), plus
@@ -23,11 +24,23 @@ export const INSTRUCTOR_REVENUE_SHARE = 0.85 // 85% instructor / 15% platform
 export const MARKETPLACE_SHARE_OWN_LINK = 0.85
 export const MARKETPLACE_SHARE_ACADEMY = 0.5
 /**
- * Referral commission (owner, 2026-10-05): 10% of the referred person's FIRST
- * paid enrollment, paid from the Academy's share as a "referral" earning that
- * clears like a sale. Never on a self-referral.
+ * Referral commission (owner, 2026-10-05): a share of EVERY paid purchase the
+ * referred person makes, however they paid (client, 2026-11-05: wallet, or a
+ * transfer once an admin confirms it), booked as a "referral" earning that
+ * clears like a sale (`bookReferralCommission`, lib/referrals.ts). Never on a
+ * self-referral. The share follows the
+ * plan bought (programme document of 13 Sept, §2 and §4; Owen, 2026-11-05):
+ * Basic 10%, Standard 12%, Executive 15% — $4.90, $23.88 and $149.85 at
+ * $49 / $199 / $999. A course sold without plans (New Economy) earns the base
+ * rate, REFERRAL_COMMISSION_RATE.
  */
 export const REFERRAL_COMMISSION_RATE = 0.1
+export const REFERRAL_RATE_BY_PLAN: Record<PackageKey, number> = { basic: 0.1, standard: 0.12, executive: 0.15 }
+
+/** The referral share of a purchase of plan `packageKey` (null: a course without plans). */
+export function referralRateFor(packageKey: PackageKey | null | undefined): number {
+  return packageKey ? REFERRAL_RATE_BY_PLAN[packageKey] : REFERRAL_COMMISSION_RATE
+}
 export const EARNINGS_CLEARING_DAYS = 7
 
 export interface IEarning extends Document {

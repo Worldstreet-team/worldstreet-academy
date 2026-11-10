@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import connectDB from "@/lib/db"
 import { Earning } from "@/lib/db/models"
 import { createWalletCredit, createWalletCharge, isInsufficientBalance, walletEnabled } from "@/lib/wallet"
+import { bookMissingReferralCommissions } from "@/lib/referrals"
 
 /**
  * Scheduled earnings clearing — the cron counterpart to the lazy pass inside
@@ -31,6 +32,14 @@ export async function POST(request: NextRequest) {
   }
 
   await connectDB()
+
+  // First, book any referral commission a purchase or transfer approval failed
+  // to write (2026-11-08). Booked pending, so it still waits out the clearing
+  // window; idempotent on the order's credit reference.
+  const commissionsBooked = await bookMissingReferralCommissions().catch((err) => {
+    console.error("[Earnings] missing-commission pass failed:", err)
+    return 0
+  })
 
   const matured = await Earning.find({
     status: "pending",
@@ -80,6 +89,7 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     ok: true,
+    commissionsBooked,
     matured: matured.length,
     cleared,
     skippedInsufficient,

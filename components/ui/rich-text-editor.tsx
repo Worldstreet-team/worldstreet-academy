@@ -5,6 +5,7 @@ import { useEditor, EditorContent, type Editor } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
 import Placeholder from "@tiptap/extension-placeholder"
 import { Button } from "@/components/ui/button"
+import { SafeHtml } from "@/components/shared/safe-html"
 import { cn } from "@/lib/utils"
 
 
@@ -190,6 +191,7 @@ export function RichTextEditor({
 }
 
 /* ─── Read-only Renderer ─── */
+/** Stored lesson text, cleaned before it is shown (`SafeHtml`): it is never trusted. */
 export function RichTextContent({
   content,
   className,
@@ -197,13 +199,5 @@ export function RichTextContent({
   content: string
   className?: string
 }) {
-  return (
-    <div
-      className={cn(
-        "prose prose-sm dark:prose-invert max-w-none",
-        className
-      )}
-      dangerouslySetInnerHTML={{ __html: content }}
-    />
-  )
+  return <SafeHtml html={content} className={cn("prose prose-sm dark:prose-invert max-w-none", className)} />
 }

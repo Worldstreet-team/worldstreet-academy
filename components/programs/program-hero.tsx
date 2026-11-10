@@ -59,7 +59,7 @@ export function ProgramHero({
             label: school ? "All schools" : "All programs",
             schoolHref: (slug: string) => `/schools/${slug}`,
           }
-  const badge = program.kind === "marketplace" ? `Marketplace · ${FORMAT_LABEL[program.format ?? "course"]}` : program.kind === "new-economy" ? "New Economy · Free" : null
+  const badge = program.kind === "marketplace" ? `Marketplace · ${FORMAT_LABEL[program.format ?? "course"]}` : program.kind === "new-economy" ? "New Economy" : null
   const profileHref = program.instructorUsername
     ? facultyHref(program.instructorUsername)
     : signedIn

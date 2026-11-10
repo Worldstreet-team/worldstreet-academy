@@ -99,6 +99,8 @@ export type MyEnrollmentIntent = {
   price: number | null
   /** True when `price` is a "from" figure (a ladder with no package chosen). */
   fromPrice: boolean
+  /** The regular price `price` is discounted from; null = no discount. */
+  listPrice: number | null
   /** Checkout when a program is chosen, else the saved school's page. */
   href: string
 }
@@ -115,7 +117,7 @@ export async function getMyEnrollmentIntent(): Promise<MyEnrollmentIntent | null
     if (!intent || !school) return null
     const courseId = intent.course ? String(intent.course) : null
     const schoolOnly: MyEnrollmentIntent = {
-      school, courseId: null, courseTitle: null, packageName: null, price: null, fromPrice: false,
+      school, courseId: null, courseTitle: null, packageName: null, price: null, fromPrice: false, listPrice: null,
       href: `/schools/${school}`,
     }
     if (!courseId) return schoolOnly
@@ -136,6 +138,7 @@ export async function getMyEnrollmentIntent(): Promise<MyEnrollmentIntent | null
       packageName: chosen && program.tierCount > 1 ? chosen.name : null,
       price: chosen ? chosen.price : program.price,
       fromPrice: !chosen && program.tierCount > 1,
+      listPrice: chosen ? chosen.listPrice : program.listPrice,
       href: checkoutHrefFor(courseId, chosen ? chosen.key : null) ?? `/schools/${school}`,
     }
   } catch (error) {

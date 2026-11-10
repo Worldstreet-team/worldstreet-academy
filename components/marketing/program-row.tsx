@@ -8,6 +8,7 @@ import { levelChipStyle } from "@/components/shared/level-badge"
 import { SCHOOL_BY_SLUG } from "@/lib/schools"
 import { SchoolIcon } from "@/components/shared/school-icon"
 import { programPriceLabel } from "@/lib/program-price"
+import { PackageDiscount } from "@/components/programs/package-offer"
 
 /**
  * One program on a school page (spec §5): title, blurb, level, price and the
@@ -68,8 +69,12 @@ export function ProgramRow({ course, href }: { course: BrowseCourse; href?: stri
             {course.shortDescription ?? course.description}
           </p>
           <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-5">
-            <span className="text-[14px] font-semibold tabular-nums text-ws-primary">
+            <span className="inline-flex flex-wrap items-baseline gap-x-2 text-[14px] font-semibold tabular-nums text-ws-primary">
               {programPriceLabel(course)}
+              <PackageDiscount
+                pkg={{ price: course.price ?? 0, listPrice: course.listPrice }}
+                className="text-[13px] font-normal"
+              />
             </span>
             <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-ws-muted transition-colors duration-[var(--ws-motion-fast)] group-hover:text-ws-primary">
               {href ? "Choose program" : "View program"}

@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PageHeader } from "@/components/shared/page-header"
 import { adminExportPartnersCsv, adminListPartners } from "@/lib/actions/admin-partners"
 import { money } from "@/components/admin/shared"
+import { partnerLevelFor } from "@/lib/partner-levels"
 
 export default function AdminPartnersPage() {
   const [exporting, setExporting] = React.useState(false)
@@ -94,6 +95,7 @@ export default function AdminPartnersPage() {
                     <TableHead className="hidden text-right md:table-cell">Clicks</TableHead>
                     <TableHead className="hidden text-right md:table-cell">Sign-ups</TableHead>
                     <TableHead className="hidden text-right md:table-cell">Enrolled</TableHead>
+                    <TableHead className="hidden lg:table-cell">Level</TableHead>
                     <TableHead className="text-right">Revenue</TableHead>
                     <TableHead className="text-right">Commission</TableHead>
                   </TableRow>
@@ -114,6 +116,10 @@ export default function AdminPartnersPage() {
                       <TableCell className="hidden text-right tabular-nums md:table-cell">{r.clicks.toLocaleString()}</TableCell>
                       <TableCell className="hidden text-right tabular-nums md:table-cell">{r.signUps.toLocaleString()}</TableCell>
                       <TableCell className="hidden text-right tabular-nums md:table-cell">{r.enrolled.toLocaleString()}</TableCell>
+                      {/* Programme document §3: successful referrals = the Enrolled count. */}
+                      <TableCell className="hidden whitespace-nowrap text-[12.5px] text-muted-foreground lg:table-cell">
+                        {partnerLevelFor(r.enrolled)?.name ?? "—"}
+                      </TableCell>
                       <TableCell className="text-right tabular-nums">{money(r.revenueMinor)}</TableCell>
                       <TableCell className="text-right tabular-nums">
                         <p>{money(r.commissionPendingMinor + r.commissionPaidMinor)}</p>

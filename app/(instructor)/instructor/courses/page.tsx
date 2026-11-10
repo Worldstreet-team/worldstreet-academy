@@ -1,5 +1,5 @@
 "use client"
-import { ArrowRight, ClipboardCheck, Link2, Plus, Search, Users } from "@/components/icons"
+import { ArrowRight, ClipboardCheck, Link2, ListVideo, Plus, Search, Users } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
@@ -23,14 +23,19 @@ type StatusFilter = "all" | "published" | "draft" | "archived"
 const TAUGHT_LINK =
   "inline-flex min-h-11 items-center gap-1.5 font-medium text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:text-ws-primary"
 
-/** A program you're assigned to teach: teaching links only — no editor, price or earnings. */
+/** A program you're assigned to teach: its lessons and teaching links — no course editor, price or earnings. */
 function TaughtProgramCard({ program }: { program: TaughtProgramItem }) {
   return (
     <CardShell>
       <div className="flex items-start gap-3 px-4 pb-3 pt-4">
         <ProgramCover src={program.thumbnailUrl} sizes="44px" mark="sm" className="h-11 w-11 shrink-0 rounded-[9px]" />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="line-clamp-2 text-[15px] font-semibold leading-snug text-ws-primary">{program.title}</span>
+          <Link
+            href={`/instructor/courses/${program.id}/lessons`}
+            className="line-clamp-2 rounded-sm text-[15px] font-semibold leading-snug text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:text-ws-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40"
+          >
+            {program.title}
+          </Link>
           <span className="truncate text-[12px] text-ws-muted">
             {[program.schoolName, `${program.enrolledCount.toLocaleString()} students`, program.status !== "published" ? `${program.status[0].toUpperCase()}${program.status.slice(1)}` : null]
               .filter(Boolean)
@@ -39,6 +44,10 @@ function TaughtProgramCard({ program }: { program: TaughtProgramItem }) {
         </div>
       </div>
       <div className="mt-auto flex flex-wrap items-center justify-between gap-x-4 border-t border-ws-hairline px-4 text-[13px]">
+        <Link href={`/instructor/courses/${program.id}/lessons`} className={TAUGHT_LINK}>
+          <ListVideo size={14} strokeWidth={2} aria-hidden />
+          Lessons
+        </Link>
         <Link href={`/instructor/courses/${program.id}/assignments`} className={TAUGHT_LINK}>
           <ClipboardCheck size={14} strokeWidth={2} aria-hidden />
           Assignments
@@ -213,7 +222,7 @@ export default function InstructorCoursesPage() {
                   Programs you teach
                 </h2>
                 <p className="text-[13px] text-ws-muted">
-                  You run these programs&apos; classes, mentorship and grading. Their owner manages the program itself.
+                  You add these programs&apos; lessons and run their classes, mentorship and grading. Their owner manages the rest: the description, plans and prices.
                 </p>
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

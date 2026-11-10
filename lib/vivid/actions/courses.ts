@@ -2,15 +2,15 @@
 
 import { Course, Enrollment, Lesson } from "@/lib/db/models"
 import { Types } from "mongoose"
-import { sellsPackages } from "@/lib/entitlements"
+import { ON_SALE_FILTER, isOnSale, sellsPackages } from "@/lib/entitlements"
 import { courseKindOf } from "@/lib/course-kind"
+import { OPEN_KINDS_FILTER, kindIsOpen } from "@/lib/marketplace"
 import { courseCredit } from "@/lib/faculty"
 import { initAction, type Doc } from "./helpers"
 
 export async function vividSearchCourses(p: {
   search?: string
   level?: string
-  pricing?: string
   category?: string
   sortBy?: string
   limit?: number
@@ -19,14 +19,14 @@ export async function vividSearchCourses(p: {
     const currentUser = await initAction()
     if (!currentUser) return { success: false, courses: [], error: "Not authenticated" }
 
-    const query: Doc = { status: "published" }
+    // Only courses on sale: no course is free (isOnSale).
+    const query: Doc = { status: "published", ...ON_SALE_FILTER, ...OPEN_KINDS_FILTER }
     if (p.search) query.$or = [
       { title: { $regex: p.search, $options: "i" } },
       { description: { $regex: p.search, $options: "i" } },
       { tags: { $regex: p.search, $options: "i" } },
     ]
     if (p.level) query.level = p.level
-    if (p.pricing) query.pricing = p.pricing
     if (p.category) query.category = p.category
 
     let sort: Doc = { enrolledCount: -1 }
@@ -205,21 +205,14 @@ export async function vividEnrollInCourse(p: { courseId: string }) {
     const existing = await Enrollment.findOne({ user: currentUser.id, course: course._id })
     if (existing) return { success: true, already: true, message: "Already enrolled" }
 
+    // No course is free (isOnSale): one that isn't on sale can't be bought.
+    if (!isOnSale(course)) return { success: false, error: "This course isn't on sale." }
+    if (!kindIsOpen(course.kind)) return { success: false, error: "The marketplace opens soon." }
     const packaged = sellsPackages(course)
 
-    if (course.pricing === "free" && !packaged) {
-      // Route through the shared purchase action so enrollment side-effects
-      // (counts, instructor stats) stay in one place.
-      const { purchaseCourse } = await import("@/lib/actions/enrollments")
-      const result = await purchaseCourse({ courseId: course._id.toString() })
-      if (!result.success) return { success: false, error: result.error }
-      return { success: true, enrolled: true, message: "Enrolled successfully!" }
-    }
-
-    // Paid courses — and every course sold in packages — go through the real
-    // checkout: the wallet debit happens server-side there and the student
-    // picks their own package. Vivid never chooses a tier or marks a course
-    // as purchased itself.
+    // Every course goes through the real checkout: the wallet debit happens
+    // server-side there and the student picks their own package. Vivid never
+    // chooses a tier or marks a course as purchased itself.
     return {
       success: true,
       needsCheckout: true,

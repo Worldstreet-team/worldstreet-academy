@@ -9,11 +9,12 @@ import { PageHeader } from "@/components/shared/page-header"
 import { EmptyState } from "@/components/shared/empty-state"
 import { ArtCourses } from "@/components/shared/illustrations"
 
-import { fetchCourseForEdit } from "@/lib/actions/instructor"
+import { fetchCourseForEdit, fetchCourseLessons } from "@/lib/actions/instructor"
 import { ResourceManager } from "@/components/instructor/resource-manager"
 import { DeleteCourseButton } from "@/components/instructor/delete-course-dialog"
 import { getCachedUser } from "@/lib/auth/cached"
 import { COURSE_KIND_LABEL } from "@/lib/course-kind"
+import { CourseLessonsView } from "@/components/instructor/course-lessons-view"
 
 export default async function InstructorCourseInfoPage({
   params,
@@ -23,7 +24,14 @@ export default async function InstructorCourseInfoPage({
   const { courseId } = await params
   const [data, viewer] = await Promise.all([fetchCourseForEdit(courseId), getCachedUser()])
 
-  if (!data) notFound()
+  if (!data) {
+    // An assigned tutor manages the program's lessons, not the program itself
+    // (lib/teaching.ts): show them those, never a dead end (a redirect here
+    // crashes the client router — see CourseLessonsView).
+    const lessons = await fetchCourseLessons(courseId)
+    if (lessons) return <CourseLessonsView courseId={courseId} data={lessons} />
+    notFound()
+  }
   // Approved marketplace sellers (no faculty role) get no exam or assignment tools.
   const seller = viewer?.role === "USER"
 

@@ -23,6 +23,11 @@ import { getCourseAccess, isLessonLockedFor, lockedLessonIds } from "@/lib/cours
 
 const MAX_RESOURCE_BYTES = 100 * 1024 * 1024 // 100 MB
 
+// Ids arrive from the browser untyped: an object such as {"$ne": null} would
+// otherwise reach Mongo as an operator and match another course's rows.
+const OBJECT_ID = /^[a-f0-9]{24}$/
+const isId = (v: unknown): v is string => typeof v === "string" && OBJECT_ID.test(v)
+
 /** Accepted document types, mapped to the default resource kind. */
 const ALLOWED_MIME: Record<string, ResourceKind> = {
   "application/pdf": "pdf",
@@ -57,6 +62,7 @@ export type ResourceListItem = {
 async function assertCourseOwner(courseId: string) {
   const user = await getCurrentUser()
   if (!user) return { error: "You need to be signed in" as const }
+  if (!isId(courseId)) return { error: "Course not found" as const }
   const course = await Course.findById(courseId).select("instructor")
   if (!course) return { error: "Course not found" as const }
   if (course.instructor.toString() !== user.id && user.role !== "ADMIN") {
@@ -134,8 +140,13 @@ export async function addResource(input: {
       // Only a key getResourceUploadUrl issued: never a submission, payment
       // proof or recording that shares the private bucket.
       return { success: false, error: "Upload the file again" }
+    } else if (await Resource.exists({ storageKey: input.storageKey })) {
+      // A key belongs to the one resource it was uploaded for. Another owner who
+      // learns it (it's in a signed download link) can't attach it to their own
+      // course, so they can neither hand the file out free nor delete it.
+      return { success: false, error: "Upload the file again" }
     }
-    if (input.lessonId && !(await Lesson.exists({ _id: input.lessonId, course: input.courseId }))) {
+    if (input.lessonId && (!isId(input.lessonId) || !(await Lesson.exists({ _id: input.lessonId, course: input.courseId })))) {
       return { success: false, error: "That lesson isn't part of this course" }
     }
 
@@ -167,13 +178,16 @@ export async function addResource(input: {
 export async function deleteResource(resourceId: string): Promise<{ success: boolean; error?: string }> {
   try {
     await connectDB()
+    if (!isId(resourceId)) return { success: false, error: "Resource not found" }
     const resource = await Resource.findById(resourceId)
     if (!resource) return { success: false, error: "Resource not found" }
 
     const owner = await assertCourseOwner(resource.course.toString())
     if ("error" in owner) return { success: false, error: owner.error }
 
-    if (resource.storageKey) {
+    // Older rows may share a key (addResource refuses that now): the file goes
+    // only with the last resource that points at it.
+    if (resource.storageKey && !(await Resource.exists({ storageKey: resource.storageKey, _id: { $ne: resource._id } }))) {
       // Best-effort: a failed object delete shouldn't strand the DB record.
       await deleteFromR2(resource.storageKey, R2_RESOURCE_BUCKET)
     }
@@ -190,7 +204,7 @@ export async function deleteResource(resourceId: string): Promise<{ success: boo
 
 /** Does this viewer have download rights for the course's paid materials? */
 async function hasCourseAccess(courseId: string, user: { id: string; role: string } | null) {
-  if (!user) return false
+  if (!user || !isId(courseId)) return false
   if (user.role === "ADMIN") return true
   const course = await Course.findById(courseId).select("instructor")
   if (course && course.instructor.toString() === user.id) return true
@@ -209,6 +223,7 @@ async function hasCourseAccess(courseId: string, user: { id: string; role: strin
  */
 export async function listCourseResources(courseId: string): Promise<ResourceListItem[]> {
   try {
+    if (!isId(courseId)) return []
     await connectDB()
     const user = await getCurrentUser()
     const access = await hasCourseAccess(courseId, user)
@@ -253,6 +268,7 @@ export async function getResourceDownloadUrl(
     const user = await getCurrentUser()
     if (!user) return { success: false, error: "You need to be signed in" }
 
+    if (!isId(resourceId)) return { success: false, error: "Resource not found" }
     const resource = await Resource.findById(resourceId)
     if (!resource) return { success: false, error: "Resource not found" }
 

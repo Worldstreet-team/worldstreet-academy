@@ -118,11 +118,6 @@ const LEVEL_ITEMS = [
 
 const SCHOOL_ITEMS = SCHOOLS.map((s) => ({ value: s.slug, label: s.name }))
 
-const PRICING_ITEMS = [
-  { value: "free", label: "Free" },
-  { value: "paid", label: "Paid" },
-]
-
 function formatDay(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", { dateStyle: "medium" })
 }
@@ -282,6 +277,25 @@ function formatDurationTimecode(totalSeconds: number): string {
   return `${pad(m)}:${pad(s)}`
 }
 
+/**
+ * Whole hours and the minutes left over, from seconds, rounded to the minute
+ * first (as the lesson manager's `splitLength`), so 3,580 s reads 1 h 0 m —
+ * never "0 h 60 m", which the 59-minute cap would then cut short.
+ */
+function partsFromLength(seconds: number): { hours: string; minutes: string } {
+  if (!seconds || seconds <= 0) return { hours: "", minutes: "" }
+  const totalMinutes = Math.max(1, Math.round(seconds / 60))
+  return { hours: String(Math.floor(totalMinutes / 60)), minutes: String(totalMinutes % 60) }
+}
+
+/** Seconds, as the editor stores them, from typed hours and minutes; "" when both are empty or zero. */
+function lengthFromParts(hours: string, minutes: string): string {
+  const h = Math.min(24, Math.max(0, parseInt(hours) || 0))
+  const m = Math.min(59, Math.max(0, parseInt(minutes) || 0))
+  const seconds = h * 3600 + m * 60
+  return seconds > 0 ? String(seconds) : ""
+}
+
 /** Human-readable summary: "23s", "3m", "1hr 10min", "4hrs 10min" */
 function formatDurationHuman(totalSeconds: number): string {
   if (!totalSeconds || totalSeconds <= 0) return "0s"
@@ -384,8 +398,8 @@ export function CourseEditor({
   const [thumbnailUrl, setThumbnailUrl] = useState(course?.thumbnailUrl ?? "")
   const [level, setLevel] = useState(course?.level ?? "beginner")
   const [school, setSchool] = useState<SchoolSlug | "">(course?.school ?? "")
-  const [pricing, setPricing] = useState(course?.pricing ?? "free")
-  const [price, setPrice] = useState(course?.price?.toString() ?? "")
+  // Every course is paid (owner, 2026-11-03): there is no "free" to choose, and an unpriced draft starts empty.
+  const [price, setPrice] = useState(course?.price ? course.price.toString() : "")
   const [objectives, setObjectives] = useState<string[]>(course?.whatYouWillLearn ?? [])
   const [requirements, setRequirements] = useState<string[]>(course?.requirements ?? [])
   const [audience, setAudience] = useState<string[]>(course?.targetAudience ?? [])
@@ -417,15 +431,13 @@ export function CourseEditor({
   const [submitForReview, setSubmitForReview] = useState(false)
   const review = course?.review ?? { status: "none" as const, submittedAt: null, reviewedAt: null, note: null }
   // Marketplace and New Economy courses sell at one price (owner, 2026-10-05):
-  // only a school program has a package ladder, and New Economy is free.
+  // only a school program has a package ladder.
   const ladderActive = kind === "program"
   // With a ladder, the course's scalar pricing is the cheapest enabled
   // tier (the server derives the same in updateCourse/createCourse); the
   // hidden fields mirror that so the server's price check keeps passing.
   const derivedPrice = ladderActive ? ladderPrice(packages) : null
-  const effectivePricing =
-    kind === "new-economy" ? "free" : derivedPrice === null ? pricing : derivedPrice > 0 ? "paid" : "free"
-  const effectivePrice = kind === "new-economy" ? "0" : derivedPrice === null ? price : String(derivedPrice)
+  const effectivePrice = derivedPrice === null ? price : String(derivedPrice)
   const [previewError, setPreviewError] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
 
@@ -538,7 +550,7 @@ export function CourseEditor({
             <input type="hidden" name="thumbnailUrl" value={thumbnailUrl} />
             <input type="hidden" name="level" value={level} />
             <input type="hidden" name="school" value={school} />
-            <input type="hidden" name="pricing" value={effectivePricing} />
+            <input type="hidden" name="pricing" value="paid" />
             <input type="hidden" name="price" value={effectivePrice} />
             <input type="hidden" name="packages" value={JSON.stringify(packages.map(toCoursePackage))} />
             <input type="hidden" name="status" value={status} />
@@ -954,41 +966,20 @@ export function CourseEditor({
 
           <SectionDivider label="Pricing" />
 
-          {kind === "new-economy" ? (
+          {derivedPrice !== null ? (
             <p className="rounded-md border p-3 text-[11px] text-muted-foreground">
-              New Economy courses are always free.
-            </p>
-          ) : derivedPrice !== null ? (
-            <p className="rounded-md border p-3 text-[11px] text-muted-foreground">
-              Set by plans: this course sells {derivedPrice > 0 ? `from $${derivedPrice}` : "free"} — the
-              cheapest enabled tier, at the Academy&apos;s price list. With every tier disabled the program can
-              only be free.
+              Set by plans: this course sells from ${derivedPrice} — the cheapest enabled tier, at the
+              Academy&apos;s price list, with each plan&apos;s regular price struck through beside it.
             </p>
           ) : (
           <div className="space-y-3">
-            <Select
-              items={PRICING_ITEMS}
-              value={pricing}
-              onValueChange={(v) =>
-                setPricing((v ?? "free") as "free" | "paid")
-              }
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="free">Free</SelectItem>
-                <SelectItem value="paid">Paid</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {pricing === "paid" && ladderActive && (
+            {ladderActive && (
               <p className="text-[11px] text-ws-warning">
                 Academy programs sell through their plans at the price list ({PROGRAM_PRICE_LIST_LINE}).
-                Turn on a plan above, or choose Free.
+                Turn on at least one plan above. No course on the Academy is free.
               </p>
             )}
-            {pricing === "paid" && !ladderActive && (
+            {!ladderActive && (
               <div className="space-y-1.5">
                 <Label htmlFor="ed-price">Price (USD)</Label>
                 <div className="relative max-w-[180px]">
@@ -999,8 +990,9 @@ export function CourseEditor({
                     id="ed-price"
                     type="number"
                     step="0.01"
-                    min="0.99"
-                    placeholder="49.99"
+                    min="1"
+                    required
+                    placeholder="49"
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
                     className="pl-7"
@@ -1139,8 +1131,8 @@ export function CourseEditor({
                             />
                           </div>
 
-                          {/* Type + Duration */}
-                          <div className="grid grid-cols-2 gap-3">
+                          {/* Type, then the length (hours and minutes need a row of their own) */}
+                          <div className="grid gap-3">
                             <div className="space-y-1.5">
                               <Label>Type</Label>
                               <Select
@@ -1161,26 +1153,44 @@ export function CourseEditor({
                               </Select>
                             </div>
                             <div className="space-y-1.5">
-                              <Label>
-                                Duration
-                                {dur > 0 && (
-                                  <span className="text-muted-foreground font-normal ml-1">
-                                    — {formatDurationTimecode(dur)}
-                                  </span>
-                                )}
-                              </Label>
-                              <Input
-                                type="number"
-                                min="1"
-                                placeholder="Seconds"
-                                value={lesson.duration}
-                                onChange={(e) =>
-                                  updateLesson(lesson.tempId, {
-                                    duration: e.target.value,
-                                  })
-                                }
-                                disabled={lesson.autoDuration}
-                              />
+                              <Label>{lesson.type === "video" ? "Video length" : "Reading time"}</Label>
+                              {/* Hours and minutes, stored in seconds. Typing turns auto-detect off. */}
+                              <div className="flex items-center gap-1.5">
+                                <Input
+                                  type="number"
+                                  inputMode="numeric"
+                                  min={0}
+                                  max={24}
+                                  placeholder="0"
+                                  aria-label="Hours"
+                                  value={partsFromLength(dur).hours}
+                                  onChange={(e) =>
+                                    updateLesson(lesson.tempId, {
+                                      duration: lengthFromParts(e.target.value, partsFromLength(dur).minutes),
+                                      autoDuration: false,
+                                    })
+                                  }
+                                  className="w-16 tabular-nums"
+                                />
+                                <span className="text-xs text-muted-foreground">h</span>
+                                <Input
+                                  type="number"
+                                  inputMode="numeric"
+                                  min={0}
+                                  max={59}
+                                  placeholder="0"
+                                  aria-label="Minutes"
+                                  value={partsFromLength(dur).minutes}
+                                  onChange={(e) =>
+                                    updateLesson(lesson.tempId, {
+                                      duration: lengthFromParts(partsFromLength(dur).hours, e.target.value),
+                                      autoDuration: false,
+                                    })
+                                  }
+                                  className="w-16 tabular-nums"
+                                />
+                                <span className="text-xs text-muted-foreground">m</span>
+                              </div>
                               {/* Auto-detect from video checkbox */}
                               {lesson.type === "video" && (
                                 <label className="flex items-center gap-2 cursor-pointer mt-1">
@@ -1398,9 +1408,9 @@ export function CourseEditor({
               )}
               <Badge
                 className="absolute top-2.5 left-2.5 text-[10px] z-10 shadow-sm"
-                variant={pricing === "free" ? "default" : "secondary"}
+                variant="secondary"
               >
-                {pricing === "free" ? "Free" : price ? `$${price}` : "Paid"}
+                {Number(effectivePrice) > 0 ? `$${effectivePrice}` : "No price yet"}
               </Badge>
             </div>
             <CardContent className="p-3.5 space-y-2">

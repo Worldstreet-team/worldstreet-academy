@@ -33,6 +33,57 @@ import {
 } from "@/lib/actions/applications"
 import type { RejectionReason } from "@/lib/db/models"
 import { SCHOOL_BY_SLUG } from "@/lib/schools"
+import {
+  INTERVIEW_LOCATION_MAX,
+  INTERVIEW_MODES,
+  INTERVIEW_MODE_LABEL,
+  INTERVIEW_PREFERENCE_LABEL,
+  defaultInterviewMode,
+  type InterviewMode,
+} from "@/lib/careers"
+
+/** Office or online, and the office address when it's in person — shared by both scheduling dialogs. */
+function InterviewPlaceFields({
+  mode,
+  location,
+  onMode,
+  onLocation,
+}: {
+  mode: InterviewMode
+  location: string
+  onMode: (mode: InterviewMode) => void
+  onLocation: (location: string) => void
+}) {
+  return (
+    <div className="space-y-2">
+      <div role="radiogroup" aria-label="How the interview is held" className="flex flex-wrap gap-2">
+        {INTERVIEW_MODES.map((value) => (
+          <Button
+            key={value}
+            type="button"
+            size="sm"
+            variant={mode === value ? "default" : "outline"}
+            role="radio"
+            aria-checked={mode === value}
+            onClick={() => onMode(value)}
+          >
+            {INTERVIEW_MODE_LABEL[value]}
+          </Button>
+        ))}
+      </div>
+      {mode === "office" && (
+        <Textarea
+          aria-label="Office address and directions"
+          value={location}
+          onChange={(e) => onLocation(e.target.value)}
+          placeholder="Office address, floor and who to ask for at reception"
+          maxLength={INTERVIEW_LOCATION_MAX}
+          className="min-h-20"
+        />
+      )}
+    </div>
+  )
+}
 
 const REJECTION_REASONS: { value: RejectionReason; label: string }[] = [
   { value: "not_enough_experience", label: "Not enough experience" },
@@ -80,6 +131,8 @@ export default function AdminApplicationDetailPage() {
   const [proposeOpen, setProposeOpen] = React.useState(false)
   const [proposeSlots, setProposeSlots] = React.useState<string[]>(["", "", ""])
   const [proposeError, setProposeError] = React.useState<string | null>(null)
+  const [placeMode, setPlaceMode] = React.useState<InterviewMode>("online")
+  const [placeLocation, setPlaceLocation] = React.useState("")
   const [rejectionReason, setRejectionReason] = React.useState<RejectionReason>("other")
   // Scorecard local state
   const [scDepth, setScDepth] = React.useState(3)
@@ -145,7 +198,11 @@ export default function AdminApplicationDetailPage() {
   })
 
   const schedule = useMutation({
-    mutationFn: () => adminScheduleInterview(applicationId, new Date(scheduleAt).toISOString()),
+    mutationFn: () =>
+      adminScheduleInterview(applicationId, new Date(scheduleAt).toISOString(), {
+        mode: placeMode,
+        location: placeLocation,
+      }),
     onSuccess: (res) => {
       if (!res.success) {
         setScheduleError(res.error ?? "Failed to schedule")
@@ -162,7 +219,8 @@ export default function AdminApplicationDetailPage() {
     mutationFn: () =>
       adminProposeSlots(
         applicationId,
-        proposeSlots.filter(Boolean).map((at) => ({ at: new Date(at).toISOString() }))
+        proposeSlots.filter(Boolean).map((at) => ({ at: new Date(at).toISOString() })),
+        { mode: placeMode, location: placeLocation }
       ),
     onSuccess: (res) => {
       if (!res.success) {
@@ -218,6 +276,27 @@ export default function AdminApplicationDetailPage() {
   const isActive =
     app && ["submitted", "under_review", "interview_scheduled"].includes(app.status)
 
+  // Opening a scheduling dialog starts from the booking (or plan) already made, else the applicant's preference.
+  const resetPlace = () => {
+    if (!app) return
+    if (app.interview?.mode === "office") {
+      setPlaceMode("office")
+      setPlaceLocation(app.interview.location)
+    } else if (app.interview?.mode === "online") {
+      setPlaceMode("online")
+      setPlaceLocation("")
+    } else if (app.plannedInterview.mode === "office") {
+      setPlaceMode("office")
+      setPlaceLocation(app.plannedInterview.location ?? "")
+    } else {
+      setPlaceMode(defaultInterviewMode(app.answers.interviewPreference))
+      setPlaceLocation("")
+    }
+  }
+  // Staff tutors are hired through an interview: approval opens once it has taken place.
+  const canApprove = app?.status === "interview_scheduled" && app.interviewHeld
+  const placeIncomplete = placeMode === "office" && placeLocation.trim().length < 5
+
   return (
     <>
       <Topbar variant="admin" breadcrumbOverrides={{ [applicationId]: app?.applicantName ?? "Application" }} />
@@ -244,6 +323,9 @@ export default function AdminApplicationDetailPage() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <h1 className="text-base font-semibold truncate">{app.applicantName}</h1>
                         <StatusBadge status={app.status} />
+                        <Badge variant="outline" className="text-[10px]">
+                          Staff tutor job application
+                        </Badge>
                       </div>
                       <p className="text-xs text-muted-foreground truncate">{app.applicantEmail}</p>
                       <p className="text-[11px] text-muted-foreground mt-0.5">
@@ -299,6 +381,7 @@ export default function AdminApplicationDetailPage() {
                           variant="ghost"
                           onClick={() => {
                             setProposeError(null)
+                            resetPlace()
                             setScheduleMin(new Date(Date.now() + 5 * 60_000).toISOString().slice(0, 16))
                             setProposeOpen(true)
                           }}
@@ -311,6 +394,7 @@ export default function AdminApplicationDetailPage() {
                         variant="ghost"
                         onClick={() => {
                           setScheduleError(null)
+                          resetPlace()
                           setScheduleMin(new Date(Date.now() + 5 * 60_000).toISOString().slice(0, 16))
                           setScheduleOpen(true)
                         }}
@@ -319,6 +403,8 @@ export default function AdminApplicationDetailPage() {
                       </Button>
                       <Button
                         size="sm"
+                        disabled={!canApprove}
+                        title={canApprove ? undefined : "Approve after the interview has taken place"}
                         onClick={() => setDecisionDialog("approved")}
                       >
                         Approve
@@ -337,6 +423,7 @@ export default function AdminApplicationDetailPage() {
                   <div className="mt-3 rounded-lg border border-ws-hairline bg-ws-raised px-3 py-2.5">
                     <p className="text-xs font-semibold">
                       Waiting on the applicant to pick a slot
+                      {app.plannedInterview.mode === "office" ? " (at the office)" : " (online)"}
                     </p>
                     <p className="text-[11px] text-muted-foreground">
                       {app.proposedSlots
@@ -347,13 +434,33 @@ export default function AdminApplicationDetailPage() {
                     </p>
                   </div>
                 )}
+                {isActive && !canApprove && (
+                  <p className="text-[11px] text-muted-foreground mt-2">
+                    {app.status === "interview_scheduled"
+                      ? "Approve opens once the interview has taken place."
+                      : "Interview this applicant, at the office or online, before approving. You can reject at any stage."}
+                  </p>
+                )}
                 {actionError && (
                   <p className="text-xs text-ws-danger mt-2">{actionError}</p>
                 )}
-                {app.interview && (
+                {app.interview?.mode === "office" && (
+                  <div className="mt-3 rounded-lg border border-ws-brand/25 bg-ws-brand/10 px-3 py-2.5">
+                    <p className="text-xs font-semibold">Office interview scheduled</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {new Date(app.interview.scheduledAt).toLocaleString("en-US", {
+                        dateStyle: "full",
+                        timeStyle: "short",
+                      })}
+                      {" · "}
+                      {app.interview.location}
+                    </p>
+                  </div>
+                )}
+                {app.interview?.mode === "online" && (
                   <div className="mt-3 rounded-lg border border-ws-brand/25 bg-ws-brand/10 px-3 py-2.5 flex items-center justify-between gap-3 flex-wrap">
                     <div>
-                      <p className="text-xs font-semibold">Interview scheduled</p>
+                      <p className="text-xs font-semibold">Online interview scheduled</p>
                       <p className="text-[11px] text-muted-foreground">
                         {app.interview.scheduledAt
                           ? new Date(app.interview.scheduledAt).toLocaleString("en-US", {
@@ -405,6 +512,16 @@ export default function AdminApplicationDetailPage() {
                           </Badge>
                         )}
                       </div>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
+                        Can interview
+                      </p>
+                      <p className="text-sm">
+                        {app.answers.interviewPreference
+                          ? INTERVIEW_PREFERENCE_LABEL[app.answers.interviewPreference]
+                          : "Not asked (applied before office interviews) — confirm with the applicant"}
+                      </p>
                     </div>
                     {(app.answers.school || app.answers.teachingTopic) && (
                       <div>
@@ -653,11 +770,17 @@ export default function AdminApplicationDetailPage() {
               {app?.interview ? "Reschedule interview" : "Schedule interview"}
             </DialogTitle>
             <DialogDescription>
-              Creates a private interview room with a waiting room. {app?.applicantName} gets an
-              email + in-app invite with the join link; you start the call by opening the room at
-              the scheduled time.
+              {placeMode === "office"
+                ? `${app?.applicantName ?? "The applicant"} gets an email (with a calendar file) and an in-app notice with the time and this address.`
+                : `Creates a private interview room with a waiting room. ${app?.applicantName ?? "The applicant"} gets an email + in-app invite with the join link; you start the call by opening the room at the scheduled time.`}
             </DialogDescription>
           </DialogHeader>
+          <InterviewPlaceFields
+            mode={placeMode}
+            location={placeLocation}
+            onMode={setPlaceMode}
+            onLocation={setPlaceLocation}
+          />
           <Input
             type="datetime-local"
             value={scheduleAt}
@@ -671,7 +794,7 @@ export default function AdminApplicationDetailPage() {
             </Button>
             <Button
               size="sm"
-              disabled={!scheduleAt || schedule.isPending}
+              disabled={!scheduleAt || placeIncomplete || schedule.isPending}
               onClick={() => schedule.mutate()}
             >
               {schedule.isPending
@@ -691,9 +814,17 @@ export default function AdminApplicationDetailPage() {
             <DialogTitle>Propose interview slots</DialogTitle>
             <DialogDescription>
               Offer up to three times — {app?.applicantName} picks one from their status page
-              and the interview room is created automatically.
+              {placeMode === "office"
+                ? " and the office interview is booked at this address."
+                : " and the interview room is created automatically."}
             </DialogDescription>
           </DialogHeader>
+          <InterviewPlaceFields
+            mode={placeMode}
+            location={placeLocation}
+            onMode={setPlaceMode}
+            onLocation={setPlaceLocation}
+          />
           <div className="space-y-2">
             {proposeSlots.map((v, i) => (
               <Input
@@ -714,7 +845,7 @@ export default function AdminApplicationDetailPage() {
             </Button>
             <Button
               size="sm"
-              disabled={propose.isPending || proposeSlots.every((s) => !s)}
+              disabled={propose.isPending || placeIncomplete || proposeSlots.every((s) => !s)}
               onClick={() => propose.mutate()}
             >
               {propose.isPending ? "Sending…" : "Send to applicant"}
@@ -732,7 +863,7 @@ export default function AdminApplicationDetailPage() {
             </DialogTitle>
             <DialogDescription>
               {decisionDialog === "approved"
-                ? `${app?.applicantName} becomes an INSTRUCTOR immediately — their instructor portal unlocks and their public profile is seeded from this application.`
+                ? `You're hiring ${app?.applicantName} as a staff tutor. They become an INSTRUCTOR immediately: their instructor portal unlocks and their profile is seeded from this application. They teach Academy students once you assign them to a program.`
                 : `${app?.applicantName} will be notified. They can apply again after 30 days.`}
             </DialogDescription>
           </DialogHeader>
