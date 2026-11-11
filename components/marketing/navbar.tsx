@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { headers } from "next/headers"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { MarketingMobileNav, type MarketingNavLink } from "@/components/marketing/mobile-nav"
@@ -6,6 +7,7 @@ import { NavbarShell } from "@/components/marketing/navbar-shell"
 import { NavSearch } from "@/components/marketing/nav-search"
 import { SchoolsMenu, type SchoolCounts } from "@/components/marketing/schools-menu"
 import { getCurrentUser } from "@/lib/auth/actions"
+import { loginUrl, registerUrl, safeReturnPath } from "@/lib/auth/login-url"
 import { fetchBrowseCourses } from "@/lib/actions/student"
 import { countProgramsBySchool } from "@/lib/schools"
 import { needsSchoolChoice } from "@/lib/start-gate"
@@ -16,9 +18,15 @@ import { BRAND } from "@/lib/brand"
 import { BrandLockup } from "@/components/shared/brand-lockup"
 import { cn } from "@/lib/utils"
 
-const isLocalDev = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_")
-const LOGIN_URL = isLocalDev ? "/login" : "https://worldstreetgold.com/login"
-const REGISTER_URL = isLocalDev ? "/register" : "https://worldstreetgold.com/register"
+/**
+ * A new account comes back to the schools with the gate's notice
+ * (`?start=1`: "Next, choose your program"), so "Join WMA" is one path:
+ * a WorldStreet account on worldstreetgold.com, then a program, then payment.
+ * Sent with its return address, the hub also says "Coming from Academy"
+ * and offers "Back to Academy" (2026-11-11 audit: without it, a new account
+ * was left on the hub). `registerUrl` mirrors the pk_test_ switch.
+ */
+const REGISTER_URL = registerUrl("/schools?start=1")
 
 const barLinkClass =
   "inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-full px-2 text-sm font-medium xl:px-3 text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-chip hover:text-ws-primary"
@@ -36,12 +44,18 @@ export async function Navbar({ showFaculty }: { showFaculty: boolean }) {
   // Server-side auth check: signed-in users get one gold path back into the
   // app; guests get the acquisition pair. "My Learning" is signed-in only —
   // for a guest it would just bounce through the login wall.
-  const [user, published] = await Promise.all([getCurrentUser(), fetchBrowseCourses()])
+  const [user, published, h] = await Promise.all([getCurrentUser(), fetchBrowseCourses(), headers()])
+  // Sign in returns to the page it was pressed on (middleware forwards the
+  // path and query); from the homepage, to the dashboard, which the gate turns
+  // into the schools for anyone who hasn't paid yet. `loginUrl` mirrors the
+  // pk_test_ switch.
+  const here = safeReturnPath(`${h.get("x-next-pathname") ?? ""}${h.get("x-next-search") ?? ""}`)
+  const loginHref = loginUrl(here === "/" ? "/dashboard" : here)
   const isInstructor = user && (user.role === "INSTRUCTOR" || user.role === "ADMIN")
   // An approved marketplace seller's way back to their courses (owner, 2026-10-05).
   const isSeller = Boolean(user && user.role === "USER" && (await getSellerStatus(user.id)) === "approved")
   // A learner the gate would bounce (no paid enrollment — owner meeting
-  // 2026-10-03) gets "Choose a program" instead of a dashboard link that loops
+  // 2026-10-03) gets "Join WMA" (to /schools) instead of a dashboard link that loops
   // back to /schools, or "Payment status" while an ESPEE proof of theirs is
   // under review. Fails open like the gate: unreadable state shows the dashboard.
   const gate = user && user.role === "USER" ? await getStartGateState(user.id).catch(() => null) : null
@@ -81,7 +95,7 @@ export async function Navbar({ showFaculty }: { showFaculty: boolean }) {
   const sheetActions: MarketingNavLink[] = user
     ? []
     : [
-        { href: LOGIN_URL, label: "Sign in", external: true },
+        { href: loginHref, label: "Sign in", external: true },
         { href: REGISTER_URL, label: "Join WMA", external: true },
       ]
 
@@ -155,9 +169,10 @@ export async function Navbar({ showFaculty }: { showFaculty: boolean }) {
             <span className="hidden sm:inline">Payment status</span>
           </Link>
         ) : user && gated ? (
+          // Same words as the guest CTA (owner, 2026-11-11: "change that
+          // Choose button to Join WMA"); it still leads to the school picker.
           <Link href="/schools?start=1" className={primaryClass}>
-            <span className="sm:hidden">Choose</span>
-            <span className="hidden sm:inline">Choose a program</span>
+            Join {BRAND.shortName}
           </Link>
         ) : user ? (
           // Authenticated: one gold path back into the app. The label
@@ -173,7 +188,7 @@ export async function Navbar({ showFaculty }: { showFaculty: boolean }) {
             <Button
               variant="ghost"
               className="hidden h-10 rounded-full px-4 text-sm font-medium text-ws-primary hover:bg-ws-chip lg:inline-flex dark:hover:bg-ws-chip"
-              render={<a href={LOGIN_URL} />}
+              render={<a href={loginHref} />}
             >
               Sign in
             </Button>
@@ -183,7 +198,13 @@ export async function Navbar({ showFaculty }: { showFaculty: boolean }) {
           </>
         )}
 
-        <MarketingMobileNav links={sheetLinks} actions={sheetActions} counts={counts} className="lg:hidden" />
+        <MarketingMobileNav
+          links={sheetLinks}
+          actions={sheetActions}
+          actionsNote={user ? undefined : `Uses your WorldStreet account. New to WorldStreet? Join ${BRAND.shortName} to create one.`}
+          counts={counts}
+          className="lg:hidden"
+        />
       </div>
     </NavbarShell>
   )

@@ -28,6 +28,31 @@ export function safeReturnPath(value: string | string[] | undefined): string {
 }
 
 /**
+ * The admin panels' own sign-in (Owen, 2026-11-11): `/admin/login` for any
+ * admin, `/superadmin` for super admins. An admin types their WorldStreet email
+ * and password there, with no trip to the hub (lib/actions/admin-login.ts).
+ */
+export const ADMIN_LOGIN_PATH = "/admin/login"
+export const SUPER_ADMIN_LOGIN_PATH = "/superadmin"
+
+/**
+ * Where the admin sign-in returns to: a page inside /admin only (never the
+ * sign-in itself), so the form can never send anyone elsewhere.
+ */
+export function safeAdminReturnPath(value: string | string[] | null | undefined): string {
+  const path = typeof value === "string" ? value : ""
+  const inAdmin = path === "/admin" || path.startsWith("/admin/") || path.startsWith("/admin?")
+  if (!inAdmin || path.includes("\\") || path.startsWith(ADMIN_LOGIN_PATH)) return "/admin"
+  return path
+}
+
+/** The admin sign-in, returning to `returnPath` once signed in. */
+export function adminLoginUrl(returnPath: string): string {
+  const back = safeAdminReturnPath(returnPath)
+  return back === "/admin" ? ADMIN_LOGIN_PATH : `${ADMIN_LOGIN_PATH}?next=${encodeURIComponent(back)}`
+}
+
+/**
  * Where a signed-out visitor returns to after signing in from a checkout page:
  * the checkout path they were on, query included (`courseId`, `package`).
  * Only a checkout path is ever returned, so the return can never be steered

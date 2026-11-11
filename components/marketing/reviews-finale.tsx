@@ -19,6 +19,7 @@ import { useMediaQuery, useMotionOK } from "@/components/marketing/motion/bus"
 import { SectionLabel, SectionTitle } from "@/components/marketing/section-heading"
 import type { LandingReview } from "@/lib/actions/reviews"
 import { ACADEMY_LINE, BIGGER_VISION, CLOSING_BANNER } from "@/lib/institution"
+import { BRAND } from "@/lib/brand"
 
 /** From this many reviews up, two rows slide past each other. */
 const ROWS_FROM = 6
@@ -431,11 +432,14 @@ export function FinaleCta({
                 Enrol now
               </Link>
             ) : (
+              // A guest's button opens WorldStreet account creation on
+              // worldstreetgold.com, not an enrolment: it carries the bar's
+              // words (2026-11-11).
               <a
                 href={registerUrl}
                 className="inline-flex h-12 items-center justify-center rounded-full border border-ws-hairline px-8 text-[15px] font-semibold text-ws-primary transition-colors duration-[var(--ws-motion-fast)] hover:border-ws-brand/40 hover:text-ws-gold"
               >
-                Enrol now
+                Join {BRAND.shortName}
               </a>
             )}
           </Reveal>

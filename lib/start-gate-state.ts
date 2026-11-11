@@ -1,7 +1,8 @@
 import { cache } from "react"
 import connectDB from "@/lib/db"
+import { getCachedUser } from "@/lib/auth/cached"
 import { Course, Enrollment, ManualPayment } from "@/lib/db/models"
-import { OPENS_DASHBOARD_FILTER } from "@/lib/start-gate"
+import { OPENS_DASHBOARD_FILTER, needsSchoolChoice } from "@/lib/start-gate"
 
 /**
  * The two facts the gate needs, for RSC layouts: does the learner have access
@@ -22,3 +23,24 @@ export const getStartGateState = cache(async (userId: string) => {
     enrolledIn.length > 0 ? await Course.exists({ _id: { $in: enrolledIn }, ...OPENS_DASHBOARD_FILTER }) : null
   return { hasAccess: Boolean(access), hasOpenProof: Boolean(openProof) }
 })
+
+/**
+ * The gate's welcome (GateNotice), for a signed-in learner the school-first
+ * gate would still send to the schools (`?start=1` alone is not enough: an
+ * enrolled learner can follow an old `/dashboard/start` link too). Fails
+ * closed to no notice. Shared by `/schools` and `/schools/[slug]`, the two
+ * places the gate sends a learner (`schoolsPathFor`).
+ */
+export async function gateWelcome(): Promise<{ firstName: string } | null> {
+  const user = await getCachedUser()
+  if (!user || user.role !== "USER") return null
+  const gate = await getStartGateState(user.id).catch(() => null)
+  if (!gate) return null
+  const sent = needsSchoolChoice({
+    role: user.role,
+    instructorStatus: user.instructorStatus,
+    pathname: "/dashboard",
+    ...gate,
+  })
+  return sent ? { firstName: (user.firstName ?? "").trim() } : null
+}

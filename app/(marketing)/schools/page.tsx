@@ -1,8 +1,6 @@
 import type { Metadata } from "next"
 import { fetchBrowseCourses, fetchFacultyCount, fetchFreePreviewLessons } from "@/lib/actions/student"
-import { getCachedUser } from "@/lib/auth/cached"
-import { getStartGateState } from "@/lib/start-gate-state"
-import { needsSchoolChoice } from "@/lib/start-gate"
+import { gateWelcome } from "@/lib/start-gate-state"
 import { appUrl } from "@/lib/app-url"
 import { FACULTY_PUBLIC } from "@/lib/faculty"
 import { getCohortCalendar } from "@/lib/cohort-calendar"
@@ -26,25 +24,6 @@ export const revalidate = 0
 type Search = { searchParams: Promise<Record<string, string | string[] | undefined>> }
 
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value)
-
-/**
- * The gate's welcome, for a signed-in learner the school-first gate would
- * still send here (`?start=1` alone is not enough: an enrolled learner can
- * follow an old `/dashboard/start` link too). Fails closed to no notice.
- */
-async function gateWelcome(): Promise<{ firstName: string } | null> {
-  const user = await getCachedUser()
-  if (!user || user.role !== "USER") return null
-  const gate = await getStartGateState(user.id).catch(() => null)
-  if (!gate) return null
-  const sent = needsSchoolChoice({
-    role: user.role,
-    instructorStatus: user.instructorStatus,
-    pathname: "/dashboard",
-    ...gate,
-  })
-  return sent ? { firstName: (user.firstName ?? "").trim() } : null
-}
 
 /**
  * `/schools` — "Explore our schools" (blueprint §4, §17): the step between

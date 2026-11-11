@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import connectDB from "@/lib/db"
-import { Course, ICourse, Lesson, User } from "@/lib/db/models"
+import { Course, ICourse, User } from "@/lib/db/models"
 import { uploadThumbnail, deleteFromCloudinary } from "@/lib/cloudinary"
 import { z } from "zod/v4"
 import { Types } from "mongoose"
@@ -206,73 +206,81 @@ export async function uploadCourseThumbnail(
   }
 }
 
-/**
- * Archive a course
- */
-export async function archiveCourse(courseId: string, instructorId: string) {
-  try {
-    await connectDB()
+// Retired 2026-11-11 (review of the admin delete): archiveCourse and deleteCourse
+// took the course and instructor ids from the caller with no sign-in check, so
+// anyone could call them as server actions. Nothing imported them. The live paths
+// are deleteCourse in lib/actions/instructor.ts and the admin course actions in
+// lib/actions/admin-courses.ts. Kept commented, not deleted (Owen: comment out, don't delete).
 
-    const course = await Course.findOneAndUpdate(
-      { _id: courseId, instructor: instructorId },
-      { status: "archived" },
-      { new: true }
-    )
-
-    if (!course) {
-      return { success: false, error: "Course not found or unauthorized" }
-    }
-
-    revalidatePath(`/instructor/courses/${courseId}`)
-    revalidatePath("/instructor/courses")
-
-    return { success: true }
-  } catch (error) {
-    console.error("Archive course error:", error)
-    return { success: false, error: "Failed to archive course" }
-  }
-}
-
-/**
- * Delete a course (soft delete by archiving, or hard delete if draft)
- */
-export async function deleteCourse(courseId: string, instructorId: string) {
-  try {
-    await connectDB()
-
-    const course = await Course.findOne({
-      _id: courseId,
-      instructor: instructorId,
-    })
-
-    if (!course) {
-      return { success: false, error: "Course not found or unauthorized" }
-    }
-
-    // If draft, delete completely
-    if (course.status === "draft") {
-      // Delete all lessons
-      await Lesson.deleteMany({ course: courseId })
-      // Delete course
-      await course.deleteOne()
-      // Update instructor stats
-      await User.findByIdAndUpdate(instructorId, {
-        $inc: { "instructorProfile.totalCourses": -1 },
-      })
-    } else {
-      // Just archive
-      course.status = "archived"
-      await course.save()
-    }
-
-    revalidatePath("/instructor/courses")
-
-    return { success: true }
-  } catch (error) {
-    console.error("Delete course error:", error)
-    return { success: false, error: "Failed to delete course" }
-  }
-}
+// /**
+//  * Archive a course
+//  */
+// export async function archiveCourse(courseId: string, instructorId: string) {
+//   try {
+//     await connectDB()
+//
+//     const course = await Course.findOneAndUpdate(
+//       { _id: courseId, instructor: instructorId },
+//       { status: "archived" },
+//       { new: true }
+//     )
+//
+//     if (!course) {
+//       return { success: false, error: "Course not found or unauthorized" }
+//     }
+//
+//     revalidatePath(`/instructor/courses/${courseId}`)
+//     revalidatePath("/instructor/courses")
+//
+//     return { success: true }
+//   } catch (error) {
+//     console.error("Archive course error:", error)
+//     return { success: false, error: "Failed to archive course" }
+//   }
+// }
+//
+// /**
+//  * Delete a course (soft delete by archiving, or hard delete if draft)
+//  */
+// export async function deleteCourse(courseId: string, instructorId: string) {
+//   try {
+//     await connectDB()
+//
+//     const course = await Course.findOne({
+//       _id: courseId,
+//       instructor: instructorId,
+//     })
+//
+//     if (!course) {
+//       return { success: false, error: "Course not found or unauthorized" }
+//     }
+//
+//     // If draft, delete completely, but never one anyone enrolled in or paid for (lib/course-deletion.ts).
+//     if (course.status === "draft") {
+//       const refusal = await courseDeletionRefusal(course._id)
+//       if (refusal) return { success: false, error: refusal }
+//       // Delete all lessons
+//       await Lesson.deleteMany({ course: courseId })
+//       // Delete course
+//       await course.deleteOne()
+//       // Update instructor stats
+//       await User.findByIdAndUpdate(instructorId, {
+//         $inc: { "instructorProfile.totalCourses": -1 },
+//       })
+//     } else {
+//       // Just archive
+//       course.status = "archived"
+//       await course.save()
+//     }
+//
+//     revalidatePath("/instructor/courses")
+//
+//     return { success: true }
+//   } catch (error) {
+//     console.error("Delete course error:", error)
+//     return { success: false, error: "Failed to delete course" }
+//   }
+// }
 
 // ============================================================================
 // COURSE QUERIES

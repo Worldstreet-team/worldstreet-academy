@@ -1145,8 +1145,9 @@ function WelcomeEmail({ data }: { data: WelcomeEmailData }) {
               {`${data.firstName ? `${data.firstName}, your` : "Your"} payment is confirmed and your place at the Academy is ready.`}
             </Text>
             <Text style={sub}>
-              Sign in at <Link href={portalUrl}>{portalUrl}</Link> with <strong>{data.to}</strong> and the password of
-              your WorldStreet account.
+              {/* No "password": an account opened with Google or KingsChat has none (2026-11-11). */}
+              Sign in at <Link href={portalUrl}>{portalUrl}</Link> with your WorldStreet account for{" "}
+              <strong>{data.to}</strong>, the same way you sign in on worldstreetgold.com.
             </Text>
             {data.cohortStartLabel ? (
               <Text style={sub}>

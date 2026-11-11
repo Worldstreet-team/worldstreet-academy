@@ -342,7 +342,7 @@ export function CheckoutView({
           disabled
           className="flex h-[52px] w-full cursor-not-allowed items-center justify-center rounded-full border border-ws-hairline text-[15px] font-semibold text-ws-muted"
         >
-          Payments unavailable
+          Payments not open yet
         </button>
       )
     }
@@ -472,7 +472,7 @@ export function CheckoutView({
                   </span>
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="text-[14px] font-semibold text-ws-primary">WorldStreet wallet</span>
-                    <span className="text-[12.5px] text-ws-muted">{wallet.enabled ? "USD balance" : "Unavailable right now"}</span>
+                    <span className="text-[12.5px] text-ws-muted">{wallet.enabled ? "USD balance" : "Not open yet"}</span>
                   </span>
                   {wallet.enabled && (
                     <RollingAmount
@@ -528,12 +528,18 @@ export function CheckoutView({
               </Appear>
 
               {/* Wallet off. Stated before the click, because no amount of
-                  trying clears it — the CTA is disabled for the same reason. */}
+                  trying clears it — the CTA is disabled for the same reason.
+                  Worded as "not open yet", never as an outage (2026-11-11):
+                  the wallet isn't connected yet. A program with a school
+                  is saved on load (saveCheckoutIntent); only then does it
+                  say so. */}
               <Appear show={payBlocked && !byEspee}>
                 <div className="mt-5 rounded-[14px] bg-warning-chip p-4">
-                  <p className="text-[14px] font-semibold text-warning">Payments are unavailable right now</p>
+                  <p className="text-[14px] font-semibold text-warning">Wallet payments aren&apos;t open yet</p>
                   <p className="mt-1 text-[13px] leading-relaxed text-ws-muted">
-                    You haven&apos;t been charged, and this program is still here when payments are back.
+                    {intentSchool
+                      ? "You haven't been charged, and your choice is saved. Come back to this page to pay once they open."
+                      : "You haven't been charged. Come back to this page to pay once they open."}
                   </p>
                 </div>
               </Appear>

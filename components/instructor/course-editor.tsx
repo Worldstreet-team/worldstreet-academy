@@ -426,7 +426,7 @@ export function CourseEditor({
           { value: "closed", label: "Closed" },
         ]
       : []),
-    { value: "archived", label: "Archived" },
+    { value: "archived", label: "Hidden" },
   ]
   const [submitForReview, setSubmitForReview] = useState(false)
   const review = course?.review ?? { status: "none" as const, submittedAt: null, reviewedAt: null, note: null }
@@ -554,6 +554,8 @@ export function CourseEditor({
             <input type="hidden" name="price" value={effectivePrice} />
             <input type="hidden" name="packages" value={JSON.stringify(packages.map(toCoursePackage))} />
             <input type="hidden" name="status" value={status} />
+            {/* The status this editor opened with: the server keeps a newer one set elsewhere unless this editor changed it. */}
+            {course?.status && <input type="hidden" name="loadedStatus" value={course.status} />}
             <input type="hidden" name="whatYouWillLearn" value={JSON.stringify(objectives)} />
             <input type="hidden" name="requirements" value={JSON.stringify(requirements)} />
             <input type="hidden" name="targetAudience" value={JSON.stringify(audience)} />
@@ -896,7 +898,7 @@ export function CourseEditor({
                     <SelectItem value="published">Published</SelectItem>
                     {adminMode && <SelectItem value="suspended">Suspended</SelectItem>}
                     {adminMode && <SelectItem value="closed">Closed</SelectItem>}
-                    <SelectItem value="archived">Archived</SelectItem>
+                    <SelectItem value="archived">Hidden</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

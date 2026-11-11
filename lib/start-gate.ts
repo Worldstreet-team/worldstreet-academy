@@ -66,12 +66,13 @@ export function needsSchoolChoice(input: StartGateInput): boolean {
  * The `wsa_school` cookie outlives a school rename by 30 days, so a retired slug
  * resolves to its new school here.
  *
- * The all-schools target carries `?start=1` so `/schools` can say why the
- * learner is there ("choose a program to get started"). The page shows that
- * notice only to a signed-in learner the gate would still send, so an
- * enrolled learner following an old `/dashboard/start` link never sees it.
+ * Both targets carry `?start=1` so the page can say why the learner is there
+ * ("Next, choose your program" — GateNotice; a school's page too since
+ * 2026-11-11, which before then said nothing). The page shows that notice
+ * only to a signed-in learner the gate would still send, so an enrolled
+ * learner following an old `/dashboard/start` link never sees it.
  */
 export function schoolsPathFor(school: string | null | undefined): string {
   const slug = schoolSlugOf(school)
-  return slug ? `/schools/${slug}` : "/schools?start=1"
+  return slug ? `/schools/${slug}?start=1` : "/schools?start=1"
 }

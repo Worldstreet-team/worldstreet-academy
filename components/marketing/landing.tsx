@@ -25,8 +25,9 @@ import { CertificateBand } from "@/components/marketing/certificate-band"
 import { CourseTeaser } from "@/components/marketing/course-teaser"
 import { ScrollProgress } from "@/components/marketing/motion/scroll-progress"
 
-// A new account starts at the schools (Homepage → School → Program), never at the hub.
-const REGISTER_URL = registerUrl("/schools")
+// A new account starts at the schools (Homepage → School → Program), never at the hub,
+// with the gate's notice saying what comes next (`?start=1`, 2026-11-11).
+const REGISTER_URL = registerUrl("/schools?start=1")
 
 /** Published courses with a FUTURE availableAt, soonest first — real
  *  scheduling only; the drops section hides entirely when this is empty. */

@@ -3,15 +3,26 @@
 import { revalidatePath } from "next/cache"
 import { z } from "zod/v4"
 import connectDB from "@/lib/db"
-import { Course, Meeting, Review, User, type CourseKind, type CourseReviewStatus } from "@/lib/db/models"
+import {
+  Course,
+  Meeting,
+  Review,
+  User,
+  type CourseKind,
+  type CourseReviewStatus,
+  type ICourse,
+} from "@/lib/db/models"
+import type { CourseStatus } from "@/lib/db/models/course"
 import { requireAdmin } from "@/lib/auth/admin"
 import { notifyUser } from "@/lib/notify"
 import { PROGRAM_KIND_FILTER, courseKindOf } from "@/lib/course-kind"
 import { courseFormatOf, hasDeliverable, isFileFormat, type CourseFormat } from "@/lib/course-format"
 import { creatorPublishRefusal } from "@/lib/course-review"
+import { courseDeletionRefusal, deleteCourseAndContent, isLiveOnWebsite } from "@/lib/course-deletion"
 import { isOnSale } from "@/lib/entitlements"
 
 const PAGE_SIZE = 20
+const OBJECT_ID = /^[a-f0-9]{24}$/
 
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
@@ -22,6 +33,8 @@ export type AdminCourseRow = {
   title: string
   thumbnailUrl: string | null
   status: string
+  /** Hidden courses: the status "Show on website" restores (null = through the Publish checks). */
+  statusBeforeHidden: Exclude<CourseStatus, "archived"> | null
   pricing: string
   price: number | null
   level: string
@@ -91,6 +104,7 @@ export async function adminListCourses(filters?: {
           title: c.title,
           thumbnailUrl: c.thumbnailUrl ?? null,
           status: c.status,
+          statusBeforeHidden: c.status === "archived" ? (c.statusBeforeHidden ?? null) : null,
           pricing: c.pricing,
           price: c.price ?? null,
           level: c.level,
@@ -125,9 +139,40 @@ export async function adminListCourses(filters?: {
 }
 
 /**
+ * Why this course can't go live, or null. "Show on website" passes `wasLive`
+ * for a course that was published when it was hidden: its lessons gate is
+ * skipped (a catalogue program sells before its tutors add lessons), while the
+ * price and the marketplace checks, which can change while it is hidden, still
+ * apply.
+ */
+async function publishRefusal(course: ICourse, opts: { wasLive?: boolean } = {}): Promise<string | null> {
+  // No course is free (isOnSale): set a price in the editor first.
+  if (!isOnSale(course)) return "Can't publish a course without a price"
+  if (!opts.wasLive) {
+    const format = courseFormatOf(course)
+    if (!hasDeliverable({ format, totalLessons: course.totalLessons ?? 0, productFile: course.productFile ?? null })) {
+      return isFileFormat(format) ? "Can't publish a template or guide without its file" : "Can't publish a course with no lessons"
+    }
+  }
+  // No way around the four checks: a Marketplace Creator's course is published
+  // from its review page, or republished here only on content its checks cover.
+  if (courseKindOf(course) === "marketplace") return creatorPublishRefusal(course)
+  return null
+}
+
+const COURSE_STATUSES = ["draft", "published", "suspended", "closed", "archived"] as const
+
+const CourseStatusInput = z.object({
+  courseId: z.string().regex(OBJECT_ID),
+  status: z.enum(COURSE_STATUSES),
+})
+
+/**
  * Admin course status lifecycle: draft ↔ published, plus the admin-only
  * verbs — suspended (temporarily offline), closed (no new enrollments),
- * archived (out of the catalogue).
+ * archived ("Hide from website": out of the catalogue and checkout, while
+ * enrolled learners keep their lessons). Hiding remembers the status it left
+ * for adminShowCourse; any other change forgets it.
  */
 export async function adminSetCourseStatus(
   courseId: string,
@@ -137,55 +182,138 @@ export async function adminSetCourseStatus(
     await connectDB()
     await requireAdmin()
 
-    const course = await Course.findById(courseId)
-    if (!course) return { success: false, error: "Course not found" }
-    if (course.status === status) return { success: true }
+    const parsed = CourseStatusInput.safeParse({ courseId, status })
+    if (!parsed.success) return { success: false, error: "Course not found" }
 
-    if (status === "published") {
-      // No course is free (isOnSale): set a price in the editor first.
-      if (!isOnSale(course)) return { success: false, error: "Can't publish a course without a price" }
-      const format = courseFormatOf(course)
-      if (!hasDeliverable({ format, totalLessons: course.totalLessons ?? 0, productFile: course.productFile ?? null })) {
-        return {
-          success: false,
-          error: isFileFormat(format) ? "Can't publish a template or guide without its file" : "Can't publish a course with no lessons",
-        }
-      }
-      // No way around the four checks: a Marketplace Creator's course is published
-      // from its review page, or republished here only on content its checks cover.
-      if (courseKindOf(course) === "marketplace") {
-        const refusal = await creatorPublishRefusal(course)
-        if (refusal) return { success: false, error: refusal }
-      }
+    const course = await Course.findById(parsed.data.courseId)
+    if (!course) return { success: false, error: "Course not found" }
+    const previous = course.status
+    const next = parsed.data.status
+    if (previous === next) return { success: true }
+
+    if (next === "published") {
+      const refusal = await publishRefusal(course)
+      if (refusal) return { success: false, error: refusal }
     }
 
-    course.status = status
-    if (status === "published" && !course.publishedAt) {
+    course.status = next
+    // undefined unsets it: only a hidden course carries the field.
+    course.statusBeforeHidden = next === "archived" && previous !== "archived" ? previous : undefined
+    if (next === "published" && !course.publishedAt) {
       course.publishedAt = new Date()
     }
     await course.save()
 
-    const titleByStatus: Record<typeof status, string> = {
+    const titleByStatus: Record<typeof next, string> = {
       published: "Your course was published",
       suspended: "Your course was temporarily suspended",
       closed: "Your course was closed to new enrollments",
-      archived: "Your course was archived",
+      archived: "Your course was hidden from the website",
       draft: "Your course was moved to draft",
     }
     await notifyUser(course.instructor.toString(), {
       type: "course",
-      title: titleByStatus[status],
+      title: titleByStatus[next],
       body: `"${course.title}" — updated by an administrator.`,
       href: `/instructor/courses/${course._id.toString()}`,
       courseId: course._id.toString(),
     })
 
-    revalidatePath("/admin/courses")
-    revalidatePath("/dashboard/courses")
+    // The catalogue, school and program pages, the landing and the admin list all read status.
+    revalidatePath("/", "layout")
     return { success: true }
   } catch (error) {
     console.error("Admin set course status error:", error)
     return { success: false, error: "Failed to update course status" }
+  }
+}
+
+type AdminCourseResult<T> = { success: true; data: T } | { success: false; error: string }
+
+/**
+ * "Show on website": a hidden (archived) course goes back to the status it
+ * had when an admin hid it. Back to published re-checks only what can change
+ * while hidden — the price, and a Marketplace Creator's checks. A course
+ * archived before Hide remembered anything goes through every Publish check.
+ */
+export async function adminShowCourse(courseId: string): Promise<AdminCourseResult<{ status: CourseStatus }>> {
+  try {
+    await connectDB()
+    await requireAdmin()
+    if (typeof courseId !== "string" || !OBJECT_ID.test(courseId)) return { success: false, error: "Course not found" }
+
+    const course = await Course.findById(courseId)
+    if (!course) return { success: false, error: "Course not found" }
+    if (course.status !== "archived") return { success: true, data: { status: course.status } }
+
+    const remembered = course.statusBeforeHidden ?? null
+    const next = remembered ?? "published"
+    if (next === "published") {
+      const refusal = await publishRefusal(course, { wasLive: remembered === "published" })
+      if (refusal) return { success: false, error: refusal }
+    }
+
+    course.status = next
+    course.statusBeforeHidden = undefined
+    if (next === "published" && !course.publishedAt) course.publishedAt = new Date()
+    await course.save()
+
+    await notifyUser(course.instructor.toString(), {
+      type: "course",
+      title: next === "published" ? "Your course is back on the website" : "Your course is no longer hidden",
+      body: `"${course.title}" — updated by an administrator.`,
+      href: `/instructor/courses/${course._id.toString()}`,
+      courseId: course._id.toString(),
+    })
+
+    revalidatePath("/", "layout")
+    return { success: true, data: { status: next } }
+  } catch (error) {
+    console.error("Admin show course error:", error)
+    return { success: false, error: "Failed to show the course" }
+  }
+}
+
+/**
+ * Delete a course for good, with the content that exists only for it. Refused
+ * when anyone has enrolled in or paid for it (lib/course-deletion.ts): that
+ * course is hidden instead. Storage objects (R2, Cloudinary) are left in place,
+ * and no money or learner record is touched: none can exist past the check.
+ */
+export async function adminDeleteCourse(courseId: string): Promise<AdminCourseResult<{ id: string }>> {
+  try {
+    await connectDB()
+    await requireAdmin()
+    if (typeof courseId !== "string" || !OBJECT_ID.test(courseId)) return { success: false, error: "Course not found" }
+
+    const course = await Course.findById(courseId).lean()
+    if (!course) return { success: false, error: "Course not found" }
+
+    if (isLiveOnWebsite(course.status)) {
+      return { success: false, error: "It's live on the website. Hide it from the website first, then delete it." }
+    }
+
+    const hideInstead = "Hide it from the website instead: learners who enrolled keep their access."
+    const refusal = await courseDeletionRefusal(course._id)
+    if (refusal) return { success: false, error: `${refusal} ${hideInstead}` }
+
+    const id = course._id
+    // Deletes the content with it, and puts the course back if an order slipped in (lib/course-deletion.ts).
+    const lateRefusal = await deleteCourseAndContent(course)
+    if (lateRefusal) return { success: false, error: `${lateRefusal} ${hideInstead}` }
+
+    await notifyUser(course.instructor.toString(), {
+      type: "course",
+      title: "Your course was deleted",
+      body: `"${course.title}" — deleted by an administrator.`,
+      href: "/instructor/courses",
+    })
+
+    revalidatePath("/", "layout")
+    return { success: true, data: { id: id.toString() } }
+  } catch (error) {
+    console.error("Admin delete course error:", error)
+    return { success: false, error: "Failed to delete the course" }
   }
 }
 
@@ -336,7 +464,6 @@ export async function adminSetReviewFeatured(reviewId: string, featured: boolean
  * share don't change, and nothing here touches money.
  */
 
-const OBJECT_ID = /^[a-f0-9]{24}$/
 const NOT_A_PROGRAM = "Only school programs have teaching faculty"
 
 const AddTeachingInput = z.object({

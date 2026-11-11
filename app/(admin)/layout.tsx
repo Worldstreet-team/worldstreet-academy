@@ -1,4 +1,4 @@
-import { cookies } from "next/headers"
+import { cookies, headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 import { AdminSidebar } from "@/components/admin/admin-sidebar"
@@ -9,6 +9,7 @@ import { CallProvider } from "@/components/providers/call-provider"
 import { MeetingProvider } from "@/components/providers/meeting-provider"
 import { QueryProvider } from "@/components/providers/query-provider"
 import { getCachedUser } from "@/lib/auth/cached"
+import { adminLoginUrl } from "@/lib/auth/login-url"
 
 export default async function AdminLayout({
   children,
@@ -17,14 +18,14 @@ export default async function AdminLayout({
 }) {
   const user = await getCachedUser()
 
-  if (!user) {
+  // Hard role gate — the admin console is ADMIN-only. Anyone else, signed in
+  // or not, gets the panel's own sign-in and comes back here after it (Owen,
+  // 2026-11-11). Local Clerk test keys keep the local flow.
+  if (!user || user.role !== "ADMIN") {
     const isLocalDev = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_")
-    redirect(isLocalDev ? "/login" : "https://www.worldstreetgold.com/login")
-  }
-
-  // Hard role gate — the admin console is ADMIN-only.
-  if (user.role !== "ADMIN") {
-    redirect("/dashboard")
+    if (isLocalDev) redirect(user ? "/dashboard" : "/login")
+    const h = await headers()
+    redirect(adminLoginUrl(`${h.get("x-next-pathname") ?? "/admin"}${h.get("x-next-search") ?? ""}`))
   }
 
   // Same provider chrome as the student/instructor dashboards — calls and

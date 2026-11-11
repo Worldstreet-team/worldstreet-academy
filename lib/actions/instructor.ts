@@ -54,6 +54,7 @@ import { referralPath } from "@/lib/referral-link"
 import { ensureReferralCode } from "@/lib/referrals"
 import { sellerSplitNote } from "@/lib/marketplace"
 import { creatorPublishRefusal, requestCourseReview, requestLiveCourseReview } from "@/lib/course-review"
+import { courseDeletionRefusal, deleteCourseAndContent, isLiveOnWebsite } from "@/lib/course-deletion"
 import { lessonVideoUrlError } from "@/lib/lesson-video"
 
 const PackageSchema = z
@@ -882,7 +883,7 @@ export async function updateCourse(
   const thumbnailUrl = formData.get("thumbnailUrl") as string
   const level = formData.get("level") as CourseLevel
   const price = formData.get("price") as string
-  const status = formData.get("status") as CourseStatus
+  const sentStatus = formData.get("status") as CourseStatus
   const school = formData.get("school") as SchoolSlug
   const lessonsJson = formData.get("lessons") as string
   const whatYouWillLearn = parseStringArray(formData.get("whatYouWillLearn"))
@@ -932,6 +933,13 @@ export async function updateCourse(
     if (!existingCourse) {
       return { success: false, error: "Course not found", fieldErrors: {} }
     }
+
+    // An editor opened before someone changed the status (say "Hide from website" in the
+    // admin list) sends back the status it loaded: saving it must not undo that change.
+    // Only a status picked in this editor is written (audit, 2026-11-11).
+    const loadedStatus = formData.get("loadedStatus")
+    const status: CourseStatus =
+      typeof loadedStatus === "string" && sentStatus === loadedStatus ? existingCourse.status : sentStatus
 
     const seller = isSellerOnly(instructor)
     if (seller) {
@@ -1032,6 +1040,13 @@ export async function updateCourse(
       thumbnailUrl: thumbnailUrl || null,
       level,
       status,
+      // "Archived" picked here hides it like the admin list does, remembering the status it
+      // had, so "Show on website" can bring it back; any other status picked here replaces that.
+      ...(status !== existingCourse.status
+        ? status === "archived"
+          ? { statusBeforeHidden: existingCourse.status }
+          : { $unset: { statusBeforeHidden: 1 } }
+        : {}),
       ...courseHome(kind, school),
       kind,
       // A form without the field (an older editor tab) leaves the link alone.
@@ -1212,45 +1227,63 @@ async function announceLessons(
 }
 
 // ---- Delete Course ----
-export async function deleteCourse(formData: FormData): Promise<void> {
-  const courseId = formData.get("courseId") as string
+/** What the delete dialog shows when a delete is refused; success redirects instead. */
+export type DeleteCourseState = { error: string } | null
+
+export async function deleteCourse(_prev: DeleteCourseState, formData: FormData): Promise<DeleteCourseState> {
+  const courseId = formData.get("courseId")
 
   try {
     await connectDB()
     const instructor = await getAuthenticatedInstructor()
-    
-    const course = await Course.findOne({
-      _id: courseId,
-      ...courseScope(instructor),
-    })
-    
+
+    const course =
+      typeof courseId === "string" && /^[a-f0-9]{24}$/.test(courseId)
+        ? // Lean: the raw document is what deleteCourseAndContent puts back if an order slips in.
+          await Course.findOne({
+            _id: courseId,
+            ...courseScope(instructor),
+          }).lean()
+        : null
+
     if (!course) {
       // Just redirect without error for form action
       redirect(editorReturnPath(formData))
     }
-    
-    // Delete thumbnail from Cloudinary if exists
+
+    // Never a course still on the website, nor one anyone has enrolled in or paid for (lib/course-deletion.ts).
+    if (isLiveOnWebsite(course.status)) {
+      return {
+        error:
+          instructor.role === "ADMIN"
+            ? "It's live on the website. Hide it from the website on the admin Courses page first, then delete it."
+            : "It's live on the website. Move it to draft first, then delete it.",
+      }
+    }
+    const refusal = await courseDeletionRefusal(course._id)
+    if (refusal) {
+      return {
+        error:
+          instructor.role === "ADMIN"
+            ? `${refusal} Hide it from the website on the admin Courses page instead.`
+            : `${refusal} Move it to draft instead, or ask an admin to hide it from the website.`,
+      }
+    }
+
+    // The same delete as the admin's (lib/course-deletion.ts): every piece of the course's own
+    // content goes, and the owner's course count drops (no longer the acting user's).
+    // Media is collected first and removed only once the course is really gone.
+    const lessonVideos = (await Lesson.find({ course: course._id }).select("videoPublicId").lean())
+      .map((lesson) => lesson.videoPublicId)
+      .filter((publicId): publicId is string => Boolean(publicId))
+    const lateRefusal = await deleteCourseAndContent(course)
+    if (lateRefusal) return { error: `${lateRefusal} Move it to draft instead, or ask an admin to hide it from the website.` }
+
     if (course.thumbnailPublicId) {
       await deleteFromCloudinary(course.thumbnailPublicId, "image")
     }
-    
-    // Delete all lessons (and their videos)
-    const lessons = await Lesson.find({ course: courseId })
-    for (const lesson of lessons) {
-      if (lesson.videoPublicId) {
-        await deleteFromCloudinary(lesson.videoPublicId, "video")
-      }
-    }
-    await Lesson.deleteMany({ course: courseId })
-    
-    // Delete course
-    await course.deleteOne()
-    
-    // Update instructor course count (faculty only — a seller has no instructor profile)
-    if (!isSellerOnly(instructor)) {
-      await User.findByIdAndUpdate(instructor._id, {
-        $inc: { "instructorProfile.totalCourses": -1 },
-      })
+    for (const publicId of lessonVideos) {
+      await deleteFromCloudinary(publicId, "video")
     }
 
     revalidatePath("/instructor/courses")

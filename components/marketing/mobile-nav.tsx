@@ -69,12 +69,15 @@ function NavAnchor({ link, className, onClick }: { link: MarketingNavLink; class
 export function MarketingMobileNav({
   links,
   actions,
+  actionsNote,
   counts,
   className,
 }: {
   links: MarketingNavLink[]
   /** Pinned under the scroll area — Sign in / Create an account for guests. */
   actions: MarketingNavLink[]
+  /** One line above the actions: whose account they use (2026-11-11). */
+  actionsNote?: string
   counts: SchoolCounts
   className?: string
 }) {
@@ -143,10 +146,13 @@ export function MarketingMobileNav({
           </div>
 
           {actions.length > 0 && (
-            <div className="flex gap-2 border-t border-ws-hairline px-5 py-3">
-              {actions.map((link) => (
-                <NavAnchor key={link.href} link={link} className={actionClass} onClick={close} />
-              ))}
+            <div className="border-t border-ws-hairline px-5 py-3">
+              {actionsNote && <p className="pb-3 text-[12.5px] leading-snug text-ws-muted">{actionsNote}</p>}
+              <div className="flex gap-2">
+                {actions.map((link) => (
+                  <NavAnchor key={link.href} link={link} className={actionClass} onClick={close} />
+                ))}
+              </div>
             </div>
           )}
         </SheetContent>

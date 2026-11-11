@@ -31,7 +31,10 @@ import { PageHeader } from "@/components/shared/page-header"
 import {
   adminListCourses,
   adminSetCourseStatus,
+  adminShowCourse,
+  type AdminCourseRow,
 } from "@/lib/actions/admin-courses"
+import { DeleteProgramDialog } from "@/components/admin/delete-program-dialog"
 import { FORMAT_LABEL, isFileFormat } from "@/lib/course-format"
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import {
@@ -46,6 +49,11 @@ import type { CourseStatus } from "@/lib/types/course"
 
 
 const KIND_LABEL = { marketplace: "Marketplace", "new-economy": "New Economy" } as const
+
+/** A hidden course goes back to the status it had; only "published" puts it on the website. */
+function unhideLabel(before: AdminCourseRow["statusBeforeHidden"]): string {
+  return before === null || before === "published" ? "Show on website" : `Unhide (back to ${before})`
+}
 
 /**
  * The catalogue, and (owner 2026-10-05) the marketplace review queue at
@@ -71,7 +79,8 @@ function AdminCoursesInner() {
   const [debouncedSearch, setDebouncedSearch] = React.useState("")
   const [page, setPage] = React.useState(1)
   const [actionError, setActionError] = React.useState<string | null>(null)
-  const [archiveTarget, setArchiveTarget] = React.useState<{ id: string; title: string } | null>(null)
+  const [hideTarget, setHideTarget] = React.useState<{ id: string; title: string } | null>(null)
+  const [deleteTarget, setDeleteTarget] = React.useState<{ id: string; title: string } | null>(null)
 
   React.useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 350)
@@ -93,7 +102,15 @@ function AdminCoursesInner() {
       adminSetCourseStatus(courseId, newStatus),
     onSuccess: (res, vars) => {
       setActionError(res.success ? null : (res.error ?? "Failed"))
-      if (res.success && vars.newStatus === "archived") setArchiveTarget(null)
+      if (res.success && vars.newStatus === "archived") setHideTarget(null)
+      queryClient.invalidateQueries({ queryKey: ["admin", "courses"] })
+    },
+  })
+
+  const showCourse = useMutation({
+    mutationFn: (courseId: string) => adminShowCourse(courseId),
+    onSuccess: (res) => {
+      setActionError(res.success ? null : res.error)
       queryClient.invalidateQueries({ queryKey: ["admin", "courses"] })
     },
   })
@@ -159,7 +176,7 @@ function AdminCoursesInner() {
                 { value: "draft", label: "Drafts" },
                 { value: "suspended", label: "Suspended" },
                 { value: "closed", label: "Closed" },
-                { value: "archived", label: "Archived" },
+                { value: "archived", label: "Hidden" },
               ]}
             />
           )}
@@ -212,7 +229,8 @@ function AdminCoursesInner() {
                       >
                         {c.title}
                       </Link>
-                      <StatusBadge status={c.status} />
+                      {/* "archived" is what "Hide from website" stores; same neutral tone. */}
+                      <StatusBadge status={c.status === "archived" ? "hidden" : c.status} />
                       {/* Published + future date = the derived Coming Soon state,
                           worth surfacing here since the raw status won't show it. */}
                       {courseAvailability({ status: c.status as CourseStatus, availableAt: c.availableAt }) ===
@@ -280,13 +298,21 @@ function AdminCoursesInner() {
                           Open review
                         </DropdownMenuItem>
                       )}
-                      {c.status !== "published" && !(c.kind === "marketplace" && c.sellerOwned && c.reviewStatus !== "approved") && (
+                      {c.status !== "published" && c.status !== "archived" && !(c.kind === "marketplace" && c.sellerOwned && c.reviewStatus !== "approved") && (
                         <DropdownMenuItem
                           onClick={() =>
                             setCourseStatus.mutate({ courseId: c.id, newStatus: "published" })
                           }
                         >
                           Publish
+                        </DropdownMenuItem>
+                      )}
+                      {c.status === "archived" && (
+                        <DropdownMenuItem
+                          disabled={showCourse.isPending}
+                          onClick={() => showCourse.mutate(c.id)}
+                        >
+                          {unhideLabel(c.statusBeforeHidden)}
                         </DropdownMenuItem>
                       )}
                       {c.status === "published" && (
@@ -327,12 +353,20 @@ function AdminCoursesInner() {
                       )}
                       {c.status !== "archived" && (
                         <DropdownMenuItem
-                          variant="destructive"
-                          onClick={() => setArchiveTarget({ id: c.id, title: c.title })}
+                          onClick={() => {
+                            setActionError(null)
+                            setHideTarget({ id: c.id, title: c.title })
+                          }}
                         >
-                          Archive
+                          Hide from website…
                         </DropdownMenuItem>
                       )}
+                      <DropdownMenuItem
+                        variant="destructive"
+                        onClick={() => setDeleteTarget({ id: c.id, title: c.title })}
+                      >
+                        Delete program…
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -344,20 +378,24 @@ function AdminCoursesInner() {
         </div>
       </div>
 
-      {/* Archive confirm — archiving pulls a course out of the catalog, so it
-          gets the same explicit confirmation as role changes and refunds. */}
-      <Dialog open={!!archiveTarget} onOpenChange={(open) => !open && setArchiveTarget(null)}>
+      {/* Hide confirm — hiding (status "archived") pulls a course out of the
+          catalogue, so it gets the same explicit confirmation as role changes
+          and refunds. */}
+      <Dialog open={!!hideTarget} onOpenChange={(open) => !open && setHideTarget(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Archive “{archiveTarget?.title}”?</DialogTitle>
+            <DialogTitle>Hide “{hideTarget?.title}” from the website?</DialogTitle>
             <DialogDescription>
-              The course disappears from the public catalog and can no longer be
-              purchased. Existing students keep access to their content. You can
-              re-publish it later from this page.
+              It leaves the public catalogue and can no longer be bought.
+              Learners already enrolled keep their lessons and certificates.
+              While it&apos;s hidden, its tutors can&apos;t schedule new classes on it,
+              and learners who pre-enrolled aren&apos;t told when it opens.
+              Show on website puts it back as it was.
             </DialogDescription>
           </DialogHeader>
+          {actionError && <p className="text-xs text-ws-danger">{actionError}</p>}
           <DialogFooter>
-            <Button variant="outline" size="sm" onClick={() => setArchiveTarget(null)}>
+            <Button variant="outline" size="sm" onClick={() => setHideTarget(null)}>
               Cancel
             </Button>
             <Button
@@ -365,16 +403,22 @@ function AdminCoursesInner() {
               variant="destructive"
               disabled={setCourseStatus.isPending}
               onClick={() => {
-                if (archiveTarget) {
-                  setCourseStatus.mutate({ courseId: archiveTarget.id, newStatus: "archived" })
+                if (hideTarget) {
+                  setCourseStatus.mutate({ courseId: hideTarget.id, newStatus: "archived" })
                 }
               }}
             >
-              {setCourseStatus.isPending ? "Archiving…" : "Archive course"}
+              {setCourseStatus.isPending ? "Hiding…" : "Hide from website"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <DeleteProgramDialog
+        target={deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onDeleted={() => queryClient.invalidateQueries({ queryKey: ["admin", "courses"] })}
+      />
     </>
   )
 }

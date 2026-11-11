@@ -115,6 +115,13 @@ export interface ICourse extends Document {
   price: number
   currency: string
   status: CourseStatus
+  /**
+   * Admin "Hide from website" (2026-11-11): the status the course had when it
+   * was hidden (archived), so "Show on website" puts it back as it was. Set
+   * only while hidden that way; any other status change clears it. Missing on
+   * most rows, and on courses archived before the switch existed.
+   */
+  statusBeforeHidden?: Exclude<CourseStatus, "archived"> | null
   category: string
   /** School this program belongs to (lib/schools.ts). null only on legacy rows not yet re-saved. */
   school: SchoolSlug | null
@@ -250,6 +257,11 @@ const CourseSchema = new Schema<ICourse>(
       enum: ["draft", "published", "suspended", "closed", "archived"],
       default: "draft",
       index: true,
+    },
+    // No default: only a hidden course carries it (additive; the Go API ignores it).
+    statusBeforeHidden: {
+      type: String,
+      enum: [null, "draft", "published", "suspended", "closed"],
     },
     category: {
       type: String,

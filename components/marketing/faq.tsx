@@ -17,13 +17,20 @@ import { BRAND } from "@/lib/brand"
  * An open row's question stays ink; closed rows lift from muted to ink on
  * hover, so the list reads as a list and the open one as the page.
  *
- * Copy is spec §15 verbatim.
+ * Copy is spec §15 verbatim, except the WorldStreet account question and the
+ * payment answer (2026-11-11, marked below; awaiting owner sign-off).
  */
 
 const FAQS = [
   {
     q: `Who can join ${BRAND.name}?`,
     a: "Anyone who wants to develop practical knowledge and skills can explore our programs, subject to the requirements of individual programs.",
+  },
+  // Added 2026-11-11 (not in spec §15) at Owen's request, so the account and
+  // the wallet are clear; needs owner sign-off.
+  {
+    q: "Do I need a WorldStreet account?",
+    a: `Yes. You sign in to the Academy with your WorldStreet account, the same one you use on worldstreetgold.com and every WorldStreet app. New to WorldStreet? Join ${BRAND.shortName} takes you to worldstreetgold.com to create one, then you come back here to choose your program.`,
   },
   {
     q: "Do I need previous experience?",
@@ -43,7 +50,10 @@ const FAQS = [
   },
   {
     q: "Can I pay online?",
-    a: "Yes. The platform provides secure payment options available to the student's country.",
+    // 2026-11-11: spec §15 copy; replaced at Owen's request so the account and
+    // the wallet are clear; needs owner sign-off.
+    // a: "Yes. The platform provides secure payment options available to the student's country.",
+    a: "Yes. You pay at checkout from your WorldStreet wallet. If your balance is short, checkout shows how much to add.",
   },
   {
     q: "What happens after payment?",

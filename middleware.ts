@@ -8,6 +8,7 @@ import {
   normalizeReferralCode,
   sellerLinkValue,
 } from "@/lib/referral-link"
+import { ADMIN_LOGIN_PATH, adminLoginUrl } from "@/lib/auth/login-url"
 
 const isProtectedRoute = createRouteMatcher(["/dashboard(.*)", "/instructor(.*)", "/admin(.*)"])
 
@@ -61,7 +62,8 @@ export default clerkMiddleware(async (auth, request) => {
     return response
   }
 
-  if (isProtectedRoute(request)) {
+  // The admin panels' own sign-in is open to everyone (Owen, 2026-11-11).
+  if (isProtectedRoute(request) && pathname !== ADMIN_LOGIN_PATH) {
     const { userId } = await auth()
 
     if (!userId) {
@@ -70,6 +72,13 @@ export default clerkMiddleware(async (auth, request) => {
         const loginUrl = new URL("/login", request.url)
         loginUrl.searchParams.set("redirect_url", `${pathname}${request.nextUrl.search}`)
         return withReferral(NextResponse.redirect(loginUrl))
+      }
+
+      // An admin page sends a signed-out visitor to the admin sign-in, not the hub.
+      if (pathname === "/admin" || pathname.startsWith("/admin/")) {
+        return withReferral(
+          NextResponse.redirect(new URL(adminLoginUrl(`${pathname}${request.nextUrl.search}`), request.url))
+        )
       }
 
       const returnUrl = `https://academy.worldstreetgold.com${pathname}${request.nextUrl.search}`

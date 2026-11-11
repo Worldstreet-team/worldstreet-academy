@@ -1,5 +1,5 @@
 "use client"
-import { ArrowRightIcon } from "@/components/icons"
+import { ArrowRightIcon, ShieldCheckIcon } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
@@ -8,6 +8,7 @@ import type { PublicPackage } from "@/lib/actions/student"
 import type { PackageKey } from "@/lib/db/models"
 import { PACKAGE_LABEL } from "@/lib/entitlements"
 import { packagePriceLabel } from "@/lib/program-price"
+import { cn } from "@/lib/utils"
 import { RollingAmount } from "@/components/ui/rolling-amount"
 import { actionLabel, checkoutHref, cheapestOf, defaultPackageKey } from "@/components/programs/package-model"
 import { OfferEnds, PackageDiscount } from "@/components/programs/package-offer"
@@ -125,6 +126,26 @@ export function CheckoutLink({ className, children, ...rest }: React.ComponentPr
   )
 }
 
+/**
+ * The line under an enrol button: how paying works. A guest also learns,
+ * before the button sends them to worldstreetgold.com, that a WorldStreet
+ * account comes first (2026-11-11 audit: the account wall came as a surprise
+ * after the price).
+ */
+export function PayNote({ className }: { className?: string }) {
+  const { signedIn } = usePackageSelection()
+  return (
+    <p className={cn("flex items-center gap-2 text-[13px] leading-snug text-ws-muted", className)}>
+      <ShieldCheckIcon size={15} className="shrink-0 text-ws-subtle" aria-hidden />
+      <span>
+        {signedIn
+          ? "Paid from your WorldStreet wallet at checkout"
+          : "Sign in or create a WorldStreet account, then pay from your WorldStreet wallet"}
+      </span>
+    </p>
+  )
+}
+
 /** Glide to the chooser (instant under reduced motion); a plain anchor without JS. */
 export function jumpToPackages(event: React.MouseEvent<HTMLAnchorElement>) {
   const target = document.getElementById("packages")
@@ -210,6 +231,7 @@ export function SelectedOffer({ fromPrice }: { fromPrice: number }) {
           </CheckoutLink>
         )}
         <OfferEnds pkg={quoted} endsAt={offerEndsAt} className="mt-3 block text-center" />
+        {price > 0 && <PayNote className="mt-3 justify-center text-center" />}
       </div>
     </>
   )

@@ -18,7 +18,9 @@ import { appUrl } from "@/lib/app-url"
 import { BRAND } from "@/lib/brand"
 import { FACULTY_PUBLIC } from "@/lib/faculty"
 import { getCohortCalendar } from "@/lib/cohort-calendar"
+import { gateWelcome } from "@/lib/start-gate-state"
 import { Faq } from "@/components/marketing/faq"
+import { GateNotice } from "@/components/schools-index/gate-notice"
 import { CohortBanner } from "@/components/marketing/cohort-banner"
 import { PreviewProvider } from "@/components/programs/preview-player"
 import { SectionNav, type SectionLink } from "@/components/programs/section-nav"
@@ -44,6 +46,7 @@ import { SchoolStickyBar } from "@/components/schools/school-sticky-bar"
 export const revalidate = 0
 
 type Params = { params: Promise<{ slug: string }> }
+type PageProps = Params & { searchParams: Promise<Record<string, string | string[] | undefined>> }
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params
@@ -103,19 +106,24 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
  * lessons, prices from the packages, ratings from their collections, and
  * anything at zero is left out rather than printed.
  */
-export default async function SchoolPage({ params }: Params) {
+export default async function SchoolPage({ params, searchParams }: PageProps) {
   const { slug } = await params
   const moved = isSchoolSlug(slug) ? null : schoolFromSlug(slug)
   if (moved) permanentRedirect(`/schools/${moved.slug}`)
   if (!isSchoolSlug(slug)) notFound()
   const school = SCHOOL_BY_SLUG[slug]
   const cover = schoolCover(school.slug)
+  // The gate sends a learner here with `?start=1` when the landing's school
+  // cookie names this school (schoolsPathFor): the page says why (2026-11-11).
+  const { start } = await searchParams
+  const sentByGate = (Array.isArray(start) ? start[0] : start) === "1"
 
-  const [catalogue, faculty, reviews, calendar] = await Promise.all([
+  const [catalogue, faculty, reviews, calendar, welcome] = await Promise.all([
     fetchBrowseCourses(),
     FACULTY_PUBLIC ? fetchFaculty() : Promise.resolve([]),
     fetchSchoolReviews(school.slug, 6),
     getCohortCalendar(),
+    sentByGate ? gateWelcome().catch(() => null) : Promise.resolve(null),
   ])
   const loaded = await Promise.all(
     catalogue
@@ -208,6 +216,12 @@ export default async function SchoolPage({ params }: Params) {
   return (
     <PreviewProvider previews={previews} programTitle={school.name}>
       <article>
+        {/* Only for a signed-in learner the gate would still send (gateWelcome). */}
+        {welcome && (
+          <div className="mx-auto max-w-7xl px-6 pt-6">
+            <GateNotice firstName={welcome.firstName} className="mb-6 md:mb-8" />
+          </div>
+        )}
         <SchoolHero
           school={school}
           cover={cover}

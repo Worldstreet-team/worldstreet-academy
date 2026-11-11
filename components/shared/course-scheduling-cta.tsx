@@ -123,7 +123,7 @@ export function CourseSchedulingCta({
             href={loginUrl(pathname)}
             className="flex h-11 items-center justify-center rounded-full bg-ws-brand px-5 text-sm font-semibold text-ws-brand-on transition-opacity hover:opacity-90"
           >
-            Sign in to enroll
+            Sign in to enrol
           </a>
         )
       ) : (

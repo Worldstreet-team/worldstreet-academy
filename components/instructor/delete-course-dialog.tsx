@@ -16,12 +16,12 @@ import { deleteCourse } from "@/lib/actions/instructor"
 
 /**
  * Type-to-confirm deletion dialog for a course. Deleting a course throws away
- * lessons, resources and student access, so the destructive submit stays
- * disabled until the instructor types the exact course title.
+ * its lessons and resources, so the destructive submit stays disabled until
+ * the instructor types the exact course title.
  *
- * The mutation itself is the unchanged `deleteCourse` server action, invoked
- * through a plain form so the flow works identically from server and client
- * call sites.
+ * The mutation is the `deleteCourse` server action, invoked through a plain
+ * form. It redirects on success; a course anyone has enrolled in or paid for
+ * is refused, and the reason shows here.
  */
 export function DeleteCourseDialog({
   courseId,
@@ -52,8 +52,8 @@ export function DeleteCourseDialog({
           <p className="text-sm leading-relaxed text-ws-muted">
             This permanently deletes{" "}
             <span className="font-semibold text-ws-primary">{courseTitle}</span>{" "}
-            along with its lessons and resources, and students lose access. This
-            cannot be undone.
+            along with its lessons and resources. This cannot be undone. A
+            course anyone has enrolled in or paid for can&apos;t be deleted.
           </p>
           <div className="space-y-1.5">
             <label
@@ -72,24 +72,37 @@ export function DeleteCourseDialog({
           </div>
         </div>
 
-        <form action={deleteCourse}>
-          <input type="hidden" name="courseId" value={courseId} />
-          <DialogFooter>
-            <DialogClose render={<Button variant="outline" type="button" />}>
-              Cancel
-            </DialogClose>
-            <Button
-              type="submit"
-              disabled={!matches}
-              className="bg-ws-danger text-white transition-opacity duration-[var(--ws-motion-fast)] hover:bg-ws-danger hover:opacity-90"
-            >
-              <Trash2 size={16} strokeWidth={2} />
-              Delete course
-            </Button>
-          </DialogFooter>
-        </form>
+        {/* Mounted only while open, so a refusal doesn't outlive the dialog. */}
+        <DeleteCourseForm courseId={courseId} matches={matches} />
       </DialogContent>
     </Dialog>
+  )
+}
+
+function DeleteCourseForm({ courseId, matches }: { courseId: string; matches: boolean }) {
+  const [state, formAction, pending] = React.useActionState(deleteCourse, null)
+  return (
+    <form action={formAction}>
+      <input type="hidden" name="courseId" value={courseId} />
+      {state?.error && (
+        <p role="alert" className="mb-3 text-sm leading-relaxed text-ws-danger">
+          {state.error}
+        </p>
+      )}
+      <DialogFooter>
+        <DialogClose render={<Button variant="outline" type="button" />}>
+          Cancel
+        </DialogClose>
+        <Button
+          type="submit"
+          disabled={!matches || pending}
+          className="bg-ws-danger text-white transition-opacity duration-[var(--ws-motion-fast)] hover:bg-ws-danger hover:opacity-90"
+        >
+          <Trash2 size={16} strokeWidth={2} />
+          Delete course
+        </Button>
+      </DialogFooter>
+    </form>
   )
 }
 

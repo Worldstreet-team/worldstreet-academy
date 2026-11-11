@@ -1,5 +1,5 @@
 "use client"
-import { ArrowRightIcon, AwardIcon, CheckIcon, ChevronDownIcon, ClipboardCheckIcon, HandshakeIcon, LayersIcon, LifeBuoyIcon, ListVideoIcon, MessagesSquareIcon, RadioIcon, ShieldCheckIcon, StarIcon, VideoReplayIcon, type IconComponent } from "@/components/icons"
+import { ArrowRightIcon, AwardIcon, CheckIcon, ChevronDownIcon, ClipboardCheckIcon, HandshakeIcon, LayersIcon, LifeBuoyIcon, ListVideoIcon, MessagesSquareIcon, RadioIcon, StarIcon, VideoReplayIcon, type IconComponent } from "@/components/icons"
 
 import * as React from "react"
 import { motion } from "motion/react"
@@ -13,7 +13,7 @@ import { RollingAmount } from "@/components/ui/rolling-amount"
 import { useMotionOK } from "@/components/marketing/motion/bus"
 import { EASE_LUX } from "@/components/marketing/motion/ease"
 import { PROGRAM_H2, SECTION_SCROLL_MT } from "@/components/programs/section-title"
-import { CheckoutLink, usePackageSelection } from "@/components/programs/package-selection"
+import { CheckoutLink, PayNote, usePackageSelection } from "@/components/programs/package-selection"
 import { PackageCompare } from "@/components/programs/package-compare"
 import { OfferEnds, PackageDiscount, PackageDuration } from "@/components/programs/package-offer"
 import {
@@ -287,10 +287,7 @@ function Breakdown({
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
           <OfferAction pkg={selected} single={false} comingSoon={comingSoon} />
-          <p className="flex items-center gap-2 text-[13px] leading-snug text-ws-muted">
-            <ShieldCheckIcon size={15} className="shrink-0 text-ws-subtle" aria-hidden />
-            Paid from your WorldStreet wallet at checkout
-          </p>
+          <PayNote />
         </div>
         <OfferTerms pkg={selected} comingSoon={comingSoon} className="mt-4" />
       </div>
@@ -611,12 +608,7 @@ function SingleOffer({
     <>
       <OfferAction pkg={pkg} single comingSoon={comingSoon} />
       {!comingSoon && <OfferEnds pkg={pkg} endsAt={offerEndsAt} className="mt-3 block" />}
-      {!comingSoon && pkg.price > 0 && (
-        <p className="mt-3 flex items-center gap-2 text-[13px] text-ws-muted">
-          <ShieldCheckIcon size={15} className="shrink-0 text-ws-subtle" aria-hidden />
-          Paid from your WorldStreet wallet at checkout
-        </p>
-      )}
+      {!comingSoon && pkg.price > 0 && <PayNote className="mt-3" />}
     </>
   )
 
