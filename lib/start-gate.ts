@@ -24,7 +24,8 @@ export type StartGateInput = {
 
 /**
  * Reachable without paying: the retired picker URL (now a redirect), the
- * till, the wallet (so a learner can top up to pay), their payments (a
+ * till (no longer the wallet: learners add money on the WorldStreet dashboard
+ * since 2026-11-12), their payments (a
  * failed or in-review purchase stays visible — corrections brief,
  * 2026-10-28), the instructor door, invite links, referrals (owner,
  * 2026-10-05: anyone signed in can share their code) and the seller
@@ -34,7 +35,9 @@ export type StartGateInput = {
 const EXEMPT_PREFIXES = [
   "/dashboard/start",
   "/dashboard/checkout",
-  "/dashboard/wallet",
+  // Closed to learners who haven't paid (Owen, 2026-11-12): checkout now sends them to the WorldStreet dashboard
+  // to add money, so the Academy's wallet pages no longer need to be open to them. Kept commented:
+  // "/dashboard/wallet",
   "/dashboard/payments",
   "/dashboard/become-instructor",
   "/dashboard/meetings",

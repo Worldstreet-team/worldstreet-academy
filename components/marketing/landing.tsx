@@ -2,7 +2,7 @@ import { fetchBrowseCourses, fetchFaculty, fetchFreePreviewLessons, type BrowseC
 import { fetchLandingReviews } from "@/lib/actions/reviews"
 import { getCurrentUser } from "@/lib/auth/actions"
 import { FACULTY_PUBLIC } from "@/lib/faculty"
-import { registerUrl } from "@/lib/auth/login-url"
+import { loginUrl /* , registerUrl */ } from "@/lib/auth/login-url"
 import { cheapestBySchool, countProgramsBySchool } from "@/lib/schools"
 import { HeroWall } from "@/components/marketing/hero-wall"
 import { CohortBanner } from "@/components/marketing/cohort-banner"
@@ -26,8 +26,12 @@ import { CourseTeaser } from "@/components/marketing/course-teaser"
 import { ScrollProgress } from "@/components/marketing/motion/scroll-progress"
 
 // A new account starts at the schools (Homepage → School → Program), never at the hub,
-// with the gate's notice saying what comes next (`?start=1`, 2026-11-11).
-const REGISTER_URL = registerUrl("/schools?start=1")
+// with the gate's notice saying what comes next (`?start=1`, 2026-11-11). Kept commented:
+// const REGISTER_URL = registerUrl("/schools?start=1")
+// Join WMA and Start learning open the WorldStreet sign-in page, like the bar's one button (Owen, 2026-11-12);
+// someone new picks "Create an account" there. Back to the dashboard, which the gate turns into the schools
+// for anyone who hasn't paid. (The prop keeps its name, `registerUrl`.)
+const REGISTER_URL = loginUrl("/dashboard")
 
 /** Published courses with a FUTURE availableAt, soonest first — real
  *  scheduling only; the drops section hides entirely when this is empty. */

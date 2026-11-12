@@ -122,21 +122,41 @@ export function ShortfallPanel({
   priceMinor,
   refreshing,
   onRefresh,
+  fundsOnHub = false,
+  fundingOpened = false,
 }: {
   shortfallMinor: number
   balanceMinor: number
   priceMinor: number
   refreshing: boolean
   onRefresh: () => void
+  /** Money is added on the WorldStreet dashboard, in another tab (since 2026-11-12). */
+  fundsOnHub?: boolean
+  /** The learner has opened it. */
+  fundingOpened?: boolean
 }) {
   const covered = priceMinor > 0 ? Math.min(1, Math.max(0, balanceMinor / priceMinor)) : 0
   return (
     <div role="status" className="mt-5 rounded-[14px] bg-warning-chip p-4">
       <p className="text-[14px] font-semibold text-warning">You&apos;re {centsUsd(shortfallMinor)} short</p>
-      <p className="mt-1 text-[13px] leading-relaxed text-ws-muted">
-        Your wallet holds {centsUsd(balanceMinor)} of the {centsUsd(priceMinor)} this order costs. Top up and come
-        back — your order stays right here.
-      </p>
+      {fundsOnHub ? (
+        // Programs are paid in dollars; the dashboard's Add money credits the Dollar Account (card or naira transfer).
+        <p className="mt-1 text-[13px] leading-relaxed text-ws-muted">
+          Your wallet holds {centsUsd(balanceMinor)} of the {centsUsd(priceMinor)} this order costs. Add money to your
+          Dollar Account on your WorldStreet dashboard, then come back to this tab to pay. Your order stays right here.
+        </p>
+      ) : (
+        <p className="mt-1 text-[13px] leading-relaxed text-ws-muted">
+          Your wallet holds {centsUsd(balanceMinor)} of the {centsUsd(priceMinor)} this order costs. Top up and come
+          back — your order stays right here.
+        </p>
+      )}
+      {fundsOnHub && fundingOpened && (
+        <p className="mt-2 text-[13px] font-medium text-ws-primary">
+          Your WorldStreet dashboard opened in a new tab. Once the money is in, come back here and your balance
+          updates by itself.
+        </p>
+      )}
       {/* How much of the price the balance covers. */}
       <div
         role="meter"

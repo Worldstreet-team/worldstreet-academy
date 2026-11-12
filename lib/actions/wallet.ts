@@ -42,11 +42,15 @@ export type MyWalletBalance = {
   enabled: boolean
   usdAvailableMinor: number
   usdAvailable: number
-  /** In-academy funding page (external override via NEXT_PUBLIC_WALLET_FUNDING_URL). */
+  /** Where a learner adds money: the WorldStreet dashboard (override via NEXT_PUBLIC_WALLET_FUNDING_URL). */
   fundingUrl: string
 }
 
-const FUNDING_URL = process.env.NEXT_PUBLIC_WALLET_FUNDING_URL || "/dashboard/wallet/deposit"
+// Learners add money on the WorldStreet dashboard, then come back to the Academy to pay (Owen, 2026-11-12).
+// The Academy's own deposit page sits inside the dashboard, which a learner who hasn't paid for a program
+// shouldn't reach. The old default, kept commented:
+// const FUNDING_URL = process.env.NEXT_PUBLIC_WALLET_FUNDING_URL || "/dashboard/wallet/deposit"
+const FUNDING_URL = process.env.NEXT_PUBLIC_WALLET_FUNDING_URL || "https://www.worldstreetgold.com/welcome"
 
 /** The top bar's glanceable read gives up after this; checkout keeps the wallet client's default. */
 const QUICK_BALANCE_TIMEOUT_MS = 3_000

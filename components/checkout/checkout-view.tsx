@@ -130,6 +130,8 @@ export function CheckoutView({
   // balance read below until the buyer refreshes that read.
   const [declinedShortfallMinor, setDeclinedShortfallMinor] = React.useState<number | null>(null)
   const [refreshing, setRefreshing] = React.useState(false)
+  /** The learner opened the WorldStreet dashboard in another tab to add money. */
+  const [fundingOpened, setFundingOpened] = React.useState(false)
   const [savingLater, setSavingLater] = React.useState(false)
   const [savedLater, setSavedLater] = React.useState(false)
   const [saveLaterError, setSaveLaterError] = React.useState<string | null>(null)
@@ -158,6 +160,8 @@ export function CheckoutView({
   const knownShortfallMinor = isPaid && wallet.enabled ? Math.max(0, priceMinor - wallet.usdAvailableMinor) : 0
   const shortfallMinor = declinedShortfallMinor ?? (knownShortfallMinor > 0 ? knownShortfallMinor : null)
   const shortfall = !payBlocked && shortfallMinor !== null && shortfallMinor > 0
+  /** Money is added on the WorldStreet dashboard (since 2026-11-12), not on an Academy page. */
+  const fundsOnHub = !wallet.fundingUrl.startsWith("/")
 
   // Transfers closed (CTO, 2026-11-08): the wallet is the only way to pay, so
   // nothing on this page is ever "by transfer". The old state, kept commented:
@@ -263,11 +267,42 @@ export function CheckoutView({
       router.push(`${wallet.fundingUrl}?${params.toString()}`)
       return
     }
-    // External override (central dashboard) — keep the legacy new-tab flow.
-    const returnTo = window.location.href
-    const url = `${wallet.fundingUrl}${wallet.fundingUrl.includes("?") ? "&" : "?"}redirect=${encodeURIComponent(returnTo)}`
-    window.open(url, "_blank", "noopener")
+    // The WorldStreet dashboard (the default since 2026-11-12, Owen): a new tab, so this order stays open
+    // here, and the balance is read again when the learner comes back to this tab (the effect below). The
+    // saves aren't awaited: an await before window.open loses the click, and Safari then blocks the tab.
+    void ensureIntentSaved()
+    void saveInvite()
+    setFundingOpened(true)
+    // The dashboard has no way back to an app, so no return address is sent. The old link, kept commented:
+    // const returnTo = window.location.href
+    // const url = `${wallet.fundingUrl}${wallet.fundingUrl.includes("?") ? "&" : "?"}redirect=${encodeURIComponent(returnTo)}`
+    window.open(wallet.fundingUrl, "_blank", "noopener")
   }
+
+  // Back from the WorldStreet dashboard: read the balance again, so Pay appears without a manual refresh.
+  // Returning to the tab fires both events; `checking` keeps it to one read.
+  React.useEffect(() => {
+    if (!fundingOpened) return
+    let checking = false
+    const onBack = async () => {
+      if (document.visibilityState !== "visible" || checking) return
+      checking = true
+      setRefreshing(true)
+      const next = await getMyWalletBalance().catch(() => null)
+      if (next) {
+        setWallet(next)
+        setDeclinedShortfallMinor(null)
+      }
+      setRefreshing(false)
+      checking = false
+    }
+    document.addEventListener("visibilitychange", onBack)
+    window.addEventListener("focus", onBack)
+    return () => {
+      document.removeEventListener("visibilitychange", onBack)
+      window.removeEventListener("focus", onBack)
+    }
+  }, [fundingOpened])
 
   async function handlePurchase() {
     if (phase !== "idle") return
@@ -356,7 +391,8 @@ export function CheckoutView({
           className="flex h-[52px] w-full items-center justify-center gap-2 rounded-full bg-ws-brand text-[15px] font-semibold text-ws-brand-on transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-brand/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40 focus-visible:ring-offset-2 focus-visible:ring-offset-ws-page active:translate-y-px disabled:opacity-45"
         >
           <WalletIcon size={17} aria-hidden />
-          Add {centsUsd(shortfallMinor)} to your wallet
+          {/* Was "Add … to your wallet", when this opened the Academy's own deposit page (until 2026-11-12). */}
+          {fundsOnHub ? `Add ${centsUsd(shortfallMinor)} on WorldStreet` : `Add ${centsUsd(shortfallMinor)} to your wallet`}
         </button>
       )
     }
@@ -552,6 +588,8 @@ export function CheckoutView({
                   priceMinor={priceMinor}
                   refreshing={refreshing}
                   onRefresh={refreshBalance}
+                  fundsOnHub={fundsOnHub}
+                  fundingOpened={fundingOpened}
                 />
               </Appear>
 

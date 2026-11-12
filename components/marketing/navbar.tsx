@@ -1,13 +1,13 @@
 import Link from "next/link"
 import { headers } from "next/headers"
-import { Button } from "@/components/ui/button"
+// import { Button } from "@/components/ui/button" — only the Sign in button used it (commented out 2026-11-12)
 import { ThemeToggle } from "@/components/theme-toggle"
 import { MarketingMobileNav, type MarketingNavLink } from "@/components/marketing/mobile-nav"
 import { NavbarShell } from "@/components/marketing/navbar-shell"
 import { NavSearch } from "@/components/marketing/nav-search"
 import { SchoolsMenu, type SchoolCounts } from "@/components/marketing/schools-menu"
 import { getCurrentUser } from "@/lib/auth/actions"
-import { loginUrl, registerUrl, safeReturnPath } from "@/lib/auth/login-url"
+import { loginUrl, /* registerUrl, */ safeReturnPath } from "@/lib/auth/login-url"
 import { fetchBrowseCourses } from "@/lib/actions/student"
 import { countProgramsBySchool } from "@/lib/schools"
 import { needsSchoolChoice } from "@/lib/start-gate"
@@ -26,7 +26,9 @@ import { cn } from "@/lib/utils"
  * and offers "Back to Academy" (2026-11-11 audit: without it, a new account
  * was left on the hub). `registerUrl` mirrors the pk_test_ switch.
  */
-const REGISTER_URL = registerUrl("/schools?start=1")
+// Join WMA opens the WorldStreet sign-in page instead (Owen, 2026-11-12): one button, no separate Sign in.
+// Someone new picks "Create an account" there, which keeps the way back. Kept commented:
+// const REGISTER_URL = registerUrl("/schools?start=1")
 
 const barLinkClass =
   "inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-full px-2 text-sm font-medium xl:px-3 text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-chip hover:text-ws-primary"
@@ -95,8 +97,8 @@ export async function Navbar({ showFaculty }: { showFaculty: boolean }) {
   const sheetActions: MarketingNavLink[] = user
     ? []
     : [
-        { href: loginHref, label: "Sign in", external: true },
-        { href: REGISTER_URL, label: "Join WMA", external: true },
+        // One button (Owen, 2026-11-12). Was: Sign in (loginHref), then Join WMA (REGISTER_URL).
+        { href: loginHref, label: "Join WMA", external: true },
       ]
 
   return (
@@ -182,26 +184,28 @@ export async function Navbar({ showFaculty }: { showFaculty: boolean }) {
             <span className="hidden sm:inline">Go to dashboard</span>
           </Link>
         ) : (
-          // Not authenticated: the acquisition pair. Sign in joins the sheet
-          // below lg so only the primary CTA stays inline.
-          <>
-            <Button
-              variant="ghost"
-              className="hidden h-10 rounded-full px-4 text-sm font-medium text-ws-primary hover:bg-ws-chip lg:inline-flex dark:hover:bg-ws-chip"
-              render={<a href={loginHref} />}
-            >
-              Sign in
-            </Button>
-            <a href={REGISTER_URL} className={primaryClass}>
-              Join {BRAND.shortName}
-            </a>
-          </>
+          // Not authenticated: one button, Join WMA, to the WorldStreet sign-in
+          // page (Owen, 2026-11-12: "no point of the sign in button"). It returns
+          // to this page, or from the homepage to the dashboard, which the gate
+          // turns into the schools for anyone who hasn't paid. The Sign in
+          // button, and Join WMA's old register link, kept commented:
+          // <Button
+          //   variant="ghost"
+          //   className="hidden h-10 rounded-full px-4 text-sm font-medium text-ws-primary hover:bg-ws-chip lg:inline-flex dark:hover:bg-ws-chip"
+          //   render={<a href={loginHref} />}
+          // >
+          //   Sign in
+          // </Button>
+          // <a href={REGISTER_URL} className={primaryClass}>
+          <a href={loginHref} className={primaryClass}>
+            Join {BRAND.shortName}
+          </a>
         )}
 
         <MarketingMobileNav
           links={sheetLinks}
           actions={sheetActions}
-          actionsNote={user ? undefined : `Uses your WorldStreet account. New to WorldStreet? Join ${BRAND.shortName} to create one.`}
+          actionsNote={user ? undefined : "Uses your WorldStreet account. New to WorldStreet? You can create one there."}
           counts={counts}
           className="lg:hidden"
         />
