@@ -124,6 +124,10 @@ function DepositPageInner() {
   })
 
   const sub = overview?.ngn?.payoutSubaccount ?? null
+  // Programs are charged from the USD balance, so a naira deposit can't pay for one: it lands in the separate NGN
+  // balance. From checkout, only the USD route shows; its "Naira (auto-converted)" option takes naira and credits USD.
+  // (Production, 2026-11-12: learners who reached checkout were holding naira they couldn't spend there.)
+  const fromCheckout = Boolean(redirect)
 
   return (
     <>
@@ -177,6 +181,7 @@ function DepositPageInner() {
           )}
 
           <Tabs defaultValue="usd" className="gap-5">
+            {!fromCheckout && (
             <TabsList className="rounded-full bg-ws-track p-[3px] group-data-horizontal/tabs:h-10">
               <TabsTrigger
                 value="usd"
@@ -191,6 +196,7 @@ function DepositPageInner() {
                 NGN deposit
               </TabsTrigger>
             </TabsList>
+            )}
 
             {/* ── USD ── */}
             <TabsContent value="usd">
@@ -280,8 +286,13 @@ function DepositPageInner() {
             </TabsContent>
 
             {/* ── NGN ── */}
+            {!fromCheckout && (
             <TabsContent value="ngn">
               <div className="space-y-4">
+                <p className="rounded-lg border border-ws-hairline bg-ws-surface px-4 py-3 text-[13px] text-ws-muted">
+                  Naira deposits go to your NGN balance, which can&apos;t pay for programs. To pay for a program
+                  with naira, use USD deposit and choose Naira (auto-converted).
+                </p>
                 {/* Bank transfer into the dedicated funding account */}
                 <div className="space-y-4 rounded-lg border border-ws-hairline bg-ws-surface p-6">
                   <div className="flex items-center gap-3">
@@ -390,6 +401,7 @@ function DepositPageInner() {
                 )}
               </div>
             </TabsContent>
+            )}
           </Tabs>
         </div>
       </div>
