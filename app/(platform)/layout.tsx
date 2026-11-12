@@ -35,22 +35,31 @@ export default async function PlatformLayout({
   // program and a package there. A saved school no longer opens the dashboard.
   // Fails OPEN — a gate that cannot read its state must never lock anyone out.
   // `redirect()` throws by design, so it stays outside the catch.
+  // A learner who hasn't paid yet reaches only the gate's exempt pages, and the
+  // rail then lists just those (live QA, 2026-11-12). Fails open like the gate.
+  let gated = false
   if (user.role === "USER") {
     const pathname = (await headers()).get("x-next-pathname") ?? ""
     const gate = await getStartGateState(user.id).catch(() => null)
+    gated = Boolean(
+      gate && needsSchoolChoice({ role: user.role, instructorStatus: user.instructorStatus, pathname: "/dashboard", ...gate })
+    )
     if (
       gate &&
-      needsSchoolChoice({ role: user.role, instructorStatus: user.instructorStatus, pathname, ...gate }) &&
+      needsSchoolChoice({ role: user.role, instructorStatus: user.instructorStatus, pathname, ...gate })
+    ) {
       // A payment an admin recorded for this email (team, 2026-11-06) opens
       // here if sign-in didn't open it (the account was made in the mobile
       // app, say, or the first try failed). Only runs for a learner it would send away.
-      (await claimWaitingGrants(user)) === 0
-    ) {
-      redirect(
-        gate.hasOpenProof
-          ? "/dashboard/checkout/pending"
-          : schoolsPathFor((await cookies()).get(START_SCHOOL_COOKIE)?.value)
-      )
+      if ((await claimWaitingGrants(user)) === 0) {
+        redirect(
+          gate.hasOpenProof
+            ? "/dashboard/checkout/pending"
+            : schoolsPathFor((await cookies()).get(START_SCHOOL_COOKIE)?.value)
+        )
+      }
+      // That waiting payment just opened the dashboard.
+      gated = false
     }
   }
 
@@ -70,11 +79,12 @@ export default async function PlatformLayout({
               defaultOpen={sidebarOpen}
               style={{ "--sidebar-width-icon": "4.5rem" } as React.CSSProperties}
             >
-              <AppSidebar />
+              <AppSidebar gated={gated} />
               <SidebarInset>
                 {children}
               </SidebarInset>
-              <PlatformBottomNav />
+              {/* Every tab of the phone bar is behind the gate, so it waits until they've paid. */}
+              {!gated && <PlatformBottomNav />}
               <CommandSearch />
               <TranslateScript initialLanguage={user.preferredLanguage} />
               {/* First run: a short tour of the real dashboard, not a slideshow

@@ -171,6 +171,28 @@ const accountItems: NavItem[] = [
   },
 ]
 
+/**
+ * A learner who hasn't paid for a program yet (the school-first gate) reaches
+ * only the gate's exempt pages, so the rail lists just those (live QA,
+ * 2026-11-12): the rest would only send them back to the schools.
+ */
+const gatedItems: NavItem[] = [
+  { title: "Choose a program", href: "/schools", icon: BookOpen01Icon, match: (p) => p.startsWith("/schools") },
+  {
+    title: "Apply to teach",
+    href: "/dashboard/become-instructor",
+    icon: TeachingIcon,
+    match: (p) => p.startsWith("/dashboard/become-instructor"),
+  },
+  { title: "Payments", href: "/dashboard/payments", icon: ReceiptTextIcon, match: (p) => p === "/dashboard/payments" },
+  {
+    title: "WMA Partners",
+    href: "/dashboard/referrals",
+    icon: GiftIcon,
+    match: (p) => p.startsWith("/dashboard/referrals"),
+  },
+]
+
 type WorldStreetApp = { title: string; description: string; href: string; icon: Icon }
 
 /**
@@ -412,7 +434,8 @@ function NavGroup({
   )
 }
 
-export function AppSidebar() {
+/** `gated`: the learner hasn't paid for a program yet, so the rail shows only the pages open to them. */
+export function AppSidebar({ gated = false }: { gated?: boolean }) {
   const pathname = usePathname()
   const router = useRouter()
   const user = useUser()
@@ -456,6 +479,8 @@ export function AppSidebar() {
   ]
 
   React.useEffect(() => {
+    // Gated pages would only redirect to the schools; nothing worth warming.
+    if (gated) return
     const routes = [
       ...learnItems.map((i) => i.href),
       ...(hasMentorship ? [mentorshipItem.href] : []),
@@ -464,7 +489,7 @@ export function AppSidebar() {
       isInstructor ? teachItem.href : "/dashboard/become-instructor",
     ]
     routes.forEach((r) => router.prefetch(r))
-  }, [router, isInstructor, hasMentorship])
+  }, [router, isInstructor, hasMentorship, gated])
 
   const badgeFor = (item: NavItem): Badge | undefined => {
     if (item.href === "/dashboard/my-courses" && inProgressCount > 0) {
@@ -553,22 +578,31 @@ export function AppSidebar() {
           </Link>
         )}
 
-        <NavGroup
-          label="Learn"
-          hasActive={learn.some((i) => isActive(i, pathname))}
-          collapsed={collapsed}
-          defaultOpen
-        >
-          {rows(learn)}
-        </NavGroup>
+        {gated ? (
+          // Not paid yet: only the pages open to them (live QA, 2026-11-12).
+          <NavGroup label="Get started" hasActive={gatedItems.some((i) => isActive(i, pathname))} collapsed={collapsed} defaultOpen>
+            {rows(gatedItems)}
+          </NavGroup>
+        ) : (
+          <>
+            <NavGroup
+              label="Learn"
+              hasActive={learn.some((i) => isActive(i, pathname))}
+              collapsed={collapsed}
+              defaultOpen
+            >
+              {rows(learn)}
+            </NavGroup>
 
-        <NavGroup label="Connect" hasActive={connectItems.some((i) => isActive(i, pathname))} collapsed={collapsed}>
-          {rows(connectItems)}
-        </NavGroup>
+            <NavGroup label="Connect" hasActive={connectItems.some((i) => isActive(i, pathname))} collapsed={collapsed}>
+              {rows(connectItems)}
+            </NavGroup>
 
-        <NavGroup id="account" label="Account" hasActive={accountItems.some((i) => isActive(i, pathname))} collapsed={collapsed}>
-          {rows(accountItems)}
-        </NavGroup>
+            <NavGroup id="account" label="Account" hasActive={accountItems.some((i) => isActive(i, pathname))} collapsed={collapsed}>
+              {rows(accountItems)}
+            </NavGroup>
+          </>
+        )}
 
         {/* No "Become an instructor" card here: staff tutors are hired a few
             at a time through /careers, not recruited from every student's
@@ -585,8 +619,9 @@ export function AppSidebar() {
       <SidebarFooter className="border-t border-sidebar-border px-3 py-2.5">
         <div className={cn("flex items-center gap-1", collapsed && "justify-center")}>
           <Link
-            href="/dashboard/profile"
-            aria-label={collapsed ? "Profile" : undefined}
+            // The profile page is behind the gate; until they've paid, the card leads to the schools.
+            href={gated ? "/schools" : "/dashboard/profile"}
+            aria-label={collapsed ? (gated ? "Choose a program" : "Profile") : undefined}
             className={cn(
               "flex min-w-0 flex-1 items-center gap-2.5 rounded-[10px] p-1.5 outline-none transition-colors duration-[var(--ws-motion-fast)] hover:bg-foreground/[0.04] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sidebar-ring",
               collapsed && "flex-none",

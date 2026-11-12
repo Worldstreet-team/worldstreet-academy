@@ -179,6 +179,15 @@ export function MediaUpload({
     setUploadStartTime(Date.now())
     setUploadStatus("Preparing upload...")
 
+    // Read the length from the file on this device straight away (live QA,
+    // 2026-11-12): the probe of the uploaded copy below only runs once the
+    // upload ends and depends on the storage URL answering, so a lesson saved
+    // quickly went in with no length. The later probe stays as a fallback.
+    if (type === "video" && onDurationDetected) {
+      const localUrl = URL.createObjectURL(file)
+      probeVideoDuration(localUrl, () => URL.revokeObjectURL(localUrl))
+    }
+
     try {
       if (onGetPresignedUrl) {
         setUploadStatus("Getting upload URL...")
@@ -263,7 +272,7 @@ export function MediaUpload({
   }
 
   /* ── Video duration detection (returns seconds) ── */
-  function probeVideoDuration(url: string) {
+  function probeVideoDuration(url: string, done?: () => void) {
     const vid = document.createElement("video")
     vid.preload = "metadata"
     vid.src = url
@@ -273,10 +282,12 @@ export function MediaUpload({
       }
       vid.src = ""
       vid.load()
+      done?.()
     })
     vid.addEventListener("error", () => {
       vid.src = ""
       vid.load()
+      done?.()
     })
   }
 

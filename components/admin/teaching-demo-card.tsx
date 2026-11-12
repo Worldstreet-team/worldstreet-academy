@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { formatDate, formatDateTime } from "@/components/admin/shared"
+import { datetimeLocalValue } from "@/lib/utils"
 import {
   adminRecordDemoOutcome,
   adminRequestTeachingDemo,
@@ -50,7 +51,8 @@ export function TeachingDemoCard({
     setNote(demo?.note ?? "")
   }, [demo?.outcome, demo?.note])
 
-  const refreshMin = () => setMin(new Date(Date.now() + 5 * 60_000).toISOString().slice(0, 16))
+  // Local time, not UTC (live QA, 2026-11-12). Was: new Date(…).toISOString().slice(0, 16)
+  const refreshMin = () => setMin(datetimeLocalValue(new Date(Date.now() + 5 * 60_000)))
 
   const request = useMutation({
     mutationFn: () => adminRequestTeachingDemo(applicationId, new Date(at).toISOString()),

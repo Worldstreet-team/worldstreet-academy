@@ -95,6 +95,7 @@ const REJECTION_REASONS: { value: RejectionReason; label: string }[] = [
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import { formatDate, formatDateTime, StatusBadge, FilterChips } from "@/components/admin/shared"
 import { TeachingDemoCard } from "@/components/admin/teaching-demo-card"
+import { datetimeLocalValue } from "@/lib/utils"
 
 function LinkRow({ label, href }: { label: string; href?: string }) {
   if (!href) return null
@@ -382,7 +383,8 @@ export default function AdminApplicationDetailPage() {
                           onClick={() => {
                             setProposeError(null)
                             resetPlace()
-                            setScheduleMin(new Date(Date.now() + 5 * 60_000).toISOString().slice(0, 16))
+                            // Local time, not UTC (live QA, 2026-11-12). Was: new Date(…).toISOString().slice(0, 16)
+                            setScheduleMin(datetimeLocalValue(new Date(Date.now() + 5 * 60_000)))
                             setProposeOpen(true)
                           }}
                         >
@@ -395,7 +397,8 @@ export default function AdminApplicationDetailPage() {
                         onClick={() => {
                           setScheduleError(null)
                           resetPlace()
-                          setScheduleMin(new Date(Date.now() + 5 * 60_000).toISOString().slice(0, 16))
+                          // Local time, not UTC (live QA, 2026-11-12). Was: new Date(…).toISOString().slice(0, 16)
+                          setScheduleMin(datetimeLocalValue(new Date(Date.now() + 5 * 60_000)))
                           setScheduleOpen(true)
                         }}
                       >
