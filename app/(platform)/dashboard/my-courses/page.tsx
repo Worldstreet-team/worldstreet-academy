@@ -34,7 +34,9 @@ export default function MyProgramsPage() {
     }
 
     if (search.trim()) {
-      const q = search.toLowerCase()
+      // 2026-11-12: trimmed — a phone keyboard's trailing space after autocomplete matched nothing.
+      // const q = search.toLowerCase()
+      const q = search.trim().toLowerCase()
       courses = courses.filter(
         (c) =>
           c.courseTitle.toLowerCase().includes(q) ||

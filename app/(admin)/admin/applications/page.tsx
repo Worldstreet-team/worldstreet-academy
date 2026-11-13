@@ -46,7 +46,9 @@ export default function AdminApplicationsPage() {
     mutationFn: () => adminExportApplicationsCsv(),
     onSuccess: (res) => {
       if (!res.success) return
-      const blob = new Blob([res.csv], { type: "text/csv;charset=utf-8" })
+      // 2026-11-12: a byte-order mark, so Excel reads names with accents (Yoruba ọ, ẹ, ṣ) as UTF-8.
+      // const blob = new Blob([res.csv], { type: "text/csv;charset=utf-8" })
+      const blob = new Blob(["﻿", res.csv], { type: "text/csv;charset=utf-8" })
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
@@ -67,7 +69,9 @@ export default function AdminApplicationsPage() {
         <div className="mx-auto w-full max-w-7xl space-y-8">
         <PageHeader
           title="Staff tutor applications"
-          subline="Job applications to teach Academy students. Interview each shortlisted applicant at the office or online, then approve or reject. Marketplace creators are under Sellers."
+          // 2026-11-12: the menu calls them Marketplace Creators; there is no "Sellers" item. Was:
+          // subline="... Marketplace creators are under Sellers."
+          subline="Job applications to teach Academy students. Interview each shortlisted applicant at the office or online, then approve or reject. Marketplace creators have their own page, Marketplace Creators."
         />
 
         <div className="flex items-center gap-3 flex-wrap">
@@ -93,7 +97,8 @@ export default function AdminApplicationsPage() {
                 setMine((m) => !m)
                 setPage(1)
               }}
-              className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+              // 2026-11-12: whitespace-nowrap — on a phone the label broke over two lines.
+              className={`whitespace-nowrap text-xs px-2.5 py-1 rounded-full border transition-colors ${
                 mine
                   ? "bg-ws-brand text-ws-brand-on border-transparent font-medium"
                   : "border-ws-hairline text-ws-muted hover:bg-ws-raised hover:text-ws-primary"

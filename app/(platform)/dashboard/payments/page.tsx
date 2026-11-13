@@ -9,6 +9,9 @@ import { myPayments, type MyPayment, type MyPaymentStatus } from "@/lib/my-payme
 import { formatMinor } from "@/lib/teaching-home"
 import { cn } from "@/lib/utils"
 import { transferLabel } from "@/lib/payment-channels"
+// 2026-11-12 (buyer QA): to keep a learner who hasn't paid yet off links the gate would bounce.
+import { needsSchoolChoice } from "@/lib/start-gate"
+import { getStartGateState } from "@/lib/start-gate-state"
 
 export const metadata: Metadata = {
   title: "Payments",
@@ -23,6 +26,12 @@ const STATUS: Record<MyPaymentStatus, { label: string; tone: "credit" | "debit" 
   refunding: { label: "Being refunded", tone: "neutral", detail: "This charge bought no access, so it's on its way back to your wallet." },
   refunded: { label: "Refunded", tone: "neutral", detail: "Returned to your wallet." },
   failed: { label: "Failed", tone: "debit", detail: "You weren't charged." },
+  unconfirmed: {
+    label: "Not confirmed",
+    tone: "neutral",
+    detail:
+      "We couldn't confirm this payment with your wallet. If your balance went down and the program didn't open, write to us before you pay again.",
+  },
   declined: { label: "Declined", tone: "debit", detail: "Your receipt wasn't approved. You can send a new one from checkout." },
   cancelled: { label: "Cancelled", tone: "neutral", detail: "You weren't charged." },
 }
@@ -57,6 +66,14 @@ export default async function PaymentsPage() {
   const paid = payments?.filter((p) => p.status === "paid") ?? []
   const paidMinor = paid.reduce((sum, p) => sum + p.amountMinor, 0)
 
+  // 2026-11-12 (buyer QA): this page is open to a learner who hasn't paid for a program yet (a failed or
+  // in-review payment), but Help and the Wallet are not: their links sent them to the schools page.
+  // They get the public FAQ instead, and no pointer to the Wallet. Fails open like the gate.
+  const gate = user.role === "USER" ? await getStartGateState(user.id).catch(() => null) : null
+  const gated = Boolean(
+    gate && needsSchoolChoice({ role: user.role, instructorStatus: user.instructorStatus, pathname: "/dashboard", ...gate })
+  )
+
   return (
     <>
       <Topbar title="Payments" breadcrumbOverrides={{ payments: "Payments" }} />
@@ -64,7 +81,12 @@ export default async function PaymentsPage() {
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
           <PageHeader
             title="Payments"
-            subtitle="Everything you've bought at the Academy and where each payment stands. Your balance and top-ups are in your Wallet."
+            // subtitle="Everything you've bought at the Academy and where each payment stands. Your balance and top-ups are in your Wallet."
+            subtitle={
+              gated
+                ? "Everything you've bought at the Academy and where each payment stands."
+                : "Everything you've bought at the Academy and where each payment stands. Your balance and top-ups are in your Wallet."
+            }
           />
 
           {!payments ? (
@@ -108,7 +130,8 @@ export default async function PaymentsPage() {
               {BRAND.supportEmail}
             </a>{" "}
             with the program and the date, or visit{" "}
-            <Link href="/dashboard/help" className="font-medium text-foreground underline underline-offset-4">
+            {/* <Link href="/dashboard/help" …> — 2026-11-12: the public FAQ for a learner the gate would bounce */}
+            <Link href={gated ? "/#faq" : "/dashboard/help"} className="font-medium text-foreground underline underline-offset-4">
               Help
             </Link>
             .

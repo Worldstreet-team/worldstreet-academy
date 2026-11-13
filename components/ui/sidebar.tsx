@@ -309,8 +309,13 @@ function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
   return (
     <main
       data-slot="sidebar-inset"
+      // 2026-11-12: overflow-x clip, not hidden. `hidden` makes <main> a scroll container
+      // (overflow-y turns auto) that never scrolls itself, so every `sticky` inside it (the
+      // top bar, the exam timer, the course page's buy rail) scrolled away with the page.
+      // `clip` cuts off wide content the same way without that; browsers without it keep `hidden`. Was:
+      // "... relative flex w-full flex-1 flex-col overflow-x-hidden",
       className={cn(
-        "bg-background md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-lg md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2 relative flex w-full flex-1 flex-col overflow-x-hidden",
+        "bg-background md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-lg md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2 relative flex w-full flex-1 flex-col overflow-x-hidden supports-[overflow:clip]:overflow-x-clip",
         className
       )}
       {...props}

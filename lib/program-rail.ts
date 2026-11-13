@@ -2,6 +2,11 @@
  * What the student program page may print about price and size. One rule
  * each: an enrolled learner is never quoted a price; a ladder is quoted
  * "From"; a zero is not a fact worth showing.
+ *
+ * The one exception (Owen, 2026-11-12): a plan upgrade. An enrolled learner on
+ * a lower plan is shown "Upgrade for $X" on each higher plan, X being only the
+ * difference (`getUpgradeOptions`, lib/actions/enrollments.ts; the program
+ * page's "Your plan" and checkout). Never a plan's price, never a lower plan.
  */
 export type ProgramRail = {
   /** The large figure: a price, "Free", or "Enrolled". */

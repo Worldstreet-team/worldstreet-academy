@@ -40,7 +40,12 @@ export default async function AdminEditCoursePage({
         existingLessons={lessons}
       />
       {data.course.kind === "program" && (
-        <div className="px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-8 sm:px-6 md:px-8 md:pb-12 lg:px-12">
+        // 2026-11-12: an anchor, so the courses list's "Teaching faculty" lands on the card. Was:
+        // <div className="px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-8 sm:px-6 md:px-8 md:pb-12 lg:px-12">
+        <div
+          id="teaching-faculty"
+          className="scroll-mt-4 px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-8 sm:px-6 md:px-8 md:pb-12 lg:px-12"
+        >
           <div className="mx-auto w-full max-w-3xl">
             <TeachingFacultyCard courseId={courseId} courseTitle={data.course.title} />
           </div>

@@ -30,6 +30,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { SectionDivider } from "@/components/instructor/section-divider"
 import { CHECK_STATUS_LABEL, REVIEW_CHECK_DETAILS, type ReviewCheckKey, type ReviewCheckStatus } from "@/lib/review-checks"
 import { cn } from "@/lib/utils"
+import { COHORT_TIME_ZONE } from "@/lib/cohort"
 import { EmptyState } from "@/components/shared/empty-state"
 import { ArtCourses } from "@/components/shared/illustrations"
 import { RichTextEditor } from "@/components/ui/rich-text-editor"
@@ -40,6 +41,7 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
 import { useUser } from "@/components/providers/user-provider"
+import { courseCredit } from "@/lib/faculty"
 import type { Lesson, CourseLevel, CoursePricing, CourseStatus } from "@/lib/types"
 
 import { RenderIcon } from "@/components/shared/render-icon"
@@ -103,6 +105,8 @@ type EditableCourse = {
   }
   /** The seller's own link to this live marketplace course. */
   share?: { url: string; note: string } | null
+  /** The course's owner, whom the student preview credits (null: the account is gone). */
+  owner?: { role: string | null; firstName: string; lastName: string; avatarUrl: string | null } | null
 }
 
 const KIND_ITEMS = (["program", "marketplace", "new-economy"] as const).map((value) => ({
@@ -119,7 +123,10 @@ const LEVEL_ITEMS = [
 const SCHOOL_ITEMS = SCHOOLS.map((s) => ({ value: s.slug, label: s.name }))
 
 function formatDay(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", { dateStyle: "medium" })
+  // 2026-11-12: one fixed zone, so the server's render (UTC) and the browser's agree —
+  // a review stamped between midnight and 1 am Lagos printed two different days.
+  // return new Date(iso).toLocaleDateString("en-US", { dateStyle: "medium" })
+  return new Date(iso).toLocaleDateString("en-US", { dateStyle: "medium", timeZone: COHORT_TIME_ZONE })
 }
 
 /** An editable list of short lines: what students learn, requirements, who it is for. */
@@ -409,6 +416,9 @@ export function CourseEditor({
     (course?.packages ?? []).map(toEditorPackage)
   )
   const [kind, setKind] = useState<CourseKind>(course?.kind ?? (sellerMode ? "marketplace" : "program"))
+  // The student preview's credit: an existing course's owner (sent by the server), else the
+  // person creating it. Follows the kind picker, like learners' cards.
+  const previewCredit = courseCredit(kind, course ? (course.owner ?? null) : user)
   const [communityUrl, setCommunityUrl] = useState(course?.communityUrl ?? "")
   const [format, setFormat] = useState<CourseFormat>(course?.format ?? "course")
   const [productFile, setProductFile] = useState<ProductFileValue | null>(course?.productFile ?? null)
@@ -682,9 +692,14 @@ export function CourseEditor({
       )}
 
       {/* ─── 3-Column Layout ─── */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_1fr_340px] overflow-hidden">
+      {/* 2026-11-12: on a phone the columns were three small scroll boxes (the details column
+          ~370px tall, the bottom nav over the curriculum). Below lg the columns now scroll
+          together under the save bar; lg and up are unchanged. */}
+      {/* <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_1fr_340px] overflow-hidden"> */}
+      <div className="min-h-0 flex-1 grid grid-cols-1 content-start overflow-y-auto lg:content-stretch lg:grid-cols-[1fr_1fr_340px] lg:overflow-hidden">
         {/* ───────── LEFT: Course Details ───────── */}
-        <div className="overflow-auto border-r p-5 space-y-4">
+        {/* <div className="overflow-auto border-r p-5 space-y-4"> */}
+        <div className="lg:overflow-auto border-b lg:border-b-0 lg:border-r p-5 space-y-4">
           {kind === "marketplace" && (review.status !== "none" || sellerMode) && (
             <ReviewState review={review} status={status} seller={sellerMode} />
           )}
@@ -1010,7 +1025,8 @@ export function CourseEditor({
         </div>
 
         {/* ───────── CENTER: Curriculum ───────── */}
-        <div className="overflow-auto border-r p-5 space-y-3">
+        {/* <div className="overflow-auto border-r p-5 space-y-3"> */}
+        <div className="lg:overflow-auto lg:border-r p-5 pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-5 space-y-3">
           {fileFormat ? (
             <>
               <SectionDivider label="Product file" />
@@ -1426,6 +1442,8 @@ export function CourseEditor({
                 {description || "Course description will appear here."}
               </p>
               <div className="flex items-center justify-between pt-2 border-t text-xs text-muted-foreground">
+                {/* 2026-11-12: the name learners see (courseCredit: the Academy for programs, the
+                    owner for a marketplace course), not the signed-in editor's. Was:
                 <div className="flex items-center gap-2">
                   <Avatar size="sm">
                     {user.avatarUrl && (
@@ -1437,6 +1455,13 @@ export function CourseEditor({
                     <AvatarFallback>{user.firstName[0]}{user.lastName[0]}</AvatarFallback>
                   </Avatar>
                   <span>{user.firstName} {user.lastName}</span>
+                </div> */}
+                <div className="flex min-w-0 items-center gap-2">
+                  <Avatar size="sm">
+                    {previewCredit.avatarUrl && <AvatarImage src={previewCredit.avatarUrl} alt={previewCredit.name} />}
+                    <AvatarFallback>{previewCredit.name.slice(0, 1).toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  <span className="truncate">{previewCredit.name}</span>
                 </div>
                 <span>{lessons.length} lessons</span>
               </div>

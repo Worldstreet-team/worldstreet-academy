@@ -23,7 +23,13 @@ import { fmtMoney, CopyButton, NAIRA_FONT } from "@/components/wallet/shared"
 const USD_PRESETS = [10, 25, 50, 100]
 const NGN_PRESETS = [5000, 10000, 25000, 50000]
 
-type PendingCheckout = { txRef: string; currency: "USD" | "NGN" }
+/** `checkoutUrl`: the hosted payment page, linked in case the browser blocked the new tab (2026-11-12). */
+type PendingCheckout = { txRef: string; currency: "USD" | "NGN"; checkoutUrl?: string }
+
+/** Only an https payment page is linked. */
+function safeCheckoutUrl(url: string | undefined): string | undefined {
+  return typeof url === "string" && url.startsWith("https://") ? url : undefined
+}
 
 function DepositPageInner() {
   const router = useRouter()
@@ -31,7 +37,13 @@ function DepositPageInner() {
   const queryClient = useQueryClient()
 
   // Checkout hand-off: /dashboard/wallet/deposit?suggestMinor=1234&redirect=/dashboard/checkout?courseId=…
-  const redirect = search.get("redirect")
+  // Only a path on this site (2026-11-12): `?redirect=https://…` sent a learner off-site right after paying.
+  // const redirect = search.get("redirect")
+  const rawRedirect = search.get("redirect")
+  const redirect =
+    rawRedirect && rawRedirect.startsWith("/") && !rawRedirect.startsWith("//") && !rawRedirect.includes("\\")
+      ? rawRedirect
+      : null
   const suggestMinor = Number(search.get("suggestMinor") ?? "")
   const suggestedUsd = Number.isFinite(suggestMinor) && suggestMinor > 0
     ? (Math.ceil(suggestMinor / 100) + 1).toString()
@@ -62,7 +74,7 @@ function DepositPageInner() {
         setError(res.error)
       } else {
         setError(null)
-        setPending({ txRef: res.txRef, currency: "USD" })
+        setPending({ txRef: res.txRef, currency: "USD", checkoutUrl: safeCheckoutUrl(res.checkoutUrl) })
         window.open(res.checkoutUrl, "_blank", "noopener")
       }
     },
@@ -75,7 +87,7 @@ function DepositPageInner() {
         setError(res.error)
       } else {
         setError(null)
-        setPending({ txRef: res.txRef, currency: "NGN" })
+        setPending({ txRef: res.txRef, currency: "NGN", checkoutUrl: safeCheckoutUrl(res.checkoutUrl) })
         window.open(res.checkoutUrl, "_blank", "noopener")
       }
     },
@@ -106,6 +118,9 @@ function DepositPageInner() {
       } else if (res.status === "failed") {
         setPending(null)
         setSyncMessage("The payment failed — nothing was credited. You can try again.")
+      } else if (res.status === "credited_pending_settlement") {
+        // Received, not spendable yet (2026-11-12): it isn't "not confirmed".
+        setSyncMessage("Payment received — it's settling and will be in your balance shortly. Check again in a minute.")
       } else {
         setSyncMessage("Payment not confirmed yet — give it a few seconds and sync again.")
       }
@@ -158,6 +173,17 @@ function DepositPageInner() {
               <p className="mt-1.5 text-[13px] text-ws-muted">
                 Once you&apos;ve paid, come back here and confirm — your balance updates instantly.
               </p>
+              {/* A phone often blocks a tab opened after a wait, so the page is linked too (2026-11-12). */}
+              {pending.checkoutUrl && (
+                <a
+                  href={pending.checkoutUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-1.5 inline-block text-[13px] font-medium text-ws-primary underline underline-offset-4"
+                >
+                  No new tab? Open the payment page
+                </a>
+              )}
               {syncMessage && <p className="mt-1.5 text-[13px] text-ws-gold">{syncMessage}</p>}
               <div className="mt-4 flex items-center gap-2">
                 <button

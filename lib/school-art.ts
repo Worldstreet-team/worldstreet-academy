@@ -45,15 +45,48 @@ export const PROGRAM_ART: Partial<Record<string, string>> = {
 }
 
 /**
- * What a program shows: its own thumbnail, else its own program art
- * (`PROGRAM_ART`), else its school's cover, else null (the caller renders
- * the school icon). A program's uploaded thumbnail always wins; its
- * school's cover is the last fallback before the icon.
+ * Live programs were renamed after their art was drawn (2026-11-12, checked
+ * against the production sitemap): the base slug on the left, its art's key on the right.
+ */
+const PROGRAM_ART_ALIASES: Partial<Record<string, string>> = {
+  "artificial-intelligence-ai-automation": "ai-ai-automation",
+  "content-creation-video-editing-mastery": "content-creation-mastery",
+}
+
+/**
+ * A program's own art by slug. Production slugs carry a random six-character
+ * suffix (`forex-trading-mastery-j7g0ta`), so the plain key never matched
+ * there and 10 of the 12 live programs showed old stock photos instead.
+ */
+function programArtFor(slug: string | null | undefined): string | undefined {
+  if (!slug) return undefined
+  if (PROGRAM_ART[slug]) return PROGRAM_ART[slug]
+  const base = slug.replace(/-[a-z0-9]{6}$/, "")
+  return PROGRAM_ART[base] ?? PROGRAM_ART[PROGRAM_ART_ALIASES[base] ?? ""]
+}
+
+/**
+ * A stock photo the old catalogue seeded as a thumbnail (images.unsplash.com),
+ * not one anyone uploaded: the uploads go to R2 or Cloudinary.
+ */
+function isStockThumbnail(url: string): boolean {
+  return /^https:\/\/images\.unsplash\.com\//.test(url)
+}
+
+/**
+ * What a program shows: its own uploaded thumbnail, else its own program art
+ * (`PROGRAM_ART`), else a seeded stock photo, else its school's cover, else
+ * null (the caller renders the school icon). An uploaded thumbnail always
+ * wins; since 2026-11-12 the designed art beats a stock photo, and a live slug's
+ * random suffix no longer hides its art. Was:
+ * return course.thumbnailUrl || (course.slug ? PROGRAM_ART[course.slug] : undefined) || schoolCover(course.school) || null
  */
 export function programArt(course: {
   thumbnailUrl?: string | null
   school?: string | null
   slug?: string | null
 }): string | null {
-  return course.thumbnailUrl || (course.slug ? PROGRAM_ART[course.slug] : undefined) || schoolCover(course.school) || null
+  const own = course.thumbnailUrl || null
+  if (own && !isStockThumbnail(own)) return own
+  return programArtFor(course.slug) || own || schoolCover(course.school) || null
 }

@@ -118,9 +118,11 @@ export function MobileLessonList({
               <p className={cn("truncate font-medium text-sm", lesson.locked && "text-muted-foreground")}>{lesson.title}</p>
               <p className="text-[11px] text-muted-foreground capitalize">
                 {lesson.type}
-                {lesson.duration 
+                {/* 2026-11-12: `duration` is whole minutes (LearnLesson) — a 45-minute lesson read "0:45". */}
+                {/* {lesson.duration 
                   ? ` · ${Math.floor(lesson.duration / 60)}:${String(lesson.duration % 60).padStart(2, '0')}` 
-                  : ""}
+                  : ""} */}
+                {lesson.duration ? ` · ${lesson.duration} min` : ""}
                 {watchPercent > 0 && !isCompleted && (
                   <span className="text-primary"> · {watchPercent}%</span>
                 )}
@@ -166,9 +168,11 @@ export function MobileLessonList({
                   exit={{ opacity: 0 }}
                   className="text-[10px] text-muted-foreground tabular-nums shrink-0"
                 >
-                  {lesson.duration 
+                  {/* 2026-11-12: whole minutes, not m:ss. */}
+                  {/* {lesson.duration 
                     ? `${Math.floor(lesson.duration / 60)}:${String(lesson.duration % 60).padStart(2, '0')}` 
-                    : lesson.type}
+                    : lesson.type} */}
+                  {lesson.duration ? `${lesson.duration} min` : lesson.type}
                 </motion.span>
               )}
             </AnimatePresence>

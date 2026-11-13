@@ -111,6 +111,8 @@ export function PurchasePanel({
   includes,
   hasPreview,
   variant,
+  planName = null,
+  upgradeHref = null,
 }: {
   program: ProgramDetail
   access: ProgramAccess
@@ -121,6 +123,10 @@ export function PurchasePanel({
   includes: IncludedItem[]
   hasPreview: boolean
   variant: "card" | "inline"
+  /** Enrolled: the plan held, e.g. "Basic" (2026-11-12); null when it isn't a plan that can change. */
+  planName?: string | null
+  /** Enrolled: where the upgrades are (the page's "Your plan"); null when there are none. Never a price. */
+  upgradeHref?: string | null
 }) {
   const card = variant === "card"
   const fileFormat = isFileFormat(program.format) ? FORMAT_LABEL[program.format].toLowerCase() : null
@@ -150,7 +156,11 @@ export function PurchasePanel({
                   {fileFormat ? `You own this ${fileFormat}` : "You're enrolled"}
                 </p>
                 <p className="mt-0.5 text-[13.5px] text-ws-muted">
-                  {fileFormat ? "Download it from your dashboard any time." : "Pick up where you left off."}
+                  {fileFormat
+                    ? "Download it from your dashboard any time."
+                    : planName
+                      ? `You're on ${planName}. Pick up where you left off.`
+                      : "Pick up where you left off."}
                 </p>
               </div>
             </div>
@@ -185,6 +195,14 @@ export function PurchasePanel({
               >
                 {fileFormat ? `Go to your ${fileFormat}` : "Continue learning"}
               </Link>
+              {upgradeHref && (
+                <Link
+                  href={upgradeHref}
+                  className="mt-2.5 flex h-11 w-full items-center justify-center rounded-full text-[14px] font-medium text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-raised hover:text-ws-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40"
+                >
+                  See upgrade options
+                </Link>
+              )}
             </div>
           ) : scheduling ? (
             <div className="mt-5">

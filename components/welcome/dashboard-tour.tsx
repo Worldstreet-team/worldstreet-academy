@@ -173,7 +173,11 @@ export function DashboardTour({ autoStart, firstName }: { autoStart: boolean; fi
     if (replay) router.replace("/dashboard", { scroll: false })
     if (autoStart) {
       // The layout mounts this off `hasOnboarded`; refresh so it stops.
-      void completeOnboarding().then(() => router.refresh())
+      // 2026-11-12: best effort — offline or after a deploy it rejected unhandled; the tour simply offers itself again.
+      // void completeOnboarding().then(() => router.refresh())
+      void completeOnboarding()
+        .then(() => router.refresh())
+        .catch(() => {})
     }
   }, [autoStart, replay, router])
 

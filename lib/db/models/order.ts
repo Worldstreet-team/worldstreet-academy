@@ -18,7 +18,17 @@ import type { PackageKey } from "./course"
  * document's payment details, 2026-11-05): the money moved outside the wallet,
  * so an admin's approval of the learner's proof (ManualPayment) is what moves
  * it to `paid`, and it never carries a chargeId.
+ *
+ * A plan upgrade (2026-11-12, Owen) is an order of its own: `kind: "upgrade"`,
+ * the difference between the new plan's price and what the seat has paid,
+ * charged under its own reference family (`academy_upgrade_…`, never an
+ * `academy_enroll_…` key). `enrolled` there means the new plan was applied to
+ * the existing enrollment (`enrollment`); `fromPackageKey` is the plan it left.
+ * Older orders have none of these fields and read as purchases.
  */
+
+/** Additive (2026-11-12): null or missing = a purchase. */
+export type OrderKind = "upgrade"
 
 export type OrderStatus =
   | "pending"
@@ -71,6 +81,12 @@ export interface IOrder extends Document {
   /** Additive: null = an Academy sale with no code. */
   attribution: IOrderAttribution | null
   failureCode: string | null
+  /** Additive (2026-11-12): "upgrade" for a plan upgrade; null or missing = a purchase. */
+  kind: OrderKind | null
+  /** Additive (2026-11-12): an upgrade's plan before it. */
+  fromPackageKey: PackageKey | null
+  /** Additive (2026-11-12): the enrollment an upgrade changes. Purchases leave it null. */
+  enrollment: Types.ObjectId | null
   history: IOrderTransition[]
   createdAt: Date
   updatedAt: Date
@@ -105,6 +121,9 @@ const OrderSchema = new Schema<IOrder>(
       default: null,
     },
     failureCode: { type: String, default: null },
+    kind: { type: String, enum: [null, "upgrade"], default: null },
+    fromPackageKey: { type: String, enum: [null, "basic", "standard", "executive"], default: null },
+    enrollment: { type: Schema.Types.ObjectId, ref: "Enrollment", default: null },
     history: [
       {
         status: { type: String, required: true },

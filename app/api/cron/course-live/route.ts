@@ -67,18 +67,23 @@ export async function POST(request: NextRequest) {
       } | null
       if (!user) continue
 
-      const res = await sendCourseLiveEmail({
-        to: user.email ?? "",
-        firstName: user.firstName ?? "",
-        courseTitle: course.title,
-        courseId: course._id.toString(),
-        isPaid: course.pricing === "paid",
-        // A packaged course is quoted "from" its cheapest enabled tier.
-        price: pricingFromPackages(course.packages)?.price ?? course.price ?? 0,
-        fromPrice: sellsPackages(course),
-      })
-      if (res.success) emailsSent++
-      else emailsFailed++
+      // Placeholder addresses (mobile sign-ups) can't receive mail: bell only,
+      // as the reminders cron does.
+      const mailable = Boolean(user.email) && !user.email?.endsWith("@users.noemail")
+      if (mailable) {
+        const res = await sendCourseLiveEmail({
+          to: user.email ?? "",
+          firstName: user.firstName ?? "",
+          courseTitle: course.title,
+          courseId: course._id.toString(),
+          isPaid: course.pricing === "paid",
+          // A packaged course is quoted "from" its cheapest enabled tier.
+          price: pricingFromPackages(course.packages)?.price ?? course.price ?? 0,
+          fromPrice: sellsPackages(course),
+        })
+        if (res.success) emailsSent++
+        else emailsFailed++
+      }
 
       await notifyUser(user._id.toString(), {
         type: "course",

@@ -38,7 +38,7 @@ import {
   type ProgramTab,
 } from "@/lib/dashboard-home"
 import { COMMUNITY_SCOPE_TITLE, type CommunityLink } from "@/lib/communities"
-import { useMyCertificates, useMyPoints, useUpcomingClasses } from "@/lib/hooks/queries"
+import { useClassBoard, useMyCertificates, useMyPoints, useUpcomingClasses } from "@/lib/hooks/queries"
 import { cn } from "@/lib/utils"
 
 /*
@@ -172,6 +172,10 @@ export function UpcomingClassesTile({ now }: { now: number }) {
   // The same split the stat strip counts: waiting classes (host not in yet) lead, then those ahead.
   const { waiting, ahead } = splitClasses(classes, now)
   const rows = [...waiting, ...ahead].slice(0, CLASS_ROWS)
+  // 2026-11-12: this lists scheduled classes only, so while one was live (the
+  // banner at the top says so) the tile read "No classes scheduled". Same query as the banner.
+  const { data: board = [] } = useClassBoard()
+  const liveNow = board.some((b) => b.live)
   return (
     <CardShell>
       <CardHeader
@@ -184,8 +188,14 @@ export function UpcomingClassesTile({ now }: { now: number }) {
       ) : rows.length === 0 ? (
         <TileEmpty
           icon={ClassesGlyph}
-          title="No classes scheduled"
-          description="When your instructor schedules a live class, it shows up here."
+          // title="No classes scheduled"
+          // description="When your instructor schedules a live class, it shows up here."
+          title={liveNow ? "No other classes scheduled" : "No classes scheduled"}
+          description={
+            liveNow
+              ? "Your live class is at the top of the page. New classes show up here when they're scheduled."
+              : "When your instructor schedules a live class, it shows up here."
+          }
           link={{ label: "Meetings", href: "/dashboard/meetings" }}
         />
       ) : (

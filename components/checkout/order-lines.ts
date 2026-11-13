@@ -18,7 +18,15 @@ export function wholeUsd(price: number): string {
 
 /** A wallet figure in cents: "$2,500.00". */
 export function centsUsd(minor: number): string {
-  return `$${(minor / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  // A balance can be negative (a clawback): "-$5.00", not "$-5.00" (2026-11-12). Was:
+  // return `$${(minor / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const sign = minor < 0 ? "-" : ""
+  return `${sign}$${(Math.abs(minor) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
+/** A figure in cents, whole dollars when it is one: "$950", "$950.50" (2026-11-12: upgrade differences). */
+export function minorUsd(minor: number): string {
+  return minor % 100 === 0 ? `$${(minor / 100).toLocaleString("en-US")}` : centsUsd(minor)
 }
 
 /** "2h 41m", "45m" — a total video length. Empty for zero. */

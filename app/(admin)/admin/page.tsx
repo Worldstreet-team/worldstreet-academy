@@ -14,7 +14,8 @@ import { queryKeys } from "@/lib/hooks/queries/keys"
 import { money, formatDateTime, StatusBadge } from "@/components/admin/shared"
 
 export default function AdminOverviewPage() {
-  const { data, isLoading } = useQuery({
+  // 2026-11-12: isSuccess too, for a load that answered null. Was: const { data, isLoading } = useQuery({
+  const { data, isLoading, isSuccess } = useQuery({
     queryKey: queryKeys.adminOverview,
     queryFn: () => getAdminOverview(),
   })
@@ -29,15 +30,28 @@ export default function AdminOverviewPage() {
             subline="Users, money and instructor pipeline at a glance."
           />
 
-          {isLoading || !data ? (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              {Array.from({ length: 8 }).map((_, i) => (
+          {/* 2026-11-12: six tiles (revenue split by channel) sit in three columns. */}
+          {/* 2026-11-12: a failed load (the action returns null) kept the skeleton up forever. */}
+          {isSuccess && !data ? (
+            <p className="rounded-lg border border-ws-hairline bg-ws-surface p-4 text-sm text-ws-danger">
+              Couldn&apos;t load the overview. Reload the page to try again.
+            </p>
+          ) : isLoading || !data ? (
+            // <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            //   {Array.from({ length: 8 }).map((_, i) => (
+            // 2026-11-12: one column on a phone; two cut the revenue figures to "$1484...." Was:
+            // <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {Array.from({ length: 6 }).map((_, i) => (
                 <Skeleton key={i} className="h-24 rounded-lg" />
               ))}
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {/* <div className="grid grid-cols-2 lg:grid-cols-4 gap-3"> */}
+              {/* 2026-11-12: one column on a phone, where two cut the revenue figures to "$1484....". Was:
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3"> */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 <StatTile
                   label="Users"
                   value={data.totals.users.toLocaleString()}
@@ -58,21 +72,54 @@ export default function AdminOverviewPage() {
                   context={`${data.totals.activeEnrollments.toLocaleString()} active enrollments`}
                   icon={<BookOpen size={20} strokeWidth={2} />}
                 />
-                <StatTile
+                {/* 2026-11-12 (Owen): wallet payments and payments recorded outside the platform
+                    apart, with the total kept. Instructor earnings come from wallet sales only. */}
+                {/* <StatTile
                   label="Gross revenue"
                   value={money(data.totals.grossRevenueMinor)}
                   context={`${money(data.totals.pendingEarningsMinor)} pending · ${money(data.totals.clearedEarningsMinor)} cleared to instructors`}
                   icon={<CircleDollarSign size={20} strokeWidth={2} />}
                   tone="gold"
+                /> */}
+                <StatTile
+                  label="Through WorldStreet"
+                  value={money(data.totals.worldStreetRevenueMinor)}
+                  context={`${money(data.totals.pendingEarningsMinor)} pending · ${money(data.totals.clearedEarningsMinor)} cleared to instructors`}
+                  icon={<CircleDollarSign size={20} strokeWidth={2} />}
+                  tone="gold"
+                />
+                <StatTile
+                  label="Recorded outside"
+                  value={money(data.totals.outsideRevenueMinor)}
+                  context="Paid outside the platform, recorded by an admin"
+                  icon={<CircleDollarSign size={20} strokeWidth={2} />}
+                />
+                <StatTile
+                  label="Gross revenue"
+                  value={money(data.totals.grossRevenueMinor)}
+                  context="Both together"
+                  icon={<CircleDollarSign size={20} strokeWidth={2} />}
                 />
               </div>
 
               {/* 14-day revenue */}
               <div className="rounded-lg border border-ws-hairline bg-ws-surface p-4">
-                <div className="flex items-center justify-between mb-3">
+                {/* 2026-11-12: the total split by channel; each bar stacks WorldStreet (gold) under outside (grey). */}
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-3">
                   <h2 className="text-sm font-semibold text-ws-primary">Revenue — last 14 days</h2>
-                  <span className="text-xs tabular-nums text-ws-muted">
+                  {/* <span className="text-xs tabular-nums text-ws-muted">
                     {money(data.revenueByDay.reduce((s, d) => s + d.minor, 0))} total
+                  </span> */}
+                  <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs tabular-nums text-ws-muted">
+                    <span>{money(data.revenueByDay.reduce((s, d) => s + d.minor, 0))} total</span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-ws-brand" aria-hidden />
+                      {money(data.revenueByDay.reduce((s, d) => s + d.worldStreetMinor, 0))} through WorldStreet
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-ws-subtle" aria-hidden />
+                      {money(data.revenueByDay.reduce((s, d) => s + d.outsideMinor, 0))} recorded outside
+                    </span>
                   </span>
                 </div>
                 {(() => {
@@ -80,16 +127,35 @@ export default function AdminOverviewPage() {
                   return (
                     <div className="flex items-end gap-1.5 h-24">
                       {data.revenueByDay.map((d) => (
-                        <div key={d.date} className="flex-1 flex flex-col items-center gap-1 group/bar">
+                        // 2026-11-12: h-full + justify-end give the bar's % height something to resolve
+                        // against; without them every bar was 0px tall and the chart looked empty. Was:
+                        // <div key={d.date} className="flex-1 flex flex-col items-center gap-1 group/bar">
+                        <div key={d.date} className="flex-1 h-full flex flex-col items-center justify-end gap-1 group/bar">
                           <span className="text-[8px] tabular-nums text-ws-muted opacity-0 group-hover/bar:opacity-100 transition-opacity">
                             {d.minor > 0 ? money(d.minor) : ""}
                           </span>
-                          <div
+                          {/* <div
                             className={`w-full rounded-t-md transition-colors ${
                               d.minor > 0 ? "bg-ws-brand" : "bg-ws-track"
                             }`}
                             style={{ height: `${Math.max(3, (d.minor / max) * 100)}%` }}
-                          />
+                          /> */}
+                          <div
+                            className={`flex w-full flex-col overflow-hidden rounded-t-md ${d.minor > 0 ? "" : "bg-ws-track"}`}
+                            style={{ height: `${Math.max(3, (d.minor / max) * 100)}%` }}
+                            title={
+                              d.minor > 0
+                                ? `${money(d.worldStreetMinor)} through WorldStreet · ${money(d.outsideMinor)} recorded outside`
+                                : undefined
+                            }
+                          >
+                            {d.outsideMinor > 0 && (
+                              <div className="w-full bg-ws-subtle" style={{ flexGrow: d.outsideMinor, flexBasis: 0 }} />
+                            )}
+                            {d.worldStreetMinor > 0 && (
+                              <div className="w-full bg-ws-brand" style={{ flexGrow: d.worldStreetMinor, flexBasis: 0 }} />
+                            )}
+                          </div>
                           <span className="text-[8px] tabular-nums text-ws-subtle">
                             {new Date(d.date + "T00:00:00").toLocaleDateString("en-US", { day: "numeric" })}
                           </span>
@@ -100,7 +166,10 @@ export default function AdminOverviewPage() {
                 })()}
               </div>
 
-              <div className="grid lg:grid-cols-2 gap-4">
+              {/* 2026-11-12: minmax(0,1fr) tracks; a long payment reference widened the track past a
+                  phone's edge, hiding the status badges and times. Was:
+              <div className="grid lg:grid-cols-2 gap-4"> */}
+              <div className="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-2 gap-4">
                 {/* Recent applications */}
                 <div className="rounded-lg border border-ws-hairline bg-ws-surface p-4">
                   <div className="flex items-center justify-between mb-3">

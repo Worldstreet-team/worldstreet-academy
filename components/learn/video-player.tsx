@@ -237,7 +237,9 @@ export function VideoPlayer({
     const interval = setInterval(() => {
       const video = videoRef.current
       if (!video || video.paused || !isFinite(video.duration)) return
-      saveWatchProgress(courseId, lessonId, video.currentTime, video.duration)
+      // 2026-11-12: best effort — offline or after a deploy it rejected unhandled every 5s.
+      // saveWatchProgress(courseId, lessonId, video.currentTime, video.duration)
+      saveWatchProgress(courseId, lessonId, video.currentTime, video.duration).catch(() => {})
     }, 5000)
     return () => clearInterval(interval)
   }, [courseId, lessonId])
@@ -248,7 +250,8 @@ export function VideoPlayer({
     const saveOnLeave = () => {
       const video = videoRef.current
       if (!video || !isFinite(video.duration)) return
-      saveWatchProgress(courseId, lessonId, video.currentTime, video.duration)
+      // saveWatchProgress(courseId, lessonId, video.currentTime, video.duration)
+      saveWatchProgress(courseId, lessonId, video.currentTime, video.duration).catch(() => {})
     }
     const onVisibilityChange = () => {
       if (document.visibilityState === "hidden") saveOnLeave()

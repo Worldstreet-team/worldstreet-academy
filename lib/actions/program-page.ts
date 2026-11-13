@@ -3,7 +3,8 @@
 import mongoose from "mongoose"
 import connectDB from "@/lib/db"
 import { Course, Lesson, Review, type LessonType, type PackageKey } from "@/lib/db/models"
-import { PACKAGE_RANK, effectiveLessonTier } from "@/lib/entitlements"
+import { ON_SALE_FILTER, PACKAGE_RANK, effectiveLessonTier } from "@/lib/entitlements"
+import { OPEN_KINDS_FILTER } from "@/lib/marketplace"
 import { countryName } from "@/lib/countries"
 import { maskedName } from "@/lib/masked-name"
 import { getCourseRatingSummary, type CourseRatingSummary } from "@/lib/actions/reviews"
@@ -132,7 +133,9 @@ export async function fetchProgramReviews(
     const limit = Number.isInteger(pageSize) ? Math.min(Math.max(pageSize, 1), MAX_PAGE_SIZE) : 6
 
     await connectDB()
-    const published = await Course.exists({ _id: courseId, status: "published" })
+    // Only a course with a public page (2026-11-12): this action is called from the
+    // browser with any id, and a closed marketplace or not-on-sale course has none.
+    const published = await Course.exists({ _id: courseId, status: "published", ...ON_SALE_FILTER, ...OPEN_KINDS_FILTER })
     if (!published) return EMPTY_PAGE
 
     const match = {

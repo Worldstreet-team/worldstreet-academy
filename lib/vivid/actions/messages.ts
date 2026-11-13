@@ -107,7 +107,14 @@ export async function vividSearchUsers(p: { query: string; limit?: number }) {
     const { searchUsers } = await import("@/lib/actions/messages")
     const users = await searchUsers(p.query)
 
-    const limited = Array.isArray(users) ? users.slice(0, p.limit || 15) : []
+    // 2026-11-12: searchUsers answers { success, users }, never an array, so this always listed
+    // nobody. It reads the users list now (already limited to who the caller may contact). Was:
+    // const limited = Array.isArray(users) ? users.slice(0, p.limit || 15) : []
+    const found = users.success ? users.users ?? [] : []
+    const limited = found.slice(0, p.limit || 15).map((u) => {
+      const [firstName = "", ...rest] = u.name.split(" ")
+      return { id: u.id, firstName, lastName: rest.join(" "), avatarUrl: u.avatar ?? undefined, role: u.role } as Doc
+    })
     return {
       success: true,
       users: limited.map((u: Doc) => ({

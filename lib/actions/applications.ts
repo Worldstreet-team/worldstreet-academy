@@ -44,8 +44,50 @@ import {
   type InterviewMode,
   type InterviewPreference,
 } from "@/lib/careers"
+import { COHORT_TIME_ZONE } from "@/lib/cohort"
+import {
+  applicationDocumentKeyPrefix,
+  generatePresignedDownloadUrl,
+  hasPrivateResourceBucket,
+  R2_RESOURCE_BUCKET,
+} from "@/lib/r2"
 
 const PAGE_SIZE = 20
+
+/** Server actions take any argument: an id is checked as 24-hex before any query (an object is a Mongo operator). */
+function isObjectId(value: unknown): value is string {
+  return typeof value === "string" && /^[a-f0-9]{24}$/.test(value)
+}
+
+/** Longest reviewer note or decision note (2026-11-12): the decision note is emailed. */
+const NOTE_MAX = 2000
+
+/** The schema's rejection reasons; checked first, since the decision is written with a targeted update. */
+const REJECTION_REASONS: readonly string[] = [
+  "not_enough_experience",
+  "content_fit",
+  "quality_concerns",
+  "incomplete_application",
+  "other",
+]
+
+/** The interview scorecard as a server action may receive it (2026-11-12: NaN scores and any recommendation were stored). */
+const ScorecardInput = z.object({
+  expertiseDepth: z.number().finite(),
+  communication: z.number().finite(),
+  productionReadiness: z.number().finite(),
+  recommendation: z.enum(["approve", "reject", "unsure"]),
+  notes: z.string().max(NOTE_MAX, "Keep the notes under 2,000 characters").optional(),
+})
+
+/**
+ * A time as the Academy reads it, zone included (2026-11-12). The server runs
+ * in UTC, so a bare toLocaleString() printed interview times an hour early,
+ * unlabelled, in the applicant's notice and the application's history.
+ */
+function lagosWhen(at: Date): string {
+  return `${at.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: COHORT_TIME_ZONE })} (Lagos time)`
+}
 
 /* ═══════════════════════ Shared types ═══════════════════════ */
 
@@ -72,6 +114,13 @@ export type ApplicationAnswersInput = {
   readyToCommit?: boolean
   /** Optional additional PDF, uploaded like the CV. */
   extraDocumentUrl?: string
+  /**
+   * 2026-11-12: an uploaded CV / additional PDF, as the private-bucket key
+   * getDocumentUploadUrl returned (input only — the views never carry a key).
+   * Accepted only inside the applicant's own folder; the URL beside it is then dropped.
+   */
+  cvKey?: string
+  extraDocumentKey?: string
   /** Terms-of-teaching acceptance — required at submit, recorded with a timestamp. */
   termsAccepted?: boolean
   /** Staff hiring (2026-11-05): office, online or either — required at submit, absent on older applications. */
@@ -103,10 +152,38 @@ function teachingAnswersView(answers: IApplicationAnswers) {
     passion: answers.passion ?? undefined,
     passionReason: answers.passionReason || undefined,
     readyToCommit: answers.readyToCommit ?? undefined,
-    extraDocumentUrl: answers.extraDocumentUrl ?? undefined,
+    // 2026-11-12: once the PDF is in the private bucket, the old public link beside it is never shown.
+    // extraDocumentUrl: answers.extraDocumentUrl ?? undefined,
+    extraDocumentUrl: answers.extraDocumentKey ? undefined : (answers.extraDocumentUrl ?? undefined),
     interviewPreference: answers.interviewPreference ?? undefined,
   }
 }
+
+/* ═══════════════════════ Application documents (2026-11-12) ═══════════════════════ */
+
+/**
+ * A key getDocumentUploadUrl minted for this user: their own folder, then
+ * `<ms timestamp>-<24 hex>.pdf` (lib/r2.ts generateApplicationDocumentKey).
+ * The only shape submit accepts — server actions take any argument.
+ */
+function isUploadedDocumentKey(key: string, userId: string): boolean {
+  const prefix = applicationDocumentKeyPrefix(userId)
+  return key.startsWith(prefix) && /^\d{10,16}-[a-f0-9]{24}\.pdf$/.test(key.slice(prefix.length))
+}
+
+/**
+ * A stored key that may be signed for this applicant: inside their folder, one
+ * plain file name (also the migration's `migrated-<old name>.pdf`).
+ */
+function isApplicantDocumentKey(key: unknown, userId: string): key is string {
+  if (typeof key !== "string") return false
+  const prefix = applicationDocumentKeyPrefix(userId)
+  const name = key.slice(prefix.length)
+  return key.startsWith(prefix) && /^[A-Za-z0-9._-]{1,200}$/.test(name) && !name.includes("..")
+}
+
+/** An uploaded-document key from the form: absent, or one this applicant uploaded. */
+const DocumentKeyInput = z.string().max(300).optional()
 
 /** Days a rejected applicant must wait before re-applying. */
 const REAPPLY_COOLDOWN_DAYS = 30
@@ -227,6 +304,18 @@ function sanitizeUrl(value?: string): string | null {
   return v
 }
 
+/** 2026-11-12: an empty link, or one that reads as an http(s) address with a dotted host once prefixed (sanitizeUrl). */
+function isWebLink(value?: string): boolean {
+  const v = sanitizeUrl(value)
+  if (!v) return true
+  try {
+    const url = new URL(v)
+    return (url.protocol === "https:" || url.protocol === "http:") && url.hostname.includes(".")
+  } catch {
+    return false
+  }
+}
+
 export async function submitInstructorApplication(input: ApplicationAnswersInput) {
   try {
     await connectDB()
@@ -273,12 +362,42 @@ export async function submitInstructorApplication(input: ApplicationAnswersInput
     if (!input.termsAccepted) {
       return { success: false, error: "Please accept the instructor terms to continue" }
     }
+    // 2026-11-12: links were only prefixed, so "not a url" was stored as "https://not a url" and
+    // reviewers got a dead link. Each pasted link must now be a web address.
+    const links: [string | undefined, string][] = [
+      [input.sampleVideoUrl, "sample video"],
+      [input.cvKey ? undefined : input.cvUrl, "CV"],
+      [input.extraDocumentKey ? undefined : input.extraDocumentUrl, "additional document"],
+      [input.portfolioUrl, "portfolio"],
+      [input.linkedin, "LinkedIn"],
+      [input.twitter, "Twitter / X"],
+      [input.website, "website"],
+    ]
+    for (const [value, label] of links) {
+      if (!isWebLink(value)) {
+        return { success: false, error: `Check the ${label} link: paste its full address, like https://example.com/…` }
+      }
+    }
     // Minimum-profile check — reviewer sees a real name, and payments/KYC need one later.
     if (!user.firstName?.trim() || !user.lastName?.trim()) {
       return {
         success: false,
         error: "Add your first and last name to your profile before applying",
       }
+    }
+    // 2026-11-12: uploaded PDFs arrive as private-bucket keys, accepted only inside this applicant's own folder.
+    const cvKeyInput = DocumentKeyInput.safeParse(input.cvKey || undefined)
+    const extraKeyInput = DocumentKeyInput.safeParse(input.extraDocumentKey || undefined)
+    if (!cvKeyInput.success || (cvKeyInput.data && !isUploadedDocumentKey(cvKeyInput.data, user.id))) {
+      return { success: false, error: "Upload your CV again" }
+    }
+    if (!extraKeyInput.success || (extraKeyInput.data && !isUploadedDocumentKey(extraKeyInput.data, user.id))) {
+      return { success: false, error: "Upload your additional document again" }
+    }
+    const cvKey = cvKeyInput.data ?? null
+    const extraDocumentKey = extraKeyInput.data ?? null
+    if ((cvKey || extraDocumentKey) && !hasPrivateResourceBucket()) {
+      return { success: false, error: "PDF uploads aren't available right now. Paste a link to your document instead." }
     }
 
     const existing = await InstructorApplication.findOne({
@@ -301,7 +420,9 @@ export async function submitInstructorApplication(input: ApplicationAnswersInput
       if (eligibleAt.getTime() > Date.now()) {
         return {
           success: false,
-          error: `You can re-apply from ${eligibleAt.toLocaleDateString("en-US", { dateStyle: "medium" })}`,
+          // 2026-11-12: the day as Lagos reads it, not the server's UTC day.
+          // error: `You can re-apply from ${eligibleAt.toLocaleDateString("en-US", { dateStyle: "medium" })}`,
+          error: `You can re-apply from ${eligibleAt.toLocaleDateString("en-US", { dateStyle: "medium", timeZone: COHORT_TIME_ZONE })}`,
         }
       }
     }
@@ -320,9 +441,14 @@ export async function submitInstructorApplication(input: ApplicationAnswersInput
         linkedin: sanitizeUrl(input.linkedin),
         website: sanitizeUrl(input.website),
         sampleVideoUrl: sanitizeUrl(input.sampleVideoUrl),
-        cvUrl: sanitizeUrl(input.cvUrl),
+        // 2026-11-12: an uploaded PDF is stored as its private key, and a link beside it is dropped.
+        // cvUrl: sanitizeUrl(input.cvUrl),
+        cvUrl: cvKey ? null : sanitizeUrl(input.cvUrl),
         ...teaching.data,
-        extraDocumentUrl: sanitizeUrl(input.extraDocumentUrl),
+        // extraDocumentUrl: sanitizeUrl(input.extraDocumentUrl),
+        extraDocumentUrl: extraDocumentKey ? null : sanitizeUrl(input.extraDocumentUrl),
+        ...(cvKey ? { cvKey } : {}),
+        ...(extraDocumentKey ? { extraDocumentKey } : {}),
         interviewPreference,
       },
       termsAcceptedAt: new Date(),
@@ -419,7 +545,9 @@ export async function getMyInstructorApplication(): Promise<MyApplication | null
         linkedin: app.answers.linkedin ?? undefined,
         website: app.answers.website ?? undefined,
         sampleVideoUrl: app.answers.sampleVideoUrl ?? undefined,
-        cvUrl: app.answers.cvUrl ?? undefined,
+        // 2026-11-12: once the CV is in the private bucket, the old public link beside it is never shown.
+        // cvUrl: app.answers.cvUrl ?? undefined,
+        cvUrl: app.answers.cvKey ? undefined : (app.answers.cvUrl ?? undefined),
         ...teachingAnswersView(app.answers),
       },
       decisionNote: app.decisionNote ?? "",
@@ -609,12 +737,20 @@ export type AdminApplicationDetail = AdminApplicationRow & {
   termsAcceptedAt: string | null
   /** Null means a teaching demonstration was never requested. */
   demo: AdminDemoView | null
+  /**
+   * 2026-11-12: which uploaded PDFs are held in the private bucket. Each opens
+   * through getApplicationDocumentUrl (a 5-minute signed link); the key itself
+   * never leaves the server. False with a URL in `answers` = a pasted link or a
+   * legacy public upload not yet moved.
+   */
+  documents: { cv: boolean; extra: boolean }
 }
 
 export async function adminGetApplication(applicationId: string): Promise<AdminApplicationDetail | null> {
   try {
     await connectDB()
     await requireAdmin()
+    if (!isObjectId(applicationId)) return null
 
     const a = await InstructorApplication.findById(applicationId)
       .populate("user", "firstName lastName email avatarUrl createdAt")
@@ -683,9 +819,12 @@ export async function adminGetApplication(applicationId: string): Promise<AdminA
         linkedin: a.answers.linkedin ?? undefined,
         website: a.answers.website ?? undefined,
         sampleVideoUrl: a.answers.sampleVideoUrl ?? undefined,
-        cvUrl: a.answers.cvUrl ?? undefined,
+        // 2026-11-12: once the CV is in the private bucket, the old public link beside it is never shown.
+        // cvUrl: a.answers.cvUrl ?? undefined,
+        cvUrl: a.answers.cvKey ? undefined : (a.answers.cvUrl ?? undefined),
         ...teachingAnswersView(a.answers),
       },
+      documents: { cv: Boolean(a.answers.cvKey), extra: Boolean(a.answers.extraDocumentKey) },
       reviewerNotes: (a.reviewerNotes ?? [])
         .map((n) => ({ byName: n.byName, note: n.note, at: new Date(n.at).toISOString() }))
         .reverse(),
@@ -724,6 +863,45 @@ export async function adminGetApplication(applicationId: string): Promise<AdminA
   } catch (error) {
     console.error("Admin get application error:", error)
     return null
+  }
+}
+
+/**
+ * A 5-minute signed link to an application's uploaded CV or additional PDF
+ * (2026-11-12) — for an admin or the applicant themself, minted on click.
+ * Only a key stored on the application, inside the applicant's own folder, is
+ * ever signed. Legacy public-URL documents aren't served here: the admin page
+ * keeps their old link until the migration records a key.
+ */
+export async function getApplicationDocumentUrl(
+  applicationId: string,
+  which: "cv" | "extra"
+): Promise<{ success: true; data: { url: string } } | { success: false; error: string }> {
+  try {
+    await connectDB()
+    const user = await getCurrentUser()
+    if (!user) return { success: false, error: "You need to be signed in" }
+    if (!isObjectId(applicationId) || (which !== "cv" && which !== "extra")) {
+      return { success: false, error: "Document not found" }
+    }
+    if (!hasPrivateResourceBucket()) return { success: false, error: "Documents aren't available right now" }
+
+    const app = await InstructorApplication.findById(applicationId)
+      .select("user answers.cvKey answers.extraDocumentKey")
+      .lean()
+    if (!app) return { success: false, error: "Document not found" }
+    const applicantId = app.user.toString()
+    // Mongo is authoritative for role (requireAdmin's rule); anyone else gets the same answer as a missing file.
+    if (applicantId !== user.id && user.role !== "ADMIN") return { success: false, error: "Document not found" }
+
+    const key = which === "cv" ? app.answers?.cvKey : app.answers?.extraDocumentKey
+    if (!isApplicantDocumentKey(key, applicantId)) return { success: false, error: "Document not found" }
+
+    const url = await generatePresignedDownloadUrl(key, { expiresIn: 300, bucket: R2_RESOURCE_BUCKET })
+    return { success: true, data: { url } }
+  } catch (error) {
+    console.error("Get application document URL error:", error)
+    return { success: false, error: "Couldn't open the document — try again" }
   }
 }
 
@@ -827,7 +1005,9 @@ async function scheduleInterviewCore(
 
   // Application state: interview_scheduled + pointer + history; proposed slots
   // are consumed by the pick (or superseded by a direct schedule).
-  const when = scheduledAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })
+  // 2026-11-12: Lagos time, labelled (the server's UTC read an hour early).
+  // const when = scheduledAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })
+  const when = lagosWhen(scheduledAt)
   if (isDemo) {
     app.demo = {
       requested: true,
@@ -871,7 +1051,9 @@ async function scheduleInterviewCore(
       : rescheduled
         ? "Your interview was rescheduled"
         : "Interview scheduled",
-    body: `${scheduledAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })} — with ${host.name}`,
+    // 2026-11-12: Lagos time, labelled.
+    // body: `${scheduledAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })} — with ${host.name}`,
+    body: `${when} — with ${host.name}`,
     href: "/dashboard/become-instructor",
   })
   if (applicant.email) {
@@ -932,7 +1114,9 @@ async function scheduleOfficeInterview(
   app.interviewMeetingId = null
   app.proposedSlots = []
   if (app.status !== "interview_scheduled") app.status = "interview_scheduled"
-  const when = scheduledAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })
+  // 2026-11-12: Lagos time, labelled — the applicant comes to the office by this notice.
+  // const when = scheduledAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })
+  const when = lagosWhen(scheduledAt)
   app.history.push({
     status: "interview_scheduled",
     at: new Date(),
@@ -1017,6 +1201,7 @@ export async function adminScheduleInterview(
     if (scheduledAt.getTime() < Date.now() - 60_000) {
       return { success: false, error: "Interview time must be in the future" }
     }
+    if (!isObjectId(applicationId)) return { success: false, error: "Application not found" }
 
     const app = await InstructorApplication.findById(applicationId).populate(
       "user",
@@ -1041,7 +1226,11 @@ export async function adminScheduleInterview(
     return { success: true, ...result }
   } catch (error) {
     console.error("Schedule interview error:", error)
-    return { success: false, error: "Failed to schedule interview" }
+    // return { success: false, error: "Failed to schedule interview" } — 2026-11-12: say what to do
+    return {
+      success: false,
+      error: "Couldn't book the interview. For an online interview the video room couldn't be created: try again, or book it at the office.",
+    }
   }
 }
 
@@ -1180,14 +1369,20 @@ export async function adminProposeSlots(
       return { success: false, error: place.error.issues[0]?.message ?? "Choose how the interview is held" }
     }
 
+    // 2026-11-12: a slot note is capped, and the same time offered twice is one slot.
+    // const parsed = (slots ?? [])
+    //   .map((s) => ({ at: new Date(s.at), note: s.note?.trim() || undefined }))
+    //   .filter((s) => !isNaN(s.at.getTime()) && s.at.getTime() > Date.now())
     const parsed = (slots ?? [])
-      .map((s) => ({ at: new Date(s.at), note: s.note?.trim() || undefined }))
+      .map((s) => ({ at: new Date(s.at), note: s.note?.trim().slice(0, 200) || undefined }))
       .filter((s) => !isNaN(s.at.getTime()) && s.at.getTime() > Date.now())
+      .filter((s, i, all) => all.findIndex((o) => o.at.getTime() === s.at.getTime()) === i)
       .sort((a, b) => a.at.getTime() - b.at.getTime())
       .slice(0, 3)
     if (parsed.length === 0) {
       return { success: false, error: "Propose at least one future time slot" }
     }
+    if (!isObjectId(applicationId)) return { success: false, error: "Application not found" }
 
     const app = await InstructorApplication.findById(applicationId).populate(
       "user",
@@ -1253,6 +1448,7 @@ export async function pickInterviewSlot(applicationId: string, slotAtISO: string
     await connectDB()
     const user = await getCurrentUser()
     if (!user) return { success: false, error: "Not authenticated" }
+    if (!isObjectId(applicationId)) return { success: false, error: "Application not found" }
 
     const app = await InstructorApplication.findOne({
       _id: applicationId,
@@ -1272,8 +1468,13 @@ export async function pickInterviewSlot(applicationId: string, slotAtISO: string
     }
 
     // Host = the admin who proposed the slots (fallback: any admin).
+    // 2026-11-12: the proposer hosts only while still an admin: their admin access may have
+    // been removed since, and a non-admin would then host the interview room.
+    // let host = app.slotsProposedBy
+    //   ? await User.findById(app.slotsProposedBy).select("firstName lastName avatarUrl").lean()
+    //   : null
     let host = app.slotsProposedBy
-      ? await User.findById(app.slotsProposedBy).select("firstName lastName avatarUrl").lean()
+      ? await User.findOne({ _id: app.slotsProposedBy, role: "ADMIN" }).select("firstName lastName avatarUrl").lean()
       : null
     if (!host) {
       host = await User.findOne({ role: "ADMIN" }).select("firstName lastName avatarUrl").lean()
@@ -1298,7 +1499,9 @@ export async function pickInterviewSlot(applicationId: string, slotAtISO: string
     void notifyUser(host._id.toString(), {
       type: "meeting",
       title: "Interview slot confirmed",
-      body: `${applicantName} picked ${new Date(picked.at).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}`,
+      // 2026-11-12: Lagos time, labelled.
+      // body: `${applicantName} picked ${new Date(picked.at).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}`,
+      body: `${applicantName} picked ${lagosWhen(new Date(picked.at))}`,
       href: `/admin/applications/${app._id.toString()}`,
     })
 
@@ -1314,6 +1517,7 @@ export async function adminStartApplicationReview(applicationId: string) {
   try {
     await connectDB()
     const admin = await requireAdmin()
+    if (!isObjectId(applicationId)) return { success: false, error: "Application not found" }
 
     const app = await InstructorApplication.findById(applicationId)
     if (!app) return { success: false, error: "Application not found" }
@@ -1360,8 +1564,12 @@ export async function adminAddApplicationNote(applicationId: string, note: strin
     await connectDB()
     const admin = await requireAdmin()
 
-    const trimmed = note.trim()
+    if (!isObjectId(applicationId)) return { success: false, error: "Application not found" }
+    // 2026-11-12: a non-string note threw; a note is capped like the decision note.
+    // const trimmed = note.trim()
+    const trimmed = typeof note === "string" ? note.trim() : ""
     if (!trimmed) return { success: false, error: "Note can't be empty" }
+    if (trimmed.length > NOTE_MAX) return { success: false, error: "Keep the note under 2,000 characters" }
 
     const app = await InstructorApplication.findByIdAndUpdate(
       applicationId,
@@ -1401,12 +1609,22 @@ export async function adminDecideApplication(
   try {
     await connectDB()
     const admin = await requireAdmin()
+    if (!isObjectId(applicationId)) return { success: false, error: "Application not found" }
+    // 2026-11-12: a server action takes any argument; only these two may be written as the status.
+    if (decision !== "approved" && decision !== "rejected") return { success: false, error: "Choose approve or reject" }
+    if (rejectionReason !== undefined && !REJECTION_REASONS.includes(rejectionReason)) {
+      return { success: false, error: "Choose a reason" }
+    }
+    if (typeof note === "string" && note.trim().length > NOTE_MAX) {
+      return { success: false, error: "Keep the note under 2,000 characters" }
+    }
 
     const app = await InstructorApplication.findById(applicationId)
     if (!app) return { success: false, error: "Application not found" }
     if (!ACTIVE_APPLICATION_STATUSES.includes(app.status)) {
       return { success: false, error: `Application is already ${app.status}` }
     }
+    const fromStatus = app.status
 
     // Staff tutors are hired through an interview (owner, 2026-11-05): no
     // approval before one is booked and its time has come. Rejection may
@@ -1425,9 +1643,12 @@ export async function adminDecideApplication(
     }
 
     const user = await User.findById(app.user)
-    if (!user) return { success: false, error: "Applicant no longer exists" }
+    // 2026-11-12: an applicant who deleted their account can still be rejected, so the
+    // application leaves the queue; only approval needs the account.
+    // if (!user) return { success: false, error: "Applicant no longer exists" }
+    if (!user && decision === "approved") return { success: false, error: "Applicant no longer exists" }
 
-    const decisionNote = note?.trim() ?? ""
+    const decisionNote = typeof note === "string" ? note.trim() : ""
     const adminName = `${admin.firstName} ${admin.lastName}`.trim()
 
     app.status = decision
@@ -1438,7 +1659,32 @@ export async function adminDecideApplication(
       app.rejectionReason = rejectionReason
     }
     app.history.push({ status: decision, at: new Date(), by: adminName, note: decisionNote })
-    await app.save()
+    // 2026-11-12: claimed on the status read above, so two admins deciding at once can't both
+    // land (an approve and a reject together left the application "rejected" with its applicant
+    // promoted, and a double approve sent every email twice). Only the claim's winner goes on.
+    // await app.save()
+    const claimed = await InstructorApplication.updateOne(
+      { _id: app._id, status: fromStatus },
+      {
+        $set: {
+          status: decision,
+          decidedBy: admin.id,
+          decidedAt: app.decidedAt,
+          decisionNote,
+          ...(decision === "rejected" && rejectionReason ? { rejectionReason } : {}),
+        },
+        $push: { history: { status: decision, at: app.decidedAt, by: adminName, note: decisionNote } },
+      }
+    )
+    if (claimed.matchedCount === 0) {
+      return { success: false, error: "This application changed in the meantime. Reload and try again." }
+    }
+
+    if (!user) {
+      revalidatePath(`/admin/applications/${applicationId}`)
+      revalidatePath("/admin/applications")
+      return { success: true }
+    }
 
     // Targeted $set updates — never doc.save(): legacy user rows that fail
     // full-document validation (e.g. seed accounts without authUserId) must
@@ -1524,6 +1770,7 @@ export async function adminAssignApplication(applicationId: string, assign: bool
   try {
     await connectDB()
     const admin = await requireAdmin()
+    if (!isObjectId(applicationId)) return { success: false, error: "Application not found" }
 
     const app = await InstructorApplication.findById(applicationId)
     if (!app) return { success: false, error: "Application not found" }
@@ -1561,14 +1808,26 @@ export async function adminSaveScorecard(
   try {
     await connectDB()
     const admin = await requireAdmin()
+    if (!isObjectId(applicationId)) return { success: false, error: "Application not found" }
+    // 2026-11-12: validated first — findByIdAndUpdate skips the schema's checks.
+    const checked = ScorecardInput.safeParse(input)
+    if (!checked.success) return { success: false, error: checked.error.issues[0]?.message ?? "Check the scorecard" }
+    const valid = checked.data
 
     const clamp = (v: number) => Math.min(5, Math.max(1, Math.round(v)))
+    // 2026-11-12: built from the validated input.
+    // const scorecard: IScorecard = {
+    //   expertiseDepth: clamp(input.expertiseDepth),
+    //   communication: clamp(input.communication),
+    //   productionReadiness: clamp(input.productionReadiness),
+    //   recommendation: input.recommendation,
+    //   notes: input.notes?.trim() ?? "",
     const scorecard: IScorecard = {
-      expertiseDepth: clamp(input.expertiseDepth),
-      communication: clamp(input.communication),
-      productionReadiness: clamp(input.productionReadiness),
-      recommendation: input.recommendation,
-      notes: input.notes?.trim() ?? "",
+      expertiseDepth: clamp(valid.expertiseDepth),
+      communication: clamp(valid.communication),
+      productionReadiness: clamp(valid.productionReadiness),
+      recommendation: valid.recommendation,
+      notes: valid.notes?.trim() ?? "",
       byName: `${admin.firstName} ${admin.lastName}`.trim(),
       at: new Date(),
     }
@@ -1602,9 +1861,16 @@ export async function adminExportApplicationsCsv(): Promise<
       .populate("user", "firstName lastName email")
       .lean()
 
+    // 2026-11-12: names and headlines are typed by applicants; a leading = + - @ (or a tab or
+    // carriage return) would run as a formula in a spreadsheet, so it is prefixed with '.
+    // const esc = (v: unknown) => {
+    //   const s = String(v ?? "")
+    //   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+    // }
     const esc = (v: unknown) => {
-      const s = String(v ?? "")
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+      const raw = String(v ?? "")
+      const s = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw
+      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
     }
     const header = [
       "submitted_at",
@@ -1618,6 +1884,8 @@ export async function adminExportApplicationsCsv(): Promise<
       "recommendation",
       "decided_at",
       "rejection_reason",
+      // 2026-11-12: whether a CV was given (uploaded or linked) — never the link itself.
+      "has_cv",
     ].join(",")
 
     const lines = rows.map((a) => {
@@ -1634,6 +1902,7 @@ export async function adminExportApplicationsCsv(): Promise<
         esc(a.scorecard?.recommendation ?? ""),
         esc(a.decidedAt ? new Date(a.decidedAt).toISOString() : ""),
         esc(a.rejectionReason ?? ""),
+        esc(a.answers?.cvKey || a.answers?.cvUrl ? "yes" : "no"),
       ].join(",")
     })
 

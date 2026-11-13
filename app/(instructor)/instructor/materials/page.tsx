@@ -5,11 +5,15 @@ import { PageHeader } from "@/components/shared/page-header"
 import { CardHeader, CardShell, EmptyState } from "@/components/ui/system"
 import { getMyCourseMaterials, type FacultyMaterial } from "@/lib/actions/resources"
 import { RESOURCE_KIND_LABEL, fileSizeLabel } from "@/lib/faculty-format"
+import { MaterialDownloadButton } from "./material-download-button"
 
 /*
  * Course Materials (institutional blueprint §16): each program's downloadable
  * materials, read only. Uploads and removals stay in the course page's
  * materials section ("Manage"). Metadata only — no file or link leaves here.
+ * 2026-11-12 (Owen): it lists the programs a tutor is assigned to teach too,
+ * without "Manage" (adding materials stays with the owner), and every row has
+ * a Download that mints its signed link on click.
  */
 
 function materialMeta(m: FacultyMaterial): string {
@@ -53,7 +57,13 @@ export default async function InstructorMaterialsPage() {
               </p>
               {withMaterials.map((p) => (
                 <CardShell key={p.id} className="h-auto">
-                  <CardHeader title={p.title} subtitle={count(p.materials.length)} link={{ label: "Manage", href: p.manageHref }} />
+                  {/* 2026-11-12: no "Manage" on a program they're assigned to teach. */}
+                  {/* <CardHeader title={p.title} subtitle={count(p.materials.length)} link={{ label: "Manage", href: p.manageHref }} /> */}
+                  <CardHeader
+                    title={p.title}
+                    subtitle={p.manageHref ? count(p.materials.length) : `${count(p.materials.length)} · You teach this program`}
+                    link={p.manageHref ? { label: "Manage", href: p.manageHref } : undefined}
+                  />
                   <ul className="divide-y divide-border border-t border-border">
                     {p.materials.map((m) => (
                       <li key={m.id} className="flex items-center gap-3 px-4 py-3">
@@ -66,6 +76,7 @@ export default async function InstructorMaterialsPage() {
                             Free preview
                           </span>
                         )}
+                        <MaterialDownloadButton resourceId={m.id} title={m.title} isLink={m.kind === "link"} />
                       </li>
                     ))}
                   </ul>
@@ -82,13 +93,21 @@ export default async function InstructorMaterialsPage() {
                   <ul className="divide-y divide-border border-t border-border">
                     {empty.map((p) => (
                       <li key={p.id}>
-                        <Link
-                          href={p.manageHref}
-                          className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-foreground/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                        >
-                          <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{p.title}</span>
-                          <span className="shrink-0 text-[13px] font-medium text-muted-foreground">Manage</span>
-                        </Link>
+                        {/* 2026-11-12: a program they're assigned to teach has nothing to manage here. */}
+                        {p.manageHref ? (
+                          <Link
+                            href={p.manageHref}
+                            className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-foreground/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                          >
+                            <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{p.title}</span>
+                            <span className="shrink-0 text-[13px] font-medium text-muted-foreground">Manage</span>
+                          </Link>
+                        ) : (
+                          <div className="flex items-center gap-3 px-4 py-3">
+                            <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{p.title}</span>
+                            <span className="shrink-0 text-[13px] text-muted-foreground">You teach this program</span>
+                          </div>
+                        )}
                       </li>
                     ))}
                   </ul>

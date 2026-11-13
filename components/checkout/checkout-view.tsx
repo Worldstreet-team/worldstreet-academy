@@ -8,7 +8,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
 
-import { purchaseCourse } from "@/lib/actions/enrollments"
+import { purchaseCourse, upgradeEnrollment, type PurchaseResult, type UpgradeResult } from "@/lib/actions/enrollments"
 import { getMyWalletBalance, type MyWalletBalance } from "@/lib/actions/wallet"
 import { saveEnrollmentIntent } from "@/lib/actions/enrollment-intent"
 import { saveReferral, type EspeeCheckoutState } from "@/lib/actions/manual-payments"
@@ -32,11 +32,27 @@ import {
   LEVEL_LABEL,
   centsUsd,
   lengthLabel,
+  minorUsd,
   packageLine,
   packageServices,
   splitFeatures,
   wholeUsd,
 } from "@/components/checkout/order-lines"
+
+/**
+ * A plan upgrade (2026-11-12, Owen): an enrolled learner moving to a higher
+ * plan pays the difference. Worked out on the server (`getUpgradeOptions`);
+ * integer US cents. The page shows it and the upgrade action refuses any other figure.
+ */
+export type CheckoutUpgrade = {
+  fromKey: PublicPackage["key"]
+  /** What the plan costs today. */
+  priceMinor: number
+  /** What the place has paid so far. */
+  paidMinor: number
+  /** What this upgrade charges: priceMinor − paidMinor. */
+  upgradeMinor: number
+}
 
 /** What the curriculum says about this order — counted from published lessons, never the stored counters. */
 export type CheckoutFacts = {
@@ -107,6 +123,7 @@ export function CheckoutView({
   reservedSeat,
   espee,
   inviter,
+  upgrade = null,
 }: {
   program: ProgramDetail
   packageKey: PublicPackage["key"]
@@ -118,6 +135,8 @@ export function CheckoutView({
   espee: EspeeCheckoutState
   /** "First L." of whoever this purchase is credited to (their link or the account's referral), or null. */
   inviter: string | null
+  /** Set when an enrolled learner is moving to this higher plan: they pay the difference. */
+  upgrade?: CheckoutUpgrade | null
 }) {
   const router = useRouter()
   const queryClient = useQueryClient()
@@ -145,15 +164,25 @@ export function CheckoutView({
   const referralSavedRef = React.useRef<string | null>(null)
 
   const price = selected.price
-  const priceMinor = Math.round(price * 100)
+  // const priceMinor = Math.round(price * 100) — 2026-11-12: an upgrade charges only the difference.
+  /** What this order charges, in cents: the plan's price, or an upgrade's difference. */
+  const priceMinor = upgrade ? upgrade.upgradeMinor : Math.round(price * 100)
   const isPaid = priceMinor > 0
+  /** The amount due as the button and the total say it. */
+  const dueLabel = upgrade ? minorUsd(upgrade.upgradeMinor) : wholeUsd(price)
+  const fromLabel = upgrade ? PACKAGE_LABEL[upgrade.fromKey] : null
   // The plan's regular price, struck through on the receipt (display only: the charge is `price`).
-  const discount = discountOf(selected)
+  // const discount = discountOf(selected) — 2026-11-12: an upgrade's receipt shows what was paid instead.
+  const discount = upgrade ? null : discountOf(selected)
   // The wallet is the only way a paid seat is bought, so when it is off the
   // purchase cannot succeed — `purchaseCourse` fails closed before it touches
   // money. Say so before the click rather than after it. A free program needs
   // no debit, so it is never blocked.
-  const payBlocked = isPaid && !wallet.enabled
+  // const payBlocked = isPaid && !wallet.enabled — 2026-11-12: only a wallet that isn't connected blocks paying.
+  // A balance read that failed (a timeout on a slow network) doesn't: the charge checks the balance itself.
+  const payBlocked = isPaid && !wallet.enabled && wallet.reason !== "unreachable"
+  /** The balance couldn't be read just now; paying still works, and the wallet decides. */
+  const balanceUnknown = isPaid && !wallet.enabled && wallet.reason === "unreachable"
   // The balance read is real, so a shortfall is known before the click. The
   // server still decides: it debits or declines, and a decline's own figure
   // wins (`declinedShortfallMinor`).
@@ -197,7 +226,8 @@ export function CheckoutView({
   // program + package and never again for a re-render. A program with no
   // school (legacy) saves nothing; a program without a ladder saves no
   // package key.
-  const intentSchool = program.school
+  // const intentSchool = program.school — 2026-11-12: an upgrade is a learner already in; nothing to remind them of.
+  const intentSchool = upgrade ? null : program.school
   const intentCourseId = program.id
   const intentPackageKey = program.tierCount > 0 ? selected.key : null
 
@@ -316,36 +346,78 @@ export function CheckoutView({
       // WorldStreet wallet confirms the debit. No optimistic success. A program
       // without a package ladder (tierCount 0) shows one synthesized tier — the
       // server ignores a key there, so none is sent.
-      const result = await purchaseCourse({
-        courseId: program.id,
-        packageKey: program.tierCount > 0 ? selected.key : undefined,
-      })
+      // 2026-11-12: an upgrade pays the difference through its own action, with the figure this page shows.
+      const result: PurchaseResult | UpgradeResult = upgrade
+        ? await upgradeEnrollment({ courseId: program.id, packageKey: selected.key, expectedMinor: priceMinor })
+        : await purchaseCourse({
+            courseId: program.id,
+            packageKey: program.tierCount > 0 ? selected.key : undefined,
+            // The amount this page shows: the server refuses to charge any other (2026-11-12).
+            expectedMinor: priceMinor,
+          })
 
       if (result.success) {
         // Money moved outside the query cache — mark every wallet figure
         // stale, the top bar's balance chip included.
         queryClient.invalidateQueries({ queryKey: queryKeys.wallet })
         setPhase("success")
+        // 2026-11-12 (buyer QA): the confirmation REPLACES this page in the history. With push, Back from it
+        // reopened this checkout, which sends a paid learner straight back to the confirmation: two presses of
+        // Back still showed "Enrollment confirmed". Now Back goes to the page before checkout (the program).
+        // The confirmation names the new plan, read from the enrollment.
+        if (upgrade) {
+          // router.push(`/dashboard/checkout/success?courseId=${program.id}&upgraded=1`)
+          router.replace(`/dashboard/checkout/success?courseId=${program.id}&upgraded=1`)
+          return
+        }
         // `new=1` only words the confirmation ("a confirmation email is on its
         // way"); what it confirms is read from the enrollment, never the URL.
         // A replayed purchase (already enrolled) sent no new email.
-        const fresh = result.data.alreadyEnrolled ? "" : "&new=1"
-        router.push(`/dashboard/checkout/success?courseId=${program.id}${fresh}`)
+        // const fresh = result.data.alreadyEnrolled ? "" : "&new=1" — 2026-11-12: `result` may be an upgrade's
+        const fresh = "alreadyEnrolled" in result.data && result.data.alreadyEnrolled ? "" : "&new=1"
+        // router.push(`/dashboard/checkout/success?courseId=${program.id}${fresh}`)
+        router.replace(`/dashboard/checkout/success?courseId=${program.id}${fresh}`)
         return
       }
 
       if (result.code === "insufficient_funds") {
-        setDeclinedShortfallMinor(result.shortfallMinor ?? null)
-        if (typeof result.availableMinor === "number") {
-          const availableMinor = result.availableMinor
-          setWallet((w) => ({ ...w, usdAvailableMinor: availableMinor, usdAvailable: availableMinor / 100 }))
+        // 2026-11-12 (buyer QA): a decline doesn't always carry the balance — the action then reports 0, and the
+        // card said "Your wallet holds $0.00" and asked for the whole price. The balance is read again and the
+        // shortfall taken from that read; the decline's own figures only when the read fails. Was:
+        // setDeclinedShortfallMinor(result.shortfallMinor ?? null)
+        // if (typeof result.availableMinor === "number") {
+        //   const availableMinor = result.availableMinor
+        //   setWallet((w) => ({ ...w, usdAvailableMinor: availableMinor, usdAvailable: availableMinor / 100 }))
+        // }
+        const reread = await getMyWalletBalance().catch(() => null)
+        if (reread?.enabled) {
+          setWallet(reread)
+          const short = Math.max(0, priceMinor - reread.usdAvailableMinor)
+          setDeclinedShortfallMinor(short > 0 ? short : null)
+          // The balance covers it now (money landed while paying): the next Pay is a new attempt, never a second charge.
+          if (short === 0) setError("Your balance changed while you were paying. Tap Pay again: you won't be charged twice.")
+        } else {
+          setDeclinedShortfallMinor(result.shortfallMinor ?? null)
+          if (typeof result.availableMinor === "number") {
+            const availableMinor = result.availableMinor
+            setWallet((w) => ({ ...w, usdAvailableMinor: availableMinor, usdAvailable: availableMinor / 100 }))
+          }
         }
       } else {
-        setError(result.error || "Something went wrong. You have not been charged.")
+        // setError(result.error || "Something went wrong. You have not been charged.") — 2026-11-12: the
+        // fallback can't know that nothing moved.
+        setError(result.error || "Something went wrong. Please try again: you won't be charged twice.")
+        // The price or the plan changed since this page loaded: show the order as it is now.
+        if (result.code === "price_changed" || result.code === "package_required") router.refresh()
       }
       setPhase("idle")
     } catch {
-      setError("Something went wrong. You have not been charged.")
+      // The request itself failed (a dropped connection, a closed laptop): the charge may have gone through
+      // on the server, so the learner is never told "not charged" here (2026-11-12). Was:
+      // setError("Something went wrong. You have not been charged.")
+      setError(
+        "We couldn't reach the Academy to confirm your payment. Check your connection, then tap Pay again: you won't be charged twice."
+      )
       setPhase("idle")
     }
   }
@@ -400,7 +472,8 @@ export function CheckoutView({
       <PayButton
         id={id}
         phase={phase}
-        label={isPaid ? `Pay ${wholeUsd(price)}` : "Enrol for free"}
+        // label={isPaid ? `Pay ${wholeUsd(price)}` : "Enrol for free"} — 2026-11-12: an upgrade pays its difference
+        label={isPaid ? `Pay ${dueLabel}` : "Enrol for free"}
         paid={isPaid}
         onClick={handlePurchase}
       />
@@ -432,6 +505,8 @@ export function CheckoutView({
         line={line}
         changeHref={multiTier ? changeHref : null}
         reservedSeat={reservedSeat}
+        upgradeFrom={fromLabel}
+        total={upgrade ? dueLabel : null}
       />
 
       <div className="mx-auto w-full max-w-[1120px] px-4 sm:px-6 lg:px-8">
@@ -453,14 +528,16 @@ export function CheckoutView({
               <span className="truncate">{program.title}</span>
             </Link>
             <h1 className="mt-3 font-display text-[28px] font-semibold leading-[1.1] tracking-[-0.02em] text-ws-primary sm:text-[34px]">
-              Complete your enrollment
+              {upgrade ? "Upgrade your plan" : "Complete your enrollment"}
             </h1>
             <p className="mt-2 text-[15px] leading-relaxed text-ws-muted">
-              {!isPaid
-                ? "Review your order, then confirm your free enrollment."
-                : byEspee
-                  ? "Review your order, then send the payment and upload your receipt."
-                  : "Review your order, then pay from your WorldStreet wallet."}
+              {upgrade
+                ? `You're on ${fromLabel}. ${PACKAGE_LABEL[selected.key]} is ${minorUsd(upgrade.priceMinor)}; you've paid ${minorUsd(upgrade.paidMinor)}, so you pay ${dueLabel}.`
+                : !isPaid
+                  ? "Review your order, then confirm your free enrollment."
+                  : byEspee
+                    ? "Review your order, then send the payment and upload your receipt."
+                    : "Review your order, then pay from your WorldStreet wallet."}
             </p>
           </div>
 
@@ -472,6 +549,7 @@ export function CheckoutView({
               line={line}
               changeHref={multiTier ? changeHref : null}
               reservedSeat={reservedSeat}
+              upgradeFrom={fromLabel}
             />
           </div>
 
@@ -508,7 +586,9 @@ export function CheckoutView({
                   </span>
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="text-[14px] font-semibold text-ws-primary">WorldStreet wallet</span>
-                    <span className="text-[12.5px] text-ws-muted">{wallet.enabled ? "USD balance" : "Not open yet"}</span>
+                    <span className="text-[12.5px] text-ws-muted">
+                      {wallet.enabled ? "USD balance" : balanceUnknown ? "Balance unavailable" : "Not open yet"}
+                    </span>
                   </span>
                   {wallet.enabled && (
                     <RollingAmount
@@ -532,9 +612,19 @@ export function CheckoutView({
                     )}
                   </dt>
                   <dd className="shrink-0 font-medium tabular-nums text-ws-primary">
-                    {isPaid ? centsUsd(priceMinor) : "Free"}
+                    {/* 2026-11-12: an upgrade lists the plan's full price, then what was paid. Was: centsUsd(priceMinor) */}
+                    {isPaid ? centsUsd(upgrade ? upgrade.priceMinor : priceMinor) : "Free"}
                   </dd>
                 </div>
+                {upgrade && (
+                  <div className="flex items-baseline gap-3">
+                    <dt className="min-w-0 flex-1 text-ws-muted">Already paid · {fromLabel}</dt>
+                    <dd className="shrink-0 tabular-nums text-ws-muted">
+                      <span className="sr-only">minus </span>
+                      {centsUsd(-upgrade.paidMinor)}
+                    </dd>
+                  </div>
+                )}
                 {discount && (
                   <div className="flex items-baseline gap-3">
                     <dt className="min-w-0 flex-1 text-ws-muted">
@@ -553,7 +643,8 @@ export function CheckoutView({
               <div className="mt-4 flex items-end justify-between gap-3 border-t border-ws-hairline pt-4">
                 <span className="pb-1 text-[14px] font-semibold text-ws-primary">{isPaid ? "Total due" : "Total"}</span>
                 <span className="font-display text-[40px] font-light leading-none tracking-[-0.025em] tabular-nums text-ws-primary">
-                  {wholeUsd(price)}
+                  {/* {wholeUsd(price)} — 2026-11-12: an upgrade's total is its difference */}
+                  {dueLabel}
                 </span>
               </div>
               <Appear show={isPaid && !byEspee && wallet.enabled && !shortfall}>
@@ -577,6 +668,26 @@ export function CheckoutView({
                       ? "You haven't been charged, and your choice is saved. Come back to this page to pay once they open."
                       : "You haven't been charged. Come back to this page to pay once they open."}
                   </p>
+                </div>
+              </Appear>
+
+              {/* The balance read failed (2026-11-12). Paying still works: the wallet checks the balance and
+                  declines a debit it doesn't cover, and the shortfall then shows here. */}
+              <Appear show={balanceUnknown && !byEspee}>
+                <div role="status" className="mt-5 rounded-[14px] bg-ws-sunken p-4">
+                  <p className="text-[13px] leading-relaxed text-ws-muted">
+                    We couldn&apos;t read your wallet balance just now. You can still pay: your wallet checks the
+                    balance when you do.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={refreshBalance}
+                    disabled={refreshing}
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-full py-1 text-[13px] font-medium text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:text-ws-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40 disabled:cursor-default"
+                  >
+                    <RotateCcwIcon size={13} className={cn(refreshing && "animate-spin")} aria-hidden />
+                    {refreshing ? "Checking your balance…" : "Check my balance again"}
+                  </button>
                 </div>
               </Appear>
 
@@ -618,7 +729,8 @@ export function CheckoutView({
                   Invited by <span className="font-medium text-ws-primary">{inviter}</span>
                 </p>
               )}
-              {!inviter && !espee.referredBy && phase !== "success" && !(byEspee && espee.open) && (
+              {/* 2026-11-12: not on an upgrade — a learner already in answered it when they bought. */}
+              {!upgrade && !inviter && !espee.referredBy && phase !== "success" && !(byEspee && espee.open) && (
                 <div className="mt-5 space-y-1.5">
                   <Label htmlFor="checkout-invited-by">
                     Who invited you? <span className="font-normal text-ws-muted">· optional</span>
@@ -639,7 +751,8 @@ export function CheckoutView({
 
               {/* Only a program in a school can be saved: a legacy one has no
                   school to put on the dashboard, so the promise would be empty. */}
-              {program.school && phase !== "success" && !(byEspee && espee.open) && (
+              {/* 2026-11-12: an upgrade has no saved school to come back to (intentSchool is null). Was: program.school && … */}
+              {intentSchool && phase !== "success" && !(byEspee && espee.open) && (
                 <div className="mt-2 lg:mt-2.5">
                   {savedLater ? (
                     <div role="status" className="rounded-[14px] bg-ws-sunken px-4 py-3 text-center">
@@ -690,7 +803,9 @@ export function CheckoutView({
                         ? espee.receiptUpload
                           ? "Your receipt is stored privately. Your program opens once an admin confirms the payment — we'll email you either way."
                           : "Your program opens once an admin matches your WhatsApp receipt and confirms the payment — we'll email you either way."
-                        : "Charged once, only when you press Pay. Your program opens the moment the wallet confirms."}
+                        : upgrade
+                          ? "Charged once, only when you press Pay. Your new plan opens the moment the wallet confirms."
+                          : "Charged once, only when you press Pay. Your program opens the moment the wallet confirms."}
                   </span>
                 </p>
               )}
@@ -829,14 +944,17 @@ export function CheckoutView({
                       details are entered on this page.
                     </HowRow>
                     <HowRow icon={BadgeCheckIcon} title="Access follows the confirmed debit">
-                      Your enrollment is created only after the wallet confirms the payment — then the program opens in
-                      your dashboard straight away.
+                      {upgrade
+                        ? "Your plan changes only after the wallet confirms the payment — then everything it adds opens in your dashboard straight away."
+                        : "Your enrollment is created only after the wallet confirms the payment — then the program opens in your dashboard straight away."}
                     </HowRow>
                     <HowRow icon={CopyCheckIcon} title="Never charged twice">
                       Each order carries one payment reference, so a double click or a retry can&apos;t debit you again.
                     </HowRow>
                     <HowRow icon={RotateCcwIcon} title="Covered if something fails">
-                      If your enrollment can&apos;t be completed after the debit, the charge is refunded to your wallet.
+                      {upgrade
+                        ? "If your plan can't be changed after the debit, the charge is refunded to your wallet."
+                        : "If your enrollment can't be completed after the debit, the charge is refunded to your wallet."}
                     </HowRow>
                   </ul>
                   <p className="mt-5 flex items-center gap-2 text-[13px] text-ws-muted">

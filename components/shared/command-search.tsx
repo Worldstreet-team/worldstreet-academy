@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/sheet"
 import { type BrowseCourse } from "@/lib/actions/student"
 import { useBrowseCourses } from "@/lib/hooks/queries"
+import { useOptionalUser } from "@/components/providers/user-provider"
+import { LogoutConfirmDialog } from "@/components/shared/logout-confirm-dialog"
 
 
 import { RenderIcon } from "@/components/shared/render-icon"
@@ -33,7 +35,16 @@ type CommandItem = {
 }
 
 /* ── Pages & tools factory ────────────────────────────── */
-function useCommandItems(courses: BrowseCourse[], isInstructor: boolean) {
+// 2026-11-12: `canTeach` hides the instructor switch from learners; `onLogout` opens the real sign-out.
+// function useCommandItems(courses: BrowseCourse[], isInstructor: boolean) {
+// 2026-11-12: `isAdminArea` swaps the learner catalogue for the admin pages inside /admin.
+function useCommandItems(
+  courses: BrowseCourse[],
+  isInstructor: boolean,
+  canTeach: boolean,
+  onLogout: () => void,
+  isAdminArea = false
+) {
   const router = useRouter()
   const { resolvedTheme, setTheme } = useTheme()
 
@@ -147,7 +158,34 @@ function useCommandItems(courses: BrowseCourse[], isInstructor: boolean) {
     },
   ]
 
-  const pages = isInstructor ? instructorPages : studentPages
+  // 2026-11-12: a learner isn't offered the instructor switch (it only bounced them to "Become an instructor").
+  // const pages = isInstructor ? instructorPages : studentPages
+  const adminPages: CommandItem[] = (
+    [
+      ["Overview", "/admin", "Users, money and the tutor pipeline", HouseIcon],
+      ["Tutor applications", "/admin/applications", "Review, interview and approve tutors", UserIcon],
+      ["Users", "/admin/users", "Find people and change roles", UserIcon],
+      ["Payments", "/admin/payments", "Orders and refunds", ChartNoAxesColumnIcon],
+      ["Courses", "/admin/courses", "Programs, faculty, hide or show", BookOpenIcon],
+      ["Enrollments", "/admin/enrollments", "Seats, plans and exports", BookOpenIcon],
+      ["Cohorts", "/admin/cohorts", "Start dates and the website countdown", SettingsIcon],
+      ["Partners", "/admin/partners", "Referral partners and CSV", ChartNoAxesColumnIcon],
+      ["Reviews", "/admin/reviews", "Program reviews", BookmarkIcon],
+      ["Exams", "/admin/exams", "Final exams", BookOpenIcon],
+    ] as const
+  ).map(([label, href, description, icon]) => ({
+    id: `admin-${href}`,
+    label,
+    description,
+    icon,
+    action: () => router.push(href),
+    section: "pages" as const,
+  }))
+  const pages = isAdminArea
+    ? adminPages
+    : isInstructor
+      ? instructorPages
+      : studentPages.filter((p) => canTeach || p.id !== "page-instructor")
 
   const tools: CommandItem[] = [
     {
@@ -163,15 +201,20 @@ function useCommandItems(courses: BrowseCourse[], isInstructor: boolean) {
       label: "Log Out",
       description: "Sign out of your account",
       icon: LogOutIcon,
-      action: () => {
-        // TODO: implement real logout
-        router.push("/")
-      },
+      // 2026-11-12: signs out for real (the shared confirm dialog). Was:
+      // action: () => {
+      //   // TODO: implement real logout
+      //   router.push("/")
+      // },
+      action: onLogout,
       section: "tools",
     },
   ]
 
-  const courseItems: CommandItem[] = courses.slice(0, 8).map((c) => ({
+  // 2026-11-12: every course, so a search can find any of them; the list caps what it shows
+  // (CommandSearch). Cut to 8 here first, most programs could never be found. Was:
+  // const courseItems: CommandItem[] = courses.slice(0, 8).map((c) => ({
+  const courseItems: CommandItem[] = courses.map((c) => ({
     id: `course-${c.id}`,
     label: c.title,
     description: c.pricing === "free" ? "Free" : `$${c.price}`,
@@ -181,7 +224,8 @@ function useCommandItems(courses: BrowseCourse[], isInstructor: boolean) {
     section: "courses" as const,
   }))
 
-  return [...courseItems, ...pages, ...tools]
+  // return [...courseItems, ...pages, ...tools] — 2026-11-12: no learner catalogue inside /admin
+  return [...(isAdminArea ? [] : courseItems), ...pages, ...tools]
 }
 
 /* ── Shared results list ─────────────────────────────── */
@@ -356,16 +400,28 @@ export function CommandSearch() {
   // Detect if user is on instructor routes
   const isInstructor = pathname?.startsWith("/instructor") ?? false
 
-  const items = useCommandItems(courses, isInstructor)
+  const viewer = useOptionalUser()
+  const canTeach = viewer?.role === "INSTRUCTOR" || viewer?.role === "ADMIN"
+  const [logoutOpen, setLogoutOpen] = React.useState(false)
+  // const items = useCommandItems(courses, isInstructor) — 2026-11-12
+  const isAdminArea = pathname?.startsWith("/admin") ?? false
+  const items = useCommandItems(courses, isInstructor, canTeach, () => setLogoutOpen(true), isAdminArea)
 
   const filtered = React.useMemo(() => {
-    if (!query.trim()) return items
-    const q = query.toLowerCase()
-    return items.filter(
-      (item) =>
-        item.label.toLowerCase().includes(q) ||
-        item.description?.toLowerCase().includes(q)
-    )
+    // 2026-11-12: matches across every course first, then shows at most 8 of them. Was:
+    // if (!query.trim()) return items
+    // const q = query.toLowerCase()
+    // return items.filter(
+    //   (item) =>
+    //     item.label.toLowerCase().includes(q) ||
+    //     item.description?.toLowerCase().includes(q)
+    // )
+    const q = query.trim().toLowerCase()
+    const matched = q
+      ? items.filter((item) => item.label.toLowerCase().includes(q) || item.description?.toLowerCase().includes(q))
+      : items
+    let shownCourses = 0
+    return matched.filter((item) => item.section !== "courses" || ++shownCourses <= 8)
   }, [items, query])
 
   // Keyboard shortcut
@@ -429,6 +485,8 @@ export function CommandSearch() {
   // Mobile: bottom sheet drawer
   if (isMobile) {
     return (
+      <>
+      <LogoutConfirmDialog open={logoutOpen} onOpenChange={setLogoutOpen} />
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="bottom" showCloseButton={false} className="p-0 gap-0 rounded-t-lg max-h-[85dvh] flex flex-col">
           <SheetTitle className="sr-only">Search</SheetTitle>
@@ -457,11 +515,14 @@ export function CommandSearch() {
           </div>
         </SheetContent>
       </Sheet>
+      </>
     )
   }
 
   // Desktop: centered dialog
   return (
+    <>
+    <LogoutConfirmDialog open={logoutOpen} onOpenChange={setLogoutOpen} />
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent
         showCloseButton={false}
@@ -505,5 +566,6 @@ export function CommandSearch() {
         </div>
       </DialogContent>
     </Dialog>
+    </>
   )
 }

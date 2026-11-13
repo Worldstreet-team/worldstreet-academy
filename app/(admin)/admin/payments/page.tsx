@@ -258,6 +258,8 @@ function OrdersTab() {
                     variant="destructive"
                     onClick={() => {
                       setRefundError(null)
+                      // 2026-11-12: a reason typed for another purchase (a refusal leaves it in the box) carried over.
+                      setRefundReason("")
                       setRefundOpen(true)
                     }}
                   >

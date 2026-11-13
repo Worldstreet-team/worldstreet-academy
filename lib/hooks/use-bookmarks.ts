@@ -20,9 +20,12 @@ export function useBookmarks(courseIds: string[]) {
     if (key === checkedRef.current) return
     checkedRef.current = key
 
-    checkCoursesBookmarked(courseIds).then((result) => {
-      setMap((prev) => ({ ...prev, ...result }))
-    })
+    checkCoursesBookmarked(courseIds)
+      .then((result) => {
+        setMap((prev) => ({ ...prev, ...result }))
+      })
+      // 2026-11-12: unknown (offline, a tab left open across a deploy) reads as not saved.
+      .catch(() => {})
   }, [courseIds])
 
   const isBookmarked = useCallback(
@@ -35,7 +38,9 @@ export function useBookmarks(courseIds: string[]) {
       // Optimistic update
       setMap((prev) => ({ ...prev, [courseId]: !prev[courseId] }))
       startTransition(async () => {
-        const result = await toggleCourseBookmark(courseId)
+        // 2026-11-12: a thrown call reached the error boundary; it reverts like a refusal.
+        // const result = await toggleCourseBookmark(courseId)
+        const result = await toggleCourseBookmark(courseId).catch(() => ({ success: false, isBookmarked: false }))
         if (result.success) {
           setMap((prev) => ({ ...prev, [courseId]: result.isBookmarked }))
         } else {

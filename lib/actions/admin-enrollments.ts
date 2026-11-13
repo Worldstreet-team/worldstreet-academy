@@ -18,6 +18,7 @@ import { masteryInputsForMany, type MasteryCourseRow, type MasteryEnrollmentRow 
 import { masteryView } from "@/lib/mastery-score"
 
 const PAGE_SIZE = 20
+const OBJECT_ID = /^[a-f0-9]{24}$/
 
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
@@ -75,6 +76,30 @@ function paymentOf(e: {
   return e.status === "pre_enrolled" ? "pending" : "not_required"
 }
 
+/**
+ * paymentOf as a Mongo filter (2026-11-12), so a payment filter pages, counts
+ * and exports in the query. Null when there is no payment filter.
+ */
+async function paymentQuery(payment: unknown): Promise<Record<string, unknown> | null> {
+  if (payment !== "successful" && payment !== "pending" && payment !== "not_required" && payment !== "refunded") {
+    return null
+  }
+  if (payment === "refunded") return { status: "refunded" }
+  const charged = [{ transactionId: { $nin: [null, ""] } }, { pricePaid: { $gt: 0 } }]
+  if (payment === "successful") return { status: { $ne: "refunded" }, $or: charged }
+  const unpaid = { transactionId: { $in: [null, ""] }, pricePaid: { $not: { $gt: 0 } } }
+  // paymentOf reads a course with no pricing as free.
+  const freeCourses = await Course.distinct("_id", { pricing: { $in: ["free", null] } })
+  if (payment === "pending") {
+    return { ...unpaid, status: "pre_enrolled", legacyUnpaid: { $ne: true }, course: { $nin: freeCourses } }
+  }
+  return {
+    ...unpaid,
+    status: { $ne: "refunded" },
+    $or: [{ legacyUnpaid: true }, { course: { $in: freeCourses } }, { status: { $ne: "pre_enrolled" } }],
+  }
+}
+
 export async function adminListEnrollments(filters?: {
   course?: string
   status?: string
@@ -96,11 +121,24 @@ export async function adminListEnrollments(filters?: {
 
     const page = Math.max(1, filters?.page ?? 1)
     const query: Record<string, unknown> = {}
-    if (filters?.course) query.course = filters.course
-    if (filters?.status && filters.status !== "all") query.status = filters.status
+    // 2026-11-12: only a 24-hex course id reaches the query (an object is read as a Mongo
+    // operator; junk threw a CastError, which emptied the list without a word).
+    // if (filters?.course) query.course = filters.course
+    if (filters?.course) {
+      if (typeof filters.course !== "string" || !OBJECT_ID.test(filters.course)) return empty
+      query.course = filters.course
+    }
+    // 2026-11-12: only a literal string reaches the query.
+    // if (filters?.status && filters.status !== "all") query.status = filters.status
+    if (typeof filters?.status === "string" && filters.status !== "all") query.status = filters.status
     const packageFilter = filters?.package
     if (packageFilter === "none") query.packageKey = null
     else if (isPackageKey(packageFilter)) query.packageKey = packageFilter
+    // 2026-11-12: the payment filter runs in the query. Applied after the page was cut, page 2
+    // repeated page 1's matches, the total counted every row, and the CSV export (which walks
+    // the pages) listed the same enrollments more than once.
+    const paymentFilter = await paymentQuery(filters?.payment)
+    if (paymentFilter) query.$and = [paymentFilter]
 
     // Name/email search resolves to user ids first — enrollment stores refs.
     if (filters?.search?.trim()) {
@@ -266,7 +304,18 @@ export async function adminSetEnrollmentStatus(
     if (enrollment.user.toString() === admin.id) {
       return { success: false, error: "Another admin has to change your own enrollment" }
     }
+    const fromStatus = enrollment.status
     const wasCancelled = enrollment.status === "cancelled"
+    // 2026-11-12: a refunded seat belongs to the money trail (Payments). Cancelling or suspending
+    // it let "Restore" turn it back into an active seat with the money already returned.
+    if (fromStatus === "refunded") {
+      return { success: false, error: "This enrollment was refunded, so it can't be changed here" }
+    }
+    // A cancelled seat is restored before it is suspended: a restore from "suspended" never
+    // reopens the earnings the cancellation reversed.
+    if (action === "suspend" && wasCancelled) {
+      return { success: false, error: "Restore this enrollment first, then suspend it" }
+    }
     // …nor reopens a commission that pays them: restoring a cancelled enrollment
     // turns its reversed referral commission back to pending.
     if (
@@ -293,21 +342,39 @@ export async function adminSetEnrollmentStatus(
           ? "active"
           : "pre_enrolled"
     }
-    await enrollment.save()
+    // 2026-11-12: written only while the status is still the one read, so a cancel and a
+    // restore sent at once by two admins can't both land (a whole-document save was last-wins).
+    // await enrollment.save()
+    const written = await Enrollment.updateOne({ _id: enrollment._id, status: fromStatus }, { $set: { status: enrollment.status } })
+    if (written.matchedCount === 0) {
+      return { success: false, error: "This enrollment changed in the meantime. Reload and try again." }
+    }
 
     if (action === "cancel") {
       const pending = await Earning.find({ enrollment: enrollment._id, kind: { $in: ["sale", "referral"] }, status: "pending" })
       for (const earning of pending) {
-        earning.status = "reversed"
-        earning.note = `${CANCELLED_NOTE}${earning.note ?? ""}`
-        await earning.save()
+        // 2026-11-12: reversed only while still pending. The clearing pass can pay an earning out
+        // meanwhile, and a whole-document save overwrote its "cleared" with "reversed", which a
+        // restore then reopened as pending: a paid earning owed a second time.
+        // earning.status = "reversed"
+        // earning.note = `${CANCELLED_NOTE}${earning.note ?? ""}`
+        // await earning.save()
+        await Earning.updateOne(
+          { _id: earning._id, status: "pending" },
+          { $set: { status: "reversed", note: `${CANCELLED_NOTE}${earning.note ?? ""}` } }
+        )
       }
     } else if (action === "restore" && wasCancelled) {
       const reversed = await Earning.find({ enrollment: enrollment._id, status: "reversed", note: CANCELLED_NOTE_RE })
       for (const earning of reversed) {
-        earning.status = "pending"
-        earning.note = earning.note.replace(CANCELLED_NOTE_RE, "")
-        await earning.save()
+        // 2026-11-12: conditional, as above, so two restores at once reopen it once.
+        // earning.status = "pending"
+        // earning.note = earning.note.replace(CANCELLED_NOTE_RE, "")
+        // await earning.save()
+        await Earning.updateOne(
+          { _id: earning._id, status: "reversed", note: earning.note },
+          { $set: { status: "pending", note: earning.note.replace(CANCELLED_NOTE_RE, "") } }
+        )
       }
     }
 
@@ -466,8 +533,16 @@ export async function adminExportEnrollments(filters?: {
       "Progress %",
       "Cohort",
     ]
-    const quote = (v: string | number | null) =>
-      `"${String(v ?? "").replace(/"/g, '""')}"`
+    // 2026-11-12: names and course titles are typed by people; a leading = + - @ (or a tab or
+    // carriage return) would run as a formula when the file is opened in a spreadsheet. Text
+    // cells only: numbers are written raw.
+    // const quote = (v: string | number | null) =>
+    //   `"${String(v ?? "").replace(/"/g, '""')}"`
+    const quote = (v: string | number | null) => {
+      const text = String(v ?? "")
+      const safe = typeof v === "string" && /^[=+\-@\t\r]/.test(text) ? `'${text}` : text
+      return `"${safe.replace(/"/g, '""')}"`
+    }
     const csv = [
       header.map(quote).join(","),
       ...all.map((r) =>

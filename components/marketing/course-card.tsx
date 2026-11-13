@@ -11,6 +11,7 @@ import { levelChipStyle } from "@/components/shared/level-badge"
 import { WishlistButton, autoBookmark } from "@/components/marketing/wishlist-button"
 import type { BrowseCourse } from "@/lib/actions/student"
 import { programPriceLabel } from "@/lib/program-price"
+import { COHORT_TIME_ZONE } from "@/lib/cohort"
 import { PackageDiscount } from "@/components/programs/package-offer"
 import { SCHOOL_BY_SLUG } from "@/lib/schools"
 import { ACADEMY_FACULTY_SHORT, FACULTY_PUBLIC } from "@/lib/faculty"
@@ -40,12 +41,15 @@ export function isFutureDrop(course: Pick<BrowseCourse, "availableAt">): boolean
 }
 
 export function dropDateLabel(availableAt: string): string {
-  // Pinned to UTC: this renders in SSR'd client components, and a zone-local
+  // Pinned to one zone: this renders in SSR'd client components, and a zone-local
   // format would hydration-mismatch for every visitor west of the server.
+  // 2026-11-12: Lagos, not UTC — tutors pick the start in Lagos time, and a Lagos
+  // midnight is 23:00 UTC the day before, so the card said the day before. Was:
+  // timeZone: "UTC",
   return new Date(availableAt).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
-    timeZone: "UTC",
+    timeZone: COHORT_TIME_ZONE,
   })
 }
 

@@ -30,6 +30,9 @@ import {
 } from "@/lib/actions/admin-cohorts"
 import { cohortDateFull, lagosLocal } from "@/lib/cohort"
 import { COHORT_STATUS_LABEL } from "@/lib/cohort-rules"
+import { useClientNow } from "@/lib/hooks/use-now"
+
+const PAST_START = "That start date has already passed. Check the year."
 
 /** "HH:mm" of an ISO instant, in Lagos. */
 const lagosTime = (iso: string) => lagosLocal(iso).slice(11)
@@ -82,6 +85,16 @@ export default function AdminCohortsPage() {
 
   const editing = target && target !== "new" ? target : null
   const startedEdit = editing !== null && editing.status !== "upcoming"
+
+  // 2026-11-12: a NEW cohort's earliest start, mirroring adminCreateCohort's refusal.
+  // The form's dates are Lagos wall time whatever this browser's zone, so the
+  // bound is Lagos too (lagosLocal), not the browser's (datetimeLocalValue) nor
+  // UTC (toISOString). The next whole minute: the server refuses "now" itself.
+  // The browser clock is null on the server and through hydration (no mismatch).
+  const clientNow = useClientNow()
+  const minStart = target === "new" && clientNow !== null ? lagosLocal(new Date(clientNow + 60_000).toISOString()) : undefined
+  // Same-shape `YYYY-MM-DDTHH:mm` strings compare in time order.
+  const startPast = minStart !== undefined && form.startsAt !== "" && form.startsAt < minStart
 
   const settle = (res: { success: true } | { success: false; error: string }) => {
     if (!res.success) {
@@ -258,9 +271,17 @@ export default function AdminCohortsPage() {
                   <Input
                     id="cohort-start"
                     type="datetime-local"
+                    min={minStart}
+                    aria-invalid={startPast || undefined}
+                    aria-describedby={startPast ? "cohort-start-past" : undefined}
                     value={form.startsAt}
                     onChange={(e) => setForm({ ...form, startsAt: e.target.value })}
                   />
+                  {startPast && (
+                    <p id="cohort-start-past" className="text-xs text-ws-danger">
+                      {PAST_START}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="cohort-end">Ends (Lagos time, optional)</Label>
@@ -311,7 +332,9 @@ export default function AdminCohortsPage() {
                 <Button variant="outline" size="sm" onClick={() => setOpen(false)}>
                   Cancel
                 </Button>
-                <Button size="sm" disabled={busy || !form.startsAt} onClick={() => save.mutate()}>
+                {/* 2026-11-12: also while a new cohort's start is already past. */}
+                {/* <Button size="sm" disabled={busy || !form.startsAt} onClick={() => save.mutate()}> */}
+                <Button size="sm" disabled={busy || !form.startsAt || startPast} onClick={() => save.mutate()}>
                   {save.isPending ? "Saving…" : "Save"}
                 </Button>
               </DialogFooter>

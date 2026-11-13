@@ -18,6 +18,7 @@ import {
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import { useNotificationFeed } from "@/lib/hooks/queries/use-notifications"
 import type { SSEEventPayload } from "@/lib/call-events"
+import { useGated } from "@/components/platform/gate-guard"
 
 /**
  * The top bar's notification hub. Course activity — lessons, live classes,
@@ -43,6 +44,7 @@ function BellPanel({
 }) {
   const queryClient = useQueryClient()
   const [tab, setTab] = React.useState<BellTab>("courses")
+  const gated = useGated()
 
   const counts = feed?.unreadByCategory ?? { courses: 0, payments: 0, account: 0 }
   const otherUnread = counts.payments + counts.account
@@ -131,6 +133,9 @@ function BellPanel({
         )}
       </div>
 
+      {/* 2026-11-12: the inbox page is behind the school-first gate, so a learner who
+          hasn't paid yet only bounced to the schools from here; the panel is all of it for them. */}
+      {!gated && (
       <Link
         href="/dashboard/notifications"
         onClick={onClose}
@@ -139,6 +144,7 @@ function BellPanel({
         See all notifications
         <Glyph icon={ArrowRight01Icon} className="size-3.5" />
       </Link>
+      )}
     </div>
   )
 }

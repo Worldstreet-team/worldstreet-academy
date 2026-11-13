@@ -824,6 +824,10 @@ export default function InstructorMeetingsPage() {
       } catch (err) {
         console.error("[Meeting] Failed to join RTK room:", err)
         setSetupMessage(null)
+        // 2026-11-12: a room that wouldn't connect dropped the host back on the lobby with no word,
+        // still holding the half-joined meeting. Say so; the class stays in Active Meetings to retry.
+        setActiveMeeting(null)
+        setScheduleNotice("Couldn't connect you to the class room. Check your connection, then try again from Active Meetings.")
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1059,7 +1063,11 @@ export default function InstructorMeetingsPage() {
       }
     } else {
       setSetupMessage(null)
+      // 2026-11-12: any other refusal ("You no longer teach this course", "Meeting has ended") was
+      // only logged, so Start/Rejoin looked like it did nothing.
+      // if (result.error === EARLY_START_ERROR && result.startsAt) setScheduleNotice(earlyStartNotice(result.startsAt))
       if (result.error === EARLY_START_ERROR && result.startsAt) setScheduleNotice(earlyStartNotice(result.startsAt))
+      else setScheduleNotice(result.error ?? "Couldn't join the class. Try again in a moment.")
       console.error("[Meeting] Join failed:", result.error)
     }
   }
@@ -1101,7 +1109,11 @@ export default function InstructorMeetingsPage() {
       }
     } else {
       setSetupMessage(null)
+      // 2026-11-12: any other refusal ("You no longer teach this course", "Meeting has ended") was
+      // only logged, so Start/Rejoin looked like it did nothing.
+      // if (result.error === EARLY_START_ERROR && result.startsAt) setScheduleNotice(earlyStartNotice(result.startsAt))
       if (result.error === EARLY_START_ERROR && result.startsAt) setScheduleNotice(earlyStartNotice(result.startsAt))
+      else setScheduleNotice(result.error ?? "Couldn't join the class. Try again in a moment.")
       console.error("[Meeting] Rejoin failed:", result.error)
     }
   }

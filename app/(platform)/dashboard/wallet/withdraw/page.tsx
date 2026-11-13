@@ -31,8 +31,22 @@ import {
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import { fmtMoney, NAIRA_FONT } from "@/components/wallet/shared"
 
+/** A key for one withdrawal attempt; `crypto.randomUUID` is missing on some older phones. */
+function newAttemptKey(): string {
+  try {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID()
+  } catch {
+    // fall through
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
+}
+
 export default function WithdrawPage() {
   const queryClient = useQueryClient()
+  // One key per withdrawal attempt (2026-11-12): a retry after a timeout or a dropped connection replays
+  // the same withdrawal on the wallet instead of sending a second one. A new amount or bank, a success,
+  // or the wallet's own refusal starts a new attempt.
+  const attemptKeyRef = React.useRef<string | null>(null)
 
   const [amount, setAmount] = React.useState("")
   const [selectedBankId, setSelectedBankId] = React.useState<string | null>(null)
@@ -112,8 +126,13 @@ export default function WithdrawPage() {
   })
 
   const withdraw = useMutation({
-    mutationFn: () => withdrawNgn(amount, selectedBankId!),
+    mutationFn: () => {
+      attemptKeyRef.current ??= newAttemptKey()
+      return withdrawNgn(amount, selectedBankId!, attemptKeyRef.current)
+    },
     onSuccess: (res) => {
+      // Settled, or refused outright: the next press is a new withdrawal. Unconfirmed keeps the key.
+      if (res.success || !("unconfirmed" in res && res.unconfirmed)) attemptKeyRef.current = null
       if (!res.success) {
         setError(res.error === "kyc_required" ? "kyc_required" : res.error)
         setSuccessMsg(null)
@@ -125,6 +144,11 @@ export default function WithdrawPage() {
         )
         invalidate()
       }
+    },
+    // The request itself failed (a dropped connection): the key is kept, so pressing again is safe.
+    onError: () => {
+      setError("We couldn't reach the Academy to confirm the withdrawal. Check your connection, then try again: it won't be sent twice.")
+      setSuccessMsg(null)
     },
   })
 
@@ -265,7 +289,10 @@ export default function WithdrawPage() {
                         ? "border-ws-brand bg-ws-brand/5"
                         : "border-ws-hairline hover:bg-ws-raised/60"
                     }`}
-                    onClick={() => setSelectedBankId(b.id)}
+                    onClick={() => {
+                      if (selectedBankId !== b.id) attemptKeyRef.current = null
+                      setSelectedBankId(b.id)
+                    }}
                   >
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ws-raised">
                       <Landmark size={17} strokeWidth={2} className="text-ws-muted" aria-hidden />
@@ -308,7 +335,10 @@ export default function WithdrawPage() {
                   id="withdraw-amount"
                   inputMode="numeric"
                   value={amount}
-                  onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))}
+                  onChange={(e) => {
+                    setAmount(e.target.value.replace(/[^0-9]/g, ""))
+                    attemptKeyRef.current = null
+                  }}
                   placeholder="0"
                   size={Math.max(amount.length, 4)}
                   className="min-w-0 bg-transparent text-center font-display text-4xl font-semibold tabular-nums text-ws-primary outline-none [field-sizing:content] placeholder:text-ws-subtle"

@@ -5,6 +5,7 @@ import connectDB from "@/lib/db"
 import { Course, Review } from "@/lib/db/models"
 import { isSchoolSlug, storedSlugsFor } from "@/lib/schools"
 import { PROGRAM_KIND_FILTER } from "@/lib/course-kind"
+import { ON_SALE_FILTER } from "@/lib/entitlements"
 import { countryName } from "@/lib/countries"
 import { maskedName } from "@/lib/masked-name"
 import type { CourseRatingSummary } from "@/lib/actions/reviews"
@@ -50,7 +51,9 @@ export async function fetchSchoolReviews(slug: string, limit = 6): Promise<Schoo
 
     await connectDB()
     // The school speaks for its programs: marketplace courses filed under it are not part of its record.
-    const courses = await Course.find({ school: { $in: storedSlugsFor(slug) }, status: "published", ...PROGRAM_KIND_FILTER })
+    // On sale too (2026-11-12): the school lists only programs on sale, and each
+    // review links to its program's page, which a not-on-sale program doesn't have.
+    const courses = await Course.find({ school: { $in: storedSlugsFor(slug) }, status: "published", ...PROGRAM_KIND_FILTER, ...ON_SALE_FILTER })
       .select("title slug rating")
       .lean()
     if (courses.length === 0) return EMPTY

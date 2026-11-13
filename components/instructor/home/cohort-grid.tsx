@@ -215,9 +215,14 @@ export function CohortGrid({
       </div>
       {cohorts.length === 0 ? (
         <CardShell>
+          {/* 2026-11-12: also true for a new staff tutor, who waits for the Academy to assign a program.
           <EmptyState
             title="No published courses yet"
             description="A course becomes a cohort once it's published. Finish one and it shows up here with its classes, grading and recordings."
+          /> */}
+          <EmptyState
+            title="No programs yet"
+            description="When the Academy assigns you a program, or a course of yours is published, it shows up here with its classes, grading and recordings."
           />
         </CardShell>
       ) : (

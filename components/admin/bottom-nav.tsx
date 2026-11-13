@@ -1,5 +1,5 @@
 "use client"
-import { BookOpen, CalendarDays, ClipboardCheck, Ellipsis, HandshakeIcon, House, Inbox, ReceiptText, ShieldCheck, Star, Store, Users, Wallet, type IconComponent } from "@/components/icons"
+import { BookOpen, CalendarDays, ClipboardCheck, Ellipsis, GraduationCap, HandshakeIcon, House, Inbox, ReceiptText, ShieldCheck, Star, Store, Users, Wallet, type IconComponent } from "@/components/icons"
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -48,7 +48,7 @@ const navItems: BottomNavItem[] = [
   },
 ]
 
-/** ESPEE payments, Courses, Cohorts, Sellers, Partners, Reviews and Exams share the fifth slot behind a "More" menu. Team joins the menu for super admins. */
+/** ESPEE payments, Courses, Cohorts, Sellers, Partners, Enrollments, Reviews and Exams share the fifth slot behind a "More" menu. Team joins the menu for super admins. */
 const moreItems: BottomNavItem[] = [
   {
     title: "Transfer payments",
@@ -79,6 +79,13 @@ const moreItems: BottomNavItem[] = [
     href: "/admin/partners",
     icon: HandshakeIcon,
     match: (p: string) => p.startsWith("/admin/partners"),
+  },
+  // 2026-11-12: Enrollments (and Add paid learners behind it) had no way in on a phone.
+  {
+    title: "Enrollments",
+    href: "/admin/enrollments",
+    icon: GraduationCap,
+    match: (p: string) => p.startsWith("/admin/enrollments"),
   },
   {
     title: "Reviews",

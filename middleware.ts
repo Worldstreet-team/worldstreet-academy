@@ -37,7 +37,11 @@ export default clerkMiddleware(async (auth, request) => {
   // A code on a program page is also kept per course, last touch wins
   // (SELLER_LINK_COOKIE): a seller's own link must still credit the seller
   // when this visitor followed someone else's link before.
-  const linkedSlug = pathname.match(/^\/programs\/([^/]+)\/?$/)?.[1] ?? null
+  // 2026-11-12: lowercased, like the stored slug — `/programs/Forex-Mastery?ref=X`
+  // redirects to the lowercase page, and checkout matches the cookie against the
+  // stored slug, so a mixed-case link lost the seller's credit. Was:
+  // const linkedSlug = pathname.match(/^\/programs\/([^/]+)\/?$/)?.[1] ?? null
+  const linkedSlug = pathname.match(/^\/programs\/([^/]+)\/?$/)?.[1]?.toLowerCase() ?? null
   const courseRefCode = linkedSlug ? normalizeReferralCode(request.nextUrl.searchParams.get(REFERRAL_PARAM)) : null
   const withReferral = (response: NextResponse) => {
     if (linkedSlug && courseRefCode) {

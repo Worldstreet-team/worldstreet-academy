@@ -15,6 +15,7 @@ import {
 } from "@/lib/actions/mentorship"
 import { formatDateTime } from "@/lib/dashboard-home"
 import { queryKeys } from "@/lib/hooks/queries/keys"
+import { useClientNow } from "@/lib/hooks/use-now"
 
 /* Executive mentorship on /instructor/meetings: answer requests, see booked
    sessions (they start from Active Meetings below), keep each mentee's roadmap.
@@ -44,6 +45,12 @@ function RequestRow({ session, onChanged }: { session: MentorshipSessionView; on
   const [declining, setDeclining] = React.useState(false)
   const [note, setNote] = React.useState("")
   const { error, pending, run } = useRowAction(onChanged)
+  // 2026-11-12: a passed time still offered "Confirm", and only the refusal said it had passed.
+  // Passed times now show struck through, and the row says what to do. (The server checks
+  // again: confirmMentorshipSession refuses a time within a minute.) Null until hydrated.
+  const now = useClientNow()
+  const isPassed = (slot: string) => now !== null && Date.parse(slot) <= now + 60_000
+  const allPassed = session.proposedSlots.length > 0 && session.proposedSlots.every(isPassed)
 
   return (
     <li className="space-y-3 rounded-md bg-ws-sunken p-3">
@@ -53,18 +60,34 @@ function RequestRow({ session, onChanged }: { session: MentorshipSessionView; on
         {session.note && <p className="mt-1 break-words text-[12px] text-ws-muted">“{session.note}”</p>}
       </div>
       <div className="flex flex-wrap gap-2">
-        {session.proposedSlots.map((slot) => (
-          <Button
-            key={slot}
-            size="sm"
-            variant="outline"
-            className="tabular-nums"
-            disabled={pending}
-            onClick={() => run(() => confirmMentorshipSession(session.id, slot))}
-          >
+        {/* {session.proposedSlots.map((slot) => (
+          <Button key={slot} size="sm" variant="outline" className="tabular-nums" disabled={pending}
+            onClick={() => run(() => confirmMentorshipSession(session.id, slot))}>
             Confirm {formatDateTime(slot)}
           </Button>
-        ))}
+        ))} */}
+        {session.proposedSlots.map((slot) =>
+          isPassed(slot) ? (
+            <span
+              key={slot}
+              className="inline-flex h-8 items-center rounded-full px-3 text-[12px] tabular-nums text-ws-subtle line-through"
+              title="This time has passed"
+            >
+              {formatDateTime(slot)}
+            </span>
+          ) : (
+            <Button
+              key={slot}
+              size="sm"
+              variant="outline"
+              className="tabular-nums"
+              disabled={pending}
+              onClick={() => run(() => confirmMentorshipSession(session.id, slot))}
+            >
+              Confirm {formatDateTime(slot)}
+            </Button>
+          )
+        )}
         {!declining && (
           <Button size="sm" variant="ghost" disabled={pending} onClick={() => setDeclining(true)}>
             Decline
@@ -93,6 +116,11 @@ function RequestRow({ session, onChanged }: { session: MentorshipSessionView; on
             Keep
           </Button>
         </div>
+      )}
+      {allPassed && !declining && (
+        <p className="text-[11px] text-ws-muted">
+          Every proposed time has passed. Decline with a note asking the student for new times.
+        </p>
       )}
       {pending && <p className="text-[11px] text-ws-muted">Working…</p>}
       {error && <p className="text-xs text-ws-danger">{error}</p>}

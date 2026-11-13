@@ -5,7 +5,9 @@ export function money(minor: number, currency = "USD"): string {
   const sign = minor < 0 ? "-" : ""
   const abs = Math.abs(minor)
   const symbol = currency === "USD" ? "$" : `${currency} `
-  return `${sign}${symbol}${(abs / 100).toFixed(2)}`
+  // 2026-11-12: thousands grouped ("$1,582.00"); totals in the thousands read as one run of digits. Was:
+  // return `${sign}${symbol}${(abs / 100).toFixed(2)}`
+  return `${sign}${symbol}${(abs / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 export function formatDate(iso: string): string {

@@ -1,5 +1,6 @@
 "use client"
-import { Ban } from "@/components/icons"
+// 2026-11-12: GraduationCapIcon for the not-found state. Was: import { Ban } from "@/components/icons"
+import { Ban, GraduationCapIcon } from "@/components/icons"
 
 import * as React from "react"
 import { useParams } from "next/navigation"
@@ -19,6 +20,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { EmptyState } from "@/components/shared/empty-state"
 
 import { useUser } from "@/components/providers/user-provider"
 import {
@@ -30,6 +32,7 @@ import {
   adminProposeSlots,
   adminAssignApplication,
   adminSaveScorecard,
+  getApplicationDocumentUrl,
 } from "@/lib/actions/applications"
 import type { RejectionReason } from "@/lib/db/models"
 import { SCHOOL_BY_SLUG } from "@/lib/schools"
@@ -114,6 +117,65 @@ function LinkRow({ label, href }: { label: string; href?: string }) {
   )
 }
 
+/**
+ * An uploaded application PDF held in the private bucket (2026-11-12). Each
+ * click mints a fresh 5-minute signed link; the page never holds a URL or key.
+ * A phone browser blocks window.open after an await, so it falls back to this
+ * tab (the course-resources pattern).
+ */
+function DocumentRow({
+  label,
+  action,
+  applicationId,
+  which,
+}: {
+  label: string
+  action: string
+  applicationId: string
+  which: "cv" | "extra"
+}) {
+  const [busy, setBusy] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
+
+  async function open() {
+    setBusy(true)
+    setError(null)
+    let result: Awaited<ReturnType<typeof getApplicationDocumentUrl>>
+    try {
+      result = await getApplicationDocumentUrl(applicationId, which)
+    } catch {
+      setBusy(false)
+      setError("We couldn't reach the server. Check your connection, or reload the page.")
+      return
+    }
+    setBusy(false)
+    if (!result.success) {
+      setError(result.error)
+      return
+    }
+    const opened = window.open(result.data.url, "_blank")
+    if (opened) opened.opener = null
+    else window.location.assign(result.data.url)
+  }
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between gap-2 text-xs">
+        <span className="text-muted-foreground">{label}</span>
+        <button
+          type="button"
+          onClick={open}
+          disabled={busy}
+          className="text-ws-gold hover:underline disabled:opacity-60 disabled:no-underline"
+        >
+          {busy ? "Opening…" : action}
+        </button>
+      </div>
+      {error && <p className="text-right text-[11px] text-ws-danger">{error}</p>}
+    </div>
+  )
+}
+
 export default function AdminApplicationDetailPage() {
   const params = useParams<{ applicationId: string }>()
   const applicationId = params.applicationId
@@ -151,7 +213,9 @@ export default function AdminApplicationDetailPage() {
     }
   }, [])
 
-  const { data: app, isLoading } = useQuery({
+  // 2026-11-12: isPending (no answer yet) rather than isLoading, so the server render and a
+  // first client render both show the skeleton, never "not found". Was: const { data: app, isLoading } = useQuery({
+  const { data: app, isPending } = useQuery({
     queryKey: queryKeys.adminApplicationDetail(applicationId),
     queryFn: () => adminGetApplication(applicationId),
   })
@@ -303,11 +367,21 @@ export default function AdminApplicationDetailPage() {
       <Topbar variant="admin" breadcrumbOverrides={{ [applicationId]: app?.applicantName ?? "Application" }} />
       <div className="flex-1 px-4 sm:px-6 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-8 md:px-8 md:pb-12 lg:px-12">
         <div className="mx-auto w-full max-w-4xl space-y-4">
-        {isLoading || !app ? (
+        {/* 2026-11-12: an unknown or mistyped id loaded nothing and kept the skeleton forever. Was:
+        {isLoading || !app ? ( */}
+        {isPending ? (
           <div className="space-y-3">
             <Skeleton className="h-24 rounded-lg" />
             <Skeleton className="h-48 rounded-lg" />
           </div>
+        ) : !app ? (
+          <EmptyState
+            icon={GraduationCapIcon}
+            title="Application not found"
+            description="This application doesn't exist, or the link is incomplete."
+            actionLabel="Back to applications"
+            actionHref="/admin/applications"
+          />
         ) : (
           <>
             {/* Applicant header */}
@@ -447,7 +521,10 @@ export default function AdminApplicationDetailPage() {
                 {actionError && (
                   <p className="text-xs text-ws-danger mt-2">{actionError}</p>
                 )}
-                {app.interview?.mode === "office" && (
+                {/* 2026-11-12: only while the application is open; a rejected one still read "Office
+                    interview scheduled" (the timeline keeps the booking). Was:
+                {app.interview?.mode === "office" && ( */}
+                {isActive && app.interview?.mode === "office" && (
                   <div className="mt-3 rounded-lg border border-ws-brand/25 bg-ws-brand/10 px-3 py-2.5">
                     <p className="text-xs font-semibold">Office interview scheduled</p>
                     <p className="text-[11px] text-muted-foreground">
@@ -579,8 +656,25 @@ export default function AdminApplicationDetailPage() {
                     <div className="space-y-1.5 pt-1 border-t border-ws-hairline">
                       <LinkRow label="Portfolio" href={app.answers.portfolioUrl} />
                       <LinkRow label="Sample video" href={app.answers.sampleVideoUrl} />
+                      {/* 2026-11-12: an uploaded PDF is private, opened through a signed link; a
+                          pasted link (or a legacy public upload not yet moved) still shows as a link.
                       <LinkRow label="CV / credentials" href={app.answers.cvUrl} />
-                      <LinkRow label="Additional document" href={app.answers.extraDocumentUrl} />
+                      <LinkRow label="Additional document" href={app.answers.extraDocumentUrl} /> */}
+                      {app.documents.cv ? (
+                        <DocumentRow label="CV / credentials" action="View CV" applicationId={app.id} which="cv" />
+                      ) : (
+                        <LinkRow label="CV / credentials" href={app.answers.cvUrl} />
+                      )}
+                      {app.documents.extra ? (
+                        <DocumentRow
+                          label="Additional document"
+                          action="View document"
+                          applicationId={app.id}
+                          which="extra"
+                        />
+                      ) : (
+                        <LinkRow label="Additional document" href={app.answers.extraDocumentUrl} />
+                      )}
                       <LinkRow label="LinkedIn" href={app.answers.linkedin} />
                       <LinkRow label="Twitter / X" href={app.answers.twitter} />
                       <LinkRow label="Website" href={app.answers.website} />

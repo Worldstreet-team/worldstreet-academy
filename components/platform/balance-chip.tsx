@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query"
 import { getMyWalletBalance } from "@/lib/actions/wallet"
 import { queryKeys } from "@/lib/hooks/queries/keys"
 import { useBalanceHidden } from "@/components/wallet/shared"
+import { useGated } from "@/components/platform/gate-guard"
 
 /**
  * The Worldstreet Wallet's USD balance in the top bar.
@@ -38,6 +39,10 @@ export function BalanceChip() {
     refetchOnWindowFocus: false,
   })
   const [hidden, toggle] = useBalanceHidden()
+  // 2026-11-12: a learner who hasn't paid yet can't open the Academy's wallet
+  // page (the gate sent them to the schools), so the pill opens the WorldStreet
+  // dashboard, where they add money, in a new tab like checkout's "Add money".
+  const gated = useGated()
 
   if (!data?.enabled) return null
 
@@ -51,6 +56,21 @@ export function BalanceChip() {
 
   return (
     <div data-tour="wallet-chip" className="hidden h-10 shrink-0 items-center rounded-full bg-surface-sunken pr-1 ring-1 ring-border/70 transition-colors duration-[var(--ws-motion-fast)] focus-within:ring-2 focus-within:ring-primary/40 hover:bg-accent lg:inline-flex">
+      {gated ? (
+        <a
+          href={data.fundingUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`Wallet balance ${hidden ? "hidden" : formatted}. Add money on WorldStreet (opens a new tab).`}
+          title="Add money on WorldStreet"
+          className="flex h-full items-center gap-2 rounded-full pl-3.5 pr-1.5 outline-none"
+        >
+          <Glyph icon={Wallet01Icon} aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+          <span className="text-[13px] font-semibold leading-none tabular-nums text-foreground">
+            {hidden ? masked : formatted}
+          </span>
+        </a>
+      ) : (
       <Link
         href="/dashboard/wallet"
         aria-label={`Wallet balance ${hidden ? "hidden" : formatted}. Open wallet.`}
@@ -63,6 +83,7 @@ export function BalanceChip() {
           {hidden ? masked : formatted}
         </span>
       </Link>
+      )}
 
       <button
         type="button"

@@ -19,6 +19,8 @@ export type MyPaymentStatus =
   | "refunding"
   | "refunded"
   | "failed"
+  /** Not confirmed either way: the wallet didn't answer, or the order stalled mid-charge (2026-11-12). */
+  | "unconfirmed"
   | "declined"
   | "cancelled"
 
@@ -42,26 +44,53 @@ export type MyPayment = {
 /** The newest this many of each kind. */
 const LIMIT = 50
 
+/** An order still "processing" after this long stalled mid-charge (a restart, a closed connection). */
+const STALLED_AFTER_MS = 15 * 60 * 1000
+
 /**
  * An order's state in a learner's words. A failed order that still carries a
  * charge id was charged, then the compensating refund failed: reconciliation
  * owes it back (lib/actions/enrollments.ts), so it reads as being refunded.
+ * Only a decline proves no money moved (2026-11-12): after a timeout or a
+ * wallet error the debit may have gone through, and the learner is never told
+ * "you weren't charged" then.
  */
-function orderStatus(status: OrderStatus, chargeId: string | null): MyPaymentStatus {
+function orderStatus(
+  status: OrderStatus,
+  chargeId: string | null,
+  failureCode: string | null,
+  updatedAt: Date
+): MyPaymentStatus {
   switch (status) {
     case "paid":
     case "enrolled":
       return "paid"
     case "pending":
     case "payment_requested":
-      return "processing"
+      // return "processing" — 2026-11-12: a stalled order is unconfirmed, not "confirming" forever
+      return Date.now() - updatedAt.getTime() > STALLED_AFTER_MS ? "unconfirmed" : "processing"
     case "refunded":
       return "refunded"
     case "cancelled":
       return "cancelled"
     case "failed":
-      return chargeId ? "refunding" : "failed"
+      // return chargeId ? "refunding" : "failed" — 2026-11-12: only a decline reads "not charged"
+      // (A failed transfer approval carries no failure code: its proof went back to review.)
+      // return chargeId ? "refunding" : failureCode && failureCode !== "insufficient_funds" ? "unconfirmed" : "failed"
+      // 2026-11-12: a charge looked for in the wallet and not found (NO_CHARGE_FOUND, set by
+      // lib/actions/enrollments.ts) also proves nothing moved.
+      return chargeId
+        ? "refunding"
+        : failureCode && failureCode !== "insufficient_funds" && failureCode !== "NO_CHARGE_FOUND"
+          ? "unconfirmed"
+          : "failed"
   }
+}
+
+/** "Upgrade from Basic to Executive" (2026-11-12): an upgrade order charges only the difference. */
+function upgradeLabel(from: string | null, to: string | null): string {
+  if (from && to) return `Upgrade from ${from} to ${to}`
+  return to ? `Upgrade to ${to}` : "Plan upgrade"
 }
 
 export async function myPayments(userId: string): Promise<MyPayment[]> {
@@ -69,7 +98,8 @@ export async function myPayments(userId: string): Promise<MyPayment[]> {
     Order.find({ user: userId })
       .sort({ updatedAt: -1 })
       .limit(LIMIT)
-      .select("course packageKey amountMinor status chargeId paymentMethod updatedAt")
+      // .select("course packageKey amountMinor status chargeId failureCode paymentMethod updatedAt") — 2026-11-12: + an upgrade's kind and old plan
+      .select("course packageKey amountMinor status chargeId failureCode paymentMethod updatedAt kind fromPackageKey")
       .lean(),
     ManualPayment.find({ user: userId, status: { $in: ["submitted", "rejected"] } })
       .sort({ updatedAt: -1 })
@@ -93,12 +123,13 @@ export async function myPayments(userId: string): Promise<MyPayment[]> {
   const rows: MyPayment[] = [
     ...orders.map((o): MyPayment => {
       const courseId = o.course.toString()
-      const status = orderStatus(o.status, o.chargeId ?? null)
+      const status = orderStatus(o.status, o.chargeId ?? null, o.failureCode ?? null, o.updatedAt)
       return {
         id: o._id.toString(),
         courseId,
         courseTitle: titleOf(courseId),
-        plan: planOf(o.packageKey),
+        // plan: planOf(o.packageKey), — 2026-11-12: a plan upgrade says so, and from which plan
+        plan: o.kind === "upgrade" ? upgradeLabel(planOf(o.fromPackageKey), planOf(o.packageKey)) : planOf(o.packageKey),
         amountMinor: o.amountMinor,
         method: isTransferMethod(o.paymentMethod) ? o.paymentMethod : "wallet",
         status,

@@ -1,5 +1,5 @@
 "use client"
-import { Glyph, ArrowRight01Icon, DashboardSpeed01Icon, Logout01Icon, Moon02Icon, Search01Icon, Settings01Icon, Shield01Icon, Sun03Icon, TeachingIcon, UserIcon } from "@/components/icons"
+import { Glyph, ArrowRight01Icon, BookOpen01Icon, DashboardSpeed01Icon, Logout01Icon, Moon02Icon, Search01Icon, Settings01Icon, Shield01Icon, Sun03Icon, TeachingIcon, UserIcon } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
@@ -27,10 +27,12 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { BalanceChip } from "@/components/platform/balance-chip"
+import { useGated } from "@/components/platform/gate-guard"
 import { NotificationBell } from "@/components/shared/notification-bell"
 import { useUser } from "@/components/providers/user-provider"
 import { LogoutConfirmDialog } from "@/components/shared/logout-confirm-dialog"
 import { LanguagePicker } from "@/components/translator/language-picker"
+import { markPageHydrated } from "@/lib/hooks/queries/after-hydration"
 import { cn } from "@/lib/utils"
 
 /* ── Path → breadcrumb label map ────────────────────────── */
@@ -160,6 +162,15 @@ export function Topbar({ title, variant = "platform", breadcrumbOverrides }: Top
   const isInstructor = user.role === "INSTRUCTOR" || user.role === "ADMIN"
   const [logoutOpen, setLogoutOpen] = React.useState(false)
   const isApple = useIsApple()
+  // A learner who hasn't paid yet: the gate bounces Profile and Settings to the schools (2026-11-12).
+  const gated = useGated()
+
+  // Every dashboard page renders this bar inside its own Suspense boundary, so its
+  // first effect means the page has hydrated: the queries it shares with the rail
+  // may now fetch (lib/hooks/queries/after-hydration.ts, React #418).
+  React.useEffect(() => {
+    markPageHydrated()
+  }, [])
 
   // Shared cmd+k trigger
   const triggerSearch = () => {
@@ -339,6 +350,15 @@ export function Topbar({ title, variant = "platform", breadcrumbOverrides }: Top
                   <DropdownMenuSeparator />
                 </>
               )}
+              {/* 2026-11-12: behind the gate, Profile and Settings only bounced to the schools;
+                  the rail's footer offers "Choose a program" there too. */}
+              {gated ? (
+                <DropdownMenuItem render={<Link href="/schools" />}>
+                  <Glyph icon={BookOpen01Icon} />
+                  Choose a program
+                </DropdownMenuItem>
+              ) : (
+                <>
               <DropdownMenuItem render={<Link href={variant === "instructor" ? "/instructor/settings" : "/dashboard/profile"} />}>
                 <Glyph icon={UserIcon} />
                 Profile
@@ -347,6 +367,8 @@ export function Topbar({ title, variant = "platform", breadcrumbOverrides }: Top
                 <Glyph icon={Settings01Icon} />
                 Settings
               </DropdownMenuItem>
+                </>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 variant="destructive"

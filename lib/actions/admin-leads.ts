@@ -142,9 +142,14 @@ export async function exportInterestedLearnersCsv(): Promise<
     let withSignal = 0
     // Names and referral answers are typed by learners: a leading = + - @
     // would run as a formula when sales opens the file in a spreadsheet.
+    // 2026-11-12: a leading tab or carriage return is a formula trigger too (as in the partners export).
+    // const quote = (v: string | number | null) => {
+    //   const text = String(v ?? "")
+    //   return `"${(/^[=+\-@]/.test(text) ? `'${text}` : text).replace(/"/g, '""')}"`
+    // }
     const quote = (v: string | number | null) => {
       const text = String(v ?? "")
-      return `"${(/^[=+\-@]/.test(text) ? `'${text}` : text).replace(/"/g, '""')}"`
+      return `"${(/^[=+\-@\t\r]/.test(text) ? `'${text}` : text).replace(/"/g, '""')}"`
     }
     const header = [
       "First name",

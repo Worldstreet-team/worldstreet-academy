@@ -251,9 +251,15 @@ export async function POST(request: NextRequest) {
   // skipped. A run that missed the 24 h window sends only the 72 h email.
   let nudged = 0
   const DAY = 24 * 3600 * 1000
+  // 2026-11-12: only choices saved in the last week. This job also sends the class and
+  // interview reminders, yet it stayed switched off on production because its first run would
+  // have mailed every open choice since 2026-09-21 (257 learners, some two months old). Older
+  // choices are left alone, never nudged (choosing a different program saves a fresh date).
+  const NUDGE_WINDOW_DAYS = 7
   const due = await EnrollmentIntent.find({
     status: "open",
     course: { $ne: null },
+    savedAt: { $gte: new Date(now - NUDGE_WINDOW_DAYS * DAY) },
     $or: [
       { savedAt: { $lte: new Date(now - DAY) }, "nudges.h24SentAt": null },
       { savedAt: { $lte: new Date(now - 3 * DAY) }, "nudges.h72SentAt": null },
@@ -297,6 +303,8 @@ export async function POST(request: NextRequest) {
         User.findById(intent.user).select("firstName email").lean(),
       ])
       if (!program || program.status !== "published" || !learner?.email) continue
+      // Placeholder addresses (mobile sign-ups) can't receive mail — the class reminders' rule above.
+      if (learner.email.endsWith("@users.noemail")) continue
 
       const chosen = intent.packageKey ? program.packages.find((p) => p.key === intent.packageKey) : undefined
       await sendFinishEnrollingEmail({

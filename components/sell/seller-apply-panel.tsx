@@ -19,12 +19,18 @@ import {
 } from "@/lib/actions/seller-applications"
 import { SCHOOLS, SCHOOL_BY_SLUG, type SchoolSlug } from "@/lib/schools"
 import { QUALITY_CRITERIA, SELLER_HOME } from "@/lib/marketplace"
+import { COHORT_TIME_ZONE } from "@/lib/cohort"
 
 /* The student shell's v2 surfaces (as on /dashboard/become-instructor). */
 const PANEL = "rounded-[20px] border border-ws-hairline bg-card dark:border-transparent"
 
+// 2026-11-12: pinned to Lagos. This panel is first rendered on the server (UTC) with the
+// application's date, so between midnight and 1am Lagos the two renders disagreed (a hydration error).
+// function formatDay(iso: string): string {
+//   return new Date(iso).toLocaleDateString("en-US", { dateStyle: "medium" })
+// }
 function formatDay(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", { dateStyle: "medium" })
+  return new Date(iso).toLocaleDateString("en-US", { dateStyle: "medium", timeZone: COHORT_TIME_ZONE })
 }
 
 function Field({

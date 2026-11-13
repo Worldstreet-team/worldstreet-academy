@@ -36,16 +36,28 @@ export function LessonVideoPlayer({
   
   // Fetch saved watch position on mount
   useEffect(() => {
-    getLessonWatchProgress(lessonId).then((progress) => {
-      if (progress && progress.currentTime > 0) {
-        setInitialTime(progress.currentTime)
-      }
-    })
+    getLessonWatchProgress(lessonId)
+      .then((progress) => {
+        // 2026-11-12: a video watched to its last seconds starts again from the
+        // top — resuming there ended it at once and auto-advanced the learner.
+        // if (progress && progress.currentTime > 0) {
+        if (progress && progress.currentTime > 0 && progress.duration - progress.currentTime > 15) {
+          setInitialTime(progress.currentTime)
+        }
+      })
+      // No saved position (offline, a tab left open across a deploy): play from the start.
+      .catch(() => {})
   }, [lessonId])
   
   const handleComplete = () => {
     startTransition(async () => {
-      await markLessonComplete(courseId, lessonId)
+      // 2026-11-12: a thrown call reached the error boundary mid-lesson.
+      // await markLessonComplete(courseId, lessonId)
+      try {
+        await markLessonComplete(courseId, lessonId)
+      } catch {
+        return
+      }
       void invalidateEnrollments()
       router.refresh()
     })

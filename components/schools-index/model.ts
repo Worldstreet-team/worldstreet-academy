@@ -1,6 +1,7 @@
 import type { BrowseCourse } from "@/lib/actions/student"
 import { SCHOOLS, type FromPrice, type SchoolSlug } from "@/lib/schools"
 import { schoolCover } from "@/lib/school-art"
+import { COHORT_TIME_ZONE } from "@/lib/cohort"
 import { FACULTY_PUBLIC } from "@/lib/faculty"
 
 /**
@@ -101,9 +102,11 @@ function toProgram(course: BrowseCourse, now: number): IndexProgram {
     price: course.price ?? null,
     listPrice: course.listPrice,
     packages: course.tierCount,
+    // 2026-11-12: Lagos, not UTC — a start picked at Lagos midnight is 23:00 UTC the day before. Was:
+    // ? `Opens ${opensAt.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}`
     opens:
       opensAt && opensAt.getTime() > now
-        ? `Opens ${opensAt.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}`
+        ? `Opens ${opensAt.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: COHORT_TIME_ZONE })}`
         : null,
     terms: wordsOf(
       [

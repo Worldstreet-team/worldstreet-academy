@@ -15,6 +15,7 @@ import {
 } from "@/lib/r2"
 import type { ResourceKind } from "@/lib/db/models/resource"
 import { getCourseAccess, isLessonLockedFor, lockedLessonIds } from "@/lib/course-access"
+import { teachesCourse, teachingFilter } from "@/lib/teaching"
 
 // Instructors upload learning materials, students download them — but only
 // once the server has confirmed they're enrolled. Files live in a private
@@ -41,6 +42,8 @@ const ALLOWED_MIME: Record<string, ResourceKind> = {
   "application/vnd.openxmlformats-officedocument.presentationml.presentation": "slides",
   "text/csv": "template",
   "application/zip": "template",
+  // Windows browsers label a .zip this way (PRODUCT_MIME in lib/course-format.ts takes it too).
+  "application/x-zip-compressed": "template",
 }
 
 export type ResourceListItem = {
@@ -202,18 +205,33 @@ export async function deleteResource(resourceId: string): Promise<{ success: boo
   }
 }
 
-/** Does this viewer have download rights for the course's paid materials? */
-async function hasCourseAccess(courseId: string, user: { id: string; role: string } | null) {
+/**
+ * Does this viewer have download rights for the course's paid materials?
+ * "staff" (TEACH scope: an admin, the owner, or faculty assigned to teach it)
+ * open every material; a "learner" (enrolled) opens what their plan's lessons
+ * do. Uploading and removing stay OWNER scope (`assertCourseOwner`).
+ */
+async function hasCourseAccess(
+  courseId: string,
+  user: { id: string; role: string } | null
+): Promise<"staff" | "learner" | false> {
   if (!user || !isId(courseId)) return false
-  if (user.role === "ADMIN") return true
+  // 2026-11-12: staff and learners are told apart, so a plan's lesson locks never apply to staff.
+  // if (user.role === "ADMIN") return true
+  if (user.role === "ADMIN") return "staff"
   const course = await Course.findById(courseId).select("instructor")
-  if (course && course.instructor.toString() === user.id) return true
+  // if (course && course.instructor.toString() === user.id) return true
+  if (course && course.instructor.toString() === user.id) return "staff"
+  // 2026-11-12 (Owen): assigned teaching faculty download their program's materials too,
+  // while their role is INSTRUCTOR or ADMIN (lib/teaching.ts). They were told to enroll.
+  if (await teachesCourse(user, courseId)) return "staff"
   const enrollment = await Enrollment.findOne({
     user: user.id,
     course: courseId,
     status: { $in: ["active", "completed"] },
   }).select("_id")
-  return Boolean(enrollment)
+  // return Boolean(enrollment)
+  return enrollment ? "learner" : false
 }
 
 /**
@@ -228,7 +246,10 @@ export async function listCourseResources(courseId: string): Promise<ResourceLis
     const user = await getCurrentUser()
     const access = await hasCourseAccess(courseId, user)
     // Materials attached to a lesson the student's package can't open stay locked.
-    const lockedLessons = user ? await lockedLessonIds(await getCourseAccess(user.id, courseId)) : new Set<string>()
+    // 2026-11-12: never for staff (a tutor who is also enrolled on a smaller plan).
+    // const lockedLessons = user ? await lockedLessonIds(await getCourseAccess(user.id, courseId)) : new Set<string>()
+    const lockedLessons =
+      user && access !== "staff" ? await lockedLessonIds(await getCourseAccess(user.id, courseId)) : new Set<string>()
 
     const resources = await Resource.find({ course: courseId }).sort({ order: 1 }).lean()
     return resources.map((r) => {
@@ -277,7 +298,9 @@ export async function getResourceDownloadUrl(
       if (!access) {
         return { success: false, error: "Enroll in this course to download its materials" }
       }
-      if (resource.lesson && (await isLessonLockedFor(user.id, resource.lesson.toString()))) {
+      // 2026-11-12: a plan's lesson locks are a learner's; staff (TEACH scope) open every material.
+      // if (resource.lesson && (await isLessonLockedFor(user.id, resource.lesson.toString()))) {
+      if (access !== "staff" && resource.lesson && (await isLessonLockedFor(user.id, resource.lesson.toString()))) {
         return { success: false, error: "This material belongs to a lesson outside your plan" }
       }
     }
@@ -332,7 +355,9 @@ export type FacultyMaterialsProgram = {
   id: string
   title: string
   /** The course page's materials section, where uploads and removals happen. */
-  manageHref: string
+  // 2026-11-12: null on a program the caller is assigned to teach: adding materials stays with its owner.
+  // manageHref: string
+  manageHref: string | null
   materials: FacultyMaterial[]
 }
 
@@ -341,6 +366,9 @@ export type FacultyMaterialsProgram = {
  * program the caller teaches (an admin too sees only their own, as on My
  * Courses) with its materials. Read only, and metadata only: neither a
  * storage key nor a link's destination is selected, so neither can leave.
+ * Each material downloads through getResourceDownloadUrl's signed link.
+ * Since 2026-11-12 (Owen) that includes the programs they are assigned to
+ * teach (lib/teaching.ts), which they download from but don't manage.
  */
 export async function getMyCourseMaterials(): Promise<
   { success: true; data: { programs: FacultyMaterialsProgram[]; total: number } } | { success: false; error: string }
@@ -351,7 +379,9 @@ export async function getMyCourseMaterials(): Promise<
     if (!user) return { success: false, error: "You need to be signed in" }
     if (user.role !== "INSTRUCTOR" && user.role !== "ADMIN") return { success: false, error: "Instructors only" }
 
-    const courses = await Course.find({ instructor: user.id }).select("title").sort({ title: 1 }).lean()
+    // 2026-11-12: the programs they are assigned to teach as well as their own.
+    // const courses = await Course.find({ instructor: user.id }).select("title").sort({ title: 1 }).lean()
+    const courses = await Course.find(teachingFilter(user)).select("title instructor").sort({ title: 1 }).lean()
     if (courses.length === 0) return { success: true, data: { programs: [], total: 0 } }
 
     const resources = await Resource.find({ course: { $in: courses.map((c) => c._id) } })
@@ -383,7 +413,10 @@ export async function getMyCourseMaterials(): Promise<
         programs: courses.map((c) => ({
           id: c._id.toString(),
           title: c.title,
-          manageHref: `/instructor/courses/${c._id}#materials`,
+          // manageHref: `/instructor/courses/${c._id}#materials`,
+          // OWNER scope (owner + admin) manages; an assigned tutor only downloads.
+          manageHref:
+            user.role === "ADMIN" || c.instructor.toString() === user.id ? `/instructor/courses/${c._id}#materials` : null,
           materials: byCourse.get(c._id.toString()) ?? [],
         })),
         total: resources.length,

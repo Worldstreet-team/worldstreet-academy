@@ -77,7 +77,9 @@ export default function AdminUsersPage() {
         setExportError(res.error)
         return
       }
-      const blob = new Blob([res.data.csv], { type: "text/csv;charset=utf-8" })
+      // 2026-11-12: a byte-order mark, so Excel reads names with accents (Yoruba ọ, ẹ, ṣ) as UTF-8.
+      // const blob = new Blob([res.data.csv], { type: "text/csv;charset=utf-8" })
+      const blob = new Blob(["﻿", res.data.csv], { type: "text/csv;charset=utf-8" })
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
@@ -296,9 +298,11 @@ export default function AdminUsersPage() {
                   {selected.adminLevel === "super" && (
                     <Badge variant="outline" className="text-[10px]">Super admin</Badge>
                   )}
-                  {selected.instructorStatus !== "none" && (
+                  {/* 2026-11-12: read from the fresh detail when loaded; the row copied when the sheet
+                      opened kept the old status after a role change. Was: selected.instructorStatus */}
+                  {(detail?.instructorStatus ?? selected.instructorStatus) !== "none" && (
                     <Badge variant="outline" className="text-[10px]">
-                      application: {selected.instructorStatus}
+                      application: {detail?.instructorStatus ?? selected.instructorStatus}
                     </Badge>
                   )}
                   {selected.verified && (
@@ -407,7 +411,12 @@ export default function AdminUsersPage() {
               ) : pendingRole === "INSTRUCTOR" ? (
                 <>Grants the instructor portal and course creation. Mirrored to Clerk metadata.</>
               ) : (
-                <>Revokes instructor/admin access. Their courses stay untouched.</>
+                // 2026-11-12: a demoted instructor's scheduled classes are now cancelled (lib/auth/admin.ts). Was:
+                // <>Revokes instructor/admin access. Their courses stay untouched.</>
+                <>
+                  Revokes instructor/admin access. Their courses stay untouched, but any classes they
+                  have scheduled are cancelled.
+                </>
               )}
             </DialogDescription>
           </DialogHeader>

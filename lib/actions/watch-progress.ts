@@ -1,9 +1,15 @@
 "use server"
 
 import connectDB from "@/lib/db"
-import { WatchProgress } from "@/lib/db/models"
+import { Lesson, WatchProgress } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth"
 import { isLessonLockedFor } from "@/lib/course-access"
+
+// 2026-11-12: ids arrive from the browser untyped; only id strings reach a query.
+const OBJECT_ID = /^[a-f0-9]{24}$/
+function isId(value: unknown): value is string {
+  return typeof value === "string" && OBJECT_ID.test(value)
+}
 
 // ============================================================================
 // TYPES
@@ -33,10 +39,26 @@ export async function saveWatchProgress(
   duration: number
 ): Promise<{ success: boolean }> {
   try {
+    // 2026-11-12: a NaN, negative or endless position (a live stream reports
+    // Infinity) is never stored, and the lesson must belong to the course named.
+    if (!isId(courseId) || !isId(lessonId)) return { success: false }
+    if (
+      typeof currentTime !== "number" ||
+      typeof duration !== "number" ||
+      !Number.isFinite(currentTime) ||
+      !Number.isFinite(duration) ||
+      currentTime < 0 ||
+      duration <= 0 ||
+      duration > 24 * 3600
+    ) {
+      return { success: false }
+    }
+    currentTime = Math.min(currentTime, duration)
     await connectDB()
     const user = await getCurrentUser()
     if (!user) return { success: false }
 
+    if (!(await Lesson.exists({ _id: lessonId, course: courseId }))) return { success: false }
     if (await isLessonLockedFor(user.id, lessonId)) return { success: false }
 
     const completed = duration > 0 && currentTime / duration >= 0.9
@@ -68,6 +90,7 @@ export async function getCourseWatchProgress(
   courseId: string
 ): Promise<LessonWatchProgress[]> {
   try {
+    if (!isId(courseId)) return []
     await connectDB()
     const user = await getCurrentUser()
     if (!user) return []
@@ -97,6 +120,7 @@ export async function getLessonWatchProgress(
   lessonId: string
 ): Promise<{ currentTime: number; duration: number } | null> {
   try {
+    if (!isId(lessonId)) return null
     await connectDB()
     const user = await getCurrentUser()
     if (!user) return null

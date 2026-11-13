@@ -192,7 +192,13 @@ export async function adminSetCourseStatus(
     if (previous === next) return { success: true }
 
     if (next === "published") {
-      const refusal = await publishRefusal(course)
+      // 2026-11-12: "Reinstate" (from suspended) and reopening a closed course bring back a
+      // course that was live, so the lessons gate is skipped as on "Show on website": catalogue
+      // programs sell with 0 lessons, and Suspend → Reinstate left them stuck. The price and the
+      // marketplace checks still apply.
+      // const refusal = await publishRefusal(course)
+      const wasLive = (previous === "suspended" || previous === "closed") && !!course.publishedAt
+      const refusal = await publishRefusal(course, { wasLive })
       if (refusal) return { success: false, error: refusal }
     }
 
@@ -398,6 +404,9 @@ export async function adminSetReviewModeration(
   try {
     await connectDB()
     await requireAdmin()
+    // 2026-11-12: a server action takes any argument; an object id is read as a Mongo operator.
+    if (typeof reviewId !== "string" || !OBJECT_ID.test(reviewId)) return { success: false, error: "Review not found" }
+    if (typeof changes !== "object" || changes === null) return { success: false, error: "Nothing to update" }
 
     const update: Record<string, boolean> = {}
     if (typeof changes.isHidden === "boolean") update.isHidden = changes.isHidden

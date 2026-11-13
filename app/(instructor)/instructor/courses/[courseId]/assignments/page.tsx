@@ -141,16 +141,28 @@ function SubmissionCard({ submission, onGraded }: { submission: InstructorSubmis
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-[13px] font-medium text-ws-primary">{submission.studentName}</p>
-          <p className="text-[11px] tabular-nums text-ws-muted">Submitted {formatDateTime(submission.submittedAt)}</p>
+          {/* 2026-11-12: how late, when it came in after the due date (computed on the server, no clock here). */}
+          {/* <p className="text-[11px] tabular-nums text-ws-muted">Submitted {formatDateTime(submission.submittedAt)}</p> */}
+          <p className="text-[11px] tabular-nums text-ws-muted">
+            Submitted {formatDateTime(submission.submittedAt)}
+            {submission.lateBy && ` · ${submission.lateBy}`}
+          </p>
         </div>
-        <span
-          className={cn(
-            "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums",
-            graded ? "bg-ws-success/10 text-ws-success" : "bg-ws-warning/10 text-ws-warning"
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+          {submission.lateBy && (
+            <span className="shrink-0 rounded-full bg-ws-warning/10 px-2 py-0.5 text-[10px] font-semibold text-ws-warning">
+              Submitted late
+            </span>
           )}
-        >
-          {graded ? `Graded · ${submission.grade}/100` : "Needs grading"}
-        </span>
+          <span
+            className={cn(
+              "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums",
+              graded ? "bg-ws-success/10 text-ws-success" : "bg-ws-warning/10 text-ws-warning"
+            )}
+          >
+            {graded ? `Graded · ${submission.grade}/100` : "Needs grading"}
+          </span>
+        </div>
       </div>
       {submission.text && (
         <p className="whitespace-pre-wrap break-words text-[13px] text-ws-primary">{submission.text}</p>
@@ -228,6 +240,7 @@ function AssignmentCard({
   const [editing, setEditing] = React.useState(false)
   const [open, setOpen] = React.useState(false)
   const graded = assignment.submissions.filter((s) => s.status === "graded").length
+  const late = assignment.submissions.filter((s) => s.lateBy !== null).length
 
   if (editing) {
     return (
@@ -268,6 +281,7 @@ function AssignmentCard({
           <p className="mt-1 text-[12px] tabular-nums text-ws-muted">
             {assignment.dueAt ? `Due ${formatDateTime(assignment.dueAt)} · ` : ""}
             {assignment.submissions.length} submitted · {graded} graded
+            {late > 0 && ` · ${late} late`}
           </p>
         </div>
         <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>

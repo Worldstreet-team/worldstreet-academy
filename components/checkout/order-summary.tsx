@@ -98,12 +98,15 @@ export function OrderCard({
   line,
   changeHref,
   reservedSeat,
+  upgradeFrom = null,
 }: {
   program: ProgramDetail
   pkg: PublicPackage
   line: { label: string | null; name: string }
   changeHref: string | null
   reservedSeat: boolean
+  /** The plan an upgrade leaves, e.g. "Basic" (2026-11-12); null for a purchase. */
+  upgradeFrom?: string | null
 }) {
   const school = program.school ? SCHOOL_BY_SLUG[program.school] : null
   return (
@@ -131,6 +134,7 @@ export function OrderCard({
       <div className="border-t border-ws-hairline px-5 py-5 sm:px-6">
         <PackageRow pkg={pkg} line={line} changeHref={changeHref} />
         {reservedSeat && <ReservedSeatNote />}
+        {upgradeFrom && <UpgradeNote from={upgradeFrom} />}
       </div>
     </section>
   )
@@ -146,12 +150,18 @@ export function MobileSummary({
   line,
   changeHref,
   reservedSeat,
+  upgradeFrom = null,
+  total = null,
 }: {
   program: ProgramDetail
   pkg: PublicPackage
   line: { label: string | null; name: string }
   changeHref: string | null
   reservedSeat: boolean
+  /** The plan an upgrade leaves (2026-11-12); null for a purchase. */
+  upgradeFrom?: string | null
+  /** What is due when it isn't the plan's price (an upgrade's difference). */
+  total?: string | null
 }) {
   const ok = useMotionOK()
   const [open, setOpen] = React.useState(false)
@@ -177,7 +187,8 @@ export function MobileSummary({
             )}
           />
         </span>
-        <span className="shrink-0 font-display text-[19px] font-normal tabular-nums text-ws-primary">{wholeUsd(pkg.price)}</span>
+        {/* 2026-11-12: an upgrade's bar shows the difference due. Was: {wholeUsd(pkg.price)} */}
+        <span className="shrink-0 font-display text-[19px] font-normal tabular-nums text-ws-primary">{total ?? wholeUsd(pkg.price)}</span>
       </button>
       <motion.div
         id="order-summary-panel"
@@ -206,10 +217,21 @@ export function MobileSummary({
           <div className="mt-4 rounded-[14px] bg-ws-surface p-4">
             <PackageRow pkg={pkg} line={line} changeHref={changeHref} compact />
             {reservedSeat && <ReservedSeatNote />}
+            {upgradeFrom && <UpgradeNote from={upgradeFrom} />}
           </div>
         </motion.div>
       </motion.div>
     </div>
+  )
+}
+
+/** An upgrade (2026-11-12): the learner moves up from the plan they hold and pays only the difference. */
+export function UpgradeNote({ from }: { from: string }) {
+  return (
+    <p className="mt-4 flex items-center gap-2 text-[13px] text-ws-muted">
+      <BadgeCheckIcon size={14} className="shrink-0" aria-hidden />
+      Upgrading from {from}: what you&apos;ve paid counts in full.
+    </p>
   )
 }
 

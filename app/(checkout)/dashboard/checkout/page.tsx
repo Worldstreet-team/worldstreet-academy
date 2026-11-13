@@ -4,16 +4,16 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 
 import { getCachedUser } from "@/lib/auth/cached"
-import { checkEnrollment } from "@/lib/actions/enrollments"
+import { checkEnrollment, getUpgradeOptions } from "@/lib/actions/enrollments"
 import { getMyWalletBalance } from "@/lib/actions/wallet"
 import { getEspeeCheckoutState } from "@/lib/actions/manual-payments"
 import { fetchProgramById } from "@/lib/actions/student"
 import { fetchProgramCurriculum } from "@/lib/actions/program-page"
-import { PACKAGE_RANK } from "@/lib/entitlements"
+import { PACKAGE_RANK, isPackageKey } from "@/lib/entitlements"
 import { referralCookieCode, referrerFor } from "@/lib/referrals"
 import { maskedName } from "@/lib/masked-name"
 import { courseAvailability, type CourseStatus } from "@/lib/types/course"
-import { CheckoutView, type CheckoutFacts } from "@/components/checkout/checkout-view"
+import { CheckoutView, type CheckoutFacts, type CheckoutUpgrade } from "@/components/checkout/checkout-view"
 
 export const metadata: Metadata = {
   title: "Checkout",
@@ -28,7 +28,9 @@ type Search = { courseId?: string | string[]; package?: string | string[] }
  *
  * Everything that can be settled before the buyer acts is settled here, on
  * the server, so the page never renders a choice that belongs elsewhere:
- *   · already enrolled → the confirmation page;
+ *   · already enrolled → the confirmation page, unless `package` is a higher
+ *     plan their place can move to: then the order is that upgrade, at the
+ *     difference (2026-11-12, Owen);
  *   · not live yet → the program page (its scheduling CTA is the right door);
  *   · a multi-package program without a valid `package` → the program page's
  *     package chooser, where the choice now lives (a single-price program
@@ -51,9 +53,28 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
   const [program, enrollment] = courseId
     ? await Promise.all([fetchProgramById(courseId), checkEnrollment(user.id, courseId)])
     : [null, null]
+  // 2026-11-12 (buyer QA): a learner who holds a place on a program that has since been hidden from the
+  // website kept getting "This order isn't available… Browse programs" from an old checkout link, as if
+  // their place were gone. Their program still opens for them, so they go there instead.
+  if (!program && courseId && enrollment?.isEnrolled) redirect(`/dashboard/courses/${courseId}`)
   if (!program || !enrollment) return <ProgramNotFound />
 
-  if (enrollment.isEnrolled) redirect(`/dashboard/checkout/success?courseId=${program.id}`)
+  // if (enrollment.isEnrolled) redirect(`/dashboard/checkout/success?courseId=${program.id}`)
+  // 2026-11-12: an enrolled learner choosing a higher plan is upgrading. The
+  // difference is worked out on the server; a place that can't move to that
+  // plan still goes to its confirmation, so no upgrade is ever offered to it.
+  let upgrade: CheckoutUpgrade | null = null
+  if (enrollment.isEnrolled) {
+    const options = isPackageKey(packageParam) ? await getUpgradeOptions(program.id) : null
+    const option = options?.options.find((o) => o.key === packageParam) ?? null
+    if (!options || !option) redirect(`/dashboard/checkout/success?courseId=${program.id}`)
+    upgrade = {
+      fromKey: options.current.key,
+      priceMinor: option.priceMinor,
+      paidMinor: options.paidMinor,
+      upgradeMinor: option.upgradeMinor,
+    }
+  }
 
   if (courseAvailability({ status: program.status as CourseStatus, availableAt: program.availableAt }) === "coming_soon") {
     redirect(`/programs/${program.slug}`)
@@ -90,6 +111,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Pro
       reservedSeat={enrollment.status === "pre_enrolled"}
       espee={espee}
       inviter={inviter}
+      upgrade={upgrade}
     />
   )
 }

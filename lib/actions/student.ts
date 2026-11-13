@@ -201,6 +201,18 @@ export type StudentBookmark = {
   enrolledCount: number
 }
 
+// 2026-11-12: ids arrive from the browser untyped — an object such as
+// {"$ne": null} reaches Mongo as an operator and matches another course's rows.
+const OBJECT_ID = /^[a-f0-9]{24}$/
+function isId(value: unknown): value is string {
+  return typeof value === "string" && OBJECT_ID.test(value)
+}
+
+/** Typed search text is matched literally, never as a pattern. */
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
 // ---- Get authenticated user's MongoDB document ----
 async function getAuthenticatedUser() {
   const authUser = await getCurrentUser()
@@ -265,19 +277,30 @@ export async function fetchBrowseCourses(options?: {
     if (typeof options?.instructorId === "string" && mongoose.Types.ObjectId.isValid(options.instructorId)) {
       query.instructor = options.instructorId
     }
-    if (options?.search) {
+    // 2026-11-12: matched literally — a typed "?" or "(" made Mongo reject the
+    // whole query (empty catalogue), and a crafted pattern could run slow.
+    // if (options?.search) {
+    //   query.$or = [
+    //     { title: { $regex: options.search, $options: "i" } },
+    //     { description: { $regex: options.search, $options: "i" } },
+    //   ]
+    // }
+    if (typeof options?.search === "string" && options.search.trim()) {
+      const rx = escapeRegex(options.search.trim().slice(0, 100))
       query.$or = [
-        { title: { $regex: options.search, $options: "i" } },
-        { description: { $regex: options.search, $options: "i" } },
+        { title: { $regex: rx, $options: "i" } },
+        { description: { $regex: rx, $options: "i" } },
       ]
     }
-    
+
     const courses = await Course.find(query)
       .populate("instructor", "firstName lastName avatarUrl role")
       .sort({ enrolledCount: -1, createdAt: -1 })
       .lean()
 
-    return courses.map((course) => {
+    // 2026-11-12: a course whose owner account no longer exists would throw
+    // below and empty the whole catalogue; it is left out instead.
+    return courses.filter((course) => course.instructor).map((course) => {
       const instructor = course.instructor as unknown as {
         _id: { toString(): string }
         firstName: string
@@ -447,16 +470,33 @@ export type PublicCourse = {
  */
 export async function fetchPublicCourse(courseId: string): Promise<PublicCourse | null> {
   try {
+    if (!isId(courseId)) return null
     await connectDB()
-    
-    const course = await Course.findOne({
-      _id: courseId,
-      status: "published",
-    })
+
+    // 2026-11-12: a hidden (archived) program keeps its enrolled learners and
+    // its staff — the player's "Overview" link 404'd for them. Anyone else
+    // still only finds a published course.
+    // const course = await Course.findOne({
+    //   _id: courseId,
+    //   status: "published",
+    // })
+    const course = await Course.findById(courseId)
       .populate("instructor", "firstName lastName avatarUrl bio role instructorProfile")
       .lean()
 
     if (!course) return null
+    if (course.status !== "published") {
+      const viewer = await getCurrentUser()
+      const ownerId = (course.instructor as unknown as { _id?: { toString(): string } } | null)?._id?.toString()
+      const keeps =
+        !!viewer &&
+        (viewer.role === "ADMIN" ||
+          viewer.id === ownerId ||
+          Boolean(
+            await Enrollment.exists({ user: viewer.id, course: courseId, status: { $in: ["active", "completed"] } })
+          ))
+      if (!keeps) return null
+    }
 
     const instructor = course.instructor as unknown as {
       _id: string
@@ -690,6 +730,8 @@ async function findProgram(filter: { slug: string } | { _id: string }): Promise<
  */
 export async function fetchProgramBySlug(slug: string): Promise<ProgramDetail | null> {
   try {
+    // 2026-11-12: a string only — an operator object matched the first program.
+    if (typeof slug !== "string" || slug.length === 0 || slug.length > 200) return null
     await connectDB()
     return await findProgram({ slug })
   } catch (error) {
@@ -782,6 +824,9 @@ export type LearnCourse = {
  */
 export async function fetchCourseForLearning(courseId: string): Promise<LearnCourse | null> {
   try {
+    // 2026-11-12: {"$ne": null} as the id matched any enrollment of the caller
+    // (hasAccess) and every course's lessons — paid media of all programs.
+    if (!isId(courseId)) return null
     await connectDB()
 
     const { Lesson, Enrollment } = await import("@/lib/db/models")
@@ -814,13 +859,15 @@ export async function fetchCourseForLearning(courseId: string): Promise<LearnCou
       }
     }
 
+    // 2026-11-12: null when the owner's account no longer exists — the player
+    // threw on it and an enrolled learner got a 404.
     const instructor = course.instructor as unknown as {
       _id: { toString(): string }
       firstName: string
       lastName: string
       avatarUrl: string
       role: string
-    }
+    } | null
     const credit = courseCredit(courseKindOf(course), instructor)
 
     const lessons = await Lesson.find({ course: courseId })
@@ -832,7 +879,8 @@ export async function fetchCourseForLearning(courseId: string): Promise<LearnCou
     return {
       id: course._id.toString(),
       title: course.title,
-      instructorId: instructor._id.toString(),
+      // instructorId: instructor._id.toString(),
+      instructorId: instructor?._id.toString() ?? "",
       instructorName: credit.name,
       instructorAvatarUrl: credit.avatarUrl,
       rating: course.rating?.average || null,
@@ -874,9 +922,15 @@ export async function fetchCourseForLearning(courseId: string): Promise<LearnCou
 export async function fetchOtherCourses(excludeCourseId: string): Promise<BrowseCourse[]> {
   try {
     await connectDB()
-    
+
+    // 2026-11-12: the player's "Discover more" offered, priced, programs the
+    // learner already holds; like the home's Browse row (`notEnrolled`), any
+    // program they have an enrollment on is left out.
+    const viewer = await getCurrentUser()
+    const heldIds = viewer ? await Enrollment.distinct("course", { user: viewer.id }) : []
     const courses = await Course.find({
-      _id: { $ne: excludeCourseId },
+      // _id: { $ne: excludeCourseId },
+      _id: { $nin: [...heldIds, ...(isId(excludeCourseId) ? [excludeCourseId] : [])] },
       status: "published",
       ...PROGRAM_KIND_FILTER,
       ...ON_SALE_FILTER,
@@ -945,7 +999,10 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
     await connectDB()
     const user = await getAuthenticatedUser()
 
-    const enrollments = await Enrollment.find({ user: user._id })
+    // 2026-11-12: an enrollment whose course no longer exists threw below and
+    // emptied My programs and the dashboard; such a row is left out.
+    // const enrollments = await Enrollment.find({ user: user._id })
+    const enrollments = (await Enrollment.find({ user: user._id })
       .populate({
         path: "course",
         select: "slug title thumbnailUrl kind format instructor totalLessons availableAt status packages examRequired school communityUrl",
@@ -955,7 +1012,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
         },
       })
       .sort({ lastAccessedAt: -1 })
-      .lean()
+      .lean()).filter((e) => e.course)
 
     type PopulatedCourse = {
       _id: { toString(): string }
@@ -970,6 +1027,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
       packages?: ICoursePackage[] | null
       examRequired?: boolean
       communityUrl?: string | null
+      // 2026-11-12: null when the owner's account no longer exists.
       instructor: {
         _id: { toString(): string }
         firstName: string
@@ -977,7 +1035,7 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
         avatarUrl: string | null
         role?: string
         instructorProfile?: { headline?: string | null }
-      }
+      } | null
     }
 
     // One lesson read for every enrolled course (was one query per enrollment).
@@ -1036,7 +1094,8 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
       const access = courseAccessFromRows(enrollment, {
         _id: course._id,
         slug: course.slug,
-        instructor: course.instructor._id,
+        // instructor: course.instructor._id,
+        instructor: course.instructor?._id ?? "",
         packages,
         format: course.format,
       })
@@ -1080,8 +1139,10 @@ export async function fetchMyEnrollments(): Promise<StudentEnrollment[]> {
         resumeLessonTitle: resumeRow?.title ?? null,
         packageKey,
         packageName: enrollment.packageName ?? null,
-        instructorId: course.instructor._id.toString(),
-        instructorHeadline: credit.academy ? null : course.instructor.instructorProfile?.headline || null,
+        // instructorId: course.instructor._id.toString(),
+        // instructorHeadline: credit.academy ? null : course.instructor.instructorProfile?.headline || null,
+        instructorId: course.instructor?._id.toString() ?? "",
+        instructorHeadline: credit.academy ? null : course.instructor?.instructorProfile?.headline || null,
         instructorIsAcademy: credit.academy,
         faculty: facultyByCourse.get(courseId) ?? [],
         entitlements,
@@ -1130,7 +1191,10 @@ export async function fetchMyBookmarks(): Promise<StudentBookmark[]> {
     const bookmarks = await Bookmark.find({ user: user._id })
       .populate({
         path: "course",
-        match: { status: "published" },
+        // 2026-11-12: only what can still be bought — a bookmarked marketplace
+        // course (Coming soon) or legacy free course opened a 404 from its card.
+        // match: { status: "published" },
+        match: { status: "published", ...ON_SALE_FILTER, ...OPEN_KINDS_FILTER },
         select: "title thumbnailUrl instructor kind level pricing price rating enrolledCount school slug",
         populate: {
           path: "instructor",
@@ -1183,6 +1247,7 @@ export async function fetchMyBookmarks(): Promise<StudentBookmark[]> {
  */
 export async function toggleCourseBookmark(courseId: string): Promise<{ success: boolean; isBookmarked: boolean }> {
   try {
+    if (!isId(courseId)) return { success: false, isBookmarked: false }
     await connectDB()
     const user = await getAuthenticatedUser()
     
@@ -1203,6 +1268,9 @@ export async function toggleCourseBookmark(courseId: string): Promise<{ success:
     
     return { success: true, isBookmarked: true }
   } catch (error) {
+    // 2026-11-12: a second tab or a double tap created it first (unique
+    // { user, course }): it is bookmarked, which is what this call wanted.
+    if ((error as { code?: number } | null)?.code === 11000) return { success: true, isBookmarked: true }
     console.error("Toggle bookmark error:", error)
     return { success: false, isBookmarked: false }
   }
@@ -1216,9 +1284,14 @@ export async function checkCoursesBookmarked(courseIds: string[]): Promise<Recor
     await connectDB()
     const user = await getAuthenticatedUser()
     
+    // 2026-11-12: only id strings reach the query (any value arrives from the browser).
+    // const bookmarks = await Bookmark.find({
+    //   user: user._id,
+    //   course: { $in: courseIds },
+    // }).select("course")
     const bookmarks = await Bookmark.find({
       user: user._id,
-      course: { $in: courseIds },
+      course: { $in: courseIds.filter(isId).slice(0, 200) },
     }).select("course")
     
     const bookmarkedIds = new Set(bookmarks.map((b) => b.course.toString()))
@@ -1249,6 +1322,9 @@ export async function markLessonComplete(
 ): Promise<{ success: boolean; error?: string }> {
   "use server"
   try {
+    // 2026-11-12: {"$ne": null} as the course id matched another enrollment of
+    // the caller and rewrote its progress against an empty lesson set.
+    if (!isId(courseId) || !isId(lessonId)) return { success: false, error: "Lesson not found" }
     await connectDB()
     const user = await getAuthenticatedUser()
     const { Lesson } = await import("@/lib/db/models")
@@ -1274,12 +1350,21 @@ export async function markLessonComplete(
       (id: { toString(): string }) => id.toString() === lessonId
     )
     if (newlyCompleted) {
-      enrollment.completedLessons.push(new mongoose.Types.ObjectId(lessonId))
+      // 2026-11-12: $addToSet, not $push — a double click or a second tab
+      // stored the lesson twice, and the doubled count showed 100% early.
+      // enrollment.completedLessons.push(new mongoose.Types.ObjectId(lessonId))
+      ;(enrollment.completedLessons as mongoose.Types.Array<mongoose.Types.ObjectId>).addToSet(
+        new mongoose.Types.ObjectId(lessonId)
+      )
     }
 
     // Progress counts only the published lessons this package opens (docs/go-patches-phase-3.md R3).
     const open = access ? await openPublishedLessonIds(access) : new Set<string>()
-    const done = enrollment.completedLessons.filter((id: { toString(): string }) => open.has(id.toString())).length
+    // Distinct ids: rows written twice before the fix above count once.
+    // const done = enrollment.completedLessons.filter((id: { toString(): string }) => open.has(id.toString())).length
+    const done = new Set(
+      enrollment.completedLessons.map((id: { toString(): string }) => id.toString()).filter((id: string) => open.has(id))
+    ).size
     enrollment.progress = open.size > 0 ? Math.min(100, Math.round((done / open.size) * 100)) : 0
     enrollment.lastAccessedAt = new Date()
 
@@ -1308,6 +1393,7 @@ export async function markLessonComplete(
  */
 export async function getCompletedLessons(courseId: string): Promise<string[]> {
   try {
+    if (!isId(courseId)) return []
     await connectDB()
     const user = await getAuthenticatedUser()
     
@@ -1332,6 +1418,7 @@ export async function markCourseComplete(
 ): Promise<{ success: boolean; requiresExam?: boolean; error?: string }> {
   "use server"
   try {
+    if (!isId(courseId)) return { success: false, error: "Course not found" }
     await connectDB()
     const user = await getAuthenticatedUser()
 
@@ -1424,6 +1511,8 @@ export type InstructorCourse = {
  */
 export async function fetchInstructorProfile(instructorId: string): Promise<InstructorPublicProfile | null> {
   try {
+    // 2026-11-12: an operator object found the first user in the database.
+    if (!isId(instructorId)) return null
     await connectDB()
     
     const instructor = await User.findById(instructorId)
@@ -1465,6 +1554,7 @@ export async function fetchInstructorProfile(instructorId: string): Promise<Inst
  */
 export async function fetchInstructorPublicCourses(instructorId: string): Promise<InstructorCourse[]> {
   try {
+    if (!isId(instructorId)) return []
     await connectDB()
     
     const courses = await Course.find({
@@ -1499,6 +1589,7 @@ export async function fetchInstructorPublicCourses(instructorId: string): Promis
  */
 export async function fetchEnrolledCoursesFromInstructor(instructorId: string): Promise<InstructorCourse[]> {
   try {
+    if (!isId(instructorId)) return []
     await connectDB()
     const user = await getAuthenticatedUser()
     

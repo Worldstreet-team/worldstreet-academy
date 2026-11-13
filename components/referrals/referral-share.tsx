@@ -25,14 +25,19 @@ export function ReferralShare({ code, link }: { code: string; link: string }) {
 
   function copy(what: Exclude<Copied, null>, value: string) {
     setFailed(false)
-    navigator.clipboard.writeText(value).then(
-      () => {
-        setCopied(what)
-        if (timer.current) clearTimeout(timer.current)
-        timer.current = setTimeout(() => setCopied(null), 1800)
-      },
-      () => setFailed(true)
-    )
+    // Some in-app browsers have no clipboard API at all: that throws here rather than rejecting (2026-11-12).
+    try {
+      navigator.clipboard.writeText(value).then(
+        () => {
+          setCopied(what)
+          if (timer.current) clearTimeout(timer.current)
+          timer.current = setTimeout(() => setCopied(null), 1800)
+        },
+        () => setFailed(true)
+      )
+    } catch {
+      setFailed(true)
+    }
   }
 
   return (

@@ -35,6 +35,7 @@ import {
   requestStage,
   declineStageRequest,
   acceptStageRequest,
+  getMyMeetingState,
   type MeetingWithDetails,
   type MeetingParticipantDetails,
   type MeetingHistoryEntry,
@@ -75,6 +76,9 @@ import { MeetingInvitesList } from "@/components/meetings/meeting-invites"
 import { UpcomingClassesList } from "@/components/meetings/upcoming-classes-list"
 
 const TILES_PER_PAGE = 4
+
+/** How often someone in a room they don't host re-reads its state (see the poll effect below). */
+const ROOM_STATE_POLL_MS = 20_000
 
 type ScreenSharer = { id: string; name: string; isLocal: boolean }
 
@@ -535,6 +539,36 @@ export default function MeetingsPage() {
     return () => window.removeEventListener("sse:event", handleSSE)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.id])
+
+  /* ── Room state without the realtime bus ──
+     Ably is disabled company-wide (token requests 403), so "meeting:ended",
+     "meeting:kicked" and "meeting:role-changed" never arrive: a student stayed in
+     a class the host had ended, a removed student stayed in the room, and a
+     student invited to speak stayed muted. While in a room they don't host, the
+     client re-reads its own state and replays what the bus would have said
+     through the handler above (which ignores repeats when the bus works). */
+  const activeMeetingId = activeMeeting?.id ?? null
+  useEffect(() => {
+    if (!isJoined || !activeMeetingId || isHost) return
+    let cancelled = false
+    const replay = (detail: { type: MeetingEventPayload["type"]; role?: MeetingRole }) =>
+      window.dispatchEvent(
+        new CustomEvent("sse:event", {
+          detail: { meetingId: activeMeetingId, meetingTitle: "", userId: user.id, userName: "", userAvatar: null, ...detail },
+        })
+      )
+    const timer = setInterval(async () => {
+      const res = await getMyMeetingState(activeMeetingId).catch(() => null)
+      if (cancelled || !res?.success || hasEndedRef.current || activeMeetingRef.current?.id !== activeMeetingId) return
+      if (res.data.status === "ended") replay({ type: "meeting:ended" })
+      else if (res.data.myStatus === "kicked") replay({ type: "meeting:kicked" })
+      else if (res.data.role && res.data.role !== myRoleRef.current) replay({ type: "meeting:role-changed", role: res.data.role })
+    }, ROOM_STATE_POLL_MS)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+    }
+  }, [isJoined, activeMeetingId, isHost, user.id])
 
   /* ── RTK event listeners ── */
   useEffect(() => {

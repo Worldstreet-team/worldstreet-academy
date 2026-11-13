@@ -1,5 +1,7 @@
 "use client"
-import { FileText, GripVertical, Pencil, Plus, Trash2, Video, type IconComponent } from "@/components/icons"
+// 2026-11-12: the grip icon never dragged; rows now move with up/down arrows (moveLesson).
+// import { FileText, GripVertical, Pencil, Plus, Trash2, Video, type IconComponent } from "@/components/icons"
+import { ChevronDownIcon, ChevronUpIcon, FileText, Pencil, Plus, Trash2, Video, type IconComponent } from "@/components/icons"
 
 import Link from "next/link"
 import { useActionState, useState, useTransition } from "react"
@@ -47,6 +49,7 @@ import { getVideoUploadUrl } from "@/lib/actions/upload"
 import {
   addLesson,
   deleteLesson,
+  moveLesson,
   setLessonMinPackage,
   updateLesson,
   type CourseFormState,
@@ -115,7 +118,9 @@ function LessonTierSelect({
           })
         }}
       >
-        <SelectTrigger className="h-7 w-[9rem] text-xs" aria-label="Minimum plan">
+        {/* 2026-11-12: 9rem cut "Executive and up" to "Executive and i…". */}
+        {/* <SelectTrigger className="h-7 w-[9rem] text-xs" aria-label="Minimum plan"> */}
+        <SelectTrigger className="h-7 w-[10.5rem] text-xs" aria-label="Minimum plan">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -128,6 +133,65 @@ function LessonTierSelect({
         </SelectContent>
       </Select>
       {error && <p className="text-[10px] text-ws-danger">{error}</p>}
+    </div>
+  )
+}
+
+/**
+ * Up and down arrows for one row (2026-11-12): moveLesson swaps it with its
+ * neighbour. The first row has no "up", the last no "down".
+ */
+function MoveLessonButtons({
+  courseId,
+  lessonId,
+  lessonTitle,
+  isFirst,
+  isLast,
+}: {
+  courseId: string
+  lessonId: string
+  lessonTitle: string
+  isFirst: boolean
+  isLast: boolean
+}) {
+  const router = useRouter()
+  const [pending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+  const move = (direction: "up" | "down") => {
+    setError(null)
+    startTransition(async () => {
+      const res = await moveLesson(courseId, lessonId, direction)
+      if (res.success) router.refresh()
+      else setError(res.error)
+    })
+  }
+  const arrow =
+    "flex h-6 w-8 items-center justify-center rounded-md sm:h-5 sm:w-7 text-ws-muted transition-colors duration-[var(--ws-motion-fast)] hover:bg-ws-raised hover:text-ws-primary disabled:pointer-events-none disabled:opacity-30"
+  return (
+    <div className="flex flex-col items-center" title={error ?? undefined}>
+      <button
+        type="button"
+        aria-label={`Move lesson “${lessonTitle}” up`}
+        className={arrow}
+        disabled={isFirst || pending}
+        onClick={() => move("up")}
+      >
+        <ChevronUpIcon size={14} strokeWidth={2} />
+      </button>
+      <button
+        type="button"
+        aria-label={`Move lesson “${lessonTitle}” down`}
+        className={arrow}
+        disabled={isLast || pending}
+        onClick={() => move("down")}
+      >
+        <ChevronDownIcon size={14} strokeWidth={2} />
+      </button>
+      {error && (
+        <span role="alert" className="sr-only">
+          {error}
+        </span>
+      )}
     </div>
   )
 }
@@ -226,6 +290,9 @@ function LessonForm({
   // Checked here before submitting: a refused submit would reset the form and
   // lose what the tutor typed. The server checks again.
   const [videoUrlError, setVideoUrlError] = useState<string | null>(null)
+  // A save while a video is still uploading kept the old video (or none), and the
+  // closed dialog hid that the new file never landed: the save waits for it.
+  const [videoUploading, setVideoUploading] = useState(false)
   const fieldErrors = state.fieldErrors
 
   return (
@@ -233,6 +300,11 @@ function LessonForm({
       action={formAction}
       onSubmit={(e) => {
         if (type !== "video") return
+        if (videoUploading) {
+          e.preventDefault()
+          setVideoUrlError("Wait for the video to finish uploading, then save")
+          return
+        }
         const problem = videoUrl.trim() ? lessonVideoUrlError(videoUrl.trim()) : "Upload the video or paste its link"
         setVideoUrlError(problem)
         if (problem) e.preventDefault()
@@ -301,6 +373,7 @@ function LessonForm({
             }}
             onRemove={() => setVideoUrl("")}
             onGetPresignedUrl={(file) => getVideoUploadUrl(file.name, file.type)}
+            onUploadingChange={setVideoUploading}
             onDurationDetected={(seconds) => {
               const length = splitLength(seconds)
               setHours(length.hours)
@@ -427,10 +500,10 @@ function LessonForm({
         <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
         <Button
           type="submit"
-          disabled={isPending}
+          disabled={isPending || (type === "video" && videoUploading)}
           className="bg-ws-brand text-ws-brand-on transition-opacity duration-[var(--ws-motion-fast)] hover:bg-ws-brand hover:opacity-90"
         >
-          {isPending ? "Saving…" : editing ? "Save lesson" : "Add Lesson"}
+          {isPending ? "Saving…" : type === "video" && videoUploading ? "Uploading video…" : editing ? "Save lesson" : "Add Lesson"}
         </Button>
       </DialogFooter>
     </form>
@@ -526,7 +599,7 @@ export function LessonManager({
         <div className="space-y-2">
           {[...lessons]
             .sort((a, b) => a.order - b.order)
-            .map((lesson, index) => {
+            .map((lesson, index, sorted) => {
               const TypeIcon = typeIcons[lesson.type] ?? FileText
               const length = lesson.type === "video" && lesson.duration ? formatLength(lesson.duration) : null
               return (
@@ -537,7 +610,14 @@ export function LessonManager({
                   {/* Phones: the controls take a second line, so the title keeps its room. */}
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                     <div className="flex shrink-0 items-center gap-2 text-ws-subtle">
-                      <GripVertical size={14} strokeWidth={2} />
+                      {/* <GripVertical size={14} strokeWidth={2} /> */}
+                      <MoveLessonButtons
+                        courseId={courseId}
+                        lessonId={lesson.id}
+                        lessonTitle={lesson.title}
+                        isFirst={index === 0}
+                        isLast={index === sorted.length - 1}
+                      />
                       <span className="w-5 text-center tabular-nums text-xs tabular-nums">
                         {index + 1}
                       </span>

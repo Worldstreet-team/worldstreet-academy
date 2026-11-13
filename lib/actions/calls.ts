@@ -6,7 +6,9 @@ import { Call, Conversation, User, Message, type ICall, type CallType } from "@/
 import { getCurrentUser } from "@/lib/auth"
 import { createMeeting, addParticipant } from "@/lib/realtime"
 import { emitCallEvent, emitCallEventToMany, type CallEventPayload } from "@/lib/call-events"
-import { instructorQaRefusal } from "@/lib/course-access"
+// 2026-11-12: a first call now opens its conversation through getOrCreateConversation, which asks this. Was:
+// import { instructorQaRefusal } from "@/lib/course-access"
+import { getOrCreateConversation } from "@/lib/actions/messages"
 
 // ── Helpers ──
 
@@ -65,6 +67,13 @@ export async function initiateCall(
   try {
     const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
+    // 2026-11-12: an id string, a known call type, and never yourself
+    // (`$all: [me, me]` matched any conversation of yours and rang you).
+    if (typeof receiverId !== "string" || !/^[a-f0-9]{24}$/.test(receiverId)) {
+      return { success: false, error: "User not found" }
+    }
+    if (receiverId === currentUser.id) return { success: false, error: "You can't call yourself" }
+    if (type !== "audio" && type !== "video") return { success: false, error: "Unsupported call type" }
 
     const callerId = new Types.ObjectId(currentUser.id)
     const recipientId = new Types.ObjectId(receiverId)
@@ -101,12 +110,21 @@ export async function initiateCall(
 
     let conversation = existingConversation
     if (!conversation) {
-      const refusal = await instructorQaRefusal(currentUser, receiverId)
-      if (refusal) return { success: false, error: refusal }
-      conversation = await Conversation.create({
-        participants: [callerId, recipientId],
-        lastMessageAt: new Date(),
-      })
+      // 2026-11-12: a first call opens the conversation through messages' own gate, so a learner
+      // calls someone new only as they would message them (classmates, their tutors, support), and
+      // the instructor Q&A plan rule still applies. Was:
+      // const refusal = await instructorQaRefusal(currentUser, receiverId)
+      // if (refusal) return { success: false, error: refusal }
+      // conversation = await Conversation.create({
+      //   participants: [callerId, recipientId],
+      //   lastMessageAt: new Date(),
+      // })
+      const opened = await getOrCreateConversation(receiverId)
+      if (!opened.success || !opened.conversationId) {
+        return { success: false, error: opened.error ?? "Failed to initiate call" }
+      }
+      conversation = await Conversation.findById(opened.conversationId)
+      if (!conversation) return { success: false, error: "Failed to initiate call" }
     }
 
     const [caller, receiver] = await Promise.all([
@@ -274,6 +292,9 @@ export async function answerCall(callId: string): Promise<{
 
     call.status = "ongoing"
     call.answeredAt = new Date()
+    // 2026-11-12: lands only while still ringing. The caller hanging up in the
+    // same moment ("missed") was overwritten with "ongoing", a call stuck open.
+    call.$where = { status: "ringing" }
 
     console.log(`[AnswerCall] Call ${callId} status updated to: ongoing`)
 
@@ -288,10 +309,16 @@ export async function answerCall(callId: string): Promise<{
       receiverId: currentUser.id,
       conversationId: call.conversationId.toString(),
     }
-    await Promise.all([
-      call.save(),
-      emitCallEvent(call.callerId.toString(), eventPayload),
-    ])
+    // await Promise.all([
+    //   call.save(),
+    //   emitCallEvent(call.callerId.toString(), eventPayload),
+    // ])
+    try {
+      await call.save()
+    } catch {
+      return { success: false, error: "Call is no longer ringing" }
+    }
+    await emitCallEvent(call.callerId.toString(), eventPayload)
 
     return {
       success: true,
@@ -475,7 +502,9 @@ export async function getCallHistory(conversationId: string): Promise<{
       .populate("receiverId", "firstName lastName avatarUrl")
       .lean()
 
-    const callsWithDetails: CallWithDetails[] = calls.map((c) => {
+    // 2026-11-12: a participant whose account no longer exists threw and lost the whole history.
+    // const callsWithDetails: CallWithDetails[] = calls.map((c) => {
+    const callsWithDetails: CallWithDetails[] = calls.filter((c) => c.callerId && c.receiverId).map((c) => {
       const caller = c.callerId as unknown as {
         _id: Types.ObjectId
         firstName: string
@@ -585,11 +614,22 @@ export async function getCallStatus(callId: string): Promise<{
 // ──────────────────────────────────────────────
 
 export async function expireRingingCalls(): Promise<void> {
+  // 2026-11-12: a server action anyone could call, signed out included, that
+  // ended every ringing call on the platform. Now: the caller's own calls only,
+  // as pollIncomingCall does.
+  const currentUser = await initAction()
+  if (!currentUser) return
+  const me = new Types.ObjectId(currentUser.id)
   const thirtySecondsAgo = new Date(Date.now() - 30_000)
 
+  // const staleCalls = await Call.find({
+  //   status: "ringing",
+  //   createdAt: { $lt: thirtySecondsAgo },
+  // })
   const staleCalls = await Call.find({
     status: "ringing",
     createdAt: { $lt: thirtySecondsAgo },
+    $or: [{ callerId: me }, { receiverId: me }],
   })
 
   for (const call of staleCalls) {

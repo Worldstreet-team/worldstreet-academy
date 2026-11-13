@@ -37,6 +37,9 @@ function resolveAppUrl(): string {
   ]) {
     if (!candidate) continue
     if (inProduction && LOOPBACK.test(candidate)) continue
+    // A value without its scheme ("academy.worldstreetgold.com") is unusable too, and
+    // the root layout's `new URL(APP_URL)` would throw on every page (2026-11-12).
+    if (!/^https?:\/\/[^/\s]+/i.test(candidate)) continue
     return candidate
   }
 

@@ -3,11 +3,18 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { fetchMyEnrollments, type StudentEnrollment } from "@/lib/actions/student"
 import { queryKeys } from "./keys"
+import { afterPageHydration } from "./after-hydration"
 
 export function useEnrollments() {
   return useQuery<StudentEnrollment[]>({
     queryKey: queryKeys.enrollments,
-    queryFn: fetchMyEnrollments,
+    // 2026-11-12: waits for the page to hydrate — the rail shares this with the
+    // dashboard and My programs (after-hydration.ts, React #418). Was:
+    // queryFn: fetchMyEnrollments,
+    queryFn: async () => {
+      await afterPageHydration()
+      return fetchMyEnrollments()
+    },
     staleTime: 5 * 60 * 1000, // 5 min — enrollments rarely change
     refetchInterval: 60 * 1000, // background poll every 60s
   })

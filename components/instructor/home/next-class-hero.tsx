@@ -171,9 +171,12 @@ function EmptyHero({
           No class scheduled
         </h2>
         <p className="max-w-md text-[14px] text-muted-foreground">
+          {/* 2026-11-12: a newly hired staff tutor has no course of their own to publish; the Academy
+              assigns them a program. The copy now covers both ways a program arrives. */}
+          {/* : "Live classes run on your published courses. Publish one to schedule its first class."} */}
           {hasCourses
             ? "Schedule your next class and every student whose plan includes live classes is emailed straight away."
-            : "Live classes run on your published courses. Publish one to schedule its first class."}
+            : "Live classes run on the programs you teach. Once the Academy assigns you a program, or a course of yours is published, you can schedule its first class here."}
         </p>
       </div>
       {showCohort && nextCohort && (

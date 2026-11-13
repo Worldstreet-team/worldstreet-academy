@@ -55,6 +55,9 @@ import type { ConversationWithDetails as ConvType } from "@/lib/actions/messages
 // Extended message type with status for optimistic updates
 type OptimisticMessage = MessageWithDetails & { status?: "pending" | "sent" | "error"; uploadProgress?: number }
 
+/** How often an open thread reads its new messages while the realtime bus is down (see the poll effect). */
+const THREAD_POLL_MS = 4_000
+
 export default function MessagesPage() {
   const queryClient = useQueryClient()
   const searchParams = useSearchParams()
@@ -77,6 +80,10 @@ export default function MessagesPage() {
   const [isSearching, setIsSearching] = useState(false)
   const [recentUsers, setRecentUsers] = useState<UserSearchResult[]>([])
   const [isLoadingRecent, setIsLoadingRecent] = useState(false)
+  // 2026-11-12: a learner can start chats only with classmates, their tutors and support
+  // (lib/actions/messages.ts), so the sheet says so, and says why a chat didn't open.
+  const isLearner = user.role === "USER"
+  const [startError, setStartError] = useState<string | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   // Guard ref so the userId/callType URL params are processed only once
@@ -210,6 +217,47 @@ export default function MessagesPage() {
   }, [queryClient])
 
   useMessageEvents(user.id, handleMessageEvent)
+
+  /* ── New messages without the realtime bus ──
+     2026-11-12: Ably is disabled company-wide (token requests 403), so
+     "message:new" never arrives: a reply reached an open thread only when the
+     list refetched or the chat was reopened. While a thread is open and the tab
+     visible, its new messages are read every few seconds (/api/messages/poll);
+     with the bus working, ids dedupe. Own messages come back through the send
+     path, so a poll never adds one (racing a send, it would show twice). */
+  const messagesRef = useRef<OptimisticMessage[]>([])
+  useEffect(() => {
+    messagesRef.current = messages
+  }, [messages])
+  useEffect(() => {
+    if (!selectedId || isLoadingMessages) return
+    let cancelled = false
+    const timer = setInterval(async () => {
+      if (document.hidden) return
+      const lastId = [...messagesRef.current].reverse().find((m) => /^[a-f0-9]{24}$/.test(m.id))?.id ?? ""
+      try {
+        const res = await fetch(`/api/messages/poll?conversationId=${selectedId}&lastMessageId=${lastId}`)
+        if (!res.ok || cancelled || selectedIdRef.current !== selectedId) return
+        const data = (await res.json()) as { messages?: MessageWithDetails[] }
+        const incoming = (data.messages ?? []).filter((m) => !m.isOwn)
+        if (incoming.length === 0) return
+        setMessages((prev) => {
+          const known = new Set(prev.map((m) => m.id))
+          const added = incoming
+            .filter((m) => !known.has(m.id))
+            .map((m) => ({ ...m, timestamp: new Date(m.timestamp), isNew: true }) as OptimisticMessage & { isNew?: boolean })
+          return added.length > 0 ? [...prev, ...added] : prev
+        })
+        queryClient.invalidateQueries({ queryKey: queryKeys.conversations })
+      } catch {
+        // Offline for a moment: the next tick tries again.
+      }
+    }, THREAD_POLL_MS)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+    }
+  }, [selectedId, isLoadingMessages, queryClient])
 
   // Scroll to bottom when messages change (debounced to avoid mid-animation flicker)
   const prevMessagesLenRef = useRef(0)
@@ -464,6 +512,7 @@ export default function MessagesPage() {
 
   // User search
   const handleSearch = useCallback(async (query: string) => {
+    setStartError(null)
     setSearchQuery(query)
     if (query.length < 2) {
       setSearchResults([])
@@ -479,7 +528,10 @@ export default function MessagesPage() {
   }, [])
 
   const handleStartConversation = useCallback(async (user: UserSearchResult) => {
+    setStartError(null)
     const result = await getOrCreateConversation(user.id)
+    // 2026-11-12: a refusal (not someone they study with, or not in their plan) was silent.
+    if (!result.success) setStartError(result.error ?? "Couldn't open a conversation")
     if (result.success && result.conversationId) {
       setShowUserSearch(false)
       setSearchQuery("")
@@ -698,8 +750,9 @@ export default function MessagesPage() {
                 
                 size={16}
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              {/* 2026-11-12: learners search only the people they may message. Was: placeholder="Search users by name or email..." */}
               <Input
-                placeholder="Search users by name or email..."
+                placeholder={isLearner ? "Search classmates and tutors..." : "Search users by name or email..."}
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
                 className="pl-9"
@@ -719,6 +772,12 @@ export default function MessagesPage() {
               )}
             </div>
 
+            {startError && (
+              <p role="alert" className="text-sm text-destructive">
+                {startError}
+              </p>
+            )}
+
             <ScrollArea className="h-[300px]">
               {searchQuery.length >= 2 ? (
                 isSearching ? (
@@ -727,7 +786,16 @@ export default function MessagesPage() {
                   </div>
                 ) : searchResults.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground text-sm">
-                    No users found
+                    {/* 2026-11-12: a learner is told who they can message. Was: No users found */}
+                    {isLearner ? (
+                      <>
+                        No one found.
+                        <br />
+                        You can message classmates and tutors from your programs, and our support team.
+                      </>
+                    ) : (
+                      "No users found"
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-1">
@@ -754,7 +822,8 @@ export default function MessagesPage() {
               ) : (
                 <div className="space-y-2">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Recently Added
+                    {/* 2026-11-12: a learner sees their tutors, classmates and support. Was: Recently Added */}
+                    {isLearner ? "People you study with" : "Recently Added"}
                   </p>
                   {isLoadingRecent ? (
                     <div className="grid grid-cols-4 gap-2">
@@ -767,7 +836,10 @@ export default function MessagesPage() {
                     </div>
                   ) : recentUsers.length === 0 ? (
                     <div className="text-center py-6 text-muted-foreground text-sm">
-                      No users yet
+                      {/* 2026-11-12: Was: No users yet */}
+                      {isLearner
+                        ? "You can message classmates and tutors from your programs, and our support team."
+                        : "No users yet"}
                     </div>
                   ) : (
                     <div className="grid grid-cols-4 gap-2">

@@ -5,6 +5,7 @@ import { getMyInstructorEarnings } from "@/lib/actions/earnings"
 import { getCurrentUser } from "@/lib/auth"
 import { MARKETPLACE_SHARE_ACADEMY, MARKETPLACE_SHARE_OWN_LINK } from "@/lib/db/models"
 import { sellerSplitNote } from "@/lib/marketplace"
+import { formatMinor } from "@/lib/teaching-home"
 import { InstructorProfileClient } from "./instructor-profile-client"
 
 export default async function InstructorSettingsPage() {
@@ -37,13 +38,16 @@ export default async function InstructorSettingsPage() {
               <div className="rounded-md border border-ws-hairline bg-ws-raised/50 p-3">
                 <p className="text-[11px] text-ws-muted">In your Worldstreet wallet</p>
                 <p className="mt-1 font-display text-lg font-semibold tabular-nums text-ws-primary">
-                  ${((earnings?.clearedMinor ?? 0) / 100).toFixed(2)}
+                  {/* 2026-11-12: the Earnings page's format ("$6,187.15", not "$6187.15"). */}
+                  {/* ${((earnings?.clearedMinor ?? 0) / 100).toFixed(2)} */}
+                  {formatMinor(earnings?.clearedMinor ?? 0)}
                 </p>
               </div>
               <div className="rounded-md border border-ws-hairline bg-ws-raised/50 p-3">
                 <p className="text-[11px] text-ws-muted">Clearing (7-day window)</p>
                 <p className="mt-1 font-display text-lg font-semibold tabular-nums text-ws-primary">
-                  ${((earnings?.pendingMinor ?? 0) / 100).toFixed(2)}
+                  {/* ${((earnings?.pendingMinor ?? 0) / 100).toFixed(2)} */}
+                  {formatMinor(earnings?.pendingMinor ?? 0)}
                 </p>
               </div>
             </div>

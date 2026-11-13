@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { fetchCourseForLearning, fetchOtherCourses, getCompletedLessons } from "@/lib/actions/student"
-import { updateLastAccessed } from "@/lib/actions/enrollments"
+import { fetchCourseForLearning, fetchOtherCourses, fetchProgramSlug, getCompletedLessons } from "@/lib/actions/student"
+import { getUpgradeOptions, updateLastAccessed } from "@/lib/actions/enrollments"
 import { getCourseRatingSummary, getUserReview } from "@/lib/actions/reviews"
 import { getCourseWatchProgress } from "@/lib/actions/watch-progress"
 import { getCurrentUser } from "@/lib/auth"
@@ -25,8 +25,25 @@ import { RichTextContent } from "@/components/ui/rich-text-editor"
 import { FinishCourseButton } from "@/components/learn/finish-course-button"
 import { CourseResources } from "@/components/learn/course-resources"
 import { PackageLockNotice } from "@/components/learn/package-lock-notice"
-import { PACKAGE_LABEL } from "@/lib/entitlements"
+import { PACKAGE_LABEL, PACKAGE_RANK } from "@/lib/entitlements"
 import { assignedFacultyFor } from "@/lib/teaching"
+
+/**
+ * 2026-11-12: the reader's `prose` classes have no typography plugin behind
+ * them, so a text lesson's lists lost their bullets and numbers and its
+ * headings, quotes and code read as body text. The editor's marks, styled here.
+ */
+const LESSON_TEXT = [
+  "[&>*:first-child]:mt-0 [&_p]:my-3 [&_p]:leading-relaxed [&_strong]:font-semibold",
+  "[&_h1]:mb-3 [&_h1]:mt-6 [&_h1]:text-2xl [&_h1]:font-semibold",
+  "[&_h2]:mb-2 [&_h2]:mt-5 [&_h2]:text-xl [&_h2]:font-semibold",
+  "[&_h3]:mb-2 [&_h3]:mt-4 [&_h3]:text-lg [&_h3]:font-semibold",
+  "[&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1",
+  "[&_blockquote]:my-4 [&_blockquote]:border-l-2 [&_blockquote]:border-ws-brand [&_blockquote]:pl-4 [&_blockquote]:text-muted-foreground",
+  "[&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[0.9em]",
+  "[&_pre]:my-4 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-muted [&_pre]:p-4 [&_pre_code]:bg-transparent [&_pre_code]:p-0",
+  "[&_hr]:my-6 [&_hr]:border-border [&_a]:text-ws-gold [&_a]:underline [&_a]:underline-offset-4",
+].join(" ")
 
 export default async function LessonPage({
   params,
@@ -89,6 +106,18 @@ export default async function LessonPage({
   // never block the lesson from rendering.
   if (currentUser && !currentLesson.locked) {
     void updateLastAccessed(currentUser.id, courseId, actualLessonId)
+  }
+
+  // 2026-11-12: plans can be upgraded now (Owen). A locked lesson points at the
+  // program page's "Your plan" when this place can move up to a plan that opens
+  // it; otherwise the notice keeps its support link.
+  let upgradeHref: string | null = null
+  const requiredPackage = currentLesson.locked ? currentLesson.requiredPackage : null
+  if (access && requiredPackage) {
+    const [upgrade, slug] = await Promise.all([getUpgradeOptions(courseId), fetchProgramSlug(courseId)])
+    if (slug && upgrade?.options.some((o) => PACKAGE_RANK[o.key] >= PACKAGE_RANK[requiredPackage])) {
+      upgradeHref = `/programs/${slug}#packages`
+    }
   }
 
   const isLessonCompleted = completedLessonIds.includes(actualLessonId)
@@ -179,6 +208,7 @@ export default async function LessonPage({
                   <PackageLockNotice
                     title="This lesson isn't in your plan"
                     requiredLabel={currentLesson.requiredPackage ? PACKAGE_LABEL[currentLesson.requiredPackage] : null}
+                    upgradeHref={upgradeHref}
                   />
                 </div>
               </div>
@@ -202,10 +232,10 @@ export default async function LessonPage({
             ) : currentLesson.type === "text" && currentLesson.content ? (
               <div className="w-full bg-muted/30 border-b">
                 <div className="max-w-3xl mx-auto p-6 md:p-8">
-                  <RichTextContent content={currentLesson.content} />
+                  <RichTextContent content={currentLesson.content} className={LESSON_TEXT} />
                 </div>
               </div>
-            ) : (
+            ) : currentLesson.type === "live" ? (
               <div className="aspect-video w-full bg-black flex items-center justify-center">
                 <div className="text-center space-y-2">
                   <div className="h-3 w-3 rounded-full bg-ws-danger animate-pulse mx-auto" />
@@ -213,6 +243,16 @@ export default async function LessonPage({
                     Live Session — Not Started
                   </p>
                 </div>
+              </div>
+            ) : (
+              // 2026-11-12: a video or text lesson whose media isn't uploaded yet
+              // showed the pulsing "Live Session — Not Started" face.
+              <div className="aspect-video w-full bg-black flex items-center justify-center px-6">
+                <p className="text-center text-white/60 text-sm">
+                  {currentLesson.type === "video"
+                    ? "This lesson's video isn't ready yet. Check back soon."
+                    : "This lesson's content isn't ready yet. Check back soon."}
+                </p>
               </div>
             )}
           </div>
@@ -223,11 +263,13 @@ export default async function LessonPage({
               <Badge variant="secondary" className="text-xs capitalize">
                 {currentLesson.type}
               </Badge>
-              {currentLesson.duration && (
+              {/* 2026-11-12: a video under 30 s rounds to 0 minutes, and `0 && …` printed a stray "0". */}
+              {/* {currentLesson.duration && ( */}
+              {currentLesson.duration ? (
                 <span className="text-xs text-muted-foreground">
                   {currentLesson.duration} min
                 </span>
-              )}
+              ) : null}
               {!currentLesson.locked && (
                 <div className="ml-auto">
                   <MarkCompleteButton
@@ -241,9 +283,13 @@ export default async function LessonPage({
             <h1 className="text-lg md:text-xl font-bold">
               {currentLesson.title}
             </h1>
-            <p className="text-muted-foreground text-sm">
+            {/* 2026-11-12: the placeholder "Lesson content goes here." reached learners. */}
+            {/* <p className="text-muted-foreground text-sm">
               {currentLesson.description || "Lesson content goes here."}
-            </p>
+            </p> */}
+            {currentLesson.description && (
+              <p className="text-muted-foreground text-sm">{currentLesson.description}</p>
+            )}
 
             {/* Navigation */}
             <Separator />

@@ -88,6 +88,9 @@ function FormField({
 
 /* ── Upload-or-paste field (sample video / CV) ── */
 
+/** An uploaded application PDF (2026-11-12): its private-bucket key, never a URL, and the file's name for the chip. */
+type UploadedDocument = { key: string; name: string }
+
 function UploadField({
   label,
   accept,
@@ -95,6 +98,8 @@ function UploadField({
   value,
   onChange,
   placeholder,
+  uploaded,
+  onUploaded,
 }: {
   label: string
   accept: string
@@ -102,6 +107,9 @@ function UploadField({
   value: string
   onChange: (v: string) => void
   placeholder: string
+  /** Documents only: the uploaded PDF, held privately, shown as a chip instead of a link. */
+  uploaded?: UploadedDocument | null
+  onUploaded?: (doc: UploadedDocument | null) => void
 }) {
   const id = React.useId()
   const inputRef = React.useRef<HTMLInputElement>(null)
@@ -112,10 +120,31 @@ function UploadField({
     setUploading(true)
     setUploadError(null)
     try {
-      const presign =
-        kind === "video"
-          ? await getVideoUploadUrl(file.name, file.type)
-          : await getDocumentUploadUrl(file.name, file.type)
+      // 2026-11-12: a PDF now goes to the private bucket and comes back as a key, not a public link.
+      // const presign =
+      //   kind === "video"
+      //     ? await getVideoUploadUrl(file.name, file.type)
+      //     : await getDocumentUploadUrl(file.name, file.type)
+      if (kind === "document") {
+        const doc = await getDocumentUploadUrl(file.name, file.type, file.size)
+        if (!doc.success || !doc.uploadUrl || !doc.key) {
+          setUploadError(doc.error ?? "Upload failed")
+          return
+        }
+        const put = await fetch(doc.uploadUrl, {
+          method: "PUT",
+          headers: { "Content-Type": file.type },
+          body: file,
+        })
+        if (!put.ok) {
+          setUploadError("Upload failed — try again")
+          return
+        }
+        onUploaded?.({ key: doc.key, name: file.name })
+        onChange("")
+        return
+      }
+      const presign = await getVideoUploadUrl(file.name, file.type)
       if (!presign.success || !presign.uploadUrl || !presign.publicUrl) {
         setUploadError(presign.error ?? "Upload failed")
         return
@@ -140,11 +169,44 @@ function UploadField({
   return (
     <FormField
       label={label}
-      htmlFor={id}
-      hint={uploadError ? <span className="text-destructive">{uploadError}</span> : undefined}
+      htmlFor={uploaded ? undefined : id}
+      // 2026-11-12: documents say who can open an uploaded PDF, and its size limit.
+      // hint={uploadError ? <span className="text-destructive">{uploadError}</span> : undefined}
+      hint={
+        uploadError ? (
+          <span className="text-destructive">{uploadError}</span>
+        ) : kind === "document" ? (
+          "An uploaded PDF (up to 25 MB) is private: only you and the review team can open it."
+        ) : undefined
+      }
     >
       <div className="flex gap-2.5">
-        <Input id={id} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
+        {/* <Input id={id} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} /> */}
+        {uploaded ? (
+          <div className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-[10px] border border-input px-3.5 text-[14px] md:h-10">
+            <Glyph icon={CheckmarkCircle02Icon} className="size-4 shrink-0" />
+            <span className="truncate">{uploaded.name}</span>
+            {/* 2026-11-12: on a phone the word left the file name a single letter ("T…"); the check says it. */}
+            {/* <span className="shrink-0 text-[12.5px] text-muted-foreground">Uploaded</span> */}
+            <span className="shrink-0 text-[12.5px] text-muted-foreground max-sm:sr-only">Uploaded</span>
+          </div>
+        ) : (
+          <Input id={id} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
+        )}
+        {uploaded && (
+          <Button
+            type="button"
+            variant="ghost"
+            // 2026-11-12: a square icon button, so the file name keeps the room.
+            // className={CONTROL_BUTTON}
+            className={`${CONTROL_BUTTON} max-sm:w-11 max-sm:px-0`}
+            aria-label={`Remove ${uploaded.name}`}
+            disabled={uploading}
+            onClick={() => onUploaded?.(null)}
+          >
+            <Glyph icon={Cancel01Icon} className="size-4" />
+          </Button>
+        )}
         <input
           ref={inputRef}
           type="file"
@@ -164,7 +226,9 @@ function UploadField({
           onClick={() => inputRef.current?.click()}
         >
           <Glyph icon={Upload04Icon} className="size-4" />
-          {uploading ? "Uploading…" : "Upload"}
+          {/* 2026-11-12: an uploaded PDF can be swapped for another. */}
+          {/* {uploading ? "Uploading…" : "Upload"} */}
+          {uploading ? "Uploading…" : uploaded ? "Replace" : "Upload"}
         </Button>
       </div>
     </FormField>
@@ -257,6 +321,9 @@ function ApplicationForm({ onSubmitted }: { onSubmitted: () => void }) {
   const [passionReason, setPassionReason] = React.useState("")
   const [readyToCommit, setReadyToCommit] = React.useState(false)
   const [extraDocumentUrl, setExtraDocumentUrl] = React.useState("")
+  // 2026-11-12: uploaded PDFs, held privately (key + file name), beside the pasted links above.
+  const [cvFile, setCvFile] = React.useState<UploadedDocument | null>(null)
+  const [extraFile, setExtraFile] = React.useState<UploadedDocument | null>(null)
   const [termsAccepted, setTermsAccepted] = React.useState(false)
   const [interviewPreference, setInterviewPreference] = React.useState<InterviewPreference | "">("")
 
@@ -611,6 +678,8 @@ function ApplicationForm({ onSubmitted }: { onSubmitted: () => void }) {
               value={cvUrl}
               onChange={setCvUrl}
               placeholder="Paste a link or upload a PDF"
+              uploaded={cvFile}
+              onUploaded={setCvFile}
             />
             <UploadField
               label="Anything else you'd like to upload? (PDF, optional)"
@@ -619,6 +688,8 @@ function ApplicationForm({ onSubmitted }: { onSubmitted: () => void }) {
               value={extraDocumentUrl}
               onChange={setExtraDocumentUrl}
               placeholder="Certificates, a course outline, a track record…"
+              uploaded={extraFile}
+              onUploaded={setExtraFile}
             />
             <div className="grid gap-x-5 gap-y-6 sm:grid-cols-2">
               <FormField label="Portfolio / work URL" htmlFor={ids.portfolio}>
@@ -721,13 +792,18 @@ function ApplicationForm({ onSubmitted }: { onSubmitted: () => void }) {
                   twitter: twitter || undefined,
                   website: website || undefined,
                   sampleVideoUrl: sampleVideoUrl || undefined,
-                  cvUrl: cvUrl || undefined,
+                  // 2026-11-12: an uploaded PDF goes as its private key; a pasted link only without one.
+                  // cvUrl: cvUrl || undefined,
+                  cvUrl: cvFile ? undefined : cvUrl || undefined,
+                  cvKey: cvFile?.key,
                   school: school || undefined,
                   teachingTopic,
                   passion: passion || undefined,
                   passionReason,
                   readyToCommit,
-                  extraDocumentUrl: extraDocumentUrl || undefined,
+                  // extraDocumentUrl: extraDocumentUrl || undefined,
+                  extraDocumentUrl: extraFile ? undefined : extraDocumentUrl || undefined,
+                  extraDocumentKey: extraFile?.key,
                   termsAccepted,
                   interviewPreference: interviewPreference || undefined,
                 })
@@ -738,6 +814,12 @@ function ApplicationForm({ onSubmitted }: { onSubmitted: () => void }) {
           )}
         </div>
       </div>
+      {/* 2026-11-12: the reason sat only beside the CTA from sm up, so a phone got a silent disabled button. */}
+      {blocker && (
+        <p className="mt-3 text-right text-[12.5px] text-muted-foreground sm:hidden" aria-live="polite">
+          {blocker}
+        </p>
+      )}
     </section>
   )
 }

@@ -33,13 +33,18 @@ export async function getCurrentUser(): Promise<LocalUser | null> {
     const clerkUser = await currentUser()
     if (!clerkUser) return null
 
+    // The primary address, not simply the first one listed (2026-11-12), as in
+    // getCachedUser (lib/auth/cached.ts). Was:
+    // email: clerkUser.emailAddresses[0]?.emailAddress || "",
+    // isVerified: clerkUser.emailAddresses[0]?.verification?.status === "verified",
+    const primaryEmail = clerkUser.primaryEmailAddress ?? clerkUser.emailAddresses[0]
     const authUser: AuthUser = {
       userId: clerkUser.id,
-      email: clerkUser.emailAddresses[0]?.emailAddress || "",
+      email: primaryEmail?.emailAddress || "",
       firstName: clerkUser.firstName || "",
       lastName: clerkUser.lastName || "",
       role: (clerkUser.publicMetadata?.role as "user" | "instructor" | "admin") || "user",
-      isVerified: clerkUser.emailAddresses[0]?.verification?.status === "verified",
+      isVerified: primaryEmail?.verification?.status === "verified",
       createdAt: new Date(clerkUser.createdAt).toISOString(),
     }
 

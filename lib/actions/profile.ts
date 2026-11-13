@@ -63,6 +63,16 @@ export async function updateProfile(data: {
     await connectDB()
     const currentUser = await getCurrentUser()
     if (!currentUser) return { success: false, error: "Not authenticated" }
+    // 2026-11-12: strings only, and a first name that isn't blank — it is the
+    // name printed on certificates (a cleared one printed "Academy learner").
+    if (!data || typeof data !== "object") return { success: false, error: "No fields to update" }
+    for (const value of [data.firstName, data.lastName, data.bio]) {
+      if (value !== undefined && typeof value !== "string") return { success: false, error: "No fields to update" }
+    }
+    if (data.firstName !== undefined && data.firstName.trim().length === 0)
+      return { success: false, error: "Enter your first name" }
+    if ((data.firstName?.trim().length ?? 0) > 60 || (data.lastName?.trim().length ?? 0) > 60)
+      return { success: false, error: "Names must be 60 characters or less" }
     if (data.bio !== undefined && data.bio.trim().length > FACULTY_LIMITS.bio)
       return { success: false, error: "Bio must be 1,000 characters or less" }
 

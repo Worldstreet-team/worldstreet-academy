@@ -40,6 +40,8 @@ interface MediaUploadProps {
   compact?: boolean
   /** Show loading state during upload */
   isUploading?: boolean
+  /** Told when this component's own upload starts and ends, so a form can hold its save until the file is in. */
+  onUploadingChange?: (uploading: boolean) => void
   /** Extra class names */
   className?: string
 }
@@ -64,6 +66,7 @@ export function MediaUpload({
   label,
   compact = false,
   isUploading = false,
+  onUploadingChange,
   className,
 }: MediaUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -82,6 +85,16 @@ export function MediaUpload({
   const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState<string | null>(null)
 
   const uploading = isUploading || localUploading
+
+  // Report the upload's start and end; the latest callback is read through a ref
+  // so an inline arrow from the parent doesn't re-fire it on every render.
+  const onUploadingChangeRef = useRef(onUploadingChange)
+  useEffect(() => {
+    onUploadingChangeRef.current = onUploadingChange
+  }, [onUploadingChange])
+  useEffect(() => {
+    onUploadingChangeRef.current?.(localUploading)
+  }, [localUploading])
 
   // Calculate estimated time remaining
   useEffect(() => {

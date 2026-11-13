@@ -57,7 +57,9 @@ export function LessonSidebar({
   completedLessonIds = [],
   watchProgressMap = {},
 }: LessonSidebarProps) {
-  const completedCount = completedLessonIds.length
+  // 2026-11-12: completions of lessons since removed read "11/10 lessons completed".
+  // const completedCount = completedLessonIds.length
+  const completedCount = lessons.filter((l) => completedLessonIds.includes(l.id)).length
   
   return (
     <aside className="hidden lg:flex w-80 border-l flex-col shrink-0">
@@ -138,7 +140,9 @@ export function LessonSidebar({
                       <p className={cn("truncate font-medium text-sm", lesson.locked && "text-muted-foreground")}>{lesson.title}</p>
                       <p className="text-xs text-muted-foreground capitalize">
                         {lesson.type}
-                        {lesson.duration ? ` · ${Math.floor(lesson.duration / 60)}:${String(lesson.duration % 60).padStart(2, '0')}` : ""}
+                        {/* 2026-11-12: `duration` is whole minutes (LearnLesson) — a 45-minute lesson read "0:45". */}
+                        {/* {lesson.duration ? ` · ${Math.floor(lesson.duration / 60)}:${String(lesson.duration % 60).padStart(2, '0')}` : ""} */}
+                        {lesson.duration ? ` · ${lesson.duration} min` : ""}
                         {watchPercent > 0 && !isCompleted && (
                           <span className="text-primary"> · {watchPercent}%</span>
                         )}
@@ -184,9 +188,11 @@ export function LessonSidebar({
                           exit={{ opacity: 0 }}
                           className="text-[10px] text-muted-foreground tabular-nums shrink-0"
                         >
-                          {lesson.duration 
+                          {/* 2026-11-12: whole minutes, not m:ss. */}
+                          {/* {lesson.duration 
                             ? `${Math.floor(lesson.duration / 60)}:${String(lesson.duration % 60).padStart(2, '0')}` 
-                            : lesson.type}
+                            : lesson.type} */}
+                          {lesson.duration ? `${lesson.duration} min` : lesson.type}
                         </motion.span>
                       )}
                     </AnimatePresence>

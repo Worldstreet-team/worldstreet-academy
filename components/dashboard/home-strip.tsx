@@ -24,10 +24,18 @@ import { cn } from "@/lib/utils"
 /* Cells share the card's width from ~672px of card width; two across below
    that. Hairlines: one above the row, one between cells, one between rows. */
 const CELLS = "flex flex-wrap border-t border-border/60"
+// 2026-11-12: all cells shared one row, so a learner with every figure (up to
+// eight) got ~125px cells at desktop width and labels cut to "Liv", "Com…".
+// From ~672px it is now up to four across, a second row growing to fill.
+// const CELL = cn(
+//   "flex min-w-0 basis-1/2 flex-col px-5 py-4 text-left @2xl:basis-0 @2xl:flex-1",
+//   "border-border/60 [&:nth-child(even)]:border-l [&:nth-child(n+3)]:border-t",
+//   "@2xl:[&:not(:first-child)]:border-l @2xl:[&:nth-child(n+3)]:border-t-0"
+// )
 const CELL = cn(
-  "flex min-w-0 basis-1/2 flex-col px-5 py-4 text-left @2xl:basis-0 @2xl:flex-1",
+  "flex min-w-0 basis-1/2 flex-col px-5 py-4 text-left @2xl:basis-1/4 @2xl:grow",
   "border-border/60 [&:nth-child(even)]:border-l [&:nth-child(n+3)]:border-t",
-  "@2xl:[&:not(:first-child)]:border-l @2xl:[&:nth-child(n+3)]:border-t-0"
+  "@2xl:[&:not(:nth-child(4n+1))]:border-l @2xl:[&:nth-child(-n+4)]:border-t-0"
 )
 
 /**

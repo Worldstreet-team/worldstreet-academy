@@ -14,11 +14,14 @@ import {
 } from "@/lib/actions/meetings"
 import { getMyClassBoard, type ClassBoardEntry } from "@/lib/actions/class-board"
 import { queryKeys } from "./keys"
+import { afterPageHydration } from "./after-hydration"
 
 export function useMyMeetings() {
   return useQuery<MeetingWithDetails[]>({
     queryKey: queryKeys.meetings,
     queryFn: async () => {
+      // The rail's live badge shares this with the meetings page (after-hydration.ts).
+      await afterPageHydration()
       const r = await getMyMeetings()
       return r.success && r.meetings ? r.meetings : []
     },
@@ -42,6 +45,7 @@ export function useMeetingInvites() {
   return useQuery<MeetingInviteItem[]>({
     queryKey: queryKeys.meetingInvites,
     queryFn: async () => {
+      await afterPageHydration()
       const r = await getMyMeetingInvites()
       return r.success && r.invites ? r.invites : []
     },

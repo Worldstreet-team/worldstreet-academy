@@ -1,7 +1,7 @@
 "use client"
 import { Check, CircleCheck } from "@/components/icons"
 
-import { useTransition } from "react"
+import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { markLessonComplete } from "@/lib/actions/student"
 import { useInvalidateEnrollments } from "@/lib/hooks/queries/use-enrollments"
@@ -24,6 +24,7 @@ export function MarkCompleteButton({
 }: MarkCompleteButtonProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
   // The sidebar's progress card reads the enrollments cache, which
   // router.refresh() doesn't touch.
   const invalidateEnrollments = useInvalidateEnrollments()
@@ -44,12 +45,26 @@ export function MarkCompleteButton({
   }
 
   return (
+    <>
     <button
       type="button"
       disabled={isPending}
       onClick={() =>
         startTransition(async () => {
-          await markLessonComplete(courseId, lessonId)
+          // 2026-11-12: a refusal said nothing, and a thrown call (offline, a tab
+          // left open across a deploy) reached the error boundary.
+          // await markLessonComplete(courseId, lessonId)
+          setError(null)
+          try {
+            const res = await markLessonComplete(courseId, lessonId)
+            if (!res.success) {
+              setError(res.error ?? "We couldn't save that. Please try again.")
+              return
+            }
+          } catch {
+            setError("We couldn't reach the server. Reload the page and try again.")
+            return
+          }
           void invalidateEnrollments()
           router.refresh()
         })
@@ -59,5 +74,11 @@ export function MarkCompleteButton({
       <Check className="h-3.5 w-3.5" />
       {isPending ? "Saving…" : "Mark as complete"}
     </button>
+    {error && (
+      <span role="alert" className="ml-2 text-[11px] text-ws-danger">
+        {error}
+      </span>
+    )}
+    </>
   )
 }

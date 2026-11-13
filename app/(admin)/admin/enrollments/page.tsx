@@ -162,7 +162,9 @@ function AdminEnrollmentsInner() {
         setActionError(res.error ?? "Export failed")
         return
       }
-      const blob = new Blob([res.csv], { type: "text/csv;charset=utf-8" })
+      // 2026-11-12: a byte-order mark, so Excel reads names with accents (Yoruba ọ, ẹ, ṣ) as UTF-8.
+      // const blob = new Blob([res.csv], { type: "text/csv;charset=utf-8" })
+      const blob = new Blob(["﻿", res.csv], { type: "text/csv;charset=utf-8" })
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
@@ -177,7 +179,8 @@ function AdminEnrollmentsInner() {
   return (
     <>
       <Topbar variant="admin" />
-      <div className="flex-1 px-6 pb-24 pt-8 md:px-8 md:pb-12 lg:px-12">
+      {/* 2026-11-12: the bottom padding clears the phone nav and the home indicator, like the other admin pages. Was: px-6 pb-24 */}
+      <div className="flex-1 px-4 sm:px-6 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-8 md:px-8 md:pb-12 lg:px-12">
         <div className="mx-auto w-full max-w-7xl space-y-8">
           <PageHeader
             title="Enrollments"
@@ -356,7 +359,8 @@ function AdminEnrollmentsInner() {
                               <MoreHorizontal size={16} strokeWidth={2} />
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-40">
-                              {e.status !== "suspended" && e.status !== "cancelled" && (
+                              {/* 2026-11-12: a refunded seat is changed in Payments, never here (a cancel then a restore reopened it). */}
+                              {e.status !== "suspended" && e.status !== "cancelled" && e.status !== "refunded" && (
                                 <DropdownMenuItem
                                   onClick={() =>
                                     setEnrollmentStatus.mutate({ id: e.id, action: "suspend" })
@@ -377,6 +381,7 @@ function AdminEnrollmentsInner() {
                               {superAdmin && e.coursePackages.length > 0 && (e.status === "active" || e.status === "completed") && (
                                 <DropdownMenuItem
                                   onClick={() => {
+                                    setActionError(null)
                                     setPackageChoice(e.packageKey)
                                     setPackageTarget({
                                       id: e.id,
@@ -386,15 +391,17 @@ function AdminEnrollmentsInner() {
                                     })
                                   }}
                                 >
-                                  Change package…
+                                  {/* 2026-11-12: "plan", as in the dialog and the filters. Was: Change package… */}
+                                  Change plan…
                                 </DropdownMenuItem>
                               )}
-                              {e.status !== "cancelled" && (
+                              {e.status !== "cancelled" && e.status !== "refunded" && (
                                 <DropdownMenuItem
                                   variant="destructive"
-                                  onClick={() =>
+                                  onClick={() => {
+                                    setActionError(null)
                                     setCancelTarget({ id: e.id, name: e.customerName })
-                                  }
+                                  }}
                                 >
                                   Cancel enrollment
                                 </DropdownMenuItem>
@@ -422,6 +429,8 @@ function AdminEnrollmentsInner() {
               payment — refunds live in Payments, where the money trail is.
             </DialogDescription>
           </DialogHeader>
+          {/* 2026-11-12: a refusal (your own seat, say) showed only behind this dialog. */}
+          {actionError && <p className="text-xs text-ws-danger">{actionError}</p>}
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setCancelTarget(null)}>
               Keep enrollment
@@ -470,6 +479,7 @@ function AdminEnrollmentsInner() {
               ))}
             </SelectContent>
           </Select>
+          {actionError && <p className="text-xs text-ws-danger">{actionError}</p>}
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setPackageTarget(null)}>
               Keep plan

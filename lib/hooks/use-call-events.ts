@@ -49,7 +49,9 @@ export function useSSEEvents(
   userId: string | null,
   onEvent: RealtimeEventHandler
 ) {
-  const [isConnected, setIsConnected] = useState(false)
+  // 2026-11-12: the initial reading moved here from the effect body (react-hooks/set-state-in-effect).
+  // const [isConnected, setIsConnected] = useState(false)
+  const [isConnected, setIsConnected] = useState(() => _ablyClient?.connection.state === "connected")
   const onEventRef = useRef(onEvent)
   const channelRef = useRef<Ably.RealtimeChannel | null>(null)
 
@@ -72,7 +74,7 @@ export function useSSEEvents(
     ably.connection.on(onConnectionStateChange)
 
     // Set initial connection state
-    setIsConnected(ably.connection.state === "connected")
+    // setIsConnected(ably.connection.state === "connected")
 
     // Subscribe to the user's channel
     const channel = ably.channels.get(channelName)
@@ -89,7 +91,10 @@ export function useSSEEvents(
       }
     }
 
-    channel.subscribe("event", onMessage)
+    // 2026-11-12: Ably is off (every token request 403s), so the attach behind
+    // subscribe rejects — unhandled, on every page. Live updates degrade to polling quietly.
+    // channel.subscribe("event", onMessage)
+    void channel.subscribe("event", onMessage).catch(() => {})
     console.log(`[Ably] Subscribed to channel: ${channelName}`)
 
     // Enter the shared online-presence channel so mobile (which already reads

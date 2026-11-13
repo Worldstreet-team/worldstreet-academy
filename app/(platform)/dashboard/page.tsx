@@ -24,6 +24,7 @@ import { useUser } from "@/components/providers/user-provider"
 import { CardShell, EmptyState, Eyebrow, Rise } from "@/components/ui/system"
 import {
   assessmentCounts,
+  grantsAccess,
   toDoHref,
   hasPrioritySupport,
   includesAny,
@@ -178,6 +179,9 @@ export default function DashboardPage() {
   const loadingDiscover = loadingBrowse || loadingEnrollments
   const showBrowse = loadingDiscover || browseCourses.length === 0 || recommended.length > 0
   const showBookmarks = loadingBookmarks || bookmarks.length > 0
+  // 2026-11-12: a bookmarked program the learner already holds was quoted its
+  // price; like the rest of the dashboard it now says they're enrolled.
+  const heldIds = new Set(enrollments.filter(grantsAccess).map((e) => e.courseId))
   const bentoDelay = 120
   const discoverDelay = Math.min(bentoDelay + 60 * (loadingTiles ? 2 : tiles.length), 420)
 
@@ -328,6 +332,7 @@ export default function DashboardPage() {
                         thumbnailUrl={bookmark.courseThumbnail}
                         price={bookmark.price}
                         pricing={bookmark.pricing}
+                        priceLabel={heldIds.has(bookmark.courseId) ? "Enrolled" : undefined}
                         rating={bookmark.rating}
                         level={bookmark.level}
                         enrolledCount={bookmark.enrolledCount}

@@ -3,7 +3,7 @@
 import { headers } from "next/headers"
 import { Types } from "mongoose"
 import connectDB from "@/lib/db"
-import { Meeting, MentorshipSession, User, Course, Enrollment, type IMeeting, type IMeetingParticipant, type MeetingStatus } from "@/lib/db/models"
+import { Meeting, MentorshipSession, User, Course, Enrollment, type IMeeting, type IMeetingInvite, type IMeetingParticipant, type MeetingStatus } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth"
 import { createMeeting as createRTKMeeting, addParticipant } from "@/lib/realtime"
 import { emitEvent, emitEventToMany, type MeetingEventPayload } from "@/lib/call-events"
@@ -34,6 +34,23 @@ async function hostTeachesClass(
 ): Promise<boolean> {
   if (!meeting.courseId || meeting.mentorshipSessionId || user.role === "ADMIN") return true
   return Boolean(await Course.exists({ _id: meeting.courseId, ...teachingFilter(user) }))
+}
+
+/**
+ * Ids arrive from the browser untyped: an object such as {"$gte": "<id>"} would
+ * otherwise reach `findById` as an operator and match some other meeting.
+ */
+const OBJECT_ID = /^[a-f0-9]{24}$/
+function isId(value: unknown): value is string {
+  return typeof value === "string" && OBJECT_ID.test(value)
+}
+
+/** Meeting titles are emailed and shown everywhere; the scheduler's own limit. */
+const MAX_TITLE_LENGTH = 150
+
+/** Placeholder addresses minted for mobile sign-ups never get mail (the reminders cron's rule). */
+function mailable(email: string | null | undefined): email is string {
+  return typeof email === "string" && email !== "" && !email.endsWith("@users.noemail")
 }
 
 /** Fire-and-forget: schedule DB write without blocking the response */
@@ -133,6 +150,15 @@ export async function createMeeting(
   try {
     const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
+    // Ad-hoc rooms are a staff tool (the meetings pages only offer them to
+    // non-learners): a learner's room could invite, and search the email of,
+    // any account.
+    if (currentUser.role !== "INSTRUCTOR" && currentUser.role !== "ADMIN") {
+      return { success: false, error: "Only faculty can start a meeting" }
+    }
+    if (typeof title !== "string" || !title.trim() || title.trim().length > MAX_TITLE_LENGTH) {
+      return { success: false, error: "Give the meeting a title under 150 characters" }
+    }
 
     // Create RTK meeting room — sequential (addParticipant needs meetingId)
     const rtkMeetingId = await createRTKMeeting(`Meeting: ${title}`)
@@ -229,6 +255,7 @@ export async function joinMeeting(meetingId: string): Promise<{
   try {
     const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
+    if (!isId(meetingId)) return { success: false, error: "Meeting not found" }
 
     const meeting = await Meeting.findById(meetingId)
     if (!meeting) return { success: false, error: "Meeting not found" }
@@ -583,7 +610,8 @@ export async function joinMeeting(meetingId: string): Promise<{
     }
   } catch (error) {
     console.error("Error joining meeting:", error)
-    return { success: false, error: "Failed to join meeting" }
+    // return { success: false, error: "Failed to join meeting" } — 2026-11-12: plainer, and says what to do
+    return { success: false, error: "Couldn't connect to the class. Try again in a moment." }
   }
 }
 
@@ -596,6 +624,7 @@ export async function admitParticipant(
   try {
     const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
+    if (!isId(meetingId) || !isId(userId)) return { success: false, error: "Meeting not found" }
 
     const meeting = await Meeting.findById(meetingId)
     if (!meeting) return { success: false, error: "Meeting not found" }
@@ -607,24 +636,40 @@ export async function admitParticipant(
       (p) => p.userId.toString() === userId
     )
     if (!participant) return { success: false, error: "Participant not found" }
+    // An ended room mints no tokens, and a removed participant stays out (joinMeeting's rules).
+    if (meeting.status === "ended") return { success: false, error: "Meeting has ended" }
+    if (participant.status === "kicked") return { success: false, error: "This person was removed from the meeting" }
 
     participant.status = "admitted"
     participant.role = "participant"
     participant.joinedAt = new Date()
 
-    // Parallelize ALL independent operations: DB save, user lookup, AND RTK token generation
-    const [, user, rtkParticipant] = await Promise.all([
+    // 2026-11-12: the user is read first so RealtimeKit shows their name on their tile —
+    // every admitted person appeared to everyone as "Participant".
+    // // Parallelize ALL independent operations: DB save, user lookup, AND RTK token generation
+    // const [, user, rtkParticipant] = await Promise.all([
+    //   meeting.save(),
+    //   User.findById(userId).select("firstName lastName avatarUrl").lean(),
+    //   addParticipant(meeting.meetingId, {
+    //     name: "Participant", // placeholder — RTK only needs a display name
+    //     customParticipantId: userId,
+    //     presetName: "group_call_participant",
+    //   }),
+    //   openAttendance(meeting, userId),
+    // ])
+    const user = await User.findById(userId).select("firstName lastName avatarUrl").lean()
+    const participantName = user ? `${user.firstName} ${user.lastName}`.trim() : "Participant"
+    const [, rtkParticipant] = await Promise.all([
       meeting.save(),
-      User.findById(userId).select("firstName lastName avatarUrl").lean(),
       addParticipant(meeting.meetingId, {
-        name: "Participant", // placeholder — RTK only needs a display name
+        name: participantName || "Participant",
         customParticipantId: userId,
         presetName: "group_call_participant",
       }),
       openAttendance(meeting, userId),
     ])
 
-    const participantName = user ? `${user.firstName} ${user.lastName}`.trim() : "Participant"
+    // const participantName = user ? `${user.firstName} ${user.lastName}`.trim() : "Participant"
 
     // Notify the admitted participant
     const admittedPayload: MeetingEventPayload = {
@@ -674,6 +719,7 @@ export async function declineParticipant(
   try {
     const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
+    if (!isId(meetingId) || !isId(userId)) return { success: false, error: "Meeting not found" }
 
     const meeting = await Meeting.findById(meetingId)
     if (!meeting) return { success: false, error: "Meeting not found" }
@@ -718,6 +764,7 @@ export async function startMeeting(meetingId: string): Promise<{
   try {
     const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
+    if (!isId(meetingId)) return { success: false, error: "Meeting not found" }
 
     const meeting = await Meeting.findById(meetingId)
     if (!meeting) return { success: false, error: "Meeting not found" }
@@ -741,18 +788,30 @@ export async function startMeeting(meetingId: string): Promise<{
 
 // ── End a meeting ──
 
-export async function endMeeting(meetingId: string): Promise<{
+export async function endMeeting(
+  meetingId: string,
+  /** The "Cancel class" button: end it only while it hasn't started, so a stale list never ends a live class. */
+  opts?: { onlyIfScheduled?: boolean }
+): Promise<{
   success: boolean
   error?: string
 }> {
   try {
     const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
+    if (!isId(meetingId)) return { success: false, error: "Meeting not found" }
 
     const meeting = await Meeting.findById(meetingId)
     if (!meeting) return { success: false, error: "Meeting not found" }
     if (meeting.hostId.toString() !== currentUser.id) {
       return { success: false, error: "Only host can end meeting" }
+    }
+    // Ending twice (a second tab, a retry) changes nothing: re-stamping endedAt
+    // would lengthen the class and lower everyone's attendance share.
+    if (meeting.status === "ended") return { success: true }
+    const onlyIfScheduled = opts?.onlyIfScheduled === true
+    if (onlyIfScheduled && meeting.status !== "scheduled") {
+      return { success: false, error: "This class has already started. End it from the class itself." }
     }
 
     // Collect participant IDs to notify BEFORE mutating
@@ -760,13 +819,36 @@ export async function endMeeting(meetingId: string): Promise<{
       .filter((p) => p.status === "admitted" && p.userId.toString() !== currentUser.id)
       .map((p) => p.userId.toString())
 
-    meeting.status = "ended"
-    meeting.endedAt = new Date()
-    for (const p of meeting.participants) {
-      if (p.status === "admitted") {
-        p.status = "left"
-        p.leftAt = new Date()
-      }
+    // 2026-11-12: one atomic, filtered write instead of a whole-document save. The
+    // save's per-participant writes are version-checked, so a student joining or
+    // leaving at the same moment failed the end (VersionError) and the class stayed
+    // live while the host's screen showed it ended.
+    // meeting.status = "ended"
+    // meeting.endedAt = new Date()
+    // for (const p of meeting.participants) {
+    //   if (p.status === "admitted") {
+    //     p.status = "left"
+    //     p.leftAt = new Date()
+    //   }
+    // }
+    const endedAt = new Date()
+    const ended = await Meeting.updateOne(
+      { _id: meeting._id, status: onlyIfScheduled ? "scheduled" : { $ne: "ended" } },
+      {
+        $set: {
+          status: "ended",
+          endedAt,
+          "participants.$[p].status": "left",
+          "participants.$[p].leftAt": endedAt,
+        },
+      },
+      { arrayFilters: [{ "p.status": "admitted" }] }
+    )
+    if (ended.matchedCount === 0) {
+      // Another end won the race (fine), or the class started in between (refuse the cancel).
+      const current = await Meeting.findById(meeting._id).select("status").lean()
+      if (!current || current.status === "ended") return { success: true }
+      return { success: false, error: "This class has already started. End it from the class itself." }
     }
 
     // Save DB immediately, fire-and-forget Ably broadcasts
@@ -778,8 +860,9 @@ export async function endMeeting(meetingId: string): Promise<{
       userName: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
       userAvatar: currentUser.avatarUrl,
     }
-    await meeting.save()
-    await closeAllAttendance(meeting._id.toString(), meeting.endedAt ?? new Date())
+    // await meeting.save()
+    // await closeAllAttendance(meeting._id.toString(), meeting.endedAt ?? new Date())
+    await closeAllAttendance(meeting._id.toString(), endedAt)
     // Don't block response — participants will get notified asynchronously
     if (participantIdsToNotify.length > 0) {
       backgroundSave(emitEventToMany(participantIdsToNotify, endPayload))
@@ -880,6 +963,7 @@ export async function getMeetingDetails(meetingId: string): Promise<{
   try {
     const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
+    if (!isId(meetingId)) return { success: false, error: "Meeting not found" }
 
     const meeting = await Meeting.findById(meetingId)
     if (!meeting) return { success: false, error: "Meeting not found" }
@@ -898,6 +982,11 @@ export async function getMeetingDetails(meetingId: string): Promise<{
     if (meeting.mentorshipSessionId && !isHost) {
       const refusal = await mentorshipSessionRefusal(meeting.mentorshipSessionId, currentUser)
       if (refusal) return { success: false, error: refusal }
+    }
+    // The host token goes only to a host who still teaches the course (joinMeeting's
+    // rule): a tutor removed or demoted mid-class can't rejoin through a reload.
+    if (isHost && !(await hostTeachesClass(meeting, currentUser))) {
+      return { success: false, error: "You no longer teach this course" }
     }
 
     // Check participant status before parallel operations
@@ -968,6 +1057,47 @@ export async function getMeetingDetails(meetingId: string): Promise<{
   }
 }
 
+// ── The caller's own state in a room (no realtime bus) ──
+
+/** What a client in a room polls while the Ably bus is down: the room's status and its own row. */
+export type MyMeetingState = {
+  status: MeetingStatus
+  /** The caller's participant row; null for a host with no row. */
+  myStatus: MeetingParticipantDetails["status"] | null
+  role: MeetingRole | null
+}
+
+/**
+ * The room's status and the caller's own row, for clients that would otherwise
+ * hear "meeting:ended", "meeting:kicked" and "meeting:role-changed" over Ably —
+ * disabled company-wide since 2026-11 (token requests 403). One lean read; no
+ * RealtimeKit token is minted. Only the host and people with a row get an answer.
+ */
+export async function getMyMeetingState(
+  meetingId: string
+): Promise<{ success: true; data: MyMeetingState } | { success: false; error: string }> {
+  try {
+    const currentUser = await initAction()
+    if (!currentUser) return { success: false, error: "Unauthorized" }
+    if (!isId(meetingId)) return { success: false, error: "Meeting not found" }
+
+    const meeting = await Meeting.findById(meetingId)
+      .select("status hostId participants.userId participants.status participants.role")
+      .lean()
+    if (!meeting) return { success: false, error: "Meeting not found" }
+    const mine = meeting.participants.find((p) => p.userId.toString() === currentUser.id)
+    if (!mine && meeting.hostId.toString() !== currentUser.id) return { success: false, error: "Meeting not found" }
+
+    return {
+      success: true,
+      data: { status: meeting.status, myStatus: mine?.status ?? null, role: mine ? (mine.role as MeetingRole) : null },
+    }
+  } catch (error) {
+    console.error("Error reading meeting state:", error)
+    return { success: false, error: "Failed to read the meeting" }
+  }
+}
+
 // ── Get pending join requests (for host) ──
 
 export async function getPendingRequests(meetingId: string): Promise<{
@@ -978,6 +1108,7 @@ export async function getPendingRequests(meetingId: string): Promise<{
   try {
     const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
+    if (!isId(meetingId)) return { success: false, error: "Meeting not found" }
 
     const meeting = await Meeting.findById(meetingId)
     if (!meeting) return { success: false, error: "Meeting not found" }
@@ -1020,6 +1151,7 @@ export async function leaveMeeting(meetingId: string): Promise<{
   try {
     const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
+    if (!isId(meetingId)) return { success: false, error: "Meeting not found" }
 
     const meeting = await Meeting.findById(meetingId)
     if (!meeting) return { success: false, error: "Meeting not found" }
@@ -1075,6 +1207,7 @@ export async function inviteToStage(
   try {
     const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
+    if (!isId(meetingId) || !isId(userId)) return { success: false, error: "Meeting not found" }
 
     const meeting = await Meeting.findById(meetingId)
     if (!meeting) return { success: false, error: "Meeting not found" }
@@ -1150,6 +1283,7 @@ export async function removeFromStage(
   try {
     const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
+    if (!isId(meetingId) || !isId(userId)) return { success: false, error: "Meeting not found" }
 
     const meeting = await Meeting.findById(meetingId)
     if (!meeting) return { success: false, error: "Meeting not found" }
@@ -1262,6 +1396,7 @@ export async function declineStageRequest(
   try {
     const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
+    if (!isId(meetingId) || !isId(guestUserId)) return { success: false, error: "Meeting not found" }
 
     const meeting = await Meeting.findById(meetingId).select("hostId title").lean()
     if (!meeting) return { success: false, error: "Meeting not found" }
@@ -1302,6 +1437,7 @@ export async function acceptStageRequest(
   try {
     const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
+    if (!isId(meetingId) || !isId(guestUserId)) return { success: false, error: "Meeting not found" }
 
     const meeting = await Meeting.findById(meetingId).select("hostId title").lean()
     if (!meeting) return { success: false, error: "Meeting not found" }
@@ -1456,6 +1592,7 @@ export async function deleteMeetingHistory(
   try {
     const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
+    if (!isId(meetingId)) return { success: false, error: "Meeting not found" }
 
     const userId = new Types.ObjectId(currentUser.id)
     const meeting = await Meeting.findById(meetingId)
@@ -1553,6 +1690,7 @@ export async function kickParticipant(
   try {
     const currentUser = await initAction()
     if (!currentUser) return { success: false, error: "Unauthorized" }
+    if (!isId(meetingId) || !isId(userId)) return { success: false, error: "Meeting not found" }
 
     const meeting = await Meeting.findById(meetingId)
     if (!meeting) return { success: false, error: "Meeting not found" }
@@ -1839,6 +1977,9 @@ export async function createCourseMeeting(
     // Faculty only — a marketplace seller owns courses too, but live classes
     // (which email and notify every buyer) are a faculty tool.
     if (currentUser.role !== "INSTRUCTOR" && currentUser.role !== "ADMIN") return { success: false, error: "Only faculty can run live classes" }
+    // The title is emailed to every student and printed on every list.
+    if (typeof title !== "string" || !title.trim()) return { success: false, error: "Give the class a title" }
+    if (title.trim().length > MAX_TITLE_LENGTH) return { success: false, error: "Keep the class title under 150 characters" }
 
     // The caller must teach this course: its owner or its assigned faculty (lib/teaching.ts).
     const course = await teachesCourse(currentUser, courseId, "title thumbnailUrl packages format status")
@@ -1849,12 +1990,32 @@ export async function createCourseMeeting(
     // Every course class is recorded (owner, 2026-10-05): RealtimeKit starts
     // recording when the first participant — the host — joins, and
     // /api/cron/recordings copies the file to the private bucket.
-    const rtkMeetingId = await createRTKMeeting(`Meeting: ${title}`, { recordOnStart: true })
-    const hostParticipant = await addParticipant(rtkMeetingId, {
-      name: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
-      customParticipantId: currentUser.id,
-      presetName: "group_call_host",
-    })
+    // 2026-11-12: a video service that doesn't answer said only "Failed to create meeting";
+    // the tutor now hears why, and that nothing was scheduled or sent.
+    // const rtkMeetingId = await createRTKMeeting(`Meeting: ${title}`, { recordOnStart: true })
+    // const hostParticipant = await addParticipant(rtkMeetingId, {
+    //   name: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
+    //   customParticipantId: currentUser.id,
+    //   presetName: "group_call_host",
+    // })
+    let rtkMeetingId: string
+    let hostParticipant: Awaited<ReturnType<typeof addParticipant>>
+    try {
+      rtkMeetingId = await createRTKMeeting(`Meeting: ${title}`, { recordOnStart: true })
+      hostParticipant = await addParticipant(rtkMeetingId, {
+        name: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
+        customParticipantId: currentUser.id,
+        presetName: "group_call_host",
+      })
+    } catch (rtkError) {
+      console.error("Error creating the class room:", rtkError)
+      return {
+        success: false,
+        error: scheduledAt
+          ? "The live class service isn't answering right now, so the class wasn't scheduled and no one was notified. Try again in a few minutes."
+          : "The live class service isn't answering right now, so the class didn't start and no one was notified. Try again in a few minutes.",
+      }
+    }
 
     // Create meeting record with course linkage
     const meeting = await Meeting.create({
@@ -1921,7 +2082,10 @@ export async function createCourseMeeting(
           .lean()
 
         // Send emails in parallel (batched)
-        const emailPromises = students.map((student) =>
+        // 2026-11-12: placeholder addresses (mobile sign-ups) are skipped, as announceClassLive
+        // and the reminders cron already do — they can't receive mail.
+        // const emailPromises = students.map((student) =>
+        const emailPromises = students.filter((student) => mailable(student.email)).map((student) =>
           sendMeetingNotificationEmail(student.email, {
             meetingTitle: title,
             hostName,
@@ -1988,6 +2152,7 @@ export async function inviteByEmail(
   try {
     const currentUser = await initAction()
     if (!currentUser) return { success: false, status: "error", email, error: "Unauthorized" }
+    if (!isId(meetingId) || typeof email !== "string") return { success: false, status: "error", email, error: "Meeting not found" }
 
     const meeting = await Meeting.findById(meetingId)
     if (!meeting) return { success: false, status: "error", email, error: "Meeting not found" }
@@ -2058,7 +2223,9 @@ export async function inviteByEmail(
       email: invitee.email,
       status: "sent",
       sentAt: new Date(),
-    } as any)
+      // 2026-11-12: typed instead of `as any` (the object already is an IMeetingInvite).
+      // } as any)
+    } satisfies IMeetingInvite)
     backgroundSave(meeting.save())
 
     return {

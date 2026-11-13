@@ -55,10 +55,21 @@ export async function adminListUsers(filters?: {
 
     const page = Math.max(1, filters?.page ?? 1)
     const query: Record<string, unknown> = {}
-    if (filters?.role) query.role = filters.role
-    if (filters?.search?.trim()) {
-      const rx = new RegExp(escapeRegex(filters.search.trim()), "i")
-      query.$or = [{ email: rx }, { username: rx }, { firstName: rx }, { lastName: rx }]
+    // 2026-11-12: only a known role reaches the query (a server action may be sent an object).
+    // if (filters?.role) query.role = filters.role
+    if (filters?.role === "USER" || filters?.role === "INSTRUCTOR" || filters?.role === "ADMIN") query.role = filters.role
+    // 2026-11-12: each word on its own, so a full name ("Ada Admin") finds the account; the whole
+    // string matched no single field. Was:
+    // if (filters?.search?.trim()) {
+    //   const rx = new RegExp(escapeRegex(filters.search.trim()), "i")
+    //   query.$or = [{ email: rx }, { username: rx }, { firstName: rx }, { lastName: rx }]
+    // }
+    const terms = typeof filters?.search === "string" ? filters.search.trim().split(/\s+/).filter(Boolean).slice(0, 5) : []
+    if (terms.length > 0) {
+      query.$and = terms.map((term) => {
+        const rx = new RegExp(escapeRegex(term), "i")
+        return { $or: [{ email: rx }, { username: rx }, { firstName: rx }, { lastName: rx }] }
+      })
     }
 
     const [rows, total] = await Promise.all([
@@ -107,6 +118,8 @@ export async function adminGetUserDetail(userId: string): Promise<AdminUserDetai
   try {
     await connectDB()
     await requireAdmin()
+    // 2026-11-12: ids are checked as 24-hex first; an object is read as a Mongo operator.
+    if (typeof userId !== "string" || !/^[a-f0-9]{24}$/.test(userId)) return null
 
     const u = await User.findById(userId).lean()
     if (!u) return null

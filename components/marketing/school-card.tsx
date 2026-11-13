@@ -64,10 +64,13 @@ export function SchoolCard({
   const price = fromPrice === null ? null : `$${fromPrice.price.toLocaleString("en-US")}`
 
   return (
+    // 2026-11-12: `relative`, so the price's screen-reader text (absolutely positioned) is placed and
+    // clipped inside the card. In a phone carousel it escaped the scroller and widened the page to ~1,300px,
+    // which put the school page's pinned "View the program" bar off-screen. Was: "ws-school group @container flex …"
     <Link
       href={href ?? `/schools/${school.slug}`}
       data-school={school.slug}
-      className="ws-school group @container flex h-full flex-col overflow-hidden rounded-[20px] border border-ws-hairline bg-ws-surface transition-colors duration-[var(--ws-motion-base)] hover:bg-ws-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40 dark:border-transparent"
+      className="ws-school group @container relative flex h-full flex-col overflow-hidden rounded-[20px] border border-ws-hairline bg-ws-surface transition-colors duration-[var(--ws-motion-base)] hover:bg-ws-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ws-brand/40 dark:border-transparent"
     >
       <div className="relative aspect-[16/10] overflow-hidden bg-ws-sunken">
         {cover ? (

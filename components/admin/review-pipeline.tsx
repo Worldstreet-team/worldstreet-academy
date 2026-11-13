@@ -14,6 +14,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { adminApproveCourseReview, adminRecordReviewCheck, type AdminCourseReview } from "@/lib/actions/admin-course-review"
 import { CHECK_STATUS_LABEL, REVIEW_CHECK_DETAILS, type ReviewCheckKey, type ReviewCheckStatus } from "@/lib/review-checks"
+import { COHORT_TIME_ZONE } from "@/lib/cohort"
 
 const STATE_LABEL = { none: "Not submitted", pending: "In review", approved: "Approved", changes_requested: "Changes requested" } as const
 
@@ -25,8 +26,13 @@ const CHIP_TONE: Record<ReviewCheckStatus | "none" | "stale", string> = {
   changes: "bg-ws-danger/15 text-ws-danger",
 }
 
+// 2026-11-12: pinned to Lagos. This client component is first rendered on the server (UTC),
+// so a check recorded between midnight and 1am Lagos printed two different days: a hydration error.
+// function day(iso: string): string {
+//   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+// }
 function day(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: COHORT_TIME_ZONE })
 }
 
 /**

@@ -88,6 +88,8 @@ export async function adminGetOrderDetail(orderId: string): Promise<AdminOrderDe
   try {
     await connectDB()
     await requireAdmin()
+    // 2026-11-12: ids are checked as 24-hex first; an object is read as a Mongo operator.
+    if (typeof orderId !== "string" || !/^[a-f0-9]{24}$/.test(orderId)) return null
 
     const o = await Order.findById(orderId)
       .populate("user", "firstName lastName email")

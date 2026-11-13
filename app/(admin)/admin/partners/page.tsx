@@ -32,7 +32,9 @@ export default function AdminPartnersPage() {
         setExportError(out.error)
         return
       }
-      const blob = new Blob([out.data.csv], { type: "text/csv;charset=utf-8" })
+      // 2026-11-12: a byte-order mark, so Excel reads names with accents (Yoruba ọ, ẹ, ṣ) as UTF-8.
+      // const blob = new Blob([out.data.csv], { type: "text/csv;charset=utf-8" })
+      const blob = new Blob(["﻿", out.data.csv], { type: "text/csv;charset=utf-8" })
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url

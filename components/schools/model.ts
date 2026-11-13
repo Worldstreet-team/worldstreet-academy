@@ -2,6 +2,7 @@ import type { ProgramDetail } from "@/lib/actions/student"
 import type { ProgramCurriculumLesson } from "@/lib/actions/program-page"
 import type { PackageKey } from "@/lib/db/models"
 import { courseAvailability } from "@/lib/types/course"
+import { COHORT_TIME_ZONE } from "@/lib/cohort"
 import { PACKAGE_LABEL } from "@/lib/entitlements"
 import { FACULTY_PUBLIC } from "@/lib/faculty"
 import { programPriceLabel } from "@/lib/program-price"
@@ -81,9 +82,11 @@ export function byLevel(programs: SchoolProgram[]): SchoolProgram[] {
   return [...programs].sort((a, b) => LEVELS.indexOf(a.program.level) - LEVELS.indexOf(b.program.level))
 }
 
-/** "Opens Oct 3" — pinned to UTC so the server render and any client agree. */
+/** "Opens Oct 3" — pinned to one zone so the server render and any client agree. */
 export function opensLabel(availableAt: string): string {
-  return `Opens ${new Date(availableAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}`
+  // 2026-11-12: Lagos, not UTC — a start picked at Lagos midnight is 23:00 UTC the day before. Was:
+  // return `Opens ${new Date(availableAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}`
+  return `Opens ${new Date(availableAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: COHORT_TIME_ZONE })}`
 }
 
 /** "3 lessons · 15m of video" — only the parts that are real; empty when none are. */

@@ -12,6 +12,7 @@ import { entitlementsFor } from "@/lib/entitlements"
 import { POINTS, awardPoints, gradePoints, pointKey } from "@/lib/points"
 import { ensureCertificateTier } from "@/lib/certificate-standing"
 import { courseTeacherIds, teachesCourse, teachingFilter } from "@/lib/teaching"
+import { COHORT_TIME_ZONE } from "@/lib/cohort"
 import {
   generatePresignedDownloadUrl,
   generatePresignedUploadUrl,
@@ -50,6 +51,30 @@ function fullName(person: { firstName?: string | null; lastName?: string | null 
   return name || fallback
 }
 
+const MINUTE_MS = 60_000
+const HOUR_MS = 60 * MINUTE_MS
+const DAY_MS = 24 * HOUR_MS
+
+/**
+ * How late a submission came in, as its tutor reads it ("2 days late"), or
+ * null when it came in by the due date or there is none (owner, 2026-11-12).
+ * Late work is still accepted; nothing is stored. It is worked out on every
+ * read from the latest submittedAt (a resubmission replaces it) against the
+ * assignment's current due date. Elapsed time between two instants, rounded
+ * down, so it reads the same in Lagos, on the UTC server and in any browser,
+ * and never depends on "now".
+ */
+function lateBy(submittedAt: Date, dueAt: Date | null | undefined): string | null {
+  if (!dueAt) return null
+  const ms = submittedAt.getTime() - dueAt.getTime()
+  if (!(ms > 0)) return null
+  if (ms < MINUTE_MS) return "under a minute late"
+  const late = (n: number, unit: string) => `${n} ${unit}${n === 1 ? "" : "s"} late`
+  if (ms < HOUR_MS) return late(Math.floor(ms / MINUTE_MS), "minute")
+  if (ms < DAY_MS) return late(Math.floor(ms / HOUR_MS), "hour")
+  return late(Math.floor(ms / DAY_MS), "day")
+}
+
 /* ═══════════════════ instructor ═══════════════════ */
 
 export type SubmissionFileView = { index: number; filename: string; sizeBytes: number }
@@ -64,6 +89,8 @@ export type InstructorSubmission = {
   status: "submitted" | "graded"
   grade: number | null
   feedback: string
+  /** "2 days late" when it came in after the due date (lateBy); null when on time or undated. */
+  lateBy: string | null
 }
 
 export type InstructorAssignment = {
@@ -99,6 +126,7 @@ export async function getCourseAssignments(courseId: string): Promise<CourseAssi
       .select("firstName lastName")
       .lean()
     const namesById = new Map(students.map((s) => [s._id.toString(), fullName(s, "Student")]))
+    const dueById = new Map(assignments.map((a) => [a._id.toString(), a.dueAt ?? null]))
 
     const byAssignment = new Map<string, InstructorSubmission[]>()
     for (const s of submissions) {
@@ -117,6 +145,7 @@ export async function getCourseAssignments(courseId: string): Promise<CourseAssi
         status: s.status,
         grade: s.grade ?? null,
         feedback: s.feedback ?? "",
+        lateBy: lateBy(s.submittedAt, dueById.get(key)),
       })
       byAssignment.set(key, list)
     }
@@ -261,6 +290,11 @@ export async function saveAssignment(input: {
     if (parsed.data.dueAt) {
       dueAt = new Date(parsed.data.dueAt)
       if (Number.isNaN(dueAt.getTime())) return { success: false, error: "Pick a valid due date" }
+      // A new assignment due in the past is announced to students as already overdue.
+      // Editing an existing one keeps whatever due date it has.
+      if (!parsed.data.assignmentId && dueAt.getTime() <= Date.now()) {
+        return { success: false, error: "Pick a due date in the future" }
+      }
     }
     const fields = {
       title: parsed.data.title,
@@ -315,8 +349,13 @@ async function announceAssignment(courseId: string, assignmentId: string, title:
     const recipients = enrollments
       .filter((e) => entitlementsFor(course, e).assignments)
       .map((e) => e.user.toString())
+    // 2026-11-12: the date a Lagos learner reads. In UTC a due time between midnight
+    // and 1 am Lagos printed as the day before.
+    // const due = dueAt
+    //   ? ` · due ${dueAt.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}`
+    //   : ""
     const due = dueAt
-      ? ` · due ${dueAt.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}`
+      ? ` · due ${dueAt.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: COHORT_TIME_ZONE })}`
       : ""
     await notifyUsers(recipients, {
       type: "course",
@@ -474,6 +513,8 @@ const SUBMISSION_MIME = new Set([
   "text/csv",
   "text/plain",
   "application/zip",
+  // Windows browsers label a .zip this way (PRODUCT_MIME in lib/course-format.ts takes it too).
+  "application/x-zip-compressed",
   "image/png",
   "image/jpeg",
 ])
@@ -502,6 +543,8 @@ export type StudentAssignment = {
     status: "submitted" | "graded"
     grade: number | null
     feedback: string
+    /** Came in after the due date (lateBy). The learner is told neutrally, without how late. */
+    late: boolean
   } | null
 }
 
@@ -557,6 +600,7 @@ export async function getAssignmentForStudent(
               status: submission.status,
               grade: submission.grade ?? null,
               feedback: submission.feedback ?? "",
+              late: lateBy(submission.submittedAt, gate.assignment.dueAt) !== null,
             }
           : null,
       },

@@ -12,6 +12,7 @@ import {
   refundWalletCharge,
   isInsufficientBalance,
   walletEnabled,
+  WalletError,
 } from "@/lib/wallet"
 
 // Default: the in-academy wallet withdrawal page (Phase 4). The env override
@@ -47,6 +48,68 @@ export type InstructorEarnings = {
   byCourse: { courseId: string; courseTitle: string; netMinor: number; sales: number }[]
 }
 
+/** Of these earnings' enrollments, the ones refunded or cancelled — whose earnings must not pay out. */
+async function heldEnrollmentIds(earnings: IEarning[]): Promise<Set<string>> {
+  const ids = earnings.filter((e) => e.netMinor > 0 && e.enrollment).map((e) => e.enrollment)
+  if (ids.length === 0) return new Set()
+  const rows = await Enrollment.find({ _id: { $in: ids }, status: { $in: ["refunded", "cancelled"] } })
+    .select("_id")
+    .lean()
+  return new Set(rows.map((r) => String(r._id)))
+}
+
+/**
+ * Claims a matured earning for its payout (2026-11-12): "cleared" is written
+ * BEFORE the money moves, and only while it is still "pending". A cancellation
+ * landing meanwhile then leaves it alone (it reverses only pending earnings),
+ * and a refund books a clawback for it, instead of either reversing an earning
+ * whose credit is already on its way. There is no "clearing" status in the
+ * shared model, so "cleared" is the claim; `releaseEarningClaim` undoes it when
+ * the wallet doesn't pay. Returns the claim's time, or null when it was taken.
+ */
+async function claimEarning(earningId: Types.ObjectId): Promise<Date | null> {
+  const claimedAt = new Date()
+  const claim = await Earning.updateOne(
+    { _id: earningId, status: "pending" },
+    { $set: { status: "cleared", clearedAt: claimedAt } }
+  )
+  return claim.modifiedCount === 1 ? claimedAt : null
+}
+
+/**
+ * The wallet didn't pay a claimed earning: back to "pending" for the next pass,
+ * which replays the same reference (the wallet dedupes it, so an answer lost
+ * in a timeout can't pay twice). On the wallet's own refusal no money moved,
+ * so a refund that booked a clawback while it was claimed has nothing to claw
+ * back: both are reversed.
+ */
+async function releaseEarningClaim(earning: IEarning, claimedAt: Date, err: unknown): Promise<void> {
+  await Earning.updateOne(
+    { _id: earning._id, status: "cleared", clearedAt: claimedAt },
+    { $set: { status: "pending", clearedAt: null } }
+  )
+  const refused = err instanceof WalletError && err.status < 500 && err.code !== "WALLET_UNAVAILABLE"
+  const clawback = await Earning.findOne({ creditReference: `academy_clawback_${earning._id.toString()}` })
+    .select("_id status")
+    .lean()
+  if (!clawback) return
+  if (!refused) {
+    // The credit may have gone through: the clawback stands, and needs a look.
+    console.error("[Earnings] refunded while its payout was unconfirmed — check the wallet:", earning._id.toString())
+    return
+  }
+  const voided = await Earning.updateOne(
+    { _id: clawback._id, status: "pending" },
+    { $set: { status: "reversed", note: "payout refused while the purchase was refunded: nothing to claw back" } }
+  )
+  if (voided.modifiedCount === 1) {
+    await Earning.updateOne(
+      { _id: earning._id, status: "pending" },
+      { $set: { status: "reversed", note: "refund before clearing (its payout was refused)" } }
+    )
+  }
+}
+
 /**
  * Clear matured earnings for one instructor: sale and referral rows credit
  * their central Worldstreet wallet balance (idempotent on creditReference — a
@@ -66,8 +129,20 @@ async function clearMaturedEarnings(instructorId: string): Promise<void> {
     .populate("course", "title")
     .sort({ availableAt: 1 })
 
+  // Never pay out a share of a purchase that was refunded or cancelled
+  // (2026-11-12). The refund or cancellation reverses its pending earnings; if
+  // that write failed, the earning is still pending here, and stays so.
+  const held = await heldEnrollmentIds(matured)
+
   for (const earning of matured) {
     const courseTitle = (earning.course as unknown as { title?: string })?.title ?? "course"
+    if (earning.netMinor > 0 && earning.enrollment && held.has(String(earning.enrollment))) {
+      console.error("[Earnings] not clearing an earning of a refunded or cancelled enrollment:", earning._id.toString())
+      continue
+    }
+    // Claimed before the money moves (2026-11-12); another pass, a cancellation or a refund may have it.
+    const claimedAt = await claimEarning(earning._id)
+    if (!claimedAt) continue
     try {
       if (earning.netMinor >= 0) {
         await createWalletCredit(earning.instructorAuthUserId, {
@@ -85,10 +160,15 @@ async function clearMaturedEarnings(instructorId: string): Promise<void> {
           idempotencyKey: earning.creditReference,
         })
       }
-      earning.status = "cleared"
-      earning.clearedAt = new Date()
-      await earning.save()
+      // 2026-11-12: already "cleared" by the claim. A whole-document save here overwrote a status
+      // written meanwhile (a cancellation's "reversed"). Was:
+      // earning.status = "cleared"
+      // earning.clearedAt = new Date()
+      // await earning.save()
     } catch (err) {
+      await releaseEarningClaim(earning, claimedAt, err).catch((releaseErr) =>
+        console.error("[Earnings] couldn't release a claimed earning:", earning._id.toString(), releaseErr)
+      )
       if (isInsufficientBalance(err)) {
         // Clawback exceeds the instructor's current balance — stays pending and
         // retries on the next clearing pass.
@@ -193,31 +273,59 @@ export async function getMyInstructorEarnings(): Promise<InstructorEarnings | nu
  */
 async function clawBack(earning: IEarning, orderId: Types.ObjectId | null, reason: string): Promise<void> {
   const label = earning.kind === "referral" ? "referral refunded" : "refund"
-  if (earning.status === "pending") {
-    earning.status = "reversed"
-    earning.note = `${label} before clearing: ${reason}`
-    await earning.save()
-  } else if (earning.status === "cleared") {
-    await Earning.create({
-      enrollment: earning.enrollment,
-      order: orderId,
-      course: earning.course,
-      instructor: earning.instructor,
-      instructorAuthUserId: earning.instructorAuthUserId,
-      student: earning.student,
-      kind: "adjustment",
-      grossMinor: -earning.grossMinor,
-      feeMinor: -earning.feeMinor,
-      netMinor: -earning.netMinor,
-      currency: earning.currency,
-      status: "pending",
-      availableAt: new Date(),
-      // Keyed on the earning being reversed, not the enrollment: a
-      // re-purchased-then-refunded course would collide on the latter.
-      creditReference: `academy_clawback_${earning._id.toString()}`,
-      chargeId: earning.chargeId,
-      note: `${label} after clearing: ${reason}`,
-    })
+  // 2026-11-12: reversed only while still pending. A clearing pass may claim it meanwhile ("cleared"
+  // before its credit goes out), and a whole-document save overwrote that, so the credit went out on
+  // a "reversed" earning with nothing to claw it back. Was:
+  // if (earning.status === "pending") {
+  //   earning.status = "reversed"
+  //   earning.note = `${label} before clearing: ${reason}`
+  //   await earning.save()
+  // } else if (earning.status === "cleared") {
+  let status = earning.status
+  if (status === "pending") {
+    const reversed = await Earning.updateOne(
+      { _id: earning._id, status: "pending" },
+      { $set: { status: "reversed", note: `${label} before clearing: ${reason}` } }
+    )
+    if (reversed.modifiedCount === 1) return
+    // Claimed for its payout in the meantime: read what it is now.
+    status = (await Earning.findById(earning._id).select("status").lean())?.status ?? status
+    if (status === "pending") {
+      // The payout was refused and released: reverse it after all.
+      await Earning.updateOne(
+        { _id: earning._id, status: "pending" },
+        { $set: { status: "reversed", note: `${label} before clearing: ${reason}` } }
+      )
+      return
+    }
+  }
+  if (status === "cleared") {
+    // 2026-11-12: a refund retried after a partial failure walks the same
+    // earnings again; the unique reference means this one is already booked.
+    try {
+      await Earning.create({
+        enrollment: earning.enrollment,
+        order: orderId,
+        course: earning.course,
+        instructor: earning.instructor,
+        instructorAuthUserId: earning.instructorAuthUserId,
+        student: earning.student,
+        kind: "adjustment",
+        grossMinor: -earning.grossMinor,
+        feeMinor: -earning.feeMinor,
+        netMinor: -earning.netMinor,
+        currency: earning.currency,
+        status: "pending",
+        availableAt: new Date(),
+        // Keyed on the earning being reversed, not the enrollment: a
+        // re-purchased-then-refunded course would collide on the latter.
+        creditReference: `academy_clawback_${earning._id.toString()}`,
+        chargeId: earning.chargeId,
+        note: `${label} after clearing: ${reason}`,
+      })
+    } catch (err) {
+      if ((err as { code?: number }).code !== 11000) throw err
+    }
   }
 }
 
@@ -235,9 +343,19 @@ export async function refundEnrollment(enrollmentId: string, reason: string) {
     if (!admin || admin.role !== "ADMIN") {
       return { success: false, error: "Not authorized" }
     }
+    // Only a 24-hex id reaches the query: findById({ $ne: null }) would match some other enrollment.
+    if (typeof enrollmentId !== "string" || !/^[a-f0-9]{24}$/i.test(enrollmentId)) {
+      return { success: false, error: "Enrollment not found" }
+    }
 
     const enrollment = await Enrollment.findById(enrollmentId).populate("user", "authUserId")
     if (!enrollment) return { success: false, error: "Enrollment not found" }
+    // Four eyes on money (2026-11-12), as on transfers, grants and enrollment changes: no admin refunds
+    // their own purchase. Checked before the wallet is touched.
+    const buyerId = String((enrollment.user as unknown as { _id?: unknown } | null)?._id ?? enrollment.user)
+    if (buyerId === admin.id) {
+      return { success: false, error: "Another admin has to refund your own purchase" }
+    }
     if (enrollment.status === "refunded") return { success: true, alreadyRefunded: true }
     if (!enrollment.transactionId || enrollment.legacyUnpaid) {
       return { success: false, error: "No wallet charge on record for this enrollment" }
@@ -246,7 +364,59 @@ export async function refundEnrollment(enrollmentId: string, reason: string) {
     const studentAuthId = (enrollment.user as unknown as { authUserId?: string })?.authUserId
     if (!studentAuthId) return { success: false, error: "Student has no wallet identity" }
 
-    await refundWalletCharge(studentAuthId, enrollment.transactionId, reason || "course refund")
+    // 2026-11-12: a place moved up a plan holds one charge per upgrade beside
+    // its purchase (Order kind "upgrade"). Every one is refunded, each by its
+    // own charge id (the wallet's refund is idempotent per charge), and each
+    // order is marked refunded the moment its refund lands, so a retry after a
+    // partial failure skips it instead of asking the wallet again. The place is
+    // revoked only once every charge is back. Was a single refund:
+    // await refundWalletCharge(studentAuthId, enrollment.transactionId, reason || "course refund")
+    const order = await Order.findOne({ chargeId: enrollment.transactionId })
+    const upgradeOrders = await Order.find({
+      user: buyerId,
+      course: enrollment.course,
+      kind: "upgrade",
+      enrollment: enrollment._id,
+      // "failed" with a charge: charged, then its own compensating refund failed.
+      status: { $in: ["paid", "enrolled", "failed"] },
+      chargeId: { $nin: [null, ""] },
+    })
+    const toRefund = [
+      { chargeId: enrollment.transactionId, order },
+      ...upgradeOrders.flatMap((o) => (o.chargeId ? [{ chargeId: o.chargeId, order: o }] : [])),
+    ]
+    let refundedCount = 0
+    for (const item of toRefund) {
+      if (item.order?.status === "refunded") {
+        refundedCount++
+        continue
+      }
+      try {
+        await refundWalletCharge(studentAuthId, item.chargeId, reason || "course refund")
+      } catch (err) {
+        console.error("[Refunds] wallet refund failed:", item.chargeId, err)
+        return {
+          success: false,
+          error:
+            refundedCount > 0
+              ? `Refunded ${refundedCount} of ${toRefund.length} payments for this place; the rest didn't go through. Try again: payments already refunded won't be refunded twice.`
+              : "The wallet didn't take the refund, so nothing was refunded. Try again.",
+        }
+      }
+      refundedCount++
+      if (item.order) {
+        await Order.updateOne(
+          { _id: item.order._id, status: { $ne: "refunded" } },
+          { $set: { status: "refunded" }, $push: { history: { status: "refunded", at: new Date(), note: reason } } }
+        )
+        await PaymentEvent.create({
+          order: item.order._id,
+          reference: item.order.reference,
+          type: "charge_refunded",
+          payload: { chargeId: item.chargeId, reason, by: admin.id },
+        }).catch((err) => console.error("[Refunds] failed to log a refund event:", item.chargeId, err))
+      }
+    }
 
     // Claim the refund atomically: of two clicks that both got past the status
     // check above, only one runs the clawbacks and counters below. (The wallet
@@ -257,24 +427,37 @@ export async function refundEnrollment(enrollmentId: string, reason: string) {
     )
     if (!claimed) return { success: true, alreadyRefunded: true }
 
-    const order = await Order.findOne({ chargeId: enrollment.transactionId })
-    if (order) {
-      order.status = "refunded"
-      order.history.push({ status: "refunded", at: new Date(), note: reason })
-      await order.save()
-      await PaymentEvent.create({
-        order: order._id,
-        reference: order.reference,
-        type: "charge_refunded",
-        payload: { chargeId: enrollment.transactionId, reason, by: admin.id },
-      })
-    }
+    // 2026-11-12: the purchase order is marked refunded above, beside each upgrade's. Was:
+    // const order = await Order.findOne({ chargeId: enrollment.transactionId })
+    // if (order) {
+    //   order.status = "refunded"
+    //   order.history.push({ status: "refunded", at: new Date(), note: reason })
+    //   await order.save()
+    //   await PaymentEvent.create({
+    //     order: order._id,
+    //     reference: order.reference,
+    //     type: "charge_refunded",
+    //     payload: { chargeId: enrollment.transactionId, reason, by: admin.id },
+    //   })
+    // }
 
     // Newest first: a re-purchased course has one sale row per generation, and
     // it's the current one being refunded.
-    const earning = await Earning.findOne({ enrollment: enrollment._id, kind: "sale" }).sort({
-      createdAt: -1,
-    })
+    // 2026-11-12: an upgrade books a sale row too, and may be the newest, so the
+    // purchase's row is matched on the purchase charge first; failing that, the
+    // newest row that isn't an upgrade's. Was:
+    // const earning = await Earning.findOne({ enrollment: enrollment._id, kind: "sale" }).sort({
+    //   createdAt: -1,
+    // })
+    const earning =
+      (await Earning.findOne({ enrollment: enrollment._id, kind: "sale", chargeId: enrollment.transactionId }).sort({
+        createdAt: -1,
+      })) ??
+      (await Earning.findOne({
+        enrollment: enrollment._id,
+        kind: "sale",
+        creditReference: { $not: /^academy_earn_upgrade_/ },
+      }).sort({ createdAt: -1 }))
     if (earning) await clawBack(earning, order?._id ?? null, reason)
 
     // The referral commission this purchase paid, if any, gets the same
@@ -286,6 +469,25 @@ export async function refundEnrollment(enrollmentId: string, reason: string) {
       chargeId: enrollment.transactionId,
     })
     if (commission) await clawBack(commission, order?._id ?? null, reason)
+
+    // 2026-11-12: each upgrade's own sale share and referral commission, matched
+    // on its order. An earlier generation's are already reversed or clawed back
+    // (clawBack skips a reversed row and books a clawback once).
+    const refundedUpgrades = await Order.find({
+      user: buyerId,
+      course: enrollment.course,
+      kind: "upgrade",
+      enrollment: enrollment._id,
+      status: "refunded",
+    }).select("_id")
+    if (refundedUpgrades.length > 0) {
+      const upgradeEarnings = await Earning.find({
+        order: { $in: refundedUpgrades.map((o) => o._id) },
+        kind: { $in: ["sale", "referral"] },
+        status: { $ne: "reversed" },
+      })
+      for (const e of upgradeEarnings) await clawBack(e, e.order ?? null, reason)
+    }
 
     await Course.findByIdAndUpdate(enrollment.course, { $inc: { enrolledCount: -1 } })
     const course = await Course.findById(enrollment.course).select("instructor")

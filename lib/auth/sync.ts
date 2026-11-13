@@ -121,6 +121,15 @@ async function syncOnce(authUser: AuthUser, updateNames: boolean): Promise<Local
     // Also check by email (in case user was created before auth sync)
     user = await User.findOne({ email: authUser.email.toLowerCase() })
 
+    // Link only an address the person proved they own (2026-11-12): a Clerk
+    // account holding someone else's address unverified must not take over that
+    // person's Academy account — their programs, balance, or an admin role.
+    // Creating a second account isn't possible either (the email is unique), so
+    // the sign-in stops here until they verify the address on WorldStreet.
+    if (user && !authUser.isVerified) {
+      throw new Error("[Auth] not linking an unverified email to an existing account")
+    }
+
     if (user) {
       // Same human, different Clerk identity (e.g. signing in against the dev
       // instance, or the mobile app's instance). LINK it — never overwrite the

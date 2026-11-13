@@ -117,7 +117,8 @@ function AdminCoursesInner() {
 
   return (
     <>
-      <Topbar variant="admin" />
+      {/* 2026-11-12: named as in the menu and the heading; the bar read "Programs". Was: <Topbar variant="admin" /> */}
+      <Topbar variant="admin" breadcrumbOverrides={{ courses: "Courses" }} />
       <div className="flex-1 px-4 sm:px-6 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-8 md:px-8 md:pb-12 lg:px-12">
         <div className="mx-auto w-full max-w-7xl space-y-8">
         <PageHeader
@@ -222,10 +223,12 @@ function AdminCoursesInner() {
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
+                    {/* 2026-11-12: the badges wrap; on a phone three of them cut the title to "Pric…". Was:
+                    <div className="flex items-center gap-2"> */}
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <Link
                         href={`/admin/courses/${c.id}/edit`}
-                        className="text-sm font-medium truncate hover:underline"
+                        className="max-w-full text-sm font-medium truncate hover:underline"
                       >
                         {c.title}
                       </Link>
@@ -290,6 +293,12 @@ function AdminCoursesInner() {
                       <DropdownMenuItem render={<Link href={`/admin/courses/${c.id}/edit`} />}>
                         Edit course
                       </DropdownMenuItem>
+                      {/* 2026-11-12: the faculty card sits under the full-height editor, out of sight. */}
+                      {c.kind === "program" && (
+                        <DropdownMenuItem render={<Link href={`/admin/courses/${c.id}/edit#teaching-faculty`} />}>
+                          Teaching faculty
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem render={<Link href={`/admin/enrollments?course=${c.id}`} />}>
                         View enrollments
                       </DropdownMenuItem>

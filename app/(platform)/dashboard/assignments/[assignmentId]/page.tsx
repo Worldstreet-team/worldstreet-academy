@@ -30,6 +30,18 @@ const MAX_BYTES = 25 * 1024 * 1024
 
 type UploadedFile = { key: string; filename: string; mimeType: string; sizeBytes: number }
 
+/**
+ * A submission that came in after the due date (owner, 2026-11-12). Late work
+ * is still accepted and graded; the learner is told plainly, with no "how late".
+ */
+function LateNote() {
+  return (
+    <span className="inline-flex rounded-full bg-ws-chip px-2 py-0.5 text-[10px] font-semibold text-ws-muted">
+      Submitted after the due date
+    </span>
+  )
+}
+
 function SubmissionForm({ assignment, onSubmitted }: { assignment: StudentAssignment; onSubmitted: () => void }) {
   const existing = assignment.submission
   const [text, setText] = React.useState(existing?.text ?? "")
@@ -266,6 +278,8 @@ export default function AssignmentPage() {
                     <p className="text-[11px] tabular-nums text-ws-muted">
                       Submitted {formatDateTime(assignment.submission.submittedAt)}
                     </p>
+                    {/* 2026-11-12: neutral, without how late (the tutor sees that). */}
+                    {assignment.submission.late && <LateNote />}
                     {assignment.submission.text && (
                       <p className="whitespace-pre-wrap break-words text-[13px] text-ws-primary">
                         {assignment.submission.text}
@@ -286,6 +300,8 @@ export default function AssignmentPage() {
                       </p>
                     )}
                   </div>
+                  {/* 2026-11-12: neutral, without how late (the tutor sees that). */}
+                  {assignment.submission?.late && <LateNote />}
                   {assignment.submission && assignment.submission.files.length > 0 && (
                     <SubmissionFiles submissionId={assignment.submission.id} files={assignment.submission.files} />
                   )}

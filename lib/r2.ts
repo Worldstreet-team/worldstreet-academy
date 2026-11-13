@@ -1,5 +1,6 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
+import { randomBytes } from "node:crypto"
 import type { Readable } from "node:stream"
 
 // R2 Client configuration
@@ -190,6 +191,24 @@ export function paymentProofKeyPrefix(userId: string): string {
 export function generatePaymentProofKey(userId: string, extension: string): string {
   const randomId = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10)
   return `${paymentProofKeyPrefix(userId)}${Date.now()}-${randomId}.${extension.replace(/[^a-z0-9]/g, "")}`
+}
+
+/**
+ * The folder one applicant's application documents (CV, additional PDF) live
+ * in. PRIVATE bucket only (2026-11-12: they were uploaded to the public bucket,
+ * so anyone holding a CV's link could open it). submitInstructorApplication
+ * accepts only keys inside the applicant's own folder, and
+ * getApplicationDocumentUrl signs only those. The migration
+ * (scripts/move-applicant-docs-private.mjs) copies legacy public CVs into the
+ * same folder as `migrated-<old file name>`.
+ */
+export function applicationDocumentKeyPrefix(userId: string): string {
+  return `worldstreet-academy/applications/${userId}/`
+}
+
+/** Key for one uploaded application PDF: inside the applicant's folder, unguessable (96 random bits). PRIVATE bucket only. */
+export function generateApplicationDocumentKey(userId: string): string {
+  return `${applicationDocumentKeyPrefix(userId)}${Date.now()}-${randomBytes(12).toString("hex")}.pdf`
 }
 
 /**

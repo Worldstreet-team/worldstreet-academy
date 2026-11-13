@@ -124,7 +124,13 @@ export async function deleteCourseAndContent(
   /** The full raw document (a lean read): it is re-inserted as is when the delete is undone. */
   course: { _id: Types.ObjectId; instructor: Types.ObjectId }
 ): Promise<string | null> {
-  await Course.deleteOne({ _id: course._id })
+  // 2026-11-12: deleted only while still off the website. Another admin may have shown it
+  // again since the caller's isLiveOnWebsite check, and a checkout could then start on it.
+  // await Course.deleteOne({ _id: course._id })
+  const deleted = await Course.deleteOne({ _id: course._id, status: { $ne: "published" } })
+  if (deleted.deletedCount === 0) {
+    return "It changed in the meantime (it may be live on the website again), so it wasn't deleted."
+  }
   let lateRefusal: string | null
   try {
     lateRefusal = await courseDeletionRefusal(course._id)

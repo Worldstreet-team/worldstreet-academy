@@ -21,6 +21,10 @@ export async function GET(request: NextRequest) {
     if (!conversationId) {
       return NextResponse.json({ error: "Missing conversationId" }, { status: 400 })
     }
+    // 2026-11-12: a malformed id is the caller's mistake (400), not a server error (500).
+    if (!/^[a-f0-9]{24}$/.test(conversationId) || (lastMessageId && !/^[a-f0-9]{24}$/.test(lastMessageId))) {
+      return NextResponse.json({ error: "Invalid id" }, { status: 400 })
+    }
 
     const userId = new Types.ObjectId(currentUser.id)
     const convId = new Types.ObjectId(conversationId)
@@ -39,7 +43,9 @@ export async function GET(request: NextRequest) {
     const query: Record<string, unknown> = { conversationId: convId }
     
     if (lastMessageId) {
-      const lastMessage = await Message.findById(lastMessageId)
+      // 2026-11-12: only a message of this conversation sets the cursor.
+      // const lastMessage = await Message.findById(lastMessageId)
+      const lastMessage = await Message.findOne({ _id: lastMessageId, conversationId: convId })
       if (lastMessage) {
         query.createdAt = { $gt: lastMessage.createdAt }
       }
@@ -56,7 +62,9 @@ export async function GET(request: NextRequest) {
       { isRead: true }
     )
 
-    const messagesWithDetails: MessageWithDetails[] = messages.map((msg) => ({
+    // 2026-11-12: a sender whose account no longer exists threw and failed the whole poll.
+    // const messagesWithDetails: MessageWithDetails[] = messages.map((msg) => ({
+    const messagesWithDetails: MessageWithDetails[] = messages.filter((msg) => msg.senderId).map((msg) => ({
       id: msg._id.toString(),
       senderId: msg.senderId._id.toString(),
       senderName: `${msg.senderId.firstName} ${msg.senderId.lastName}`.trim(),

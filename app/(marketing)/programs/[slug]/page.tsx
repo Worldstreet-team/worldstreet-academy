@@ -1,16 +1,17 @@
 import type { Metadata } from "next"
 import { cache } from "react"
+import { headers } from "next/headers"
 import { notFound, permanentRedirect } from "next/navigation"
 import { fetchBrowseCourses, fetchProgramBySlug, type BrowseCourse } from "@/lib/actions/student"
 import { fetchProgramCurriculum, fetchProgramReviews } from "@/lib/actions/program-page"
 import { appUrl } from "@/lib/app-url"
 import { BRAND } from "@/lib/brand"
 import { FACULTY_PUBLIC } from "@/lib/faculty"
-import { checkEnrollment } from "@/lib/actions/enrollments"
+import { checkEnrollment, getUpgradeOptions } from "@/lib/actions/enrollments"
 import { getCachedUser } from "@/lib/auth/cached"
 import { getLearnStart } from "@/lib/course-access"
 import { courseAvailability } from "@/lib/types/course"
-import { PACKAGE_RANK, isPackageKey } from "@/lib/entitlements"
+import { PACKAGE_LABEL, PACKAGE_RANK, isPackageKey } from "@/lib/entitlements"
 import { SCHOOL_BY_SLUG } from "@/lib/schools"
 import { cn } from "@/lib/utils"
 import { ProgramHero } from "@/components/programs/program-hero"
@@ -24,6 +25,7 @@ import { ClampedText } from "@/components/programs/clamped-text"
 import { ProgramInstructor } from "@/components/programs/program-instructor"
 import { FORMAT_LABEL, isFileFormat } from "@/lib/course-format"
 import { PackageChooser } from "@/components/programs/package-chooser"
+import { UpgradePlans } from "@/components/programs/upgrade-plans"
 import { PackageSelectionProvider } from "@/components/programs/package-selection"
 import type { LessonAccess } from "@/components/programs/package-model"
 import { ProgramReviews } from "@/components/programs/program-reviews"
@@ -110,7 +112,12 @@ export default async function ProgramPage({
 }: Params & { searchParams: Promise<{ package?: string | string[] }> }) {
   const [{ slug }, query] = await Promise.all([params, searchParams])
   // Slugs are stored lowercase; any other casing redirects to the one URL.
-  if (slug !== slug.toLowerCase()) permanentRedirect(`/programs/${slug.toLowerCase()}`)
+  // 2026-11-12: keeps the query (`?package=`, `?ref=`) and encodes the slug, so a
+  // non-Latin junk slug can't put an invalid Location header together. Was:
+  // if (slug !== slug.toLowerCase()) permanentRedirect(`/programs/${slug.toLowerCase()}`)
+  if (slug !== slug.toLowerCase()) {
+    permanentRedirect(`/programs/${encodeURIComponent(slug.toLowerCase())}${(await headers()).get("x-next-search") ?? ""}`)
+  }
   const program = await getProgram(slug)
   if (!program) notFound()
 
@@ -142,6 +149,9 @@ export default async function ProgramPage({
   // One price source for the offer and the sticky bar: the tiers the chooser renders.
   const fromPrice = Math.min(...program.packages.map((p) => p.price))
   const multiTier = program.packages.length > 1
+  // 2026-11-12 (Owen): a learner holding a place on a lower plan may move up by
+  // paying the difference. null when their place can't change plan by paying.
+  const upgrade = access.kind === "enrolled" && multiTier ? await getUpgradeOptions(program.id) : null
   // `?package=<key>` — the choice, kept in the URL so checkout's "Change" lands
   // back on it. Only an enabled tier of a multi-tier program counts.
   const requested = typeof query.package === "string" ? query.package : null
@@ -189,6 +199,9 @@ export default async function ProgramPage({
   // An enrolled learner is never quoted a price (lib/program-rail.ts): the
   // offer card already says "You're enrolled", and the ladder has no action for them.
   const showLadder = access.kind !== "enrolled"
+  // In its place for an enrolled learner: their plan, and the upgrades it can take
+  // (the one figure they are quoted, the difference).
+  const showYourPlan = access.kind === "enrolled" && upgrade !== null
   const school = program.school ? SCHOOL_BY_SLUG[program.school] : null
 
   // Related: this school's other programs when there are at least two to
@@ -206,7 +219,8 @@ export default async function ProgramPage({
     { id: "overview", label: "Overview" },
     curriculum.length > 0 ? { id: "curriculum", label: "Curriculum" } : null,
     FACULTY_PUBLIC ? { id: "instructor", label: "Instructor" } : null,
-    showLadder ? { id: "packages", label: multiTier ? "Plans" : "Pricing" } : null,
+    // showLadder ? { id: "packages", label: multiTier ? "Plans" : "Pricing" } : null, — 2026-11-12: + "Your plan"
+    showLadder ? { id: "packages", label: multiTier ? "Plans" : "Pricing" } : showYourPlan ? { id: "packages", label: "Your plan" } : null,
     hasReviews ? { id: "reviews", label: "Reviews" } : null,
     { id: "faq", label: "FAQ" },
   ].filter((link): link is SectionLink => link !== null)
@@ -220,6 +234,9 @@ export default async function ProgramPage({
     multiTier,
     includes,
     hasPreview: previews.length > 0,
+    // 2026-11-12: the enrolled card names the plan held and points at its upgrades (no price there).
+    planName: upgrade ? PACKAGE_LABEL[upgrade.current.key] : null,
+    upgradeHref: upgrade && upgrade.options.length > 0 ? "#packages" : null,
   }
 
   return (
@@ -332,6 +349,15 @@ export default async function ProgramPage({
                       lessons={lessonAccess}
                     />
                   </div>
+                )}
+                {showYourPlan && upgrade && (
+                  <UpgradePlans
+                    courseId={program.id}
+                    packages={program.packages}
+                    tierCount={program.tierCount}
+                    upgrade={upgrade}
+                    programTitle={program.title}
+                  />
                 )}
                 {hasReviews && <ProgramReviews courseId={program.id} sectionId="reviews" initial={reviewsPage} />}
                 <RelatedPrograms

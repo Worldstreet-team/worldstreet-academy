@@ -240,6 +240,8 @@ function InstructorExamPageInner() {
   const [maxAttempts, setMaxAttempts] = React.useState("3")
   const [shuffleQuestions, setShuffleQuestions] = React.useState(true)
   const [shuffleOptions, setShuffleOptions] = React.useState(true)
+  // 2026-11-12: the exam's `showResults` (on by default) had no switch, and nothing read it.
+  const [showResults, setShowResults] = React.useState(true)
   const [settingsError, setSettingsError] = React.useState<string | null>(null)
   const [savedFlash, setSavedFlash] = React.useState(false)
 
@@ -258,6 +260,7 @@ function InstructorExamPageInner() {
       setMaxAttempts(String(exam.settings.maxAttempts))
       setShuffleQuestions(exam.settings.shuffleQuestions)
       setShuffleOptions(exam.settings.shuffleOptions)
+      setShowResults(exam.settings.showResults !== false)
     }
   }, [exam])
 
@@ -276,6 +279,7 @@ function InstructorExamPageInner() {
           maxAttempts: Math.min(20, Math.max(0, Number(maxAttempts) || 0)),
           shuffleQuestions,
           shuffleOptions,
+          showResults,
         },
       }),
     onSuccess: (res) => {
@@ -419,6 +423,17 @@ function InstructorExamPageInner() {
                     <label className="flex items-center justify-between text-xs font-medium">
                       Shuffle options
                       <Switch checked={shuffleOptions} onCheckedChange={setShuffleOptions} />
+                    </label>
+                    <label className="flex items-center justify-between gap-3 text-xs font-medium">
+                      <span>
+                        Show learners their marked answers
+                        <span className="mt-0.5 block font-normal text-muted-foreground">
+                          {lessonId
+                            ? "After each try: which answers were right, and the correct ones."
+                            : "After each try: which answers were right. The correct answers appear once they pass."}
+                        </span>
+                      </span>
+                      <Switch checked={showResults} onCheckedChange={setShowResults} />
                     </label>
                   </div>
                 </div>

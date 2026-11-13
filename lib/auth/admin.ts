@@ -12,7 +12,9 @@ import {
   type AdminState,
   type Role,
 } from "@/lib/admin-levels"
-import { User, type InstructorStatus } from "@/lib/db/models"
+// 2026-11-12: Meeting too, for the classes a demoted faculty member can no longer teach.
+// import { User, type InstructorStatus } from "@/lib/db/models"
+import { Meeting, User, type InstructorStatus } from "@/lib/db/models"
 import { notifyUser } from "@/lib/notify"
 import { getCurrentUser } from "./actions"
 import type { LocalUser } from "./sync"
@@ -77,6 +79,50 @@ export type RoleChangeResult =
   | { success: false; error: string }
 
 const ROLES: readonly string[] = ["USER", "INSTRUCTOR", "ADMIN"]
+
+/** The roles that teach (lib/teaching.ts). */
+const FACULTY_ROLES: readonly string[] = ["INSTRUCTOR", "ADMIN"]
+
+/**
+ * Someone who stops being faculty (owner, 2026-11-12) can't teach any more
+ * (lib/teaching.ts), so their classes that haven't started are cancelled the
+ * way `adminRemoveTeachingFaculty` (lib/actions/admin-courses.ts) cancels them
+ * on one program: ended, the admitted host row left. That drops them from
+ * students' upcoming classes and the reminder cron; as on a host's cancel,
+ * students get no notice, and an unstarted class has no attendance to close.
+ * Live classes stay with their host to end; mentorship rooms and interviews
+ * are left alone, as there. The role change is already written and audited
+ * when this runs, so it never throws: a failure is logged.
+ */
+async function endScheduledClassesOf(userId: string): Promise<void> {
+  try {
+    const endedAt = new Date()
+    const cancelled = await Meeting.updateMany(
+      { hostId: userId, courseId: { $ne: null }, status: "scheduled", mentorshipSessionId: null },
+      {
+        $set: {
+          status: "ended",
+          endedAt,
+          "participants.$[admitted].status": "left",
+          "participants.$[admitted].leftAt": endedAt,
+        },
+      },
+      { arrayFilters: [{ "admitted.status": "admitted" }] }
+    )
+    if (cancelled.modifiedCount > 0) {
+      await notifyUser(userId, {
+        type: "system",
+        title: "Your scheduled classes were cancelled",
+        body: `Your account no longer has instructor access, so your ${
+          cancelled.modifiedCount === 1 ? "scheduled class was" : `${cancelled.modifiedCount} scheduled classes were`
+        } cancelled.`,
+        href: "/dashboard",
+      })
+    }
+  } catch (err) {
+    console.error(`[Admin] Couldn't end the scheduled classes of ${userId} after their role change:`, err)
+  }
+}
 
 function notice(
   action: AdminAuditAction | null,
@@ -159,10 +205,19 @@ export async function applyRoleChange(
         }
   const approve =
     to.role === "INSTRUCTOR" && from.role !== "INSTRUCTOR" && target.instructorStatus !== "approved"
+  // 2026-11-12: someone set back to a student is no longer an approved instructor. "approved" stayed
+  // on them, and lib/start-gate.ts lets an approved applicant into the dashboard without paying.
+  const unapprove = to.role === "USER" && from.role !== "USER" && target.instructorStatus === "approved"
   const written = await User.updateOne(
     { _id: doc._id, role: from.role, adminLevel: from.adminLevel },
     {
-      $set: { role: to.role, adminLevel: to.adminLevel, ...(approve ? { instructorStatus: "approved" } : {}) },
+      // $set: { role: to.role, adminLevel: to.adminLevel, ...(approve ? { instructorStatus: "approved" } : {}) },
+      $set: {
+        role: to.role,
+        adminLevel: to.adminLevel,
+        ...(approve ? { instructorStatus: "approved" } : {}),
+        ...(unapprove ? { instructorStatus: "none" } : {}),
+      },
       ...(entry ? { $push: { adminAudit: entry } } : {}),
     }
   )
@@ -177,7 +232,8 @@ export async function applyRoleChange(
       await User.updateOne(
         { _id: doc._id },
         {
-          $set: { role: from.role, adminLevel: from.adminLevel },
+          // 2026-11-12: the instructor status goes back too. Was: $set: { role: from.role, adminLevel: from.adminLevel },
+          $set: { role: from.role, adminLevel: from.adminLevel, ...(unapprove ? { instructorStatus: "approved" } : {}) },
           ...(entry ? { $pull: { adminAudit: { at: entry.at, by: entry.by } } } : {}),
         }
       )
@@ -190,6 +246,11 @@ export async function applyRoleChange(
 
   // 8. Notify
   await notifyUser(target.id, { type: "system", ...notice(action, to) })
+
+  // 9. No longer faculty: their unstarted classes end (never throws)
+  if (FACULTY_ROLES.includes(from.role) && !FACULTY_ROLES.includes(to.role)) {
+    await endScheduledClassesOf(target.id)
+  }
 
   return { success: true, data: { ...to, changed: true } }
 }

@@ -155,7 +155,9 @@ export function AboutInstructor({
                 {totalStudents != null && totalStudents > 0 && (
                   <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                     <UsersIcon  size={12} className="text-primary" />
-                    <span className="font-medium text-foreground">{totalStudents.toLocaleString()}</span> {totalStudents === 1 ? 'student' : 'students'}
+                    {/* 2026-11-12: a fixed locale — the server's "1,234" and a French or German browser's "1 234" / "1.234" mismatched on hydration. */}
+                    {/* <span className="font-medium text-foreground">{totalStudents.toLocaleString()}</span> {totalStudents === 1 ? 'student' : 'students'} */}
+                    <span className="font-medium text-foreground">{totalStudents.toLocaleString("en-US")}</span> {totalStudents === 1 ? 'student' : 'students'}
                   </span>
                 )}
                 {averageRating != null && averageRating > 0 && (

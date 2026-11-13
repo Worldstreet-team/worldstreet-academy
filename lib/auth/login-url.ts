@@ -10,7 +10,11 @@ const isLocalDev = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk
  */
 export function loginUrl(returnPath: string): string {
   if (isLocalDev) return `/login?redirect_url=${encodeURIComponent(returnPath)}`
-  const back = `https://academy.worldstreetgold.com${returnPath}`
+  // 2026-11-12: the path is glued onto the Academy's host, so anything that isn't a
+  // root-relative path ("@evil.com", ".evil.com") would change the host. Every caller
+  // passes one today; this keeps it that way. Was:
+  // const back = `https://academy.worldstreetgold.com${returnPath}`
+  const back = `https://academy.worldstreetgold.com${safeReturnPath(returnPath)}`
   const url = new URL("https://www.worldstreetgold.com/login")
   url.searchParams.set("redirect", back)
   url.searchParams.set("redirect_url", back)
@@ -24,6 +28,9 @@ export function loginUrl(returnPath: string): string {
  */
 export function safeReturnPath(value: string | string[] | undefined): string {
   const path = typeof value === "string" ? value : ""
+  // Never back to /login or /register (2026-11-12): in production both send a
+  // signed-in visitor to the hub, which sends them straight back — a redirect loop.
+  if (/^\/(login|register)(?:[/?#]|$)/.test(path)) return "/dashboard"
   return path.startsWith("/") && !path.startsWith("//") && !path.startsWith("/\\") ? path : "/dashboard"
 }
 
@@ -71,7 +78,9 @@ export function checkoutReturnPath(pathname: string | null, search: string | nul
  */
 export function registerUrl(returnPath: string): string {
   if (isLocalDev) return `/register?redirect_url=${encodeURIComponent(returnPath)}`
-  const back = `https://academy.worldstreetgold.com${returnPath}`
+  // 2026-11-12: root-relative paths only, as in loginUrl. Was:
+  // const back = `https://academy.worldstreetgold.com${returnPath}`
+  const back = `https://academy.worldstreetgold.com${safeReturnPath(returnPath)}`
   const url = new URL("https://www.worldstreetgold.com/register")
   url.searchParams.set("redirect", back)
   url.searchParams.set("redirect_url", back)

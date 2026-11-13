@@ -80,7 +80,8 @@ export default function AdminSellersPage() {
 
   return (
     <>
-      <Topbar variant="admin" />
+      {/* 2026-11-12: named as in the menu; the bar read "Sellers". Was: <Topbar variant="admin" /> */}
+      <Topbar variant="admin" breadcrumbOverrides={{ sellers: "Marketplace Creators" }} />
       <div className="flex-1 px-4 sm:px-6 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-8 md:px-8 md:pb-12 lg:px-12">
         <div className="mx-auto w-full max-w-7xl space-y-8">
           <PageHeader

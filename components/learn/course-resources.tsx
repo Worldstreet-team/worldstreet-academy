@@ -65,10 +65,29 @@ export function CourseResources({ courseId, lessonId }: { courseId: string; less
   async function download(id: string) {
     setBusyId(id)
     setError(null)
-    const result = await getResourceDownloadUrl(id)
+    // 2026-11-12: a thrown call (offline, a tab left open across a deploy) left
+    // the row spinning; and a phone browser blocks window.open after an await,
+    // so the download silently never started — it opens in this tab instead.
+    // const result = await getResourceDownloadUrl(id)
+    // setBusyId(null)
+    // if (result.success && result.url) {
+    //   window.open(result.url, "_blank", "noopener")
+    // } else {
+    //   setError(result.error || "Couldn't start the download")
+    // }
+    let result: Awaited<ReturnType<typeof getResourceDownloadUrl>>
+    try {
+      result = await getResourceDownloadUrl(id)
+    } catch {
+      setBusyId(null)
+      setError("We couldn't reach the server. Check your connection, or reload the page.")
+      return
+    }
     setBusyId(null)
     if (result.success && result.url) {
-      window.open(result.url, "_blank", "noopener")
+      const opened = window.open(result.url, "_blank")
+      if (opened) opened.opener = null
+      else window.location.assign(result.url)
     } else {
       setError(result.error || "Couldn't start the download")
     }

@@ -3,6 +3,8 @@
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { BrandLockup } from "@/components/shared/brand-lockup"
+import { BRAND } from "@/lib/brand"
 
 export default function NotFound() {
   return (
@@ -10,12 +12,14 @@ export default function NotFound() {
       {/* Logo at top left */}
       <header className="p-6">
         <Link href="/" className="flex items-center gap-2 w-fit">
+          {/* 2026-11-12: the brand lockup, never a typed-letter "W" tile (CLAUDE.md, brand lockup). Was:
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold text-sm">
             W
           </div>
           <span className="text-lg font-bold tracking-tight">
             World<span className="text-primary">Street</span>
-          </span>
+          </span> */}
+          <BrandLockup alt={BRAND.name} />
         </Link>
       </header>
 
@@ -43,13 +47,23 @@ export default function NotFound() {
           </div>
 
           {/* CTA */}
+          {/* 2026-11-12: a wrong Academy link (an old program, a typo) keeps the visitor on
+              the Academy instead of sending them to the hub. Was:
           <div className="pt-2">
-            <Button 
-              size="lg" 
-              className="w-full" 
+            <Button
+              size="lg"
+              className="w-full"
               render={<a href="https://worldstreetgold.com" />}
             >
               Go to WorldStreetGold.com
+            </Button>
+          </div> */}
+          <div className="flex flex-col gap-2 pt-2">
+            <Button size="lg" className="w-full" render={<Link href="/schools" />}>
+              Explore the schools
+            </Button>
+            <Button size="lg" variant="outline" className="w-full" render={<Link href="/" />}>
+              Back to the Academy
             </Button>
           </div>
         </div>

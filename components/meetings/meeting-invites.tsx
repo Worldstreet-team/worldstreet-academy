@@ -112,7 +112,9 @@ export function MeetingInvitesList({
             </div>
 
             {/* Join hint */}
-            <div className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+            {/* 2026-11-12: always shown on touch screens (no hover there), hover-revealed elsewhere. Was:
+                <div className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"> */}
+            <div className="shrink-0 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity">
               <div className="flex items-center gap-0.5 text-[11px] font-medium text-foreground">
                 Join
                 <ChevronRightIcon  size={10} />

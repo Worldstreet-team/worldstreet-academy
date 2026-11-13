@@ -8,9 +8,14 @@ import { ReviewPipeline } from "@/components/admin/review-pipeline"
 import { ProductDownloadButton } from "@/components/marketplace/product-download-button"
 import { adminGetCourseReview } from "@/lib/actions/admin-course-review"
 import { FORMAT_LABEL, fileSizeLabel, isFileFormat } from "@/lib/course-format"
+import { COHORT_TIME_ZONE } from "@/lib/cohort"
 
+// 2026-11-12: the day as Lagos reads it; this server component otherwise printed the UTC day.
+// function formatDate(iso: string): string {
+//   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+// }
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: COHORT_TIME_ZONE })
 }
 
 function duration(sec: number | null): string {

@@ -44,13 +44,25 @@ export type MyWalletBalance = {
   usdAvailable: number
   /** Where a learner adds money: the WorldStreet dashboard (override via NEXT_PUBLIC_WALLET_FUNDING_URL). */
   fundingUrl: string
+  /**
+   * Why `enabled` is false (2026-11-12): `not_configured` — no wallet in this
+   * environment, so nothing can be paid; `unreachable` — the balance read
+   * failed (timeout, wallet error), and a charge may still go through.
+   */
+  reason?: WalletUnavailableReason
 }
 
 // Learners add money on the WorldStreet dashboard, then come back to the Academy to pay (Owen, 2026-11-12).
 // The Academy's own deposit page sits inside the dashboard, which a learner who hasn't paid for a program
 // shouldn't reach. The old default, kept commented:
 // const FUNDING_URL = process.env.NEXT_PUBLIC_WALLET_FUNDING_URL || "/dashboard/wallet/deposit"
-const FUNDING_URL = process.env.NEXT_PUBLIC_WALLET_FUNDING_URL || "https://www.worldstreetgold.com/welcome"
+// 2026-11-12 (buyer QA): an override pointing back into the Academy (the old default, still set in some
+// environments' NEXT_PUBLIC_WALLET_FUNDING_URL) no longer applies. That page sits behind the paid-dashboard gate,
+// so a learner who hadn't paid yet pressed "Add … to your wallet" at checkout and landed on the schools page with
+// their order gone. Only a full web address (another WorldStreet page) overrides the dashboard now. Was:
+// const FUNDING_URL = process.env.NEXT_PUBLIC_WALLET_FUNDING_URL || "https://www.worldstreetgold.com/welcome"
+const FUNDING_OVERRIDE = process.env.NEXT_PUBLIC_WALLET_FUNDING_URL ?? ""
+const FUNDING_URL = /^https?:\/\//.test(FUNDING_OVERRIDE) ? FUNDING_OVERRIDE : "https://www.worldstreetgold.com/welcome"
 
 /** The top bar's glanceable read gives up after this; checkout keeps the wallet client's default. */
 const QUICK_BALANCE_TIMEOUT_MS = 3_000
@@ -72,7 +84,9 @@ export async function getMyWalletBalance(options?: { quick?: boolean }): Promise
   const timeoutMs = options?.quick === true ? QUICK_BALANCE_TIMEOUT_MS : undefined
   try {
     const user = await getCurrentUser()
-    if (!user || !walletEnabled()) return base
+    // if (!user || !walletEnabled()) return base — 2026-11-12: say which, so checkout can tell an outage from "not open"
+    if (!walletEnabled()) return { ...base, reason: "not_configured" }
+    if (!user) return { ...base, reason: "unreachable" }
     const balances = await getWalletBalances(user.authUserId, { timeoutMs })
     return {
       enabled: true,
@@ -82,7 +96,8 @@ export async function getMyWalletBalance(options?: { quick?: boolean }): Promise
     }
   } catch (err) {
     console.error("[Wallet] balance read failed:", err)
-    return base
+    // return base — 2026-11-12
+    return { ...base, reason: "unreachable" }
   }
 }
 
@@ -479,10 +494,14 @@ export async function deleteBankAction(bankId: string) {
   }
 }
 
-export async function withdrawNgn(amountNgn: string, bankId: string) {
+/** A withdrawal attempt's key from the page: UUID-like, so it can't be anything else. */
+const ATTEMPT_KEY = /^[A-Za-z0-9-]{8,36}$/
+
+export async function withdrawNgn(amountNgn: string, bankId: string, attemptKey?: string) {
   try {
     const user = await walletUser()
     if (!user) return { success: false as const, error: "Wallet unavailable" }
+    if (typeof bankId !== "string" || !bankId) return { success: false as const, error: "Choose a bank account" }
 
     const amount = Number(amountNgn)
     if (!Number.isFinite(amount) || amount < 100) {
@@ -496,21 +515,31 @@ export async function withdrawNgn(amountNgn: string, bankId: string) {
       return { success: false as const, error: "kyc_required" }
     }
 
+    // One key per attempt, kept by the page until the attempt is settled (2026-11-12): a retry after a
+    // timeout replays the same withdrawal instead of sending a second one. Scoped to this user, so no key
+    // reaches another account's withdrawal. Without one (an older page), a fresh key as before.
+    const idempotencyKey =
+      typeof attemptKey === "string" && ATTEMPT_KEY.test(attemptKey) ? `wd_${user.id}_${attemptKey}` : randomUUID()
     const r = await initiateFiatWithdrawal(
       user.authUserId,
       amount.toFixed(2),
       bankId,
       actorOf(user),
-      randomUUID()
+      idempotencyKey
     )
 
-    await connectDB()
-    void notifyUser(user.id, {
-      type: "payment",
-      title: "Withdrawal initiated",
-      body: `₦${amount.toLocaleString()} to ${r.withdrawal.bankName} ····${r.withdrawal.accountNumber.slice(-4)}`,
-      href: "/dashboard/wallet",
-    })
+    // The withdrawal is initiated: nothing below may answer "nothing was debited" (2026-11-12).
+    try {
+      await connectDB()
+      void notifyUser(user.id, {
+        type: "payment",
+        title: "Withdrawal initiated",
+        body: `₦${amount.toLocaleString()} to ${r.withdrawal.bankName} ····${r.withdrawal.accountNumber.slice(-4)}`,
+        href: "/dashboard/wallet",
+      })
+    } catch (err) {
+      console.error("[Wallet] withdrawal initiated, but the notice failed:", err)
+    }
 
     return {
       success: true as const,
@@ -520,7 +549,17 @@ export async function withdrawNgn(amountNgn: string, bankId: string) {
     }
   } catch (err) {
     console.error("[Wallet] NGN withdrawal failed:", err)
-    return { success: false as const, error: friendlyWalletError(err, "Withdrawal failed — nothing was debited") }
+    // Only the wallet's own refusal proves nothing moved; after a timeout or a wallet error the page keeps
+    // this attempt's key, so trying again replays it (2026-11-12). Was:
+    // return { success: false as const, error: friendlyWalletError(err, "Withdrawal failed — nothing was debited") }
+    const unconfirmed = !(err instanceof WalletError) || err.code === "WALLET_UNAVAILABLE" || err.status >= 500
+    return {
+      success: false as const,
+      error: unconfirmed
+        ? "We couldn't confirm the withdrawal. Check your wallet history before you try again: trying again from this page won't send it twice."
+        : friendlyWalletError(err, "Withdrawal failed — nothing was debited"),
+      unconfirmed,
+    }
   }
 }
 

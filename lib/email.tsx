@@ -38,10 +38,18 @@ const UTC_PARTS = {
  * `dateStyle`/`timeStyle` throw when combined with `timeZoneName`.
  */
 export function formatUtcDateTime(when: string | Date, style: "medium" | "full" = "medium"): string {
-  return new Date(when).toLocaleString(
+  // 2026-11-12: printed in Lagos time, as interview notices are (applications.ts lagosWhen):
+  // learners and tutors are in Lagos, and a UTC time read an hour early. Lagos has no DST.
+  // return new Date(when).toLocaleString(
+  //   "en-US",
+  //   style === "full" ? { ...UTC_PARTS, weekday: "long", month: "long" } : { ...UTC_PARTS, month: "short" }
+  // )
+  const { timeZoneName: _utcLabel, ...parts } = { ...UTC_PARTS, timeZone: "Africa/Lagos" }
+  void _utcLabel
+  return `${new Date(when).toLocaleString(
     "en-US",
-    style === "full" ? { ...UTC_PARTS, weekday: "long", month: "long" } : { ...UTC_PARTS, month: "short" }
-  )
+    style === "full" ? { ...parts, weekday: "long", month: "long" } : { ...parts, month: "short" }
+  )} (Lagos time)`
 }
 
 export type MeetingEmailData = {

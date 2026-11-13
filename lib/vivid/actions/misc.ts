@@ -2,7 +2,7 @@
 
 import { Conversation, User } from "@/lib/db/models"
 import { Types } from "mongoose"
-import { initAction, type Doc } from "./helpers"
+import { initAction /* , type Doc — 2026-11-12: no longer used */ } from "./helpers"
 
 export async function vividSubmitReview(p: { courseId: string; rating: number; comment?: string }) {
   try {
@@ -51,23 +51,28 @@ export async function vividInitiateCall(p: { recipientId: string; recipientName:
       }
 
       if (!Types.ObjectId.isValid(resolvedId)) {
-        const nameParts = p.recipientName.trim().split(/\s+/)
-        const nameQuery: Doc = nameParts.length > 1
-          ? { firstName: { $regex: nameParts[0], $options: "i" }, lastName: { $regex: nameParts.slice(1).join(" "), $options: "i" } }
-          : { $or: [{ firstName: { $regex: nameParts[0], $options: "i" } }, { lastName: { $regex: nameParts[0], $options: "i" } }] }
-
-        const foundUsers = await User.find(nameQuery).select("_id firstName lastName avatarUrl").limit(5).lean()
+        // 2026-11-12: looked up through the messages search, so a learner only finds people they
+        // may contact (classmates, tutors, support) and the typed name is never read as a regex.
+        // Was a platform-wide User.find on unescaped $regex name parts:
+        // const nameParts = p.recipientName.trim().split(/\s+/)
+        // const nameQuery: Doc = nameParts.length > 1
+        //   ? { firstName: { $regex: nameParts[0], $options: "i" }, lastName: { $regex: nameParts.slice(1).join(" "), $options: "i" } }
+        //   : { $or: [{ firstName: { $regex: nameParts[0], $options: "i" } }, { lastName: { $regex: nameParts[0], $options: "i" } }] }
+        // const foundUsers = await User.find(nameQuery).select("_id firstName lastName avatarUrl").limit(5).lean()
+        const { searchUsers } = await import("@/lib/actions/messages")
+        const search = await searchUsers(String(p.recipientName ?? ""))
+        const foundUsers = (search.success ? search.users ?? [] : []).slice(0, 5)
         if (foundUsers.length === 1) {
-          resolvedId = foundUsers[0]._id.toString()
+          resolvedId = foundUsers[0].id
         } else if (foundUsers.length > 1) {
           return {
             success: false,
             disambiguation: true,
             message: `Found ${foundUsers.length} people named "${p.recipientName}". Ask the user which one they mean.`,
             users: foundUsers.map(u => ({
-              id: u._id.toString(),
-              name: `${u.firstName || ""} ${u.lastName || ""}`.trim(),
-              avatarUrl: u.avatarUrl,
+              id: u.id,
+              name: u.name,
+              avatarUrl: u.avatar ?? undefined,
             })),
           }
         } else {

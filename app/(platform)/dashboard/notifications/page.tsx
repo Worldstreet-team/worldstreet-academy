@@ -129,9 +129,10 @@ export default function NotificationsPage() {
   const handleOpen = React.useCallback(
     (n: NotificationItem) => {
       if (!n.read) {
-        markNotificationRead(n.id).then(() =>
-          queryClient.invalidateQueries({ queryKey: queryKeys.notifications })
-        )
+        markNotificationRead(n.id)
+          .then(() => queryClient.invalidateQueries({ queryKey: queryKeys.notifications }))
+          // 2026-11-12: best effort — offline or after a deploy it rejected unhandled; the row stays unread.
+          .catch(() => {})
       }
     },
     [queryClient]

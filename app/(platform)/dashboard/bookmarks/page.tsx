@@ -7,17 +7,23 @@ import { CourseCard, CourseCardSkeleton } from "@/components/platform/course-car
 import { EmptyState } from "@/components/shared/empty-state"
 import { ArtBookmarks } from "@/components/shared/illustrations"
 import { CardShell, EmptyState as RetryEmptyState } from "@/components/ui/system"
-import { useBookmarks, useToggleBookmark } from "@/lib/hooks/queries"
+import { useBookmarks, useEnrollments, useToggleBookmark } from "@/lib/hooks/queries"
+import { grantsAccess } from "@/lib/dashboard-home"
 
 
 export default function BookmarksPage() {
   const [search, setSearch] = React.useState("")
   const { data: bookmarks = [], isLoading, isError, refetch } = useBookmarks()
   const toggleBookmark = useToggleBookmark()
+  // 2026-11-12: a bookmarked program the learner already holds was quoted its price.
+  const { data: enrollments = [] } = useEnrollments()
+  const heldIds = new Set(enrollments.filter(grantsAccess).map((e) => e.courseId))
 
   const filteredCourses = React.useMemo(() => {
     if (!search.trim()) return bookmarks
-    const q = search.toLowerCase()
+    // 2026-11-12: trimmed — a phone keyboard's trailing space after autocomplete matched nothing.
+    // const q = search.toLowerCase()
+    const q = search.trim().toLowerCase()
     return bookmarks.filter(
       (c) =>
         c.courseTitle.toLowerCase().includes(q) ||
@@ -99,6 +105,7 @@ export default function BookmarksPage() {
                       thumbnailUrl={course.courseThumbnail}
                       price={course.price}
                       pricing={course.pricing}
+                      priceLabel={heldIds.has(course.courseId) ? "Enrolled" : undefined}
                       rating={course.rating}
                       level={course.level}
                       enrolledCount={course.enrolledCount}

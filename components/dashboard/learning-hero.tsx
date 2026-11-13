@@ -3,6 +3,7 @@ import { Glyph, BookOpen01Icon, LiveStreaming02Icon, PlayIcon, type IconComponen
 
 import * as React from "react"
 import Image from "next/image"
+import { useOptionalUser } from "@/components/providers/user-provider"
 import Link from "next/link"
 import { useQueryClient } from "@tanstack/react-query"
 import { AvailabilityCountdown } from "@/components/shared/availability-countdown"
@@ -643,6 +644,40 @@ function ReservedHero({ enrollment: e, footer }: HeroProps) {
 
 /** Nothing opens the player: the owl, one invitation, one gold CTA. */
 function StartHero({ returning }: { returning: boolean }) {
+  // A newly hired tutor (or an admin) with no program of their own lands here after signing in:
+  // point them at their portal first instead of "Choose your first program" (flow QA, 2026-11-12).
+  const viewer = useOptionalUser()
+  const portal = viewer?.role === "ADMIN" ? "/admin" : viewer?.role === "INSTRUCTOR" ? "/instructor" : null
+  if (portal && !returning) {
+    return (
+      <CardShell className="@container">
+        <div className="flex flex-col items-center gap-4 px-5 py-7 text-center @xl:flex-row @xl:gap-8 @xl:p-8 @xl:text-left">
+          <Image
+            src={illustrations.welcome}
+            alt=""
+            width={176}
+            height={176}
+            className="h-36 w-36 shrink-0 object-contain @xl:h-44 @xl:w-44"
+          />
+          <div className="flex min-w-0 flex-col items-center gap-3 @xl:items-start">
+            <Eyebrow>{portal === "/admin" ? "Admin" : "Teaching"}</Eyebrow>
+            <h2 className="font-display text-[24px] font-semibold leading-[1.2] tracking-[-0.015em] @xl:text-[28px]">
+              {portal === "/admin" ? "Open the admin panel" : "Open your instructor portal"}
+            </h2>
+            <p className="max-w-md text-[14px] leading-relaxed text-muted-foreground">
+              {portal === "/admin"
+                ? "Applications, programs, learners and payments are run from the admin panel. You can still join a program here as a learner."
+                : "Your programs, classes and learners are in the instructor portal. You can still join a program here as a learner."}
+            </p>
+            <HeroActions
+              primary={{ label: portal === "/admin" ? "Open admin panel" : "Open instructor portal", href: portal }}
+              className="mt-1"
+            />
+          </div>
+        </div>
+      </CardShell>
+    )
+  }
   return (
     <CardShell className="@container">
       <div className="flex flex-col items-center gap-4 px-5 py-7 text-center @xl:flex-row @xl:gap-8 @xl:p-8 @xl:text-left">

@@ -2,10 +2,195 @@
 
 import { Types } from "mongoose"
 import connectDB from "@/lib/db"
-import { Message, Conversation, User, type IMessage, type IConversation, type IUser } from "@/lib/db/models"
+// 2026-11-12: Course and Enrollment for who a learner may message. Was:
+// import { Message, Conversation, User, type IMessage, type IConversation, type IUser } from "@/lib/db/models"
+import {
+  Message,
+  Conversation,
+  Course,
+  Enrollment,
+  User,
+  type IMessage,
+  type IConversation,
+  type IUser,
+} from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth"
 import { emitEvent, type MessageEventPayload } from "@/lib/call-events"
 import { instructorQaRefusal } from "@/lib/course-access"
+import { R2_PUBLIC_URL } from "@/lib/r2"
+import { assignedFacultyFor } from "@/lib/teaching"
+
+const OBJECT_ID = /^[a-f0-9]{24}$/
+const MESSAGE_TYPES: readonly string[] = ["text", "image", "video", "audio", "file"]
+const MAX_MESSAGE_LENGTH = 5000
+
+/**
+ * 2026-11-12: a message's media may only be a file we stored (a link into our
+ * public bucket, as avatars are). Any other URL reached the receiver's <img>,
+ * <video> and download fallback (window.open) as typed: a tracking pixel, or a
+ * javascript: link run on our origin.
+ */
+function isOurFileUrl(url: unknown): url is string {
+  return typeof url === "string" && url.length <= 2048 && Boolean(R2_PUBLIC_URL) && url.startsWith(`${R2_PUBLIC_URL}/`)
+}
+
+function shortText(value: unknown): string | undefined {
+  return typeof value === "string" ? value.slice(0, 200) : undefined
+}
+
+/*
+ * Who a learner may message (Owen, 2026-11-12). A learner (role USER) sees, and
+ * starts a chat or a call with, only the people they study with: classmates
+ * (an active or completed seat in a course the learner holds an active or
+ * completed seat in), those courses' teachers (the owner, and the assigned
+ * faculty who still hold a faculty role — lib/teaching.ts), admins (support),
+ * and anyone they already have a conversation with. Existing conversations
+ * keep working both ways. Instructors and admins reach anyone, as before.
+ */
+const STUDYING = ["active", "completed"]
+/** A learner's own seats considered: far more than anyone holds. */
+const MAX_CIRCLE_COURSES = 50
+/** Classmates the new-chat search can find. Messaging any classmate is checked exactly (newContactRefusal). */
+const MAX_LISTED_CLASSMATES = 1000
+/** Conversation partners the new-chat search can find. */
+const MAX_LISTED_PARTNERS = 200
+/** Suggestions in the new-chat sheet before anything is typed. */
+const MAX_SUGGESTIONS = 8
+const CONTACTS_RULE = "You can message classmates and tutors from your programs, and our support team."
+
+/** The courses a learner is in, and the ids of the people who teach them. */
+async function studyCircle(userId: string): Promise<{ courseIds: Types.ObjectId[]; teacherIds: Set<string> }> {
+  const seats = await Enrollment.find({ user: userId, status: { $in: STUDYING } })
+    .select("course")
+    .limit(MAX_CIRCLE_COURSES)
+    .lean()
+  const courseIds = seats.map((s) => s.course)
+  const teacherIds = new Set<string>()
+  if (courseIds.length === 0) return { courseIds, teacherIds }
+  // courseTeacherIds (lib/teaching.ts) for every course at once: the owner, plus assignedFacultyFor.
+  const [owners, faculty] = await Promise.all([
+    Course.find({ _id: { $in: courseIds } }).select("instructor").lean(),
+    assignedFacultyFor(courseIds.map((id) => id.toString())),
+  ])
+  for (const course of owners) if (course.instructor) teacherIds.add(course.instructor.toString())
+  for (const members of faculty.values()) for (const member of members) teacherIds.add(member.id)
+  teacherIds.delete(userId)
+  return { courseIds, teacherIds }
+}
+
+/**
+ * Null when this user may open a NEW conversation (or call) with the
+ * recipient, else why not. Asked only when no conversation exists yet.
+ */
+async function newContactRefusal(user: { id: string; role: string }, recipientId: string): Promise<string | null> {
+  if (user.role !== "USER") return null
+  if (!OBJECT_ID.test(recipientId)) return "User not found"
+  const [recipient, circle] = await Promise.all([
+    User.findById(recipientId).select("role").lean(),
+    studyCircle(user.id),
+  ])
+  if (!recipient) return "User not found"
+  if (recipient.role === "ADMIN") return null
+  if (circle.teacherIds.has(recipientId)) return null
+  if (circle.courseIds.length > 0) {
+    const classmate = await Enrollment.exists({
+      user: recipient._id,
+      course: { $in: circle.courseIds },
+      status: { $in: STUDYING },
+    })
+    if (classmate) return null
+  }
+  return CONTACTS_RULE
+}
+
+/** Classmates for the new-chat lists, capped (MAX_LISTED_CLASSMATES), without the learner. */
+async function listedClassmates(userId: string, courseIds: Types.ObjectId[]): Promise<Types.ObjectId[]> {
+  if (courseIds.length === 0) return []
+  const seats = await Enrollment.find({
+    course: { $in: courseIds },
+    status: { $in: STUDYING },
+    user: { $ne: new Types.ObjectId(userId) },
+  })
+    .select("user")
+    .limit(MAX_LISTED_CLASSMATES)
+    .lean()
+  const unique = new Map(seats.map((s) => [s.user.toString(), s.user]))
+  return [...unique.values()]
+}
+
+/** Who a learner may find by name: teachers, classmates and conversation partners (admins are matched by role). */
+async function searchableContactIds(userId: string): Promise<Types.ObjectId[]> {
+  const me = new Types.ObjectId(userId)
+  const [circle, conversations] = await Promise.all([
+    studyCircle(userId),
+    Conversation.find({ participants: me })
+      .sort({ lastMessageAt: -1 })
+      .select("participants")
+      .limit(MAX_LISTED_PARTNERS)
+      .lean(),
+  ])
+  const classmates = await listedClassmates(userId, circle.courseIds)
+  const ids = new Map<string, Types.ObjectId>()
+  for (const id of circle.teacherIds) ids.set(id, new Types.ObjectId(id))
+  for (const id of classmates) ids.set(id.toString(), id)
+  for (const conv of conversations) {
+    for (const p of conv.participants) if (p.toString() !== userId) ids.set(p.toString(), p)
+  }
+  return [...ids.values()]
+}
+
+type ContactRow = {
+  _id: Types.ObjectId
+  firstName?: string | null
+  lastName?: string | null
+  username?: string | null
+  avatarUrl?: string | null
+  role: string
+}
+
+function toSearchResult(u: ContactRow): UserSearchResult {
+  return {
+    id: u._id.toString(),
+    name: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim(),
+    username: u.username ?? "",
+    avatar: u.avatarUrl || null,
+    role: u.role,
+  }
+}
+
+/** A learner's suggestions before they type: their teachers, then classmates, then support. */
+async function learnerSuggestions(userId: string): Promise<UserSearchResult[]> {
+  const me = new Types.ObjectId(userId)
+  const circle = await studyCircle(userId)
+  const classmateIds = await listedClassmates(userId, circle.courseIds)
+  const teacherIds = [...circle.teacherIds].map((id) => new Types.ObjectId(id))
+  const fields = "firstName lastName username avatarUrl role"
+  const [staff, classmates] = await Promise.all([
+    User.find({ _id: { $ne: me }, $or: [{ _id: { $in: teacherIds } }, { role: "ADMIN" }] })
+      .select(fields)
+      .limit(50)
+      .lean<ContactRow[]>(),
+    classmateIds.length > 0
+      ? User.find({ _id: { $in: classmateIds } })
+          .sort({ createdAt: -1 })
+          .select(fields)
+          .limit(MAX_SUGGESTIONS)
+          .lean<ContactRow[]>()
+      : Promise.resolve([] as ContactRow[]),
+  ])
+  const teachers = staff.filter((u) => circle.teacherIds.has(u._id.toString()))
+  const support = staff.filter((u) => !circle.teacherIds.has(u._id.toString()))
+  const seen = new Set<string>()
+  return [...teachers, ...classmates, ...support]
+    .filter((u) => {
+      const id = u._id.toString()
+      if (seen.has(id)) return false
+      seen.add(id)
+      return true
+    })
+    .slice(0, MAX_SUGGESTIONS)
+    .map(toSearchResult)
+}
 
 export type ConversationWithDetails = {
   id: string
@@ -125,6 +310,9 @@ export async function getMessages(conversationId: string): Promise<{
       return { success: false, error: "Unauthorized" }
     }
 
+    if (typeof conversationId !== "string" || !OBJECT_ID.test(conversationId)) {
+      return { success: false, error: "Conversation not found" }
+    }
     const userId = new Types.ObjectId(currentUser.id)
     const convId = new Types.ObjectId(conversationId)
 
@@ -149,7 +337,10 @@ export async function getMessages(conversationId: string): Promise<{
       { isRead: true }
     )
 
-    const messagesWithDetails: MessageWithDetails[] = messages.map((msg) => ({
+    // 2026-11-12: a message whose sender's account no longer exists threw and
+    // the whole conversation failed to open; it is left out.
+    // const messagesWithDetails: MessageWithDetails[] = messages.map((msg) => ({
+    const messagesWithDetails: MessageWithDetails[] = messages.filter((msg) => msg.senderId).map((msg) => ({
       id: msg._id.toString(),
       senderId: msg.senderId._id.toString(),
       senderName: `${msg.senderId.firstName} ${msg.senderId.lastName}`.trim(),
@@ -189,6 +380,42 @@ export async function sendMessage(
       return { success: false, error: "Unauthorized" }
     }
 
+    // 2026-11-12: everything below arrives from the browser as typed.
+    if (typeof receiverId !== "string" || !OBJECT_ID.test(receiverId)) {
+      return { success: false, error: "Recipient not found" }
+    }
+    // To yourself, `$all: [me, me]` matched any conversation of yours and posted into it.
+    if (receiverId === currentUser.id) return { success: false, error: "You can't message yourself" }
+    if (!MESSAGE_TYPES.includes(type)) return { success: false, error: "This kind of message isn't supported" }
+    if (typeof content !== "string" || content.length > MAX_MESSAGE_LENGTH) {
+      return { success: false, error: "Messages can be up to 5,000 characters" }
+    }
+    if (type === "text" && !content.trim()) return { success: false, error: "Write a message first" }
+    if (type !== "text" && !fileData) return { success: false, error: "Upload the file again" }
+    if (
+      fileData &&
+      (!isOurFileUrl(fileData.url) ||
+        (fileData.urls !== undefined &&
+          (!Array.isArray(fileData.urls) || fileData.urls.length > 20 || !fileData.urls.every(isOurFileUrl))))
+    ) {
+      return { success: false, error: "Upload the file again" }
+    }
+    if (fileData) {
+      fileData = {
+        url: fileData.url,
+        urls: fileData.urls,
+        name: shortText(fileData.name),
+        size: shortText(fileData.size),
+        duration: shortText(fileData.duration),
+        waveform:
+          Array.isArray(fileData.waveform) &&
+          fileData.waveform.length <= 200 &&
+          fileData.waveform.every((n) => typeof n === "number" && Number.isFinite(n))
+            ? fileData.waveform
+            : undefined,
+      }
+    }
+
     const senderId = new Types.ObjectId(currentUser.id)
     const recipientId = new Types.ObjectId(receiverId)
 
@@ -198,6 +425,11 @@ export async function sendMessage(
     })
 
     if (!conversation) {
+      // 2026-11-12: never a conversation with an account that doesn't exist.
+      if (!(await User.exists({ _id: recipientId }))) return { success: false, error: "Recipient not found" }
+      // 2026-11-12: a learner starts a chat only with someone they study with, or support.
+      const outsider = await newContactRefusal(currentUser, receiverId)
+      if (outsider) return { success: false, error: outsider }
       const refusal = await instructorQaRefusal(currentUser, receiverId)
       if (refusal) return { success: false, error: refusal }
 
@@ -300,13 +532,17 @@ export async function searchUsers(query: string): Promise<{
       return { success: false, error: "Unauthorized" }
     }
 
-    if (!query || query.length < 2) {
+    // 2026-11-12: a string only, and a sane length.
+    // if (!query || query.length < 2) {
+    if (typeof query !== "string" || query.trim().length < 2 || query.length > 100) {
       return { success: true, users: [] }
     }
 
     // Typed text is matched literally (never as a pattern), and an email only
     // in full — a partial one would list who has an account.
     const rx = new RegExp(escapeRegex(query.trim()), "i")
+    // 2026-11-12: a learner finds only the people they may message, never the whole platform.
+    const learnerContacts = currentUser.role === "USER" ? await searchableContactIds(currentUser.id) : null
     const users = await User.find({
       _id: { $ne: new Types.ObjectId(currentUser.id) },
       $or: [
@@ -315,6 +551,7 @@ export async function searchUsers(query: string): Promise<{
         { username: rx },
         { email: query.trim().toLowerCase() },
       ],
+      ...(learnerContacts ? { $and: [{ $or: [{ role: "ADMIN" }, { _id: { $in: learnerContacts } }] }] } : {}),
     })
       .limit(10)
       .select("firstName lastName username avatarUrl role")
@@ -349,6 +586,10 @@ export async function getOrCreateConversation(userId: string): Promise<{
       return { success: false, error: "Unauthorized" }
     }
 
+    // 2026-11-12: an id string, never yourself (`$all: [me, me]` matched any conversation of yours).
+    if (typeof userId !== "string" || !OBJECT_ID.test(userId)) return { success: false, error: "User not found" }
+    if (userId === currentUser.id) return { success: false, error: "You can't message yourself" }
+
     const senderId = new Types.ObjectId(currentUser.id)
     const recipientId = new Types.ObjectId(userId)
 
@@ -357,6 +598,10 @@ export async function getOrCreateConversation(userId: string): Promise<{
     })
 
     if (!conversation) {
+      if (!(await User.exists({ _id: recipientId }))) return { success: false, error: "User not found" }
+      // 2026-11-12: a learner starts a chat only with someone they study with, or support.
+      const outsider = await newContactRefusal(currentUser, userId)
+      if (outsider) return { success: false, error: outsider }
       const refusal = await instructorQaRefusal(currentUser, userId)
       if (refusal) return { success: false, error: refusal }
 
@@ -385,6 +630,9 @@ export async function markMessagesAsRead(conversationId: string): Promise<{
       return { success: false, error: "Unauthorized" }
     }
 
+    if (typeof conversationId !== "string" || !OBJECT_ID.test(conversationId)) {
+      return { success: false, error: "Conversation not found" }
+    }
     const userId = new Types.ObjectId(currentUser.id)
     const convId = new Types.ObjectId(conversationId)
 
@@ -466,6 +714,11 @@ export async function getRecentUsers(): Promise<{
       return { success: false, error: "Unauthorized" }
     }
 
+    // 2026-11-12: a learner is offered the people they study with (and support), not the newest sign-ups.
+    if (currentUser.role === "USER") {
+      return { success: true, users: await learnerSuggestions(currentUser.id) }
+    }
+
     const users = await User.find({
       _id: { $ne: new Types.ObjectId(currentUser.id) },
     })
@@ -500,6 +753,7 @@ export async function deleteMessage(messageId: string): Promise<{
     const currentUser = await getCurrentUser()
     if (!currentUser) return { success: false, error: "Unauthorized" }
 
+    if (typeof messageId !== "string" || !OBJECT_ID.test(messageId)) return { success: false, error: "Message not found" }
     const message = await Message.findById(messageId)
     if (!message) return { success: false, error: "Message not found" }
 

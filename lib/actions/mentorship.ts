@@ -706,6 +706,9 @@ export async function saveMentorRoadmap(
     await connectDB()
     const user = await getCurrentUser()
     if (!user) return { success: false, error: "You need to be signed in" }
+    // Current staff only, as confirm and cancel: a demoted owner still matches
+    // teachingFilter's "what they own" and could otherwise keep writing roadmaps.
+    if (user.role !== "INSTRUCTOR" && user.role !== "ADMIN") return { success: false, error: "Student not found" }
 
     const parsed = RoadmapInput.safeParse({ enrollmentId, text })
     if (!parsed.success) {

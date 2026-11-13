@@ -1063,9 +1063,15 @@ export async function adminApproveEspeePayment(paymentId: string): Promise<Espee
     // an instructor's share from (the referral commission above is the one
     // exception, client 2026-11-05). Only the student counts move, as in
     // purchaseCourse — pre-enrollment already counted this student.
+    // Display counters only, and the seat is open: a failure is logged, never answered as "Couldn't
+    // approve" (2026-11-12) — the proof is already approved, so a retry would only stop at "already approved".
     if (!isActivation) {
-      await Course.findByIdAndUpdate(courseId, { $inc: { enrolledCount: 1 } })
-      await User.findByIdAndUpdate(course.instructor, { $inc: { "instructorProfile.totalStudents": 1 } })
+      try {
+        await Course.findByIdAndUpdate(courseId, { $inc: { enrolledCount: 1 } })
+        await User.findByIdAndUpdate(course.instructor, { $inc: { "instructorProfile.totalStudents": 1 } })
+      } catch (err) {
+        console.error("[ESPEE] enrolled, but the course/instructor counters didn't update:", err)
+      }
     }
 
     // Executive (D4), as in purchaseCourse: the instructor and admins schedule onboarding.

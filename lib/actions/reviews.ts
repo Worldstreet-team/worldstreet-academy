@@ -56,6 +56,17 @@ export type CourseRatingSummary = {
 // REVIEW ACTIONS
 // ============================================================================
 
+// 2026-11-12: ids arrive from the browser untyped; only id strings reach a query.
+const OBJECT_ID = /^[a-f0-9]{24}$/
+function isId(value: unknown): value is string {
+  return typeof value === "string" && OBJECT_ID.test(value)
+}
+
+/** "Ada" when there is no last name — never "Ada undefined". */
+function fullName(user: { firstName?: string | null; lastName?: string | null }): string {
+  return [user.firstName, user.lastName].filter(Boolean).join(" ").trim()
+}
+
 /** Server actions are callable with any arguments: a userId from the browser must be the signed-in user. */
 async function isSignedInAs(userId: string): Promise<boolean> {
   const user = await getCurrentUser()
@@ -73,6 +84,7 @@ export async function submitReview(
   try {
     await connectDB()
     if (!(await isSignedInAs(userId))) return { success: false, error: "Unauthorized" }
+    if (!isId(courseId)) return { success: false, error: "Course not found" }
 
     const validated = CreateReviewSchema.parse(data)
 
@@ -115,6 +127,10 @@ export async function submitReview(
       data: { reviewId: review._id.toString() },
     }
   } catch (error) {
+    // 2026-11-12: two tabs posting at once — the unique { user, course } index kept one.
+    if ((error as { code?: number } | null)?.code === 11000) {
+      return { success: false, error: "Already reviewed this course" }
+    }
     console.error("Submit review error:", error)
     if (error instanceof z.ZodError) {
       return { success: false, error: "Invalid input data" }
@@ -134,6 +150,7 @@ export async function updateReview(
   try {
     await connectDB()
     if (!(await isSignedInAs(userId))) return { success: false, error: "Unauthorized" }
+    if (!isId(reviewId)) return { success: false, error: "Review not found" }
 
     const validated = UpdateReviewSchema.parse(data)
 
@@ -176,6 +193,7 @@ export async function deleteReview(userId: string, reviewId: string) {
   try {
     await connectDB()
     if (!(await isSignedInAs(userId))) return { success: false, error: "Unauthorized" }
+    if (!isId(reviewId)) return { success: false, error: "Review not found" }
 
     const review = await Review.findOne({
       _id: reviewId,
@@ -212,8 +230,10 @@ export async function markReviewHelpful(reviewId: string) {
     if (!mongoose.isValidObjectId(reviewId)) return { success: false, error: "Review not found" }
 
     // Once per user: the filter only matches while this user isn't counted yet.
+    // 2026-11-12: and never on your own review.
+    // { _id: reviewId, helpfulBy: { $ne: user.id } },
     await Review.updateOne(
-      { _id: reviewId, helpfulBy: { $ne: user.id } },
+      { _id: reviewId, user: { $ne: user.id }, helpfulBy: { $ne: user.id } },
       { $inc: { helpfulCount: 1 }, $addToSet: { helpfulBy: user.id } }
     )
 
@@ -265,9 +285,15 @@ export async function getCourseReviews(
   } = {}
 ): Promise<{ reviews: ReviewItem[]; total: number }> {
   try {
+    if (!isId(courseId)) return { reviews: [], total: 0 }
     await connectDB()
 
-    const { page = 1, limit = 10, sortBy = "recent" } = options
+    // 2026-11-12: page and limit arrive from the browser — a negative page threw
+    // (empty list) and a huge limit read every review at once.
+    // const { page = 1, limit = 10, sortBy = "recent" } = options
+    const { sortBy = "recent" } = options ?? {}
+    const page = Math.max(1, Math.trunc(Number(options?.page)) || 1)
+    const limit = Math.min(50, Math.max(1, Math.trunc(Number(options?.limit)) || 10))
 
     // Build sort
     let sort: Record<string, 1 | -1> = {}
@@ -304,7 +330,11 @@ export async function getCourseReviews(
     ])
 
     // Get enrollment info for verified purchase badges
-    const userIds = reviews.map((r) => r.user._id)
+    // 2026-11-12: a reviewer whose account no longer exists threw here and
+    // emptied the program's reviews; their review is skipped.
+    // const userIds = reviews.map((r) => r.user._id)
+    const shown = reviews.filter((r) => r.user)
+    const userIds = shown.map((r) => r.user._id)
     const enrollments = await Enrollment.find({
       user: { $in: userIds },
       course: courseId,
@@ -317,7 +347,8 @@ export async function getCourseReviews(
     )
 
     return {
-      reviews: reviews.map((review) => {
+      // reviews: reviews.map((review) => {
+      reviews: shown.map((review) => {
         const user = review.user as unknown as {
           _id: { toString(): string }
           firstName: string
@@ -328,7 +359,8 @@ export async function getCourseReviews(
         return {
           id: review._id.toString(),
           userId: user._id.toString(),
-          userName: `${user.firstName} ${user.lastName}`,
+          // userName: `${user.firstName} ${user.lastName}`,
+          userName: fullName(user),
           userAvatar: user.avatarUrl,
           rating: review.rating,
           title: review.title,
@@ -353,6 +385,7 @@ export async function getCourseRatingSummary(
   courseId: string
 ): Promise<CourseRatingSummary | null> {
   try {
+    if (!isId(courseId)) return null
     await connectDB()
 
     const course = await Course.findById(courseId).select("rating").lean()
@@ -388,6 +421,7 @@ export async function checkUserReview(
   try {
     await connectDB()
     if (!(await isSignedInAs(userId))) return { hasReviewed: false }
+    if (!isId(courseId)) return { hasReviewed: false }
 
     const review = await Review.findOne({
       user: userId,
@@ -414,6 +448,7 @@ export async function getUserReview(
   try {
     await connectDB()
     if (!(await isSignedInAs(userId))) return null
+    if (!isId(courseId)) return null
 
     const review = await Review.findOne({
       user: userId,
@@ -436,7 +471,8 @@ export async function getUserReview(
     return {
       id: review._id.toString(),
       userId: user._id.toString(),
-      userName: `${user.firstName} ${user.lastName}`,
+      // userName: `${user.firstName} ${user.lastName}`,
+      userName: fullName(user),
       userAvatar: user.avatarUrl,
       rating: review.rating,
       title: review.title,
@@ -537,6 +573,8 @@ export type LandingReview = {
  */
 export async function fetchLandingReviews(limit = 6): Promise<LandingReview[]> {
   try {
+    // 2026-11-12: from the browser it can be anything; a sane page only.
+    limit = Math.min(24, Math.max(1, Math.trunc(Number(limit)) || 6))
     await connectDB()
 
     // Featured ranks as `featured === true ? 1 : 0`. Reviews older than the field

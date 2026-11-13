@@ -13,6 +13,7 @@ import { schoolFromSlug } from "@/lib/schools"
 import { ensureCertificateId, normalizeCertificateId } from "@/lib/certificate-id"
 import { ensureCertificateTier } from "@/lib/certificate-standing"
 import { teachesCourse, teachingFilter } from "@/lib/teaching"
+import { programArt } from "@/lib/school-art"
 import type { CertificateTier, NextTier } from "@/lib/certificate-tier"
 
 // ============================================================================
@@ -175,7 +176,9 @@ export async function fetchMyCertificates(): Promise<StudentCertificate[]> {
     })
       .populate({
         path: "course",
-        select: "title thumbnailUrl kind instructor packages format",
+        // 2026-11-12: + slug school, for programArt below.
+        // select: "title thumbnailUrl kind instructor packages format",
+        select: "title thumbnailUrl kind instructor packages format slug school",
         populate: {
           path: "instructor",
           select: "firstName lastName avatarUrl role",
@@ -199,6 +202,8 @@ export async function fetchMyCertificates(): Promise<StudentCertificate[]> {
           _id: { toString(): string }
           title: string
           thumbnailUrl: string | null
+          slug?: string | null
+          school?: string | null
           kind?: CourseKind | null
           instructor: {
             firstName: string
@@ -213,7 +218,10 @@ export async function fetchMyCertificates(): Promise<StudentCertificate[]> {
           id: enrollment._id.toString(),
           courseId: course._id.toString(),
           courseTitle: course.title,
-          courseThumbnail: course.thumbnailUrl,
+          // 2026-11-12: the program's art like every other student read model —
+          // a program without its own thumbnail showed no picture here.
+          // courseThumbnail: course.thumbnailUrl,
+          courseThumbnail: programArt(course),
           instructorName: credit.name,
           instructorAvatarUrl: credit.avatarUrl,
           completedAt: enrollment.completedAt!.toISOString(),
@@ -420,8 +428,11 @@ export async function fetchCourseCertificates(
       .sort({ completedAt: -1 })
       .lean()
 
+    // 2026-11-12: a learner whose account no longer exists threw below and emptied the list.
+    // const certificates = enrollments
+    //   .filter((e) => entitlementsFor(course, e).certificate)
     const certificates = enrollments
-      .filter((e) => entitlementsFor(course, e).certificate)
+      .filter((e) => e.user && entitlementsFor(course, e).certificate)
       .map((enrollment) => {
         const student = enrollment.user as unknown as {
           _id: { toString(): string }
@@ -435,7 +446,8 @@ export async function fetchCourseCertificates(
         return {
           id: enrollment._id.toString(),
           studentId: student._id.toString(),
-          studentName: `${student.firstName} ${student.lastName}`,
+          // studentName: `${student.firstName} ${student.lastName}`,
+          studentName: [student.firstName, student.lastName].filter(Boolean).join(" "),
           studentEmail: student.email,
           studentAvatarUrl: student.avatarUrl,
           completedAt: enrollment.completedAt!.toISOString(),

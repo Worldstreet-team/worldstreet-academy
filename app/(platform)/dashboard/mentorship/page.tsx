@@ -22,6 +22,7 @@ import {
 import { formatDateTime } from "@/lib/dashboard-home"
 import { isoToLocalInput, localInputToIso } from "@/lib/datetime-local"
 import { queryKeys } from "@/lib/hooks/queries/keys"
+import { useNow } from "@/lib/hooks/use-now"
 import { cn } from "@/lib/utils"
 
 /* Spec §6 Executive: private 1-on-1 sessions and the personal roadmap. No gold
@@ -111,7 +112,29 @@ function RequestForm({ program, onSent }: { program: MentorshipProgram; onSent: 
   )
 }
 
-function ProgramCard({ program, onChanged }: { program: MentorshipProgram; onChanged: () => void }) {
+/**
+ * 2026-11-12: a request whose proposed times have all gone by still read
+ * "Waiting for your mentor", and the form stays closed while it is open, so the
+ * learner had no way forward. Such a request now says so and points at Cancel.
+ */
+function isLapsedRequest(session: MentorshipSessionView, now: number): boolean {
+  return (
+    session.status === "requested" &&
+    session.proposedSlots.length > 0 &&
+    session.proposedSlots.every((slot) => new Date(slot).getTime() <= now)
+  )
+}
+
+function ProgramCard({
+  program,
+  onChanged,
+  lapsed = false,
+}: {
+  program: MentorshipProgram
+  onChanged: () => void
+  /** Its open request's proposed times have all passed. */
+  lapsed?: boolean
+}) {
   return (
     <section className="space-y-5 rounded-lg bg-ws-surface p-5">
       <div className="min-w-0">
@@ -146,7 +169,11 @@ function ProgramCard({ program, onChanged }: { program: MentorshipProgram; onCha
           <CalendarClockIcon size={14} className="text-ws-muted" aria-hidden />
           Private sessions
         </h3>
-        {program.hasOpenRequest ? (
+        {program.hasOpenRequest && lapsed ? (
+          <p className="text-[13px] text-ws-muted">
+            The times you proposed have passed. Cancel that request under Sessions to propose new ones.
+          </p>
+        ) : program.hasOpenRequest ? (
           <p className="text-[13px] text-ws-muted">
             Waiting for your program&apos;s faculty to confirm a time. You&apos;ll get a notification when they do.
           </p>
@@ -158,11 +185,20 @@ function ProgramCard({ program, onChanged }: { program: MentorshipProgram; onCha
   )
 }
 
-function SessionRow({ session, onChanged }: { session: MentorshipSessionView; onChanged: () => void }) {
+function SessionRow({
+  session,
+  onChanged,
+  lapsed = false,
+}: {
+  session: MentorshipSessionView
+  onChanged: () => void
+  lapsed?: boolean
+}) {
   const [confirming, setConfirming] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [pending, startTransition] = React.useTransition()
-  const chip = SESSION_STATUS[session.status]
+  // const chip = SESSION_STATUS[session.status]
+  const chip = lapsed ? { label: "Times passed", className: "bg-ws-chip text-ws-muted" } : SESSION_STATUS[session.status]
   const cancellable = session.status === "requested" || session.status === "upcoming"
 
   return (
@@ -238,6 +274,8 @@ export default function MentorshipPage() {
   const programs = data?.programs ?? []
   const sessions = data?.sessions ?? []
   const refresh = () => queryClient.invalidateQueries({ queryKey: queryKeys.mentorship })
+  const now = useNow()
+  const lapsedCourses = new Set(sessions.filter((s) => isLapsedRequest(s, now)).map((s) => s.courseId))
 
   return (
     <>
@@ -272,14 +310,19 @@ export default function MentorshipPage() {
           ) : (
             <>
               {programs.map((program) => (
-                <ProgramCard key={program.courseId} program={program} onChanged={refresh} />
+                <ProgramCard
+                  key={program.courseId}
+                  program={program}
+                  onChanged={refresh}
+                  lapsed={lapsedCourses.has(program.courseId)}
+                />
               ))}
               {sessions.length > 0 && (
                 <section className="space-y-3">
                   <h2 className="text-sm font-semibold text-ws-primary">Sessions</h2>
                   <ul className="space-y-2">
                     {sessions.map((session) => (
-                      <SessionRow key={session.id} session={session} onChanged={refresh} />
+                      <SessionRow key={session.id} session={session} onChanged={refresh} lapsed={isLapsedRequest(session, now)} />
                     ))}
                   </ul>
                 </section>

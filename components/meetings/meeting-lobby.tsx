@@ -275,12 +275,15 @@ export function ActiveMeetingsList({
     try {
       // endMeeting works on any status for the host; an ended class leaves
       // Upcoming classes, the reminder cron and invites.
-      const result = await endMeeting(cancelTarget.id)
+      // Only while it is still scheduled: a list left open past the start must not end a live class.
+      const result = await endMeeting(cancelTarget.id, { onlyIfScheduled: true })
       if (result.success) {
         setConfirmOpen(false)
         invalidateMeetings()
       } else {
         setCancelError(result.error ?? "Couldn't cancel the class")
+        // The list was stale (the class started meanwhile): show its real state.
+        invalidateMeetings()
       }
     } catch {
       setCancelError("Couldn't cancel the class")
@@ -414,7 +417,9 @@ export function ActiveMeetingsList({
                   </span>
                 </div>
               </div>
-              <div className={cn("shrink-0 transition-opacity", isScheduled && isHostMe ? "opacity-100" : "opacity-0 group-hover:opacity-100")}>
+              {/* 2026-11-12: always shown on touch screens (no hover there). Was:
+                  <div className={cn("shrink-0 transition-opacity", isScheduled && isHostMe ? "opacity-100" : "opacity-0 group-hover:opacity-100")}> */}
+              <div className={cn("shrink-0 transition-opacity", isScheduled && isHostMe ? "opacity-100" : "opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100")}>
                 <div className="flex items-center gap-1 text-[11px] font-medium text-foreground">
                   {isScheduled && isHostMe ? "Start" : "Rejoin"}
                   <ChevronRightIcon  size={11} />

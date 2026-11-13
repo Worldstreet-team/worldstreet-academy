@@ -35,6 +35,8 @@ export default function ProfilePage() {
   const [bio, setBio] = useState(user.bio ?? "")
   const [isPending, startTransition] = useTransition()
   const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [avatarError, setAvatarError] = useState<string | null>(null)
 
   const initials =
     `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`.toUpperCase() ||
@@ -47,36 +49,71 @@ export default function ProfilePage() {
     ? new Date(user.createdAt).toLocaleDateString("en-US", {
         month: "long",
         year: "numeric",
+        // 2026-11-12: one zone for the server render and the browser, or a
+        // month-end signup (UTC vs Lagos) mismatched on hydration.
+        timeZone: "Africa/Lagos",
       })
     : "—"
 
   const handleAvatarUpload = async (file: File) => {
     if (!file.type.startsWith("image/")) return
     setIsUploading(true)
+    setAvatarError(null)
     try {
       const result = await getImageUploadUrl(file.name, file.type)
-      if (!result.success || !result.uploadUrl || !result.publicUrl) return
-      await fetch(result.uploadUrl, {
+      if (!result.success || !result.uploadUrl || !result.publicUrl) {
+        setAvatarError("We couldn't upload that photo. Please try again.")
+        return
+      }
+      // 2026-11-12: a failed upload (or save) still set the new photo, which
+      // then showed broken; each step is checked now.
+      // await fetch(result.uploadUrl, {
+      //   method: "PUT",
+      //   body: file,
+      //   headers: { "Content-Type": file.type },
+      // })
+      // await updateAvatar(result.publicUrl)
+      const put = await fetch(result.uploadUrl, {
         method: "PUT",
         body: file,
         headers: { "Content-Type": file.type },
       })
-      await updateAvatar(result.publicUrl)
+      if (!put.ok) {
+        setAvatarError("We couldn't upload that photo. Please try again.")
+        return
+      }
+      const savedAvatar = await updateAvatar(result.publicUrl)
+      if (!savedAvatar.success) {
+        setAvatarError(savedAvatar.error ?? "We couldn't save your photo. Please try again.")
+        return
+      }
       setAvatarPreview(result.publicUrl)
     } catch (err) {
       console.error("Avatar upload error:", err)
+      setAvatarError("We couldn't upload that photo. Check your connection and try again.")
     } finally {
       setIsUploading(false)
     }
   }
 
   const handleSaveProfile = () => {
+    setSaveError(null)
     startTransition(async () => {
-      const result = await updateProfile({ firstName, lastName, bio })
+      // 2026-11-12: a refusal (a blank first name) said nothing, and a thrown
+      // call (a tab left open across a deploy) reached the error boundary.
+      // const result = await updateProfile({ firstName, lastName, bio })
+      let result: Awaited<ReturnType<typeof updateProfile>>
+      try {
+        result = await updateProfile({ firstName, lastName, bio })
+      } catch {
+        result = { success: false, error: "We couldn't reach the server. Reload the page and try again." }
+      }
       if (result.success) {
         setSaved(true)
         setIsEditing(false)
         setTimeout(() => setSaved(false), 2500)
+      } else {
+        setSaveError(result.error ?? "We couldn't save your profile. Please try again.")
       }
     })
   }
@@ -170,6 +207,11 @@ export default function ProfilePage() {
                 <p className="text-xs text-muted-foreground capitalize">
                   {user.role.toLowerCase()} &middot; Since {memberSince}
                 </p>
+                {avatarError && (
+                  <p role="alert" className="text-xs text-ws-danger">
+                    {avatarError}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -185,6 +227,7 @@ export default function ProfilePage() {
                       id="firstName"
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
+                      maxLength={60}
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -193,6 +236,7 @@ export default function ProfilePage() {
                       id="lastName"
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
+                      maxLength={60}
                     />
                   </div>
                 </div>
@@ -207,6 +251,11 @@ export default function ProfilePage() {
                     placeholder="Tell us about yourself..."
                   />
                 </div>
+                {saveError && (
+                  <p role="alert" className="text-xs text-ws-danger">
+                    {saveError}
+                  </p>
+                )}
                 <div className="flex gap-2.5 justify-end pt-1">
                   <Button
                     variant="outline"

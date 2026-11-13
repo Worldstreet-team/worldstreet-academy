@@ -5,6 +5,7 @@ import { z } from "zod/v4"
 import connectDB from "@/lib/db"
 import { Notification, type NotificationType } from "@/lib/db/models"
 import { getCurrentUser } from "@/lib/auth/actions"
+import { programArt } from "@/lib/school-art"
 import {
   CATEGORY_OF,
   NOTIFICATION_CATEGORIES,
@@ -42,7 +43,7 @@ type FeedRow = {
   href?: string | null
   readAt?: Date | null
   createdAt: Date
-  course?: { _id: { toString(): string }; title: string; thumbnailUrl?: string | null } | null
+  course?: { _id: { toString(): string }; title: string; thumbnailUrl?: string | null; slug?: string | null; school?: string | null } | null
 }
 
 function emptyCounts(): Record<NotificationCategory, number> {
@@ -64,7 +65,10 @@ export async function getMyNotifications(limit = 25): Promise<NotificationFeed> 
       Notification.find({ user: user.id })
         .sort({ createdAt: -1 })
         .limit(pageSize)
-        .populate({ path: "course", select: "title thumbnailUrl" })
+        // 2026-11-12: + slug and school, so a program with no uploaded thumbnail
+        // shows its art (programArt) on the inbox's program chips, not an empty disc.
+        // .populate({ path: "course", select: "title thumbnailUrl" })
+        .populate({ path: "course", select: "title thumbnailUrl slug school" })
         .lean<FeedRow[]>(),
       // Aggregation doesn't cast, so the user id goes in as an ObjectId.
       Notification.aggregate<{ _id: NotificationType; n: number }>([
@@ -92,7 +96,8 @@ export async function getMyNotifications(limit = 25): Promise<NotificationFeed> 
         read: n.readAt != null,
         createdAt: n.createdAt.toISOString(),
         course: n.course
-          ? { id: n.course._id.toString(), title: n.course.title, thumbnailUrl: n.course.thumbnailUrl ?? null }
+          ? // { id: n.course._id.toString(), title: n.course.title, thumbnailUrl: n.course.thumbnailUrl ?? null }
+            { id: n.course._id.toString(), title: n.course.title, thumbnailUrl: programArt(n.course) }
           : null,
       })),
     }

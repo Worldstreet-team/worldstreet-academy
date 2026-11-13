@@ -66,6 +66,18 @@ export interface IApplicationAnswers {
   readyToCommit?: boolean
   /** "Anything else you'd like to upload?" — an optional PDF (R2 public URL), uploaded like the CV. */
   extraDocumentUrl?: string | null
+  /*
+   * 2026-11-12: uploaded PDFs live in the PRIVATE resources bucket, stored as a
+   * key only (lib/r2.ts `applicationDocumentKeyPrefix(<user id>)`) and opened
+   * through a 5-minute signed link. Additive and absent on older applications:
+   * those keep `cvUrl` / `extraDocumentUrl` (a pasted link, or a legacy upload
+   * in the public bucket until scripts/move-applicant-docs-private.mjs moves it).
+   * When a key is set, readers ignore the URL beside it.
+   */
+  /** The uploaded CV/credentials PDF — a private-bucket key, never a URL. */
+  cvKey?: string | null
+  /** The uploaded additional PDF — a private-bucket key, never a URL. */
+  extraDocumentKey?: string | null
   /** Staff hiring (2026-11-05): how the applicant can be interviewed. Absent on older applications. */
   interviewPreference?: "office" | "online" | "either"
 }
@@ -196,6 +208,9 @@ const InstructorApplicationSchema = new Schema<IInstructorApplication>(
       readyToCommit: { type: Boolean },
       extraDocumentUrl: { type: String },
       interviewPreference: { type: String, enum: ["office", "online", "either"] },
+      // 2026-11-12: private-bucket keys for uploaded PDFs — no defaults, so older applications stay without them.
+      cvKey: { type: String, maxlength: 300 },
+      extraDocumentKey: { type: String, maxlength: 300 },
     },
     interviewMeetingId: { type: Schema.Types.ObjectId, ref: "Meeting", default: null },
     // No defaults, so older applications read as online interviews.

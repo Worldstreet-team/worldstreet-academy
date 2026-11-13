@@ -444,6 +444,8 @@ export type StudentExamStatus = {
   progress: number
   activeAttemptId: string | null
   lastResult: { status: AttemptStatus; scorePercent: number | null } | null
+  /** 2026-11-12: a finished attempt can be reopened marked (getLastExamResult; the exam shows results). */
+  reviewAvailable: boolean
   /** Set when the student's package doesn't include this assessment — show a lock notice, never a start button. */
   packageLock: { requiredLabel: string | null } | null
 }
@@ -486,6 +488,7 @@ export async function getStudentExamStatus(
         progress: enrollment?.progress ?? 0,
         activeAttemptId: null,
         lastResult: null,
+        reviewAvailable: false,
         packageLock,
       }
     }
@@ -519,6 +522,7 @@ export async function getStudentExamStatus(
       progress: enrollment.progress ?? 0,
       activeAttemptId: active ? active._id.toString() : null,
       lastResult: last ? { status: last.status, scorePercent: last.scorePercent ?? null } : null,
+      reviewAvailable: !!last && exam.settings.showResults !== false,
       packageLock,
     }
   } catch (error) {
@@ -770,18 +774,38 @@ export type RunnerQuestion = {
 export type RunnerPayload = {
   attemptId: string
   deadlineAt: string
+  /**
+   * Time left by the server's clock when the paper was sent. The runner counts
+   * down from this, not from `deadlineAt` against the device clock: a phone set
+   * minutes fast used to auto-submit early (2026-11-12).
+   */
+  remainingMs: number
   durationMinutes: number
   passMarkPercent: number
   questions: RunnerQuestion[]
   savedAnswers: Record<string, string[]>
 }
 
-/** Grade an attempt in place (server-authoritative). */
+/** Answers sent with a submit this long after the deadline still count (a slow network, the auto-submit's own trip). */
+const SUBMIT_GRACE_MS = 60_000
+
+/**
+ * Grade an attempt in place (server-authoritative). `claimed` is false when
+ * another request graded it first (a double click, a second tab, the deadline
+ * auto-submit racing the button): nothing was written and no side effect ran.
+ */
 async function gradeAttempt(attempt: HydratedDocument<import("@/lib/db/models").IExamAttempt>) {
   const exam = await Exam.findById(attempt.exam)
   if (!exam) throw new Error("Exam missing")
 
-  const questions = await Question.find({ exam: attempt.exam }).select("+correctOptionIds")
+  // 2026-11-12: only the questions on this learner's paper. One an instructor
+  // added after the attempt started was never shown, yet scored as wrong.
+  // const questions = await Question.find({ exam: attempt.exam }).select("+correctOptionIds")
+  const questions = await Question.find(
+    attempt.questionOrder.length > 0
+      ? { exam: attempt.exam, _id: { $in: attempt.questionOrder } }
+      : { exam: attempt.exam }
+  ).select("+correctOptionIds")
   const answerMap = new Map<string, string[]>(
     attempt.answers.map((a: { question: Types.ObjectId; optionIds: string[] }) => [
       a.question.toString(),
@@ -808,7 +832,19 @@ async function gradeAttempt(attempt: HydratedDocument<import("@/lib/db/models").
   attempt.scorePercent = scorePercent
   attempt.pointsEarned = pointsEarned
   attempt.pointsTotal = pointsTotal
-  await attempt.save()
+  // 2026-11-12: the write lands only while the attempt is still in progress,
+  // so two submits grade once (each used to notify and touch the enrollment).
+  // await attempt.save()
+  attempt.$where = { status: "in_progress" }
+  try {
+    await attempt.save()
+  } catch (error) {
+    const stored = await ExamAttempt.findById(attempt._id).select("status").lean()
+    if (stored && stored.status !== "in_progress") {
+      return { passed, scorePercent, pointsEarned, pointsTotal, showResults: exam.settings.showResults, claimed: false }
+    }
+    throw error
+  }
 
   // Enrollment side-effects — FINAL exams only. Lesson knowledge checks are
   // practice: their results live on the attempt rows alone.
@@ -840,7 +876,7 @@ async function gradeAttempt(attempt: HydratedDocument<import("@/lib/db/models").
     }
   }
 
-  return { passed, scorePercent, pointsEarned, pointsTotal, showResults: exam.settings.showResults }
+  return { passed, scorePercent, pointsEarned, pointsTotal, showResults: exam.settings.showResults, claimed: true }
 }
 
 export async function startExamAttempt(
@@ -950,6 +986,7 @@ export async function startExamAttempt(
       runner: {
         attemptId: attempt._id.toString(),
         deadlineAt: attempt.deadlineAt.toISOString(),
+        remainingMs: Math.max(0, attempt.deadlineAt.getTime() - Date.now()),
         durationMinutes: exam.settings.durationMinutes,
         passMarkPercent: exam.settings.passMarkPercent,
         questions: runnerQuestions,
@@ -975,9 +1012,14 @@ export async function saveExamAnswers(
   try {
     const user = await initAction()
     if (!user) return { success: false }
+    assertId(attemptId)
+    if (!answers || typeof answers !== "object") return { success: false }
 
     const attempt = await ExamAttempt.findOne({ _id: attemptId, user: user.id })
-    if (!attempt || attempt.status !== "in_progress") return { success: false }
+    // 2026-11-12: a graded attempt answers `expired`, so the runner shows the result instead of saving into the void.
+    // if (!attempt || attempt.status !== "in_progress") return { success: false }
+    if (!attempt) return { success: false }
+    if (attempt.status !== "in_progress") return { success: false, expired: true }
 
     // 5s grace beyond the deadline for in-flight autosaves.
     if (attempt.deadlineAt.getTime() + 5_000 < Date.now()) {
@@ -996,6 +1038,8 @@ export async function saveExamAnswers(
       question: new Types.ObjectId(qid),
       optionIds,
     })) as typeof attempt.answers
+    // 2026-11-12: an autosave landing after the submit must not rewrite a graded paper.
+    attempt.$where = { status: "in_progress" }
     await attempt.save()
 
     return { success: true }
@@ -1003,6 +1047,20 @@ export async function saveExamAnswers(
     console.error("Save answers error:", error)
     return { success: false }
   }
+}
+
+/** One question of a marked paper, in the order the learner saw it (2026-11-12). */
+export type ExamReviewQuestion = {
+  id: string
+  type: QuestionType
+  prompt: string
+  points: number
+  options: { id: string; text: string }[]
+  /** The learner's choices; empty when left blank. */
+  chosen: string[]
+  correct: boolean
+  /** The right options, only when `answersRevealed` (see attemptReview). */
+  correctOptionIds: string[] | null
 }
 
 export type ExamResult = {
@@ -1014,6 +1072,65 @@ export type ExamResult = {
   passMarkPercent: number
   attemptsLeft: number | null
   courseCompleted: boolean
+  /** 2026-11-12: per-question marking; null when the exam's "show results" is off. */
+  review: ExamReviewQuestion[] | null
+  /** Whether `review` carries the correct answers, not just right or wrong. */
+  answersRevealed: boolean
+}
+
+/**
+ * The marked paper of a finished attempt (2026-11-12: learners saw only their
+ * score). Null when the exam's `showResults` is off (the instructor's switch).
+ * Each question says right or wrong. The correct options come only for a
+ * knowledge check (practice, never gates anything) or a final the learner has
+ * passed (this attempt or an earlier one): a failed final with retakes left would hand over the answers, and
+ * an admin can reset a learner's attempts, so running out doesn't reveal them.
+ * Marked against the current answer key, the questions on this learner's paper
+ * only, in their order; a question deleted since is left out.
+ */
+async function attemptReview(
+  attempt: {
+    exam: Types.ObjectId
+    status: AttemptStatus
+    questionOrder: Types.ObjectId[]
+    optionOrder?: Record<string, string[]> | null
+    answers: { question: Types.ObjectId; optionIds?: string[] | null }[]
+  },
+  exam: { scope?: string | null; settings: { showResults?: boolean | null } },
+  /** The seat's final already passed (an earlier attempt): retaking it gains nothing. */
+  passedBefore = false
+): Promise<{ review: ExamReviewQuestion[] | null; answersRevealed: boolean }> {
+  if (exam.settings.showResults === false || attempt.questionOrder.length === 0) {
+    return { review: null, answersRevealed: false }
+  }
+  const answersRevealed = (exam.scope ?? "final") === "lesson" || attempt.status === "passed" || passedBefore
+  const questions = await Question.find({ exam: attempt.exam, _id: { $in: attempt.questionOrder } })
+    .select("+correctOptionIds")
+    .lean()
+  const byId = new Map(questions.map((q) => [q._id.toString(), q]))
+  const answerMap = new Map(attempt.answers.map((a) => [a.question.toString(), [...(a.optionIds ?? [])]]))
+
+  const review: ExamReviewQuestion[] = []
+  for (const qid of attempt.questionOrder) {
+    const q = byId.get(qid.toString())
+    if (!q) continue
+    const optText = new Map(q.options.map((o) => [o.id, o.text]))
+    const order = attempt.optionOrder?.[q._id.toString()] ?? q.options.map((o) => o.id)
+    const chosen = (answerMap.get(q._id.toString()) ?? []).filter((id) => optText.has(id))
+    const given = [...chosen].sort()
+    const right = [...q.correctOptionIds].sort()
+    review.push({
+      id: q._id.toString(),
+      type: q.type,
+      prompt: q.prompt,
+      points: q.points,
+      options: order.filter((id) => optText.has(id)).map((id) => ({ id, text: optText.get(id)! })),
+      chosen,
+      correct: given.length === right.length && given.every((v, i) => v === right[i]),
+      correctOptionIds: answersRevealed ? [...q.correctOptionIds] : null,
+    })
+  }
+  return { review, answersRevealed }
 }
 
 export async function submitExamAttempt(
@@ -1023,8 +1140,10 @@ export async function submitExamAttempt(
   try {
     const user = await initAction()
     if (!user) return { success: false, error: "Not authenticated" }
+    assertId(attemptId)
 
-    const attempt = await ExamAttempt.findOne({ _id: attemptId, user: user.id })
+    // let: re-read below when another request graded it first.
+    let attempt = await ExamAttempt.findOne({ _id: attemptId, user: user.id })
     if (!attempt) return { success: false, error: "Attempt not found" }
 
     const exam = await Exam.findById(attempt.exam).select("settings title course scope")
@@ -1032,7 +1151,10 @@ export async function submitExamAttempt(
 
     if (attempt.status === "in_progress") {
       // Fold in any final answers that raced the submit click.
-      if (answers) {
+      // 2026-11-12: not once the deadline (and its grace) has passed: a paper
+      // kept open past the timer could otherwise be answered without limit.
+      // if (answers) {
+      if (answers && typeof answers === "object" && Date.now() <= attempt.deadlineAt.getTime() + SUBMIT_GRACE_MS) {
         const valid = new Set(attempt.questionOrder.map((q) => q.toString()))
         const merged = new Map(attempt.answers.map((a) => [a.question.toString(), a.optionIds]))
         for (const [qid, optionIds] of Object.entries(answers)) {
@@ -1044,46 +1166,52 @@ export async function submitExamAttempt(
         })) as typeof attempt.answers
       }
       const graded = await gradeAttempt(attempt)
-
-      const finished = await ExamAttempt.countDocuments({
-        user: user.id,
-        exam: attempt.exam,
-        status: { $ne: "in_progress" },
-      })
-      const max = exam.settings.maxAttempts
-      const enrollment = await Enrollment.findById(attempt.enrollment).select("status").lean()
-
-      if (graded.passed) {
-        const isFinal = (exam.scope ?? "final") === "final"
-        void notifyUser(user.id, {
-          type: "course",
-          title: `You passed ${exam.title}`,
-          body: isFinal
-            ? `Score: ${graded.scorePercent}% — your certificate is unlocked.`
-            : `Knowledge check score: ${graded.scorePercent}%. Keep going!`,
-          href: isFinal
-            ? `/dashboard/courses/${exam.course.toString()}/certificate`
-            : `/dashboard/courses/${exam.course.toString()}`,
-          courseId: exam.course.toString(),
+      // 2026-11-12: only the request that graded it notifies and reports here.
+      if (graded.claimed) {
+        const finished = await ExamAttempt.countDocuments({
+          user: user.id,
+          exam: attempt.exam,
+          status: { $ne: "in_progress" },
         })
-      }
+        const max = exam.settings.maxAttempts
+        // 2026-11-12: examPassed too, for the marked paper. Was: .select("status")
+        const enrollment = await Enrollment.findById(attempt.enrollment).select("status examPassed").lean()
 
-      revalidatePath(`/dashboard/courses/${exam.course.toString()}`)
-      revalidatePath("/dashboard/certificates")
+        if (graded.passed) {
+          const isFinal = (exam.scope ?? "final") === "final"
+          void notifyUser(user.id, {
+            type: "course",
+            title: `You passed ${exam.title}`,
+            body: isFinal
+              ? `Score: ${graded.scorePercent}% — your certificate is unlocked.`
+              : `Knowledge check score: ${graded.scorePercent}%. Keep going!`,
+            href: isFinal
+              ? `/dashboard/courses/${exam.course.toString()}/certificate`
+              : `/dashboard/courses/${exam.course.toString()}`,
+            courseId: exam.course.toString(),
+          })
+        }
 
-      return {
-        success: true,
-        result: {
-          status: attempt.status,
-          passed: graded.passed,
-          scorePercent: graded.scorePercent,
-          pointsEarned: graded.pointsEarned,
-          pointsTotal: graded.pointsTotal,
-          passMarkPercent: exam.settings.passMarkPercent,
-          attemptsLeft: max === 0 ? null : Math.max(0, max - finished),
-          courseCompleted: enrollment?.status === "completed",
-        },
+        revalidatePath(`/dashboard/courses/${exam.course.toString()}`)
+        revalidatePath("/dashboard/certificates")
+
+        return {
+          success: true,
+          result: {
+            status: attempt.status,
+            passed: graded.passed,
+            scorePercent: graded.scorePercent,
+            pointsEarned: graded.pointsEarned,
+            pointsTotal: graded.pointsTotal,
+            passMarkPercent: exam.settings.passMarkPercent,
+            attemptsLeft: max === 0 ? null : Math.max(0, max - finished),
+            courseCompleted: enrollment?.status === "completed",
+            ...(await attemptReview(attempt, exam, !!enrollment?.examPassed)),
+          },
+        }
       }
+      // Another request graded it first: report what it recorded, below.
+      attempt = (await ExamAttempt.findOne({ _id: attemptId, user: user.id })) ?? attempt
     }
 
     // Already terminal — return the recorded result (idempotent submit).
@@ -1093,7 +1221,8 @@ export async function submitExamAttempt(
       status: { $ne: "in_progress" },
     })
     const max = exam.settings.maxAttempts
-    const enrollment = await Enrollment.findById(attempt.enrollment).select("status").lean()
+    // 2026-11-12: examPassed too, for the marked paper. Was: .select("status")
+    const enrollment = await Enrollment.findById(attempt.enrollment).select("status examPassed").lean()
     return {
       success: true,
       result: {
@@ -1105,11 +1234,65 @@ export async function submitExamAttempt(
         passMarkPercent: exam.settings.passMarkPercent,
         attemptsLeft: max === 0 ? null : Math.max(0, max - finished),
         courseCompleted: enrollment?.status === "completed",
+        ...(await attemptReview(attempt, exam, !!enrollment?.examPassed)),
       },
     }
   } catch (error) {
     console.error("Submit exam error:", error)
     return { success: false, error: "Failed to submit — your answers are saved, try again" }
+  }
+}
+
+/**
+ * The learner's latest finished attempt as a result (2026-11-12), for "Review
+ * your last attempt" on the exam page: the marked paper was otherwise gone
+ * once they left the result screen.
+ */
+export async function getLastExamResult(
+  courseId: string,
+  lessonId?: string | null
+): Promise<{ success: true; result: ExamResult } | { success: false; error: string }> {
+  try {
+    const user = await initAction()
+    if (!user) return { success: false, error: "Not authenticated" }
+
+    const exam = await Exam.findOne({ ...examFilter(courseId, lessonId), status: "published" }).select("settings scope")
+    if (!exam) return { success: false, error: "This course has no published exam" }
+    const enrollment = await Enrollment.findOne({
+      user: user.id,
+      course: courseId,
+      status: { $in: ["active", "completed"] },
+    })
+      .select("status examPassed")
+      .lean()
+    if (!enrollment) return { success: false, error: "You're not enrolled in this course" }
+
+    const [last, finished] = await Promise.all([
+      ExamAttempt.findOne({ user: user.id, exam: exam._id, status: { $ne: "in_progress" } })
+        .sort({ createdAt: -1 })
+        .lean(),
+      ExamAttempt.countDocuments({ user: user.id, exam: exam._id, status: { $ne: "in_progress" } }),
+    ])
+    if (!last) return { success: false, error: "You haven't finished an attempt yet" }
+
+    const max = exam.settings.maxAttempts
+    return {
+      success: true,
+      result: {
+        status: last.status,
+        passed: last.status === "passed",
+        scorePercent: last.scorePercent ?? 0,
+        pointsEarned: last.pointsEarned ?? 0,
+        pointsTotal: last.pointsTotal ?? 0,
+        passMarkPercent: exam.settings.passMarkPercent,
+        attemptsLeft: max === 0 ? null : Math.max(0, max - finished),
+        courseCompleted: enrollment.status === "completed",
+        ...(await attemptReview(last, exam, !!enrollment.examPassed)),
+      },
+    }
+  } catch (error) {
+    console.error("Last exam result error:", error)
+    return { success: false, error: "Couldn't load your last attempt. Try again." }
   }
 }
 

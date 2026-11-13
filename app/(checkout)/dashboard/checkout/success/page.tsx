@@ -34,13 +34,15 @@ type NextStep = { icon: IconComponent; title: string; body: string }
 export default async function CheckoutSuccessPage({
   searchParams,
 }: {
-  searchParams: Promise<{ courseId?: string; new?: string }>
+  searchParams: Promise<{ courseId?: string; new?: string; upgraded?: string }>
 }) {
-  const { courseId, new: fresh } = await searchParams
+  const { courseId, new: fresh, upgraded } = await searchParams
   // Set by checkout after a purchase it just made. It only decides whether to
   // mention the confirmation email — a buyer who already owned the program
   // (checkout sends them here too) is not being emailed anything now.
   const justEnrolled = fresh === "1"
+  // Set by checkout after a plan upgrade (2026-11-12). Wording only: the plan named is read from the enrollment.
+  const justUpgraded = upgraded === "1"
   const confirmation = courseId ? await getCheckoutConfirmation(courseId) : null
 
   // No access-granting enrollment (bad link, unpaid reservation, refund) —
@@ -139,19 +141,19 @@ export default async function CheckoutSuccessPage({
             className="rise text-[12px] font-semibold uppercase tracking-[0.14em] text-credit"
             style={{ "--rise-delay": "380ms" } as React.CSSProperties}
           >
-            Enrollment confirmed
+            {justUpgraded ? "Upgrade confirmed" : "Enrollment confirmed"}
           </p>
           <h1
             className="rise mt-3 text-balance font-display text-[30px] font-semibold leading-[1.1] tracking-[-0.02em] text-ws-primary sm:text-[36px]"
             style={{ "--rise-delay": "440ms" } as React.CSSProperties}
           >
-            Welcome to {title}
+            {justUpgraded ? `You're now on ${confirmation.packageName ?? tierLabel ?? "your new plan"}` : `Welcome to ${title}`}
           </h1>
           <p
             className="rise mt-3 text-[15.5px] leading-relaxed text-ws-muted"
             style={{ "--rise-delay": "500ms" } as React.CSSProperties}
           >
-            Your learning journey starts now.
+            {justUpgraded ? `Everything your new plan adds to ${title} is open now.` : "Your learning journey starts now."}
           </p>
         </div>
 

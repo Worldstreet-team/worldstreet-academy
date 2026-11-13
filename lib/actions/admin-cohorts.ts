@@ -16,7 +16,8 @@ import { cohortsForEnrollments } from "@/lib/cohort-calendar"
  * (`YYYY-MM-DDTHH:mm`) and are read with the fixed +01:00 offset here, never
  * in the browser. Rules: numbers 1–999 and unique; a higher number starts
  * strictly later than every lower one; a started cohort keeps its number and
- * can't move its start into the future. Any cohort can be removed (owner,
+ * can't move its start into the future; a new cohort can't start in the past
+ * (2026-11-12). Any cohort can be removed (owner,
  * 2026-11-08), which is how a first cohort that never ran gives up its number.
  * `hidden` is the "Show on the website" switch, off; it can change at any time.
  */
@@ -139,6 +140,11 @@ async function save(id: string | null, input: CohortFormInput): Promise<Result<C
     if (parsed.data.endsAt !== null) {
       endsAt = lagosInstant(parsed.data.endsAt)
       if (!endsAt) return { success: false, error: "Enter the end as a date and time" }
+    }
+    // 2026-11-12 (Owen): a NEW cohort can't start in the past (usually a wrong year,
+    // e.g. 2025 for Cohort 001's 14 Dec). Edits keep the started-cohort rules below.
+    if (id === null && startsAt.getTime() <= Date.now()) {
+      return { success: false, error: "That start date has already passed. Check the year." }
     }
 
     let existing: CohortLean | null = null

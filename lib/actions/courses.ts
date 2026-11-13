@@ -6,6 +6,9 @@ import { Course, ICourse, User } from "@/lib/db/models"
 import { uploadThumbnail, deleteFromCloudinary } from "@/lib/cloudinary"
 import { z } from "zod/v4"
 import { Types } from "mongoose"
+import { getCurrentUser } from "@/lib/auth/actions"
+import { ON_SALE_FILTER } from "@/lib/entitlements"
+import { OPEN_KINDS_FILTER } from "@/lib/marketplace"
 
 // ============================================================================
 // VALIDATION SCHEMAS
@@ -70,6 +73,21 @@ export type CourseListItem = {
 // COURSE ACTIONS
 // ============================================================================
 
+/** A 24-hex id as a string — an object such as {"$ne": null} would reach Mongo as an operator. */
+const isObjectIdString = (value: unknown): value is string => typeof value === "string" && /^[a-f0-9]{24}$/i.test(value)
+
+/**
+ * The actions below take the instructor id from the caller, and server actions
+ * can be called with any arguments. archiveCourse and deleteCourse were retired
+ * for that on 2026-11-11; these stay (nothing imports them) but now refuse
+ * anyone but that signed-in instructor or an admin (2026-11-12).
+ */
+async function callerActsFor(instructorId: unknown): Promise<boolean> {
+  if (!isObjectIdString(instructorId)) return false
+  const me = await getCurrentUser()
+  return Boolean(me && (me.id === instructorId || me.role === "ADMIN"))
+}
+
 /**
  * Create a new course (Instructor only)
  */
@@ -78,6 +96,7 @@ export async function createCourse(
   data: z.infer<typeof CreateCourseSchema>
 ) {
   try {
+    if (!(await callerActsFor(instructorId))) return { success: false, error: "Unauthorized" }
     await connectDB()
 
     // Validate input
@@ -128,6 +147,9 @@ export async function updateCourse(
   data: z.infer<typeof UpdateCourseSchema>
 ) {
   try {
+    if (!isObjectIdString(courseId) || !(await callerActsFor(instructorId))) {
+      return { success: false, error: "Unauthorized" }
+    }
     await connectDB()
 
     const validated = UpdateCourseSchema.parse(data)
@@ -168,6 +190,9 @@ export async function uploadCourseThumbnail(
   file: string // Base64 string
 ) {
   try {
+    if (!isObjectIdString(courseId) || !(await callerActsFor(instructorId))) {
+      return { success: false, error: "Unauthorized" }
+    }
     await connectDB()
 
     const course = await Course.findOne({
@@ -298,6 +323,8 @@ export async function getInstructorCourses(
   }
 ): Promise<{ courses: CourseListItem[]; total: number }> {
   try {
+    // Drafts included, so only that instructor or an admin (2026-11-12).
+    if (!(await callerActsFor(instructorId))) return { courses: [], total: 0 }
     await connectDB()
 
     const { status = "all", page = 1, limit = 10 } = options || {}
@@ -351,6 +378,7 @@ export async function getInstructorCourses(
  */
 export async function getCourseById(courseId: string) {
   try {
+    if (!isObjectIdString(courseId)) return null
     await connectDB()
 
     const course = await Course.findById(courseId)
@@ -358,6 +386,10 @@ export async function getCourseById(courseId: string) {
       .lean()
 
     if (!course) {
+      return null
+    }
+    // Any status, drafts too ("for editing"), so only the owner or an admin (2026-11-12).
+    if (!(await callerActsFor((course.instructor as unknown as { _id?: Types.ObjectId } | null)?._id?.toString()))) {
       return null
     }
 
@@ -425,7 +457,8 @@ export async function getPublishedCourses(options?: {
       limit = 12,
     } = options || {}
 
-    const query: Record<string, unknown> = { status: "published" }
+    // On sale and in an open kind, like every public catalogue read (2026-11-12).
+    const query: Record<string, unknown> = { status: "published", ...ON_SALE_FILTER, ...OPEN_KINDS_FILTER }
 
     if (level && level !== "all") {
       query.level = level.toLowerCase()

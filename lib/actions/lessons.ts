@@ -5,6 +5,7 @@ import connectDB from "@/lib/db"
 import { Course, Lesson, ILesson, type PackageKey } from "@/lib/db/models"
 import { uploadVideo, deleteFromCloudinary } from "@/lib/cloudinary"
 import { z } from "zod/v4"
+import { getCurrentUser } from "@/lib/auth/actions"
 
 // ============================================================================
 // VALIDATION SCHEMAS
@@ -46,6 +47,17 @@ export type LessonListItem = {
 // ============================================================================
 
 /**
+ * 2026-11-12: these actions take the instructor's id as an argument and trusted
+ * it, so anyone who knew a course owner's id could change that course's lessons.
+ * Nothing imports this file today (lesson CRUD is in lib/actions/instructor.ts),
+ * so it was never reachable; this check keeps it safe if it is ever wired up.
+ */
+async function callerIs(instructorId: string): Promise<boolean> {
+  const user = await getCurrentUser()
+  return Boolean(user && typeof instructorId === "string" && user.id === instructorId)
+}
+
+/**
  * Create a new lesson
  */
 export async function createLesson(
@@ -55,6 +67,7 @@ export async function createLesson(
 ) {
   try {
     await connectDB()
+    if (!(await callerIs(instructorId))) return { success: false, error: "Course not found or unauthorized" }
 
     const validated = CreateLessonSchema.parse(data)
 
@@ -113,6 +126,7 @@ export async function updateLesson(
 ) {
   try {
     await connectDB()
+    if (!(await callerIs(instructorId))) return { success: false, error: "Course not found or unauthorized" }
 
     const validated = UpdateLessonSchema.parse(data)
 
@@ -162,6 +176,7 @@ export async function uploadLessonVideo(
 ) {
   try {
     await connectDB()
+    if (!(await callerIs(instructorId))) return { success: false, error: "Course not found or unauthorized" }
 
     // Verify course ownership
     const course = await Course.findOne({
@@ -223,6 +238,7 @@ export async function toggleLessonPublish(
 ) {
   try {
     await connectDB()
+    if (!(await callerIs(instructorId))) return { success: false, error: "Course not found or unauthorized" }
 
     // Verify course ownership
     const course = await Course.findOne({
@@ -265,6 +281,7 @@ export async function reorderLessons(
 ) {
   try {
     await connectDB()
+    if (!(await callerIs(instructorId))) return { success: false, error: "Course not found or unauthorized" }
 
     // Verify course ownership
     const course = await Course.findOne({
@@ -277,10 +294,16 @@ export async function reorderLessons(
     }
 
     // Update each lesson's order
+    // 2026-11-12: scoped to this course — a bare id could move another course's lesson.
+    // await Promise.all(
+    //   lessonIds.map((id, index) =>
+    //     Lesson.findByIdAndUpdate(id, { order: index })
+    //   )
+    // )
     await Promise.all(
-      lessonIds.map((id, index) =>
-        Lesson.findByIdAndUpdate(id, { order: index })
-      )
+      lessonIds
+        .filter((id) => typeof id === "string" && /^[a-f0-9]{24}$/.test(id))
+        .map((id, index) => Lesson.updateOne({ _id: id, course: courseId }, { order: index }))
     )
 
     revalidatePath(`/instructor/courses/${courseId}/lessons`)
@@ -302,6 +325,7 @@ export async function deleteLesson(
 ) {
   try {
     await connectDB()
+    if (!(await callerIs(instructorId))) return { success: false, error: "Course not found or unauthorized" }
 
     // Verify course ownership
     const course = await Course.findOne({

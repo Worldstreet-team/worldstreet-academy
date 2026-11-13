@@ -1,5 +1,5 @@
 "use client"
-import { LoaderCircle, CircleCheckBigIcon, ClockIcon, XIcon } from "@/components/icons"
+import { LoaderCircle, CheckIcon, CircleCheckBigIcon, ClockIcon, XIcon } from "@/components/icons"
 
 import * as React from "react"
 import Link from "next/link"
@@ -24,8 +24,10 @@ import {
   startExamAttempt,
   saveExamAnswers,
   submitExamAttempt,
+  getLastExamResult,
   type RunnerPayload,
   type ExamResult,
+  type ExamReviewQuestion,
 } from "@/lib/actions/exams"
 import { queryKeys } from "@/lib/hooks/queries/keys"
 
@@ -50,12 +52,21 @@ function ExamRunner({
 }) {
   const [answers, setAnswers] = React.useState<Record<string, string[]>>(runner.savedAnswers)
   const [currentQ, setCurrentQ] = React.useState(0)
-  const [timeLeft, setTimeLeft] = React.useState(() => new Date(runner.deadlineAt).getTime() - Date.now())
+  // 2026-11-12: the deadline on this device's clock, from the time the server
+  // said was left — a phone set minutes fast auto-submitted early. (A paper
+  // from before the deploy has no remainingMs: the old reading.)
+  // const [timeLeft, setTimeLeft] = React.useState(() => new Date(runner.deadlineAt).getTime() - Date.now())
+  const [localDeadline] = React.useState(() =>
+    typeof runner.remainingMs === "number" ? Date.now() + runner.remainingMs : new Date(runner.deadlineAt).getTime()
+  )
+  const [timeLeft, setTimeLeft] = React.useState(() => localDeadline - Date.now())
   const [confirmOpen, setConfirmOpen] = React.useState(false)
   const [submitting, setSubmitting] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const dirtyRef = React.useRef(false)
   const answersRef = React.useRef(answers)
+  // The timer's own submits: a few tries (a save racing it can fail one), then the button — never a loop every second.
+  const autoSubmitsRef = React.useRef(0)
   React.useEffect(() => {
     answersRef.current = answers
   }, [answers])
@@ -63,7 +74,15 @@ function ExamRunner({
   const submit = React.useCallback(async () => {
     if (submitting) return
     setSubmitting(true)
-    const res = await submitExamAttempt(runner.attemptId, answersRef.current)
+    // 2026-11-12: a thrown call (offline, or "Failed to find Server Action" after
+    // a deploy) left the button on "Submitting…" for good.
+    // const res = await submitExamAttempt(runner.attemptId, answersRef.current)
+    let res: Awaited<ReturnType<typeof submitExamAttempt>>
+    try {
+      res = await submitExamAttempt(runner.attemptId, answersRef.current)
+    } catch {
+      res = { success: false, error: "We couldn't reach the server. Check your connection, or reload the page — your saved answers are kept." }
+    }
     if (res.success) {
       onFinished(res.result)
     } else {
@@ -75,25 +94,48 @@ function ExamRunner({
   // Countdown + hard deadline auto-submit
   React.useEffect(() => {
     const t = setInterval(() => {
-      const left = new Date(runner.deadlineAt).getTime() - Date.now()
+      // const left = new Date(runner.deadlineAt).getTime() - Date.now()
+      const left = localDeadline - Date.now()
       setTimeLeft(left)
+      // 2026-11-12: a failed submit (it re-armed this effect) retried every second without end.
+      // if (left <= 0) {
+      //   clearInterval(t)
+      //   void submit()
+      // }
       if (left <= 0) {
         clearInterval(t)
-        void submit()
+        if (autoSubmitsRef.current < 3) {
+          autoSubmitsRef.current += 1
+          void submit()
+        }
       }
     }, 1000)
     return () => clearInterval(t)
-  }, [runner.deadlineAt, submit])
+  }, [localDeadline, submit])
 
   // Autosave every 6s while dirty
   React.useEffect(() => {
     const t = setInterval(() => {
       if (!dirtyRef.current) return
       dirtyRef.current = false
-      void saveExamAnswers(runner.attemptId, answersRef.current)
+      // 2026-11-12: a failed save is retried on the next tick; a graded paper
+      // (the deadline passed on the server) shows its result.
+      // void saveExamAnswers(runner.attemptId, answersRef.current)
+      saveExamAnswers(runner.attemptId, answersRef.current)
+        .then((res) => {
+          if (res.expired && autoSubmitsRef.current < 3) {
+            autoSubmitsRef.current += 1
+            void submit()
+          } else if (!res.success && !res.expired) {
+            dirtyRef.current = true
+          }
+        })
+        .catch(() => {
+          dirtyRef.current = true
+        })
     }, 6000)
     return () => clearInterval(t)
-  }, [runner.attemptId])
+  }, [runner.attemptId, submit])
 
   const setAnswer = (qid: string, type: "single" | "multi", optionId: string) => {
     setAnswers((prev) => {
@@ -254,6 +296,107 @@ function ExamRunner({
   )
 }
 
+/* ── Marked paper (2026-11-12: the result screen showed only the score) ── */
+
+/** How one option reads on the marked paper. Colour is never the only signal: the labels say it too. */
+function optionTone(q: ExamReviewQuestion, optionId: string): "right" | "wrong" | "chosen" | "plain" {
+  const chosen = q.chosen.includes(optionId)
+  if (q.correctOptionIds) {
+    if (q.correctOptionIds.includes(optionId)) return "right"
+    return chosen ? "wrong" : "plain"
+  }
+  if (!chosen) return "plain"
+  // Answers not revealed: a right question's picks are all right, and a wrong
+  // single-choice pick is wrong; which picks of a wrong multi-choice question
+  // were off would give the key away.
+  if (q.correct) return "right"
+  return q.type === "single" ? "wrong" : "chosen"
+}
+
+const OPTION_TONE_CLASS = {
+  right: "border-ws-success/50 bg-ws-success/5",
+  wrong: "border-destructive/40 bg-destructive/5",
+  chosen: "border-primary bg-primary/5",
+  plain: "border-ws-hairline",
+} as const
+
+function ExamReview({ result }: { result: ExamResult }) {
+  if (!result.review || result.review.length === 0) return null
+  const rightCount = result.review.filter((q) => q.correct).length
+
+  return (
+    <section aria-labelledby="exam-review-heading" className="space-y-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="exam-review-heading" className="text-sm font-semibold">
+          Your answers
+        </h2>
+        <p className="text-xs tabular-nums text-muted-foreground">
+          {rightCount} of {result.review.length} right
+        </p>
+      </div>
+      {!result.answersRevealed && (
+        <p className="rounded-lg border border-ws-hairline bg-ws-surface px-3 py-2 text-xs text-muted-foreground">
+          Each question shows whether your answer was right. The correct answers appear once you pass.
+        </p>
+      )}
+
+      {result.review.map((q, qi) => (
+        <Card key={q.id}>
+          <CardContent className="space-y-3 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-sm font-medium leading-relaxed">
+                <span className="mr-1.5 text-muted-foreground">{qi + 1}.</span>
+                {q.prompt}
+              </p>
+              <span
+                className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                  q.correct ? "bg-ws-success/10 text-ws-success" : "bg-destructive/10 text-destructive"
+                }`}
+              >
+                <RenderIcon icon={q.correct ? CheckIcon : XIcon} size={12} />
+                {q.correct
+                  ? `Right · ${q.points} pt${q.points === 1 ? "" : "s"}`
+                  : q.chosen.length === 0
+                    ? "Not answered"
+                    : "Wrong"}
+              </span>
+            </div>
+            <ul className="space-y-1.5">
+              {q.options.map((opt) => {
+                const chosen = q.chosen.includes(opt.id)
+                const tone = optionTone(q, opt.id)
+                const isKey = q.correctOptionIds?.includes(opt.id) ?? false
+                return (
+                  <li
+                    key={opt.id}
+                    className={`flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-xs ${OPTION_TONE_CLASS[tone]}`}
+                  >
+                    <span
+                      aria-hidden
+                      className={`flex h-4 w-4 shrink-0 items-center justify-center border ${
+                        q.type === "single" ? "rounded-full" : "rounded"
+                      } ${chosen ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/40"}`}
+                    >
+                      {chosen && <span className="h-1.5 w-1.5 rounded-full bg-current" />}
+                    </span>
+                    <span className="min-w-0 flex-1">{opt.text}</span>
+                    {(chosen || isKey) && (
+                      <span className="flex shrink-0 flex-col items-end gap-0.5 text-right text-[10px] leading-tight">
+                        {chosen && <span className="text-muted-foreground">Your answer</span>}
+                        {isKey && <span className="font-semibold text-ws-success">Correct answer</span>}
+                      </span>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          </CardContent>
+        </Card>
+      ))}
+    </section>
+  )
+}
+
 /* ── Page ── */
 
 export default function CourseExamPage() {
@@ -299,6 +442,22 @@ function CourseExamPageInner() {
         setStartError(res.error)
       }
     },
+    // 2026-11-12: a thrown call (offline, a tab left open across a deploy) said nothing.
+    onError: () => setStartError("We couldn't reach the server. Check your connection, or reload the page."),
+  })
+
+  // 2026-11-12: reopen the latest finished attempt, marked (the result screen was the only place it showed).
+  const lastReview = useMutation({
+    mutationFn: () => getLastExamResult(courseId, lessonId),
+    onSuccess: (res) => {
+      if (res.success) {
+        setStartError(null)
+        setResult(res.result)
+      } else {
+        setStartError(res.error)
+      }
+    },
+    onError: () => setStartError("We couldn't reach the server. Check your connection, or reload the page."),
   })
 
   const finish = (r: ExamResult) => {
@@ -316,8 +475,10 @@ function CourseExamPageInner() {
           <ExamRunner runner={runner} onFinished={finish} />
         ) : result ? (
           /* ── Result screen ── */
-          <div className="max-w-md mx-auto pt-8">
-            <Card>
+          // 2026-11-12: wider, for the marked paper under the score card. Was:
+          // <div className="max-w-md mx-auto pt-8">
+          <div className="max-w-2xl mx-auto pt-8 space-y-6">
+            <Card className="max-w-md mx-auto w-full">
               <CardContent className="p-6 text-center space-y-4">
                 <div
                   className={`mx-auto h-14 w-14 rounded-full flex items-center justify-center ${
@@ -393,6 +554,7 @@ function CourseExamPageInner() {
                 )}
               </CardContent>
             </Card>
+            <ExamReview result={result} />
           </div>
         ) : isLoading ? (
           <div className="max-w-md mx-auto pt-8 space-y-3">
@@ -452,6 +614,23 @@ function CourseExamPageInner() {
                   </p>
                 )}
 
+                {status.reviewAvailable && !status.activeAttemptId && !status.packageLock && (
+                  <div className="text-center">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={lastReview.isPending}
+                      onClick={() => lastReview.mutate()}
+                    >
+                      {lastReview.isPending
+                        ? "Loading…"
+                        : `Review your last attempt${
+                            status.lastResult?.scorePercent != null ? ` (${status.lastResult.scorePercent}%)` : ""
+                          }`}
+                    </Button>
+                  </div>
+                )}
+
                 {status.packageLock ? (
                   <PackageLockNotice
                     title="Not included in your plan"
@@ -469,7 +648,15 @@ function CourseExamPageInner() {
                 ) : (
                   <div className="space-y-2">
                     {startError && <p className="text-xs text-destructive text-center">{startError}</p>}
+                    {/* 2026-11-12: a learner back on a final they had passed was offered only
+                        "Take again" — the certificate it opened was nowhere on the page. */}
+                    {!lessonId && status.examPassed && !status.activeAttemptId && (
+                      <Button className="w-full" render={<Link href={`/dashboard/courses/${courseId}/certificate`} />}>
+                        View certificate
+                      </Button>
+                    )}
                     <Button
+                      variant={!lessonId && status.examPassed && !status.activeAttemptId ? "outline" : "default"}
                       className="w-full"
                       disabled={
                         start.isPending ||

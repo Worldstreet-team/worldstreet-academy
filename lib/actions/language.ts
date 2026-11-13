@@ -14,6 +14,10 @@ export async function updatePreferredLanguage(
     await connectDB()
     const currentUser = await getCurrentUser()
     if (!currentUser) return { success: false, error: "Not authenticated" }
+    // 2026-11-12: a language code ("en", "zh-CN", "mni-Mtei"), never any string or object the browser sends.
+    if (typeof languageCode !== "string" || !/^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})?$/.test(languageCode)) {
+      return { success: false, error: "Choose a language from the list" }
+    }
 
     await User.findByIdAndUpdate(currentUser.id, {
       preferredLanguage: languageCode,

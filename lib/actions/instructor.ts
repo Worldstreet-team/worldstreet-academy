@@ -507,14 +507,17 @@ export async function fetchCourseForEdit(courseId: string) {
   try {
     await connectDB()
     const instructor = await getAuthenticatedInstructor()
-    
+    // An object id ({"$ne": null}) would match one own course here and then every
+    // course's lessons below.
+    if (typeof courseId !== "string" || !Types.ObjectId.isValid(courseId)) return null
+
     const course = await Course.findOne({
       _id: courseId,
       ...courseScope(instructor),
     }).lean()
-    
+
     if (!course) return null
-    
+
     const lessons = await Lesson.find({ course: courseId })
       .sort({ order: 1 })
       .lean()
@@ -527,11 +530,25 @@ export async function fetchCourseForEdit(courseId: string) {
       course.status === "published" &&
       course.instructor.toString() === instructor._id.toString()
     const code = ownLive ? await sellerCode(instructor._id.toString()) : null
+    // 2026-11-12: the editor's student preview credits the course's owner, not
+    // whoever opened it (an admin editing a program saw their own name there).
+    const ownerRow =
+      course.instructor.toString() === instructor._id.toString()
+        ? instructor
+        : await User.findById(course.instructor).select("role firstName lastName avatarUrl").lean()
 
     return {
       course: {
         id: course._id.toString(),
         kind,
+        owner: ownerRow
+          ? {
+              role: ownerRow.role ?? null,
+              firstName: ownerRow.firstName ?? "",
+              lastName: ownerRow.lastName ?? "",
+              avatarUrl: ownerRow.avatarUrl ?? null,
+            }
+          : null,
         communityUrl: course.communityUrl ?? null,
         format: courseFormatOf(course),
         productFile: course.productFile
@@ -1579,6 +1596,8 @@ export async function setLessonMinPackage(
 
     const course = await lessonCourse(instructor, courseId)
     if (!course) return { success: false, error: "Course not found" }
+    // A browser-sent id: an object would reach the query below as an operator.
+    if (typeof lessonId !== "string" || !/^[a-f0-9]{24}$/.test(lessonId)) return { success: false, error: "Lesson not found" }
 
     // Only a tier the course sells may gate a lesson; null opens it to every enrolment.
     if (minPackageKey !== null && !(isPackageKey(minPackageKey) && soldTierKeys(course.packages).has(minPackageKey))) {
@@ -1598,6 +1617,52 @@ export async function setLessonMinPackage(
   } catch (error) {
     console.error("Set lesson package error:", error)
     return { success: false, error: "Failed to update lesson" }
+  }
+}
+
+// ---- Move Lesson (2026-11-12) ----
+/**
+ * Moves a lesson one place up or down: the lessons page's arrows (its grip icon
+ * never dragged, so lessons couldn't be reordered at all). Same scope as the
+ * other lesson edits (lessonCourse: the owner, an admin or the program's
+ * assigned tutor). The course's orders are rewritten 0…n-1, so duplicate or
+ * gapped orders settle on the first move.
+ */
+export async function moveLesson(
+  courseId: string,
+  lessonId: string,
+  direction: "up" | "down"
+): Promise<{ success: boolean; error: string | null }> {
+  try {
+    await connectDB()
+    const instructor = await getAuthenticatedInstructor()
+
+    const course = await lessonCourse(instructor, courseId)
+    if (!course) return { success: false, error: "Course not found" }
+    // A browser-sent id: an object would reach the query below as an operator.
+    if (typeof lessonId !== "string" || !/^[a-f0-9]{24}$/.test(lessonId)) return { success: false, error: "Lesson not found" }
+    if (direction !== "up" && direction !== "down") return { success: false, error: "Choose up or down" }
+
+    // The lessons page lists by `order`; ties keep insertion order, hence _id second.
+    const lessons = await Lesson.find({ course: courseId }).sort({ order: 1, _id: 1 }).select("_id").lean()
+    const ids = lessons.map((l) => l._id)
+    const from = ids.findIndex((id) => id.toString() === lessonId)
+    if (from === -1) return { success: false, error: "Lesson not found" }
+    const to = direction === "up" ? from - 1 : from + 1
+    // Already first or last: nothing to move.
+    if (to < 0 || to >= ids.length) return { success: true, error: null }
+    ;[ids[from], ids[to]] = [ids[to], ids[from]]
+
+    await Lesson.bulkWrite(
+      ids.map((id, order) => ({ updateOne: { filter: { _id: id, course: course._id }, update: { $set: { order } } } }))
+    )
+    await reviewLiveLessonEdit(courseId, instructor)
+
+    revalidateLessons(courseId)
+    return { success: true, error: null }
+  } catch (error) {
+    console.error("Move lesson error:", error)
+    return { success: false, error: "Couldn't move the lesson. Try again." }
   }
 }
 
